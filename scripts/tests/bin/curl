@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Offline curl stub: the quay tag listing comes from $STUB_DIR/quay.json.
+[ "${STUB_CURL_FAIL:-0}" = 1 ] && exit 22
+for a in "$@"; do case "$a" in *quay.io/api/*) cat "$STUB_DIR/quay.json"; exit 0;; esac; done
+exit 22

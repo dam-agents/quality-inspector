@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Offline gh stub: answers from files in $STUB_DIR; STUB_GH_FAIL=1 fails every call.
+[ "${STUB_GH_FAIL:-0}" = 1 ] && { echo "stub: failure" >&2; exit 1; }
+args="$*"
+case "$args" in
+  *" user"*|"api user"*) echo "qa-bot"; exit 0 ;;
+  *"/issues"*) cat "$STUB_DIR/issues.json"; exit 0 ;;
+esac
+echo "stub gh: unhandled: $args" >&2; exit 1

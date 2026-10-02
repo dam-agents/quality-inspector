@@ -1,0 +1,30 @@
+# This repository (the quality-inspector definition) is checked out at the agent's HOME root
+# (/home/agent), which also contains secrets and runtime state (.ssh, .claude, .config,
+# work/, the nested k3s state under .local/, ...). Ignore EVERYTHING at the top level,
+# then re-include only the definition files this repo tracks.
+#
+# NOTHING under work/ is tracked — it is all runtime state, seeded on a fresh volume by
+# ONBOARDING.md and scripts/env.sh / scripts/suite.sh, never from this repo.
+
+/*
+
+!/.gitignore
+!/CLAUDE.md
+!/AGENTS.md
+!/README.md
+!/ONBOARDING.md
+!/kit.yaml
+!/VERSION
+!/CHANGELOG.md
+!/LICENSE
+!/docs/
+!/scripts/
+!/.github/
+
+# The suite skeleton is copied into work/suite; its installs never come back here.
+/scripts/suite-skeleton/node_modules/
+/scripts/suite-skeleton/.e2e/
+
+# Never track these even if a future allowlist entry would pull them in.
+.DS_Store
+.claude/settings.local.json

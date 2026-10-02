@@ -1,0 +1,6 @@
+{
+  "name": "quality-inspector-suite",
+  "private": true,
+  "type": "module",
+  "description": "Black-box e2e suite generated and maintained by the quality-inspector agent. Lives in work/suite/, never in the definition."
+}

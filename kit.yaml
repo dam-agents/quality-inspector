@@ -1,0 +1,73 @@
+# kit.yaml — the platform's Starter Kit for quality-inspector.
+#
+# This repository IS the kit: the platform reads this file out of git, creates the
+# agent from it, seeds this definition into $HOME, and opens the first session on
+# ONBOARDING.md. Keep the schedules here in step with CLAUDE.md's run-types table and
+# ONBOARDING Step 5 — same names, same task text.
+
+schemaVersion: v1
+id: quality-inspector
+name: Quality Inspector
+description: >-
+  Black-box QA for the platform itself. For every GitHub issue carrying the QA label it
+  freezes acceptance criteria from the issue's "Done when" section, installs the newest
+  dev chart into a nested k3s cluster inside its own VM, drives that nested platform
+  through the built-in Chromium with the e2e framework (Playwright plus an LLM fallback
+  with a replay cache), checks the result red-green against the last release, and
+  publishes a per-criterion verdict with evidence to the artifact library and,
+  optionally, as an issue comment. It never reads the platform's source code.
+category: software
+tagline: Tests issues against a nested platform through the UI, without reading the code.
+icon: flask
+
+seed:
+  self: true
+  into: home
+
+connections:
+  - accepts: [github]
+    required: true
+    note: >-
+      Reads issues of the target repository and, when issue comments are enabled,
+      posts verdict comments and removes the retest label. Egress rules must confine
+      it to the issues endpoints (README → Black-box boundary).
+
+schedules:
+  - name: quality-inspector-issues-1h
+    cron: "7 * * * *"
+    sessionMode: fresh
+    precheck: 'bash "$HOME/scripts/precheck.sh" issues'
+    task: >-
+      QA issues run. Run `bash "$HOME/scripts/preflight.sh" issues` first unless its
+      worklist is already appended below. If its JSON says nothing_to_do, report its
+      logs in one line and end the run. Otherwise follow CLAUDE.md → "Issues run":
+      read docs/issue-qa.md and process every issues_due and reports_due entry.
+  - name: quality-inspector-regression-nightly
+    cron: "0 3 * * *"
+    sessionMode: fresh
+    enabled: false
+    precheck: 'bash "$HOME/scripts/precheck.sh" regression'
+    task: >-
+      QA regression run. Run `bash "$HOME/scripts/preflight.sh" regression` first
+      unless its worklist is already appended below. If its JSON says nothing_to_do,
+      report its logs in one line and end the run. Otherwise follow CLAUDE.md →
+      "Regression run": read docs/regression.md and replay the regression tier
+      against the worklist's candidate.
+  - name: quality-inspector-audit-weekly
+    cron: "0 7 * * 5"
+    sessionMode: fresh
+    enabled: false
+    task: >-
+      Weekly self-audit. Run `bash "$HOME/scripts/preflight.sh" audit`, then follow
+      CLAUDE.md → "Audit run": read docs/audit.md and report.
+
+resources:
+  cpu: "8"
+  memory: 16Gi
+  storage: 80Gi
+  note: >-
+    Runs a nested k3s with Istio ambient, cert-manager and the full platform chart
+    (Keycloak, Postgres, Redis) plus Chromium; 80Gi holds two platform image sets
+    (candidate and baseline) and the e2e evidence.
+
+harnesses: [claude-code]
