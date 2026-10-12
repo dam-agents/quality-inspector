@@ -40,7 +40,7 @@ The platform's egress rules cannot be declared in the kit, so the operator sets 
 | --- | --- | --- |
 | `api.github.com` | `GET` the three issues paths above; `POST …/issues/*/comments`; `DELETE …/issues/*/labels/*` | every other path under `/repos/<T>/` |
 | `raw.githubusercontent.com`, `codeload.github.com` | — | everything |
-| `github.com` | release downloads of cert-manager and gateway-api | everything under `/<T owner>/` |
+| `github.com` | release downloads of cert-manager and gateway-api; this agent's own definition repository | everything under `/<T>` (the target repository only — the definition may share its owner) |
 | `quay.io`, `*.quay.io`, `get.helm.sh`, `istio-release.storage.googleapis.com`, `objects.githubusercontent.com`, `release-assets.githubusercontent.com`, `registry.npmjs.org` | `GET` | — |
 | `api.anthropic.com` | model calls for agent steps | — |
 | `cdn.playwright.dev`, `playwright.download.prss.microsoft.com` | `GET`, only when `e2e`'s Playwright differs from the image's | — |

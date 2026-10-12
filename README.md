@@ -71,7 +71,7 @@ dam network create "$AGENT" --host api.github.com --method DELETE --path "/repos
 dam network create "$AGENT" --host api.github.com --path "/repos/$T/*" --verdict deny --yes
 dam network create "$AGENT" --host raw.githubusercontent.com --verdict deny --yes
 dam network create "$AGENT" --host codeload.github.com --verdict deny --yes
-dam network create "$AGENT" --host github.com --path "/${T%%/*}/*" --verdict deny --yes
+dam network create "$AGENT" --host github.com --path "/$T*" --verdict deny --yes
 ```
 
 Allow, method `GET`: `quay.io`, `*.quay.io`, `get.helm.sh`,
