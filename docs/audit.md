@@ -24,6 +24,11 @@ when `audit_report: disabled` (still append the log line).
      `verified` without a baseline failure; every tested AC has a candidate video and its
      `AC-<k>` screenshot; AC blocks contain checks only; no internal identifiers or
      credentials in the text, the screenshots or the first and last frames you look at.
+   - Spec quality: this week's `not-testable` verdicts and `testable: no` ACs by reason,
+     issues without "Done when", and how many suggested rewrites authors adopted (an
+     issue that became due again by `ac_changed` after a `spec-feedback` file).
+   - Flakiness: rows added to `work/FLAKY.md` this week, tests `quarantined`, and whether
+     one cause dominates (the same page, the nested platform right after `up`).
    - Triage health: heals this week from `work/HEALS.md` (each one's basis is a UI-map
      change or an issue — sample one), tests at three heals a month, `needs-review` items
      the operator has not answered, `retired` tests.

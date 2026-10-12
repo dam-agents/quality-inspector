@@ -6,7 +6,7 @@
 #   - NO external writes at all (list/GET calls only),
 #   - NO git commit/push,
 #   - local writes only: one line per call in work/<RUNTYPE>.log, the audit-mode
-#     log retention sweep.
+#     log retention sweep, and the daily media retention sweep (retention_sweep).
 #
 #   preflight.sh <mode>   -> one JSON object on stdout; everything else to stderr.
 #   .nothing_to_do == true  -> the agent ends the run immediately.
@@ -64,6 +64,24 @@ fail_out() {  # nothing-to-do JSON with an error; the agent just logs it
   exit 0
 }
 
+# Media retention, at most once a UTC day: raw e2e runs past the window go; a report keeps
+# its text but loses media/ once past the window AND delivered (artifact.id present, or
+# artifact reports disabled). Undelivered evidence is never deleted.
+MEDIA_DAYS="$(cfg media_retention_days)"; case "$MEDIA_DAYS" in (''|*[!0-9]*) MEDIA_DAYS=14;; esac
+retention_sweep() {
+  local stamp="$WORK/.cache/retention-$(date -u +%Y-%m-%d)" n=0 d art
+  [ -f "$stamp" ] && return 0
+  mkdir -p "$WORK/.cache" && rm -f "$WORK"/.cache/retention-* && : > "$stamp"
+  art="$(cfg artifact_reports)"
+  while IFS= read -r d; do rm -rf "$d" && n=$((n+1)); done < <(find "$WORK/suite/.e2e/runs" -mindepth 1 -maxdepth 1 -type d -mtime +"$MEDIA_DAYS" 2>/dev/null)
+  while IFS= read -r d; do
+    local owner; owner="$(dirname "$(dirname "$d")")"
+    if [ -f "$owner/artifact.id" ] || [ "$art" = disabled ]; then rm -rf "$d" && n=$((n+1)); fi
+  done < <(find "$WORK/issues" "$WORK/regression" -mindepth 3 -maxdepth 3 -type d -name media -mtime +"$MEDIA_DAYS" 2>/dev/null)
+  [ "$n" -gt 0 ] && log "retention: removed $n media directories older than ${MEDIA_DAYS}d"
+  return 0
+}
+
 # The nested environment serves one run at a time (scripts/env.sh lock). A live
 # holder makes this occurrence idle; a lock past the TTL is the holder's to take over.
 env_busy_out() {
@@ -89,6 +107,7 @@ last_event_epoch() {
 # ============================================================ ISSUES MODE ====
 mode_issues() {
   [ -n "$TARGET" ] || fail_out "target_repo is not configured (work/CONFIG.md or QI_TARGET_REPO)"
+  retention_sweep
   env_busy_out ISSUES
 
   local versions candidate baseline
@@ -114,6 +133,7 @@ mode_issues() {
     body="$(printf '%s' "$item" | jq -r '.body // ""')"
     retest="$(printf '%s' "$item" | jq -r --arg l "$RETEST_LABEL" '[.labels[]?.name] | index($l) != null')"
     hash="$(text_hash "$(issue_spec_text "$title" "$body")")"
+    local spec; spec="$(spec_lint "$title" "$body")"
     has_done_when "$body" && dw=true
     row="$(qa_row "$num")"
     if [ -z "$row" ]; then
@@ -142,8 +162,8 @@ mode_issues() {
     if [ "$n" -ge "$MAX_ISSUES" ]; then deferred=$((deferred+1)); log "issue #$num: $kind — deferred (max_issues_per_run)"; continue; fi
     n=$((n+1))
     due="$(printf '%s' "$due" | jq -c --argjson i "$num" --arg h "$hash" --arg k "$kind" \
-          --argjson t "$takeover" --argjson d "$dw" --argjson r "$retest" \
-          '. + [{issue:$i, ac_hash:$h, kind:$k, takeover:$t, has_done_when:$d, retest_label_present:$r}]')"
+          --argjson t "$takeover" --argjson d "$dw" --argjson r "$retest" --argjson s "$spec" \
+          '. + [{issue:$i, ac_hash:$h, kind:$k, takeover:$t, has_done_when:$d, retest_label_present:$r, spec:$s}]')"
     log "issue #$num: $kind (ac=$hash) — due"
   done < <(printf '%s' "$listing" | jq -c 'map(select(.pull_request == null)) | sort_by(.number) | .[]')
 

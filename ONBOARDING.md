@@ -91,6 +91,12 @@ EOF
 | utc | test | ac | build | old_hash | new_hash | basis |
 | --- | --- | --- | --- | --- | --- | --- |
 EOF
+[ -f FLAKY.md ] || cat > FLAKY.md <<'EOF'
+# Flaky criteria — append-only, one row per flaky confirmation (docs/triage.md → Flaky tests and quarantine)
+
+| utc | test | ac | build | runs | passes |
+| --- | --- | --- | --- | --- | --- |
+EOF
 [ -f LESSONS.md ] || cat > LESSONS.md <<'EOF'
 # Operational lessons — verified environment facts only, each with its evidence.
 EOF
@@ -132,9 +138,12 @@ with an existing file → keep its values, ask only for missing keys. Ask, valid
 2. **`issue_comments`** — ask, default `disabled`. State the consequence: comments are
    posted publicly on the target's issues as the connection's account, and the
    connection then needs write access to issues. Tick item 4.
-3. **`mock_image`** — ask, default empty; explain that without it ACs needing a working
+3. **`spec_feedback`** — ask, default `disabled`: when an issue has nothing testable, the
+   agent comments a suggested observable "Done when" on it (public, as the connection's
+   account).
+4. **`mock_image`** — ask, default empty; explain that without it ACs needing a working
    nested agent end `blocked`. Tick item 5.
-4. Everything else — defaults; show them and change only what the operator asks for.
+5. Everything else — defaults; show them and change only what the operator asks for.
 
 Write the file in exactly this shape:
 
@@ -152,6 +161,8 @@ Write the file in exactly this shape:
 - issue_comments: disabled
 - artifact_reports: enabled
 - include_comments: disabled
+- spec_feedback: disabled
+- media_retention_days: 14
 - max_issues_per_run: 1
 - lock_ttl_min: 180
 - e2e_version: 0.17.0

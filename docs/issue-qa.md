@@ -56,7 +56,10 @@ versions. `T` below is the configured `target_repo`; never print it outside the 
    - `baseline` is `null` (`baseline_channel: none`) → skip the baseline run; no AC can
      then be `verified`, only `inconclusive` or `failed`.
    Refresh the row after each install.
-7. **Judge each AC** from the two summaries, the failing steps and the screenshots, per
+7. **Confirm every failure** before judging it: re-run each failing AC on the build where
+   it failed with `--strict --repeat-each 3 --no-cache` ([triage.md](triage.md) → Order of
+   work, step 1). A `flaky` AC gets the verdict `flaky`, never `failed` or `verified`.
+   **Judge each AC** from the two summaries, the failing steps and the screenshots, per
    [reporting.md](reporting.md) → Verdicts: a step the test could not perform is
    `blocked`, an assertion that ran and was false is `failed`. Write
    `verdicts-<ac_hash>-<candidate>.json` ([reporting.md](reporting.md) → Verdicts file).

@@ -14,11 +14,12 @@ and the failing traces:
 | passed | not run (`baseline_channel: none`) | `inconclusive` |
 | failed — assertion ran and was false | any | `failed` |
 | could not reach the AC block (step failed, timeout, missing dependency) | any | `blocked` |
+| mixed passes and failures on the confirmation re-run, either side | any | `flaky` |
 | — (criterion `testable: no`) | — | `not-testable` |
 
 Issue verdict: `failed` if any AC failed; else `verified` if every testable AC is
-verified; else `partial` if at least one is verified; else `inconclusive` / `blocked` by
-majority; `not-testable` when no AC was testable.
+verified; else `partial` if at least one is verified; else `inconclusive` / `blocked`
+(a `flaky` AC counts as blocked) by majority; `not-testable` when no AC was testable.
 
 A `failed` verdict claims a product defect. Before you write it, read the candidate
 trace and confirm the assertion evaluated a screen that got there the way a user would.
@@ -82,8 +83,13 @@ the same run.
      `<!-- <marker_prefix>-data {"issue":42,"ac":"…","build":"…","verdicts":{"AC-1":"verified"}} -->`.
    - When the worklist entry had `retest_label_present`, remove that label after a
      successful post (`DELETE …/issues/<n>/labels/<label>`).
-3. Both disabled → the report stays in `work/` and is summarized in the chat UI; still
-   set `reported`.
+3. **Spec feedback comment** (`spec_feedback: enabled`, independent of
+   `issue_comments`): when `spec-feedback-<ac_hash>.md` exists, post it once per
+   `ac_hash` with the marker `<!-- <marker_prefix>-spec issue=<n> ac=<ac_hash> -->`,
+   checked the same way right before posting. Tone: a short, specific suggestion to the
+   author; no verdict language.
+4. Both artifact and comments disabled → the report stays in `work/` and is summarized in
+   the chat UI; still set `reported`.
 
 Every delivery outcome is one event (`report_delivered` / `report_failed`, with
 `issue=<n>` and the surface) — [logging.md](logging.md).

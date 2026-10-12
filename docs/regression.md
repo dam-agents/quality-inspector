@@ -13,6 +13,8 @@
   `assert_hash` is the `scripts/check-asserts.sh --hash` value of its AC blocks; it changes
   only by a heal ([triage.md](triage.md), logged in `work/HEALS.md`) or by the operator.
 - `retired` — superseded by a completed issue ([triage.md](triage.md)); kept, not replayed.
+- `quarantined` — flaky on two builds within 14 days ([triage.md](triage.md) → Flaky tests
+  and quarantine); kept, not replayed until the operator re-promotes it.
 
 ## The regression run
 
@@ -40,10 +42,11 @@ run — say so, never treat it as clean).
    of the page). Add `context` `{previous, window, issues[{number,title}], ui_diff}` (the
    diff's `--md` text). Render it with `scripts/render-report.mjs` into
    `work/regression/<candidate>/report/` and publish as in
-   [reporting.md](reporting.md) → Delivery (artifact only; regression runs never comment).
+   [reporting.md](reporting.md) → Delivery (artifact only, its reference in
+   `work/regression/<candidate>/artifact.id`; regression runs never comment).
    The run's top verdict is `regression` if any criterion is, else `needs-review` if any
    is, else `healed`, `relearned` or `unchanged`.
-8. Append `<ISO> ran candidate=<c> unchanged=<n> relearned=<n> healed=<n> needs_review=<n> superseded=<n> regression=<n> blocked=<n> drift=<n>`
+8. Append `<ISO> ran candidate=<c> unchanged=<n> relearned=<n> healed=<n> needs_review=<n> superseded=<n> flaky=<n> regression=<n> blocked=<n> drift=<n>`
    to `work/REGRESSION.log` — the pre-flight keys "already tested" and
    `previous_candidate` on `ran candidate=`.
 9. `env.sh unlock regression`. Summary in the chat UI: regressions first, each with its

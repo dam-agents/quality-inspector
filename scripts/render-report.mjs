@@ -109,6 +109,7 @@ const VERDICT = {
   inconclusive: ['Inconclusive', 'warn'], blocked: ['Blocked', 'muted'], 'not-testable': ['Not testable', 'muted'],
   unchanged: ['Unchanged', 'ok'], relearned: ['UI changed · steps re-learned', 'ok'], healed: ['UI changed · check repaired', 'warn'],
   superseded: ['Superseded by a change', 'muted'], regression: ['Regression', 'bad'], 'needs-review': ['Needs review', 'warn'],
+  flaky: ['Flaky', 'warn'],
 };
 const badge = (x) => { const [t, c] = VERDICT[x] ?? [x, 'muted']; return `<span class="badge ${c}">${esc(t)}</span>`; };
 const stateBadge = (s) => {

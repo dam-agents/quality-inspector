@@ -22,11 +22,17 @@ the step list and screenshots in `report.json`.
 | `needs-review` | passed with `judged` checks, but a healing rule fails | leave the file; the operator decides |
 | `superseded` | the criterion is false, and a completed issue in the window changes exactly this behaviour on purpose | retire the test (below) |
 | `regression` | the criterion is false (strict re-run fails and the judge agrees), and nothing in the context explains it | report it with both screens |
+| `flaky` | the confirmation re-run mixes passes and failures | log it in `work/FLAKY.md`; quarantine on the second flaky night (below) |
 | `blocked` | the test could not reach its AC block for a reason outside the product (environment, model, setup) | fix or report as environment |
 
 ## Order of work per failing or judged test
 
-1. **Re-run once without the cache** (`--no-cache`): a stale recording is not a finding.
+1. **Confirm by repetition**: `suite.sh run confirm-<candidate> --strict --tag issue-<n>
+   --tag ac-<k> --tag-mode all --repeat-each 3 --no-cache`, and read `by_test[].stability`.
+   `flaky` ends the triage of this criterion as `flaky`; only `stable-fail` can become a
+   `regression` or `superseded`, and only `stable-pass` (non-strict for a judged check)
+   can become `relearned` or `healed`. A stale recording is not a finding either — the
+   re-run is uncached.
 2. **Look at the evidence**: the AC screenshot, the failing step, the previous build's
    screenshot of the same page (`work/inventory/<previous>/shots/`).
 3. **Check the context** ([change-awareness.md](change-awareness.md)): the test's
@@ -59,6 +65,22 @@ Then update the file, set its `work/SUITE.md` `assert_hash` from
 
 A heal never touches a criteria file. Three heals of the same test inside a month →
 `needs-review` from then on: the test is fighting the product.
+
+## Flaky tests and quarantine
+
+Append one row per flaky criterion to `work/FLAKY.md`:
+
+```
+| utc | test | ac | build | runs | passes |
+| 2026-10-13T03:41:07Z | tests/issue-42.e2e.ts | AC-2 | 0.0.0-main.5951 | 3 | 1 |
+```
+
+A test with flaky rows from two different builds inside 14 days moves to tier
+`quarantined` in `work/SUITE.md`: it no longer replays, and the report names it under
+"needs review". A quarantined test comes back only by the operator ("promote #N") after
+its cause is fixed — usually a wait for state the test assumed, or nested-platform
+instability recorded in `work/LESSONS.md`. A flaky result is never a regression and
+never a pass.
 
 ## Retiring a superseded test
 

@@ -55,7 +55,7 @@ SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly qual
 KNOWN_KEYS="target_repo display_name qa_label retest_label marker_prefix chart_ref candidate_channel
 baseline_channel issue_comments artifact_reports include_comments max_issues_per_run lock_ttl_min
 e2e_version e2e_web_version e2e_model mock_image istio_version cert_manager_version gateway_api_version helm_version
-audit_report log_level"
+audit_report log_level media_retention_days spec_feedback"
 
 if [ "$STRUCTURE" = 1 ]; then
   # ------------------------------------------------------------- definition
@@ -100,10 +100,12 @@ if [ "$STRUCTURE" = 1 ]; then
   [ -z "$bad" ] && ok qa_rows "row format" || fail qa_rows "malformed rows: $bad" "fix the rows to the format in docs/issue-qa.md → State"
   [ "$(grep '^|' "$WORK/SUITE.md" 2>/dev/null | head -1)" = "$SUITE_HEADER" ] \
     && ok suite_table "header intact" || fail suite_table "work/SUITE.md missing or header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
-  bad="$(table_rows "$WORK/SUITE.md" | awk -F'|' 'NF!=7 || $4 !~ /^ *(exploratory|regression|retired) *$/' | head -3)"
+  bad="$(table_rows "$WORK/SUITE.md" | awk -F'|' 'NF!=7 || $4 !~ /^ *(exploratory|regression|retired|quarantined) *$/' | head -3)"
   [ -z "$bad" ] && ok suite_rows "row format" || fail suite_rows "malformed rows: $bad" "fix the rows to the format in docs/regression.md → Tiers"
   [ "$(grep '^|' "$WORK/HEALS.md" 2>/dev/null | head -1)" = "$HEALS_HEADER" ] \
     && ok heals_log "header intact" || fail heals_log "work/HEALS.md missing or header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
+  [ "$(grep '^|' "$WORK/FLAKY.md" 2>/dev/null | head -1)" = "$FLAKY_HEADER" ] \
+    && ok flaky_log "header intact" || fail flaky_log "work/FLAKY.md missing or header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
   [ -f "$WORK/LESSONS.md" ] && ok lessons "present" || fail lessons "work/LESSONS.md missing" "ONBOARDING.md Step 2b"
   if [ -f "$WORK/env/credentials.env" ]; then
     perm="$(stat -c %a "$WORK/env/credentials.env" 2>/dev/null || stat -f %Lp "$WORK/env/credentials.env" 2>/dev/null)"
@@ -131,7 +133,8 @@ if [ -f "$CONFIG" ]; then
   enum candidate_channel "main release"; enum baseline_channel "release none"
   enum issue_comments "enabled disabled"; enum artifact_reports "enabled disabled"
   enum include_comments "enabled disabled"; enum audit_report "enabled disabled"; enum log_level "info debug"
-  for k in max_issues_per_run lock_ttl_min; do
+  enum spec_feedback "enabled disabled"
+  for k in max_issues_per_run lock_ttl_min media_retention_days; do
     v="$(cfg "$k")"; case "$v" in (''|*[!0-9]*) [ -z "$v" ] && ok "cfg:$k" "default" || fail "cfg:$k" "'$v' is not a number" "set a positive integer";; (*) ok "cfg:$k" "$v";; esac
   done
   v="$(cfg chart_ref)"; case "$v" in (''|oci://*) ok cfg:chart_ref "${v:-default}";; (*) fail cfg:chart_ref "'$v' is not an oci:// ref" "set an oci:// chart ref";; esac

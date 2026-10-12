@@ -8,6 +8,7 @@
 QA_HEADER='| issue | ac_hash | candidate | baseline | verdict | status | updated_utc |'
 SUITE_HEADER='| test | issue | tier | assert_hash | promoted_utc |'
 HEALS_HEADER='| utc | test | ac | build | old_hash | new_hash | basis |'
+FLAKY_HEADER='| utc | test | ac | build | runs | passes |'
 
 # Data rows of a markdown table file (everything after the header + separator).
 table_rows() { grep '^|' "$1" 2>/dev/null | tail -n +3; }
@@ -31,6 +32,20 @@ issue_spec_text() { # <title> <body>
   else
     printf '%s\n%s\n' "$title" "$body" | tr -d '\r'
   fi
+}
+
+# Deterministic spec lint: is there something observable to test? JSON on stdout.
+VAGUE_WORDS='better|faster|improve[sd]?|properly|correctly|nicer|cleaner|robust|seamless|intuitive|as expected|should work|works? well|user-friendly|etc\.?'
+spec_lint() { # <title> <body>
+  local spec items vague words
+  spec="$(issue_spec_text "$1" "$2" | tail -n +2)"
+  items="$(printf '%s\n' "$spec" | grep -cE '^[[:space:]]*([-*+]|[0-9]+[.)])[[:space:]]+' )"
+  vague="$(printf '%s\n' "$spec" | grep -oiE "\b($VAGUE_WORDS)\b" | tr '[:upper:]' '[:lower:]' | sort -u | jq -R . | jq -sc .)"
+  words="$(printf '%s' "$spec" | wc -w | tr -d ' ')"
+  jq -nc --argjson d "$(has_done_when "$2" && echo true || echo false)" --argjson i "${items:-0}" \
+     --argjson v "${vague:-[]}" --argjson w "${words:-0}" \
+     '{has_done_when:$d, items:$i, vague:$v, words:$w,
+       weak: ($i == 0 and (($d|not) or $w < 8))}'
 }
 
 has_done_when() { printf '%s\n' "$1" | grep -qiE '^#{1,6}[[:space:]]+done[[:space:]]+when[[:space:]]*$'; }

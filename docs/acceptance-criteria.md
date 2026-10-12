@@ -46,3 +46,21 @@ testable: yes | no — <reason when no>
   `mock_image` makes the needed agent behaviour available.
 - Vague text ("works better", "is faster") → `testable: no — not observable`; quote it.
 - Never add criteria the issue does not state, however obvious they seem.
+
+## Spec quality feedback
+
+The worklist entry carries `spec` from a deterministic lint: `has_done_when`, `items`
+(bullets in the spec), `vague` (words like "better", "properly"), `weak` (no bullet and
+no section, or a few words only). It informs the freeze; it never decides testability.
+
+When the freeze yields **no testable AC**, or `vague` words make an AC `testable: no`:
+
+- Write `work/issues/<n>/spec-feedback-<ac_hash>.md`: which sentences could not be
+  tested and why (one line each), then a **suggested "Done when"** — observable
+  Given/When/Then bullets that keep the issue's own intent and words, marked as a
+  suggestion for the author, never as the agent's criteria.
+- The verdict stays `not-testable` (or the per-AC `testable: no`); the suggestion never
+  becomes criteria until the author edits the issue, which changes `ac_hash` and makes
+  the issue due again.
+- It is part of the report; as an issue comment only per [reporting.md](reporting.md) →
+  Delivery (`spec_feedback`).

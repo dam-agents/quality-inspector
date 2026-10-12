@@ -9,7 +9,9 @@
 #                                 dir (.e2e/runs/<label>) and the summary JSON on stdout.
 #                                 `full` records video and a trace page for every test (issue
 #                                 verification); `failures` (default) keeps them for failures.
-#                                 --strict turns off criterion()'s judged fallback (red-green)
+#                                 --strict turns off criterion()'s judged fallback (red-green).
+#                                 Extra args go to `e2e run`; a confirmation re-run adds
+#                                 `--repeat-each 3 --no-cache`, and by_test[].stability reads it
 #   suite.sh summary <label>      re-print the summary of an earlier run
 #
 # The base URL is fixed to the nested platform; any APP_URL that is not localhost
@@ -82,8 +84,12 @@ summarize() { # <report.json> <label>
         relearned: [.attempts[-1].steps[]? | select(.cache.mode == "agent-concluded" or .cache.mode == "missed") | .label]
       }] as $res
     | [$r.results[]?.attempts[]?.steps[]?.cache.mode // empty] as $modes
+    | ($res | group_by(.title) | map({title: .[0].title, tags: .[0].tags, runs: length,
+         passes: (map(select(.status == "passed")) | length),
+         codes: ([.[].code // empty] | unique)})
+       | map(. + {stability: (if .passes == .runs then "stable-pass" elif .passes == 0 then "stable-fail" else "flaky" end)})) as $by
     | {label: $label, status: $r.status, exit_code: $r.exitCode, summary: $r.summary,
-       results: $res,
+       results: $res, by_test: $by,
        cache: {replayed: ($modes | map(select(. == "self-finalized")) | length),
                handed_off: ($modes | map(select(. == "agent-concluded")) | length),
                missed: ($modes | map(select(. == "missed")) | length)}}' "$1"

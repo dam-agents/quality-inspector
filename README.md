@@ -118,6 +118,8 @@ configuration.
 | --- | --- | --- |
 | `target_repo` | asked | Repository whose issues are tested. `QI_TARGET_REPO` overrides. |
 | `issue_comments` | asked, default `disabled` | Opt-in: post verdicts on the issue. |
+| `spec_feedback` | asked, default `disabled` | Opt-in: suggest an observable "Done when" on issues with nothing testable. |
+| `media_retention_days` | default `14` | Local evidence kept after delivery. |
 | `mock_image` | asked, default empty | Mock harness image for the nested platform. |
 | `marker_prefix` | default `quality-inspector` | Dedup marker; **immutable once a comment exists**. |
 | `qa_label`, `retest_label` | defaults | The gates (`qa:ready`, `qa:retest`). |
