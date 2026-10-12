@@ -24,4 +24,5 @@ echo "2026-10-01T03:00:00Z ran candidate=0.0.0-main.aaa1111 passed=1 failed=0" >
 sed -i.bak 's/toBeVisible()/toBeHidden()/' "$WORK_DIR/suite/tests/issue-7.e2e.ts"
 out="$(bash "$SCRIPTS/preflight.sh" regression)"
 assert "changed AC block is drift" '.assert_drift | length == 1 and .[0].test=="tests/issue-7.e2e.ts"' "$out"
+assert "previous candidate is the last one tested" '.previous_candidate == "0.0.0-main.aaa1111"' "$out"
 exit $FAILED

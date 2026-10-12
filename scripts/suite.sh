@@ -4,11 +4,12 @@
 #
 #   suite.sh init                 create work/suite from scripts/suite-skeleton/ (missing
 #                                 files only), install the pinned deps, pick the browser
-#   suite.sh run <label> [--evidence full|failures] [e2e run args…]
+#   suite.sh run <label> [--evidence full|failures] [--strict] [e2e run args…]
 #                                 run against the nested platform; <label> names the output
 #                                 dir (.e2e/runs/<label>) and the summary JSON on stdout.
 #                                 `full` records video and a trace page for every test (issue
-#                                 verification); `failures` (default) keeps them for failures
+#                                 verification); `failures` (default) keeps them for failures.
+#                                 --strict turns off criterion()'s judged fallback (red-green)
 #   suite.sh summary <label>      re-print the summary of an earlier run
 #
 # The base URL is fixed to the nested platform; any APP_URL that is not localhost
@@ -71,12 +72,14 @@ pick_browser() {
 summarize() { # <report.json> <label>
   jq -c --arg label "$2" '
     .run as $r
-    | [$r.results[]? | {
+    | [$r.results[]? | select(.selected != false) | {
         title: (.titlePath | join(" › ")),
         file: (.file // .source.file // null),
         tags: (.tags // []),
         status,
-        code: ([.attempts[]?.error.code // empty] | last // null)
+        code: ([.attempts[]?.error.code // empty] | last // null),
+        judged: (if .status == "passed" then [.attempts[-1].steps[]? | select((.api | startswith("expect.")) and .status == "failed") | .label] else [] end),
+        relearned: [.attempts[-1].steps[]? | select(.cache.mode == "agent-concluded" or .cache.mode == "missed") | .label]
       }] as $res
     | [$r.results[]?.attempts[]?.steps[]?.cache.mode // empty] as $modes
     | {label: $label, status: $r.status, exit_code: $r.exitCode, summary: $r.summary,
@@ -89,7 +92,12 @@ summarize() { # <report.json> <label>
 cmd_run() {
   local label="${1:?label}"; shift
   local evidence=failures rec
-  if [ "${1:-}" = --evidence ]; then evidence="${2:?full|failures}"; shift 2; fi
+  local strict=0
+  while :; do case "${1:-}" in
+    (--evidence) evidence="${2:?full|failures}"; shift 2;;
+    (--strict) strict=1; shift;;
+    (*) break;;
+  esac; done
   case "$evidence" in (full) rec=on;; (failures) rec=retain-on-failure;; (*) die "--evidence must be full or failures";; esac
   case "$label" in (*[!A-Za-z0-9._-]*) die "label must be [A-Za-z0-9._-]";; esac
   case "$APP_URL" in
@@ -102,7 +110,7 @@ cmd_run() {
   (
     cd "$SUITE" || exit 1
     set -a; . "$WORK/env/credentials.env"; set +a
-    export APP_URL E2E_MODEL E2E_TELEMETRY_DISABLED=1 NODE_USE_ENV_PROXY=1
+    export APP_URL E2E_MODEL E2E_TELEMETRY_DISABLED=1 NODE_USE_ENV_PROXY=1 QI_STRICT="$strict"
     # Model calls leave through the gateway, which injects the provider credential.
     export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-injected-by-gateway}"
     PLAYWRIGHT_BROWSERS_PATH="$(cat .browsers-path 2>/dev/null || echo "${PLAYWRIGHT_BROWSERS_PATH:-/opt/ms-playwright}")"
@@ -126,5 +134,5 @@ case "${1:-}" in
   init)    cmd_init ;;
   run)     shift; cmd_run "$@" ;;
   summary) cmd_summary "${2:-}" ;;
-  *) echo "usage: $0 init | run <label> [--evidence full|failures] [e2e run args…] | summary <label>" >&2; exit 2 ;;
+  *) echo "usage: $0 init | run <label> [--evidence full|failures] [--strict] [e2e run args…] | summary <label>" >&2; exit 2 ;;
 esac

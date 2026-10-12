@@ -16,8 +16,8 @@ jobs:
         run: |
           set -e
           find scripts -name '*.sh' -print0 | xargs -0 -n1 bash -n
-      - name: node --check the report renderer
-        run: node --check scripts/render-report.mjs
+      - name: node --check the Node scripts
+        run: for f in scripts/*.mjs; do node --check "$f"; done
       - name: structural validator
         run: bash scripts/validate-definition.sh .
       # Cross-file section references ("<file>.md -> **Label**"). They are prose,

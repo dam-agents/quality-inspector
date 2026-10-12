@@ -49,9 +49,10 @@ versions. `T` below is the configured `target_repo`; never print it outside the 
    candidate. Refresh the row.
 6. **Red-green**, both runs with full evidence (video, screenshots, steps for every test):
    - `env.sh reset`, `env.sh up <baseline>`,
-     `suite.sh run issue-<n>-baseline --evidence full --tag issue-<n>`.
+     `suite.sh run issue-<n>-baseline --evidence full --strict --tag issue-<n>`.
    - `env.sh reset`, `env.sh up <candidate>`,
-     `suite.sh run issue-<n>-candidate --evidence full --tag issue-<n>`.
+     `suite.sh run issue-<n>-candidate --evidence full --strict --tag issue-<n>`.
+   `--strict` keeps `criterion()` from judging: red-green needs checks that discriminate.
    - `baseline` is `null` (`baseline_channel: none`) → skip the baseline run; no AC can
      then be `verified`, only `inconclusive` or `failed`.
    Refresh the row after each install.

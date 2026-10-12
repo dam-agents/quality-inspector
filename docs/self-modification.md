@@ -178,8 +178,11 @@ refuse and explain instead:
 - **Nested target only**: `scripts/suite.sh` keeps refusing non-localhost base URLs; no
   procedure drives the platform the agent runs on.
 - **ACs freeze before exploration**; criteria files are never edited; AC blocks of
-  promoted tests change only with the operator's promotion (`scripts/check-asserts.sh`
-  stays in the regression pre-flight and the audit).
+  promoted tests change only through the healing rules of [triage.md](triage.md) or the
+  operator (`scripts/check-asserts.sh` stays in the regression pre-flight and the audit).
+- **Triage never hides a regression**: no check is loosened or deleted to pass, a
+  `superseded` needs a quoted contradicting issue, and doubt resolves to `regression`;
+  `criterion()`'s judged fallback stays off in issue runs (`--strict`).
 - **`verified` requires red-green** (baseline fails, candidate passes); environment
   failures never become verdicts.
 - Dedup marker format `<!-- <marker_prefix> issue=<n> ac=<ac_hash> build=<candidate> -->`

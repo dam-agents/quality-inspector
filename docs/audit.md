@@ -24,6 +24,9 @@ when `audit_report: disabled` (still append the log line).
      `verified` without a baseline failure; every tested AC has a candidate video and its
      `AC-<k>` screenshot; AC blocks contain checks only; no internal identifiers or
      credentials in the text, the screenshots or the first and last frames you look at.
+   - Triage health: heals this week from `work/HEALS.md` (each one's basis is a UI-map
+     change or an issue — sample one), tests at three heals a month, `needs-review` items
+     the operator has not answered, `retired` tests.
    - Trends: verdict distribution (100 % one verdict is suspicious), `inconclusive`
      share (a non-discriminating suite), replay cache `handed_off + missed` share from
      `REGRESSION.log`, environment failures per week.

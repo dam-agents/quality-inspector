@@ -9,33 +9,42 @@
 ```
 
 - `exploratory` — written by an issues run; `promoted_utc` is `-`. Not replayed nightly.
-- `regression` — promoted by the operator only ("promote #N" → [on-demand.md](on-demand.md)).
-  `assert_hash` is the `scripts/check-asserts.sh --hash` value at promotion time and is
-  the frozen contract of that file's AC blocks.
-- A test file whose issue's ACs changed stays at its tier with its old hash until the
-  operator promotes the new version; the retest's new file content is `exploratory` drift.
+- `regression` — promoted by the operator ("promote #N" → [on-demand.md](on-demand.md)).
+  `assert_hash` is the `scripts/check-asserts.sh --hash` value of its AC blocks; it changes
+  only by a heal ([triage.md](triage.md), logged in `work/HEALS.md`) or by the operator.
+- `retired` — superseded by a completed issue ([triage.md](triage.md)); kept, not replayed.
 
 ## The regression run
 
-The worklist carries `candidate`, `tests[]` and `assert_drift[]` (or `null` when the
-check could not run — say so in the summary, do not treat it as clean).
+The worklist carries `candidate`, `previous_candidate` (the build last regression-tested,
+`null` the first time), `tests[]` and `assert_drift[]` (`null` when the check could not
+run — say so, never treat it as clean).
 
 1. `env.sh lock regression` (busy → end the run, log it).
 2. `env.sh reset`, `env.sh up <candidate>`, `suite.sh run smoke-<candidate> --tag smoke`.
    Failure → environment failure ([nested-env.md](nested-env.md) → Failures); append
    `<ISO> ERROR: environment candidate=<c>` to `work/REGRESSION.log`, unlock, end.
-3. Drifted tests are **not run** — list them as `drift` in the summary for the operator.
-4. Run the rest: `suite.sh run regression-<candidate> --evidence failures --tag issue-<a> --tag issue-<b> …`
-   (any-tag mode; video and steps are kept for failures only).
-5. Per failing test: judge it like an AC ([reporting.md](reporting.md) → Verdicts, with
-   no baseline). A test defect → repair outside the AC blocks per
-   [test-authoring.md](test-authoring.md) and re-run that file once. A product failure →
-   a **regression finding**: one line in the summary with the issue number, the AC and
-   the evidence path. No issue comments from regression runs.
-6. Summary to the chat UI and, with `artifact_reports: enabled`, one artifact per run.
-   Append `<ISO> ran candidate=<c> passed=<n> failed=<n> drift=<n> replayed=<n> handed_off=<n> missed=<n>`
-   to `work/REGRESSION.log` — the pre-flight keys "already tested" on `ran candidate=`.
-7. `env.sh unlock regression`.
-
-A cache that hands off or misses on most steps every night is a finding for the audit,
-not something to fix by re-recording blindly.
+3. **Build the change context** ([change-awareness.md](change-awareness.md)): the UI map
+   of the candidate, its diff against `previous_candidate`'s map, the completed issues in
+   the window, the impact per test, and your one-line expectation per impacted test.
+4. Drifted tests (`assert_drift`) are **not run** — list them for the operator.
+5. Replay: `suite.sh run regression-<candidate> --evidence failures --tag issue-<a> --tag issue-<b> …`.
+   `criterion()` judges a check whose control moved instead of failing it.
+6. **Triage** every result that is not plain `unchanged` per [triage.md](triage.md):
+   re-run without cache, look, check the context, decide, heal or retire where the rules
+   allow. Re-run every healed file strictly.
+7. **Report**: write `work/regression/<candidate>/verdicts.json` with `"mode": "regression"`
+   — one entry per criterion that was not `unchanged`, each with `issue`, `id`, `name`,
+   `then`, `verdict` (the category), `explanation`, `because_issue` when an issue explains
+   it, `heal` `{from, to}` for a repair, and `before_shot` (the previous map's screenshot
+   of the page). Add `context` `{previous, window, issues[{number,title}], ui_diff}` (the
+   diff's `--md` text). Render it with `scripts/render-report.mjs` into
+   `work/regression/<candidate>/report/` and publish as in
+   [reporting.md](reporting.md) → Delivery (artifact only; regression runs never comment).
+   The run's top verdict is `regression` if any criterion is, else `needs-review` if any
+   is, else `healed`, `relearned` or `unchanged`.
+8. Append `<ISO> ran candidate=<c> unchanged=<n> relearned=<n> healed=<n> needs_review=<n> superseded=<n> regression=<n> blocked=<n> drift=<n>`
+   to `work/REGRESSION.log` — the pre-flight keys "already tested" and
+   `previous_candidate` on `ran candidate=`.
+9. `env.sh unlock regression`. Summary in the chat UI: regressions first, each with its
+   evidence link; then what needs review; then one line of what was absorbed.

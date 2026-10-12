@@ -6,7 +6,10 @@
 //   node render-report.mjs <verdicts.json> <out-dir>
 //
 // verdicts.json is written by the agent (the judgment); every run label in it names a
-// directory under work/suite/.e2e/runs/ (the evidence). Nothing else is read.
+// directory under work/suite/.e2e/runs/ (the evidence). With "mode": "regression" it is one
+// page for a whole regression run: no baseline column, the change context on top, and a
+// triage category per criterion (docs/triage.md). Nothing else is read, except the
+// previous build's screenshots an AC names as "before_shot".
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
@@ -43,7 +46,7 @@ mkdirSync(join(outDir, 'media'), { recursive: true });
 function copyMedia(run, rel, acId) {
   const src = resolve(run, rel);
   if (!src) return null;
-  const name = `${slug(acId)}-${slug(run.side)}-${slug(dirname(rel).split('/').pop())}-${basename(rel)}`;
+  const name = `${slug(String(acId))}-${slug(run.side)}-${slug(dirname(rel).split('/').pop())}-${basename(rel)}`;
   copyFileSync(src, join(outDir, 'media', name));
   return `media/${name}`;
 }
@@ -53,7 +56,7 @@ function evidence(run, ac) {
   if (!run) return { state: 'not-run' };
   if (run.missing) return { state: 'missing', label: run.label };
   const tag = ac.id.toLowerCase();
-  const res = run.results.find((r) => (r.tags ?? []).includes(`issue-${v.issue}`) && (r.tags ?? []).includes(tag));
+  const res = run.results.find((r) => (r.tags ?? []).includes(`issue-${ac.issue ?? v.issue}`) && (r.tags ?? []).includes(tag));
   if (!res) return { state: 'no-test', label: run.label };
   const att = res.attempts?.at(-1) ?? {};
   const arts = att.artifacts ?? [];
@@ -74,9 +77,9 @@ function evidence(run, ac) {
     state: res.status, title: res.titlePath?.join(' › '), durationMs: att.durationMs,
     error: att.error ? { code: att.error.code, message: att.error.message } : null,
     steps,
-    video: video ? copyMedia(run, video.path, ac.id) : null,
-    shots: shots.map(({ caption, a }) => ({ caption, src: copyMedia(run, a.path, ac.id) })).filter((s) => s.src),
-    trace: trace ? copyMedia(run, trace.path, ac.id) : null,
+    video: video ? copyMedia(run, video.path, key(ac)) : null,
+    shots: shots.map(({ caption, a }) => ({ caption, src: copyMedia(run, a.path, key(ac)) })).filter((s) => s.src),
+    trace: trace ? copyMedia(run, trace.path, key(ac)) : null,
     tracePage,
     screenText: screenLog ? readText(resolve(run, screenLog.path)) : null,
   };
@@ -95,6 +98,8 @@ function findTracePage(run, rel) {
 }
 function readText(p) { try { return p ? readFileSync(p, 'utf8').slice(0, 20000) : null; } catch { return null; } }
 
+const key = (ac) => `${ac.issue ?? v.issue}-${ac.id}`;
+const regression = v.mode === 'regression';
 const runs = { candidate: loadRun(v.candidate_run), baseline: loadRun(v.baseline_run) };
 if (runs.candidate) runs.candidate.side = 'candidate';
 if (runs.baseline) runs.baseline.side = 'baseline';
@@ -102,6 +107,8 @@ if (runs.baseline) runs.baseline.side = 'baseline';
 const VERDICT = {
   verified: ['Verified', 'ok'], failed: ['Failed', 'bad'], partial: ['Partial', 'warn'],
   inconclusive: ['Inconclusive', 'warn'], blocked: ['Blocked', 'muted'], 'not-testable': ['Not testable', 'muted'],
+  unchanged: ['Unchanged', 'ok'], relearned: ['UI changed · steps re-learned', 'ok'], healed: ['UI changed · check repaired', 'warn'],
+  superseded: ['Superseded by a change', 'muted'], regression: ['Regression', 'bad'], 'needs-review': ['Needs review', 'warn'],
 };
 const badge = (x) => { const [t, c] = VERDICT[x] ?? [x, 'muted']; return `<span class="badge ${c}">${esc(t)}</span>`; };
 const stateBadge = (s) => {
@@ -133,21 +140,39 @@ function sideHtml(name, ev) {
   return `<section class="side"><h4>${esc(name)} ${stateBadge(ev.state)}</h4>${video}${err}${shots}${steps}${extra}</section>`;
 }
 
-const acs = (v.acs ?? []).map((ac) => ({ ...ac, cand: ac.testable === false ? null : evidence(runs.candidate, ac), base: ac.testable === false ? null : evidence(runs.baseline, ac) }));
+const acs = (v.acs ?? []).map((ac) => {
+  let before = null;
+  if (ac.before_shot && existsSync(ac.before_shot)) {
+    before = `media/${slug(key(ac))}-before-${basename(ac.before_shot)}`;
+    copyFileSync(ac.before_shot, join(outDir, before));
+  }
+  return { ...ac, before, cand: ac.testable === false ? null : evidence(runs.candidate, ac), base: ac.testable === false || regression ? null : evidence(runs.baseline, ac) };
+});
+
+const ctx = v.context ?? null;
+const contextHtml = !ctx ? '' : `
+<section class="ac"><header><h3>What changed since ${esc(ctx.previous ?? 'the last run')}</h3></header>
+${(ctx.issues ?? []).length ? `<p><b>Completed issues in the window</b> (${esc(ctx.window ?? '')})</p><ul>${ctx.issues.map((i) => `<li>#${esc(i.number)} — ${esc(i.title)}</li>`).join('')}</ul>` : '<p class="dim">No completed issues in the window.</p>'}
+${ctx.ui_diff ? `<p><b>UI map difference</b></p><pre>${esc(ctx.ui_diff)}</pre>` : ''}
+</section>`;
 
 const acHtml = acs.map((ac) => `
-<article class="ac" id="${esc(slug(ac.id))}">
-  <header><h3>${esc(ac.id)} — ${esc(ac.name)}</h3>${badge(ac.verdict)}</header>
+<article class="ac" id="${esc(slug(key(ac)))}">
+  <header><h3>${regression ? `#${esc(ac.issue)} ` : ''}${esc(ac.id)} — ${esc(ac.name)}</h3>${badge(ac.verdict)}</header>
   <blockquote>${ac.given ? `<b>Given</b> ${esc(ac.given)}<br>` : ''}${ac.when ? `<b>When</b> ${esc(ac.when)}<br>` : ''}${ac.then ? `<b>Then</b> ${esc(ac.then)}` : ''}</blockquote>
   ${ac.note ? `<p class="note">${esc(ac.note)}</p>` : ''}
-  ${ac.testable === false ? '' : `<div class="sides">${sideHtml(`Candidate ${v.candidate ?? ''}`, ac.cand)}${sideHtml(`Baseline ${v.baseline ?? ''}`, ac.base)}</div>`}
+  ${ac.explanation ? `<p><b>Why:</b> ${esc(ac.explanation)}${ac.because_issue ? ` — see #${esc(ac.because_issue)}` : ''}</p>` : ''}
+  ${ac.heal ? `<p class="dim">Check repaired: <code>${esc(ac.heal.from)}</code> → <code>${esc(ac.heal.to)}</code></p>` : ''}
+  ${ac.testable === false ? '' : `<div class="sides">${sideHtml(`${regression ? 'Build' : 'Candidate'} ${v.candidate ?? ''}`, ac.cand)}${regression
+    ? (ac.before ? `<section class="side"><h4>Previous build ${esc(ctx?.previous ?? '')}</h4><figure><a href="${esc(ac.before)}" target="_blank"><img src="${esc(ac.before)}" alt="previous build"></a><figcaption>the same page on the previous build</figcaption></figure></section>` : '')
+    : sideHtml(`Baseline ${v.baseline ?? ''}`, ac.base)}</div>`}
 </article>`).join('');
 
-const summaryRows = acs.map((ac) => `<tr><td><a href="#${esc(slug(ac.id))}">${esc(ac.id)}</a></td><td>${esc(ac.name)}</td><td>${stateBadge(ac.cand?.state ?? 'not-run')}</td><td>${stateBadge(ac.base?.state ?? 'not-run')}</td><td>${badge(ac.verdict)}</td></tr>`).join('');
+const summaryRows = acs.map((ac) => `<tr><td><a href="#${esc(slug(key(ac)))}">${regression ? `#${esc(ac.issue)} ` : ''}${esc(ac.id)}</a></td><td>${esc(ac.name)}</td><td>${stateBadge(ac.cand?.state ?? 'not-run')}</td>${regression ? '' : `<td>${stateBadge(ac.base?.state ?? 'not-run')}</td>`}<td>${badge(ac.verdict)}</td></tr>`).join('');
 
 const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>#${esc(v.issue)} QA verdict</title>
+<title>${regression ? `Regression ${esc(v.candidate)}` : `#${esc(v.issue)} QA verdict`}</title>
 <style>
 :root{--bg:#fff;--fg:#1d1f23;--dim:#6b7078;--card:#f6f7f9;--line:#e3e5e8;--ok:#127a3a;--okbg:#e3f5e9;--bad:#b42318;--badbg:#fdecea;--warn:#8a5a00;--warnbg:#fff4d6;--muted:#555b63;--mutedbg:#eceef1;--link:#1a5fb4}
 @media (prefers-color-scheme:dark){:root{--bg:#15171a;--fg:#e8eaed;--dim:#9aa0a6;--card:#1e2125;--line:#2e3238;--ok:#6fd58f;--okbg:#173322;--bad:#ff8a80;--badbg:#3a1d1b;--warn:#f5c26b;--warnbg:#3a2f14;--muted:#b0b5bb;--mutedbg:#2a2e33;--link:#8ab4f8}}
@@ -170,10 +195,14 @@ pre.error{color:var(--bad)}details{margin:6px 0}summary{cursor:pointer;color:var
 .steps{margin:6px 0;padding-left:22px;font-size:13px}.steps li.failed{color:var(--bad)}.steps code{font-size:12px}
 .note{font-style:italic;color:var(--dim)}footer{color:var(--dim);font-size:13px;margin-top:32px}
 </style></head><body><main>
-<div class="hero"><h1>#${esc(v.issue)} — ${esc(v.title)}</h1>${badge(v.verdict)}</div>
+${regression ? `<div class="hero"><h1>Regression run — ${esc(v.candidate)}</h1>${badge(v.verdict)}</div>
+<p class="meta">previous build <code>${esc(ctx?.previous ?? '–')}</code> · ${esc(v.generated_utc ?? '')}</p>
+<p class="dim">Every promoted criterion was replayed on the new build. A UI that moved or was renamed is absorbed (steps re-learned) or repaired (check updated); only a criterion that no longer holds and that no completed issue explains is a <b>regression</b>.</p>
+<table><thead><tr><th>AC</th><th>Criterion</th><th>Result</th><th>Triage</th></tr></thead><tbody>${summaryRows}</tbody></table>${contextHtml}`
+: `<div class="hero"><h1>#${esc(v.issue)} — ${esc(v.title)}</h1>${badge(v.verdict)}</div>
 <p class="meta">candidate <code>${esc(v.candidate ?? '–')}</code> · baseline <code>${esc(v.baseline ?? '–')}</code> · criteria <code>ac=${esc(v.ac_hash)}</code> (source: ${esc(v.criteria_source ?? 'done-when')}) · ${esc(v.generated_utc ?? '')}</p>
 <p class="dim">Each criterion was tested on the candidate build and on the baseline release. <b>Verified</b> means it fails on the baseline and passes on the candidate. Watch the videos and screenshots to check the result yourself.</p>
-<table><thead><tr><th>AC</th><th>Criterion</th><th>Candidate</th><th>Baseline</th><th>Verdict</th></tr></thead><tbody>${summaryRows}</tbody></table>
+<table><thead><tr><th>AC</th><th>Criterion</th><th>Candidate</th><th>Baseline</th><th>Verdict</th></tr></thead><tbody>${summaryRows}</tbody></table>`}
 ${acHtml}
 ${(v.notes ?? []).length ? `<h3>Notes</h3><ul>${v.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
 <footer>${esc(v.display_name ?? 'Quality Inspector')} · black-box test of the published chart in a nested cluster · e2e ${esc(runs.candidate?.version ?? '')}</footer>

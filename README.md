@@ -96,6 +96,19 @@ exact screen the criterion is checked on — the step list, the assertion error 
 failed, and the trace. A reader can confirm a `verified` verdict by watching the feature
 fail on the release and work on the candidate. Media add a few MB per criterion.
 
+## When the UI changes
+
+Promoted tests replay nightly against each new build, and a redesign must not fail them.
+Before replaying, the agent builds a picture of what changed — never from code: the
+**issues completed** between the two builds, and a **UI map** it crawls on each build
+(pages, navigation, buttons, tabs, fields), diffed into what was added, removed, renamed
+or moved. Tests are written to survive layout changes, and every acceptance check carries
+a fallback that judges the criterion's own sentence on screen when its exact locator no
+longer matches. A triage then sorts every non-trivial result into *re-learned* (steps
+moved), *repaired* (a check followed a renamed or moved control — logged), *superseded*
+(a completed issue changed the behaviour on purpose), *needs review*, or **regression** —
+the only one that is a product defect, and the default when the evidence is unclear.
+
 ## Configuration
 
 `work/CONFIG.md`, filled at onboarding; per-key semantics in `CLAUDE.md` → Runtime

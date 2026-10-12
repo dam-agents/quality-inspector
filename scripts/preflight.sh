@@ -178,8 +178,9 @@ mode_regression() {
   [ "$drift" = null ] && log "WARN: assertion drift check could not run"
   log "candidate $candidate is new (last regression: ${last:-never}) — due"
   runlog REGRESSION "due candidate=$candidate tests=$(printf '%s' "$tests" | jq length)"
-  jq -nc --arg c "$candidate" --argjson t "$tests" --argjson d "$drift" --argjson logs "$(logs_json)" \
-    '{mode:"regression", nothing_to_do:false, candidate:$c, tests:$t, assert_drift:$d, logs:$logs}'
+  jq -nc --arg c "$candidate" --arg p "$last" --argjson t "$tests" --argjson d "$drift" --argjson logs "$(logs_json)" \
+    '{mode:"regression", nothing_to_do:false, candidate:$c, previous_candidate:(if $p=="" then null else $p end),
+      tests:$t, assert_drift:$d, logs:$logs}'
 }
 
 # ============================================================= AUDIT MODE ====
@@ -263,6 +264,8 @@ mode_audit() {
     | group_by(.sig) | map({signature: .[0].sig, count: length, first: (map(.ts)|min), last: (map(.ts)|max)})' 2>/dev/null)"
   [ -n "$failures" ] || failures='null'
   find "$WORK/logs" -name 'events-*.jsonl' -mtime +14 -delete 2>/dev/null || true
+  # UI maps: the newest three builds; the newest is the next diff's starting point.
+  ls -1dt "$WORK"/inventory/*/ 2>/dev/null | tail -n +4 | while read -r d; do rm -rf "$d"; done
 
   # stats
   local stats
@@ -271,7 +274,8 @@ mode_audit() {
   [ -n "$stats" ] || stats='{}'
   stats="$(jq -nc --argjson v "$stats" --arg runs "$(count_lines '' "$WORK/ISSUES.log")" \
     --arg reg "$(count_lines 'ran candidate=' "$WORK/REGRESSION.log")" \
-    '{verdicts_7d:$v, issues_preflights_total:($runs|tonumber), regression_runs_total:($reg|tonumber)}')"
+    --arg heals "$(count_lines '^| 20' "$WORK/HEALS.md")" \
+    '{verdicts_7d:$v, issues_preflights_total:($runs|tonumber), regression_runs_total:($reg|tonumber), heals_total:($heals|tonumber)}')"
 
   runlog AUDIT_PREFLIGHT "checks=$(printf '%s' "$CHECKS" | jq length)"
   jq -nc --argjson c "$CHECKS" --argjson f "$failures" --argjson s "$stats" --argjson logs "$(logs_json)" \

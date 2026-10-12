@@ -12,6 +12,7 @@ One file per issue, `tests/issue-<n>.e2e.ts`; one test per testable AC:
 ```ts
 import { test } from '@e2e-dev/web';
 import { expect, unique } from 'e2e';
+import { criterion } from '../lib/criterion.js';
 
 test('#42 AC-1: a renamed agent keeps its sessions', { session: 'owner', tags: ['issue-42', 'ac-1'] },
   async ({ app, agent, screen }) => {
@@ -21,8 +22,10 @@ test('#42 AC-1: a renamed agent keeps its sessions', { session: 'owner', tags: [
     await agent.act('rename the agent {name} to {name}-2', { params: { name } });
     await app.screenshot('AC-1: the renamed agent and its sessions');
     // AC-1 begin
-    await expect(screen.getByRole('heading', { name: `${name}-2` })).toBeVisible();
-    await agent.assert('the agent still lists the session it had before the rename');
+    await criterion('AC-1', 'the renamed agent is shown under its new name with its earlier session', { agent, app }, async () => {
+      await expect(screen.getByRole('heading', { name: `${name}-2` })).toBeVisible();
+      await expect(screen.getByRole('listitem').filter({ hasText: 'session' })).toHaveCount(1);
+    });
     // AC-1 end
   });
 ```
@@ -30,6 +33,14 @@ test('#42 AC-1: a renamed agent keeps its sessions', { session: 'owner', tags: [
 - **Right before each AC block, `app.screenshot('AC-<k>: <what the Then line looks at>')`.**
   It is the still a reader checks the verdict against; the report captions it with that
   label. `agent.assert` adds its own screenshot. Never screenshot inside the setup test.
+- **Every AC block is one `criterion(id, then, ctx, check)` call**
+  (`work/suite/lib/criterion.ts`): `then` is the criterion's Then sentence verbatim, the
+  callback holds the exact checks. When the UI moves under a check, the sentence is judged
+  on screen instead and the run's triage repairs the check ([triage.md](triage.md)).
+- **Write for the redesign you cannot see yet.** Navigate with `agent.act` or by URL,
+  never by clicking through layout; locate by role and the user-visible name the issue
+  uses; no CSS selectors, DOM structure, `nth()`, or test ids the issue does not name; one
+  fact per `expect`. A check that only passes in today's layout is a future false alarm.
 - **The `// AC-<k> begin` / `end` block holds only the checks**, written from the
   criteria file's *Then* line before the first run. Everything before it — navigation,
   setup, `agent.act` — is free to change.

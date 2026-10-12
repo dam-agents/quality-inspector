@@ -71,7 +71,7 @@ Leak check: `git status --porcelain` **must be clean**. Anything under `work/`, 
 Create only what is missing; never overwrite an existing state file.
 
 ```bash
-mkdir -p /home/agent/work/issues /home/agent/work/logs
+mkdir -p /home/agent/work/issues /home/agent/work/logs /home/agent/work/inventory /home/agent/work/regression
 cd /home/agent/work
 [ -f QA.md ] || cat > QA.md <<'EOF'
 # QA state — one row per issue (docs/issue-qa.md → State)
@@ -84,6 +84,12 @@ EOF
 
 | test | issue | tier | assert_hash | promoted_utc |
 | --- | --- | --- | --- | --- |
+EOF
+[ -f HEALS.md ] || cat > HEALS.md <<'EOF'
+# Repaired checks — append-only, one row per heal (docs/triage.md → Healing rules)
+
+| utc | test | ac | build | old_hash | new_hash | basis |
+| --- | --- | --- | --- | --- | --- | --- |
 EOF
 [ -f LESSONS.md ] || cat > LESSONS.md <<'EOF'
 # Operational lessons — verified environment facts only, each with its evidence.

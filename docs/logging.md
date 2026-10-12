@@ -28,6 +28,8 @@ run type (`issues`, `regression`, `audit`, `session`).
 | `issue_abort` | you | `issue=<n> reason=<environment\|label_removed\|…>` |
 | `issue_done` | you | `issue=<n> verdict=<v>` |
 | `report_delivered` / `report_failed` | you | `issue=<n> surface=<artifact\|comment> …` |
+| `triage` | you | `issue=<n> ac=<k> category=<c> basis=<…>` |
+| `heal` | you | `issue=<n> ac=<k> old=<hash> new=<hash>` |
 | `env_up` / `env_reset` / `env_failed` / `env_lock_takeover` | `scripts/env.sh` | free text |
 | `suite_run` / `suite_failed` | `scripts/suite.sh` | `<label> exit=<rc>` / free text |
 | `onboarding_verify` | `scripts/verify-onboarding.sh` | free text |

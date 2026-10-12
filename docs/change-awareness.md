@@ -1,0 +1,51 @@
+# Change awareness
+
+A regression run never starts blind. Before any test replays, you know what landed since
+the build the suite last passed on, and what moved in the UI — from two black-box
+sources, never from code or pull requests ([black-box.md](black-box.md)).
+
+## The two sources
+
+1. **What was merged — the issues.** `bash "$HOME/scripts/changes.sh" <previous> <candidate>`
+   lists every target issue closed as *completed* between the two chart tags' push times,
+   with title, labels and its "Done when" text. It is the product team's own statement of
+   intended change. The window is approximate (an issue closed minutes before a build may
+   ship in the next); treat it as context, and an issue just outside the window as
+   possibly in it.
+2. **What the UI looks like now — the UI map.** `node "$HOME/scripts/ui-inventory.mjs"
+   work/inventory/<build>` signs in and walks the nested platform read-only: every page
+   reachable through links, navigation items and tabs, with its headings, nav items,
+   buttons, tabs, fields and links (repeated data rows and cards excluded), an
+   accessibility snapshot and a screenshot. `node "$HOME/scripts/ui-diff.mjs" <old> <new>`
+   turns two maps into pages added/removed and controls renamed, moved, removed or added —
+   including a **likely rename** when one control left and one arrived in exactly the same
+   places with unlike text. Two maps of one build diff to nothing; anything it reports is a
+   real change.
+
+## Building the context
+
+Right after `env.sh up <candidate>` on a freshly reset platform (so the map holds no test
+data), before the suite runs:
+
+```bash
+QI_BUILD=<candidate> node "$HOME/scripts/ui-inventory.mjs" "$HOME/work/inventory/<candidate>"
+node "$HOME/scripts/ui-diff.mjs" work/inventory/<previous>/inventory.json work/inventory/<candidate>/inventory.json > /tmp/quality-inspector-diff.json
+bash "$HOME/scripts/changes.sh" <previous> <candidate> > /tmp/quality-inspector-changes.json
+node "$HOME/scripts/impact.mjs" /tmp/quality-inspector-diff.json work/suite/tests/issue-*.e2e.ts
+```
+
+(Source `work/env/credentials.env` for the map's sign-in.) `impact.mjs` names, per test,
+every changed page or control it opens or mentions, and whether the hit is inside an AC
+block. With no map of `<previous>` (first run, lost volume), the diff is skipped and the
+run says so — the triage then leans on the issues alone.
+
+Then, before replaying, read it once as a whole and write down — in the run's notes — a
+one-line expectation per impacted test: *"#101 AC-1 checks the API keys tab, which the
+map shows renamed to Access tokens; #4552 says the analytics report gets a share link"*.
+The triage ([triage.md](triage.md)) compares outcomes against these expectations.
+
+## Keeping maps
+
+`work/inventory/<build>/` per regression-tested build; the audit pre-flight keeps the
+newest three. The map of the build last tested is what the next diff starts from, so
+never delete the newest.

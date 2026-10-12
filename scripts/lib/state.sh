@@ -7,6 +7,7 @@
 # Header lines of each table, verbatim — the verifier compares against these.
 QA_HEADER='| issue | ac_hash | candidate | baseline | verdict | status | updated_utc |'
 SUITE_HEADER='| test | issue | tier | assert_hash | promoted_utc |'
+HEALS_HEADER='| utc | test | ac | build | old_hash | new_hash | basis |'
 
 # Data rows of a markdown table file (everything after the header + separator).
 table_rows() { grep '^|' "$1" 2>/dev/null | tail -n +3; }
