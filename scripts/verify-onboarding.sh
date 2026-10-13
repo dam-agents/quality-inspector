@@ -141,7 +141,8 @@ if [ -f "$CONFIG" ]; then
     [ "$(profile_field '.schema')" = qi-profile/v1 ] && ok profile_schema "qi-profile/v1" \
       || fail profile_schema "profile.json schema is not qi-profile/v1" "install a profile built for this contract (docs/profile-contract.md)"
     for b in env versions build-time; do
-      [ -x "$pd/bin/$b" ] && ok "profile_bin:$b" "executable" || fail "profile_bin:$b" "missing or not executable" "fix the profile (docs/profile-contract.md → The bin/ contract)"
+      exe="$(profile_bin "$b")" && ok "profile_bin:$b" "${exe#$HOME_DIR/}" \
+        || fail "profile_bin:$b" "neither the profile nor its engine provides it" "fix the profile (docs/profile-contract.md → Engines)"
     done
     case "$(profile_field '.app.url')" in
       (http://localhost*|http://127.0.0.1*) ok profile_app_url "$(profile_field '.app.url')";;

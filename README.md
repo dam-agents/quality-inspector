@@ -11,9 +11,10 @@ product's source code.
 
 Everything product-specific — how to run it, which builds exist, how to sign in, what is
 off limits, what a tester should know — comes from a **product profile**, a skill installed
-at onboarding ([docs/profile-contract.md](docs/profile-contract.md)). The first profile,
-for DAM itself, is `qi-profile-dam` in
-[quality-inspector-profiles](https://github.com/dam-agents/quality-inspector-profiles).
+at onboarding ([docs/profile-contract.md](docs/profile-contract.md)). Reusable
+**engines** (`engines/`, e.g. `helm-k3s` for a Helm chart in k3s) do the running, so a
+profile is mostly data. The DAM profile, `qi-profile-dam`, lives in the DAM repository
+under `qa/`.
 The agent uses the platform's own primitives: schedules with Prechecks, the artifact
 library for evidence, the skill catalog for profiles, sub-agents for independent review.
 
@@ -45,9 +46,9 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
 3. **Create the agent on the vm backend** when the profile requires root (most nested
    products do). The kit asks for 8 CPU, 16 Gi and 80 Gi; the profile's README says what
    its product needs.
-4. **Connect the skill source that holds the profile** (Skills → Sources), e.g.
-   `https://github.com/dam-agents/quality-inspector-profiles`. Onboarding installs the
-   profile from it.
+4. **Assign the product profile**: add its skill source (Skills → Sources) and assign the
+   profile skill to the agent — for DAM, repository `https://github.com/dam-agents/dam`
+   with path `qa`, skill `qi-profile-dam`. Onboarding checks it.
 5. **Make sure agent steps can reach Anthropic** through the gateway with an injected
    credential (the agent's provider connection). Onboarding checks it.
 6. **Apply the egress rules** below, then answer the onboarding dialog. Schedules are
@@ -87,10 +88,14 @@ dam network create "$AGENT" --host api.github.com --path "/repos/$T/*" --verdict
 dam network create "$AGENT" --host codeload.github.com --path "/$T/*" --verdict deny --yes
 dam network create "$AGENT" --host raw.githubusercontent.com --verdict deny --yes
 dam network create "$AGENT" --host github.com --path "/$T*" --verdict deny --yes
+# Only when the profile lives in the target repository: its directory, nothing else
+# (longer than the deny above). P = the source path, e.g. qa.
+dam network create "$AGENT" --host api.github.com --method GET --path "/repos/$T/contents/$P*" --yes
 ```
 
-Allow `registry.npmjs.org` (`GET`) and `api.anthropic.com` (and `cdn.playwright.dev` only
-if `e2e`'s Playwright ever differs from the image's), then **every entry of the profile's
+The kit already seeds the rules every deployment shares (`registry.npmjs.org`,
+`api.anthropic.com`, a deny on `raw.githubusercontent.com`). Add `cdn.playwright.dev` only
+if `e2e`'s Playwright ever differs from the image's, then **every entry of the profile's
 `egress`** in its `profile.json` — the hosts its product needs to come up.
 
 Rules are matched by method first, then the longest path pattern, against the path

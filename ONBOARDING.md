@@ -31,8 +31,9 @@ Tell the two apart by what is already there; never assume.
 **Open the checklist first.** Call `set_onboarding_checklist` with exactly these
 operator-only steps, and tick each with `complete_onboarding_step` as it is settled:
 
-1. *Product profile* — connect the skill source that holds it (Skills → Sources) and
-   name the profile, e.g. `qi-profile-dam`.
+1. *Product profile* — add the skill source that holds it (Skills → Sources; for DAM:
+   repository `https://github.com/dam-agents/dam`, path `qa`) and assign the profile
+   skill to this agent (e.g. `qi-profile-dam`).
 2. *Backend* — the agent runs on the backend and size the profile's README asks for
    (vm backend when it requires root).
 3. *Target repository* — the `target_repo` whose issues are tested.
@@ -67,18 +68,19 @@ git branch --set-upstream-to=origin/main main 2>/dev/null || true
 Leak check: `git status --porcelain` **must be clean**. Anything under `work/`, `.ssh`,
 `.claude` or `.config` showing up → stop and fix `.gitignore`.
 
-## Step 2 — Install the product profile
+## Step 2 — Check the product profile
 
-1. `list_skill_sources` (platform MCP). The operator's profile source missing → checklist
-   item 1 is not done; ask for it and wait.
-2. `list_skills_in_source` on it; a profile is a skill with a `profile.json`. Confirm the
-   name with the operator, then `install_skill` — it lands in
-   `$HOME/.agents/skills/<name>/`. Already installed → leave its version alone.
-3. Check it answers the contract: `jq -r .schema "$HOME/.agents/skills/<name>/profile.json"`
-   prints `qi-profile/v1`, and `bin/env`, `bin/versions`, `bin/build-time` are executable.
-4. Its `requires`: `root: true` → `id -u` must print `0`, else stop — checklist item 2
+The operator assigns the profile on the platform; you never install it yourself.
+
+1. Find it: a directory under `$HOME/.agents/skills/` holding a `profile.json`. None →
+   checklist item 1 is not done; ask the operator to assign it and wait. More than one →
+   ask which.
+2. It answers the contract: `jq -r .schema <dir>/profile.json` prints `qi-profile/v1`,
+   and `env`, `versions`, `build-time` resolve — its own `bin/` or its engine's
+   (`profile_bin` in `scripts/lib/profile.sh`; `verify-onboarding.sh --config` reports it).
+3. Its `requires`: `root: true` → `id -u` must print `0`, else stop — checklist item 2
    (recreate the agent on the vm backend); each `commands` entry must be on `PATH`.
-5. Read its `SKILL.md` once and tell the operator in two lines what the profile says the
+4. Read its `SKILL.md` once and tell the operator in two lines what the profile says the
    nested product cannot do. Tick item 1.
 
 ## Step 2b — Provision `work/`
@@ -151,7 +153,7 @@ scripts find the profile through it.
 Key semantics: `CLAUDE.md` → **Runtime configuration** (read it first). Re-onboarding
 with an existing file → keep its values, ask only for missing keys. Ask, validate, write:
 
-1. **`profile`** — the name installed in Step 2.
+1. **`profile`** — the name found in Step 2.
 2. **`target_repo`** — ask. Validate with `gh api repos/<owner>/<repo>/issues?per_page=1`
    (host flag for a three-segment ref). Tick item 3.
 3. **`issue_comments`** — ask, default `disabled`. State the consequence: comments are

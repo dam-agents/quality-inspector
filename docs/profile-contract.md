@@ -9,8 +9,13 @@ sign in, what is off limits, and what a tester should know about it.
 
 ## Where it lives
 
-A skill directory, installed by the platform's skill tools into the agent's skill path
-(`$HOME/.agents/skills/<name>/`, also seen as `$HOME/.claude/skills/<name>/`).
+A skill, assigned to the agent by the operator from a skill source on the platform (the
+agent does not install it), which lands in the agent's skill path
+(`$HOME/.agents/skills/<name>/`, also seen as `$HOME/.claude/skills/<name>/`). It usually
+lives **in the product's own repository** — a source on that repository with `path` set
+to the profile's parent directory — so the product team versions it with the product.
+The platform fetches only that directory, and the agent's egress allows only it
+(README → Black-box boundary).
 `scripts/lib/profile.sh` resolves it; `QI_PROFILE_DIR` overrides the lookup (tests,
 local development). The core never edits a profile; changes go to its own repository.
 
@@ -18,12 +23,28 @@ local development). The core never edits a profile; changes go to its own reposi
 <profile>/
   SKILL.md        product knowledge for the agent (below)
   profile.json    the manifest (below)
-  bin/env         the product environment
-  bin/versions    which builds exist
-  bin/build-time  when a build was published
+  bin/env         optional — the product environment (else its engine's)
+  bin/versions    optional — which builds exist (else its engine's)
+  bin/build-time  optional — when a build was published (else its engine's)
   suite/          optional: files merged into work/suite on init (fixtures, helpers)
   README.md       for the people who maintain the profile
 ```
+
+## Engines
+
+Most products run the way many others do — a Helm chart, a compose file, a Python or
+Node server. An **engine** is a reusable implementation of the `bin/` contract shipped in
+this definition under `engines/<name>/`; a profile names it with `"engine": "<name>"` and
+describes its product as data in `"engine_config"`. A profile that ships its own
+`bin/<cmd>` overrides the engine for that command. Engines today:
+
+| Engine | For | Configuration |
+| --- | --- | --- |
+| `helm-k3s` | a Helm chart in an OCI registry, run in k3s | [engines/helm-k3s/README.md](../engines/helm-k3s/README.md) |
+
+A new engine is a new directory with `bin/env`, `bin/versions`, `bin/build-time` and a
+README of its configuration; it receives the profile's `engine_config` (placeholders its
+own business) as `QI_ENGINE_CONFIG`, and never product facts of its own.
 
 ## `profile.json`
 
@@ -75,6 +96,7 @@ Every executable runs with cwd `$HOME/work`, and with:
 | `QI_ENV_DIR` | `$QI_WORK/env` — the profile's own state (values, secrets, logs) |
 | `QI_PROFILE_CONFIG` | one JSON object: every `profile.json` config key, resolved (instance value, else default) |
 | `QI_CANDIDATE_CHANNEL`, `QI_BASELINE_CHANNEL` | the instance's channels |
+| `QI_PROFILE_DIR`, `QI_ENGINE_CONFIG` | the profile's directory, and its `engine_config` (JSON) for an engine |
 
 **Read-only commands** (the pre-flight calls them inside the Precheck's two minutes):
 

@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+# bin/env — a Helm-charted product inside this VM: k3s, the profile's prerequisites, then
+# the chart at the build under test (README → Configuration, docs/profile-contract.md).
+#
+#   init | up <tag> | reset | status | down
+#
+# Acts only on the local nested cluster. Every step is idempotent; a failed `up` is safe
+# to re-run. State lives in QI_ENV_DIR; nothing secret is ever printed.
+set -u
+export LC_ALL=C
+. "$(dirname "$0")/../lib/common.sh"
+
+HOME_DIR="${HOME:-/home/agent}"
+ENVD="${QI_ENV_DIR:?QI_ENV_DIR is required}"
+CRED="$ENVD/credentials.env"
+CFG="$(engine_config)" || exit 1
+cfgv() { jq -r "$1 // empty" <<<"$CFG"; }
+CHART="$(cfgv .chart)"; RELEASE="$(cfgv .release)"; RELEASE="${RELEASE:-app}"
+NS="$(cfgv .namespace)"; NS="${NS:-default}"; APP_PORT="$(cfgv .app_port)"
+HELM_VERSION="$(cfgv .helm_version)"; HELM_VERSION="${HELM_VERSION:-v3.19.0}"
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+die() { echo "env: $*" >&2; exit 1; }
+say() { echo "env: $*" >&2; }
+kc() { k3s kubectl "$@"; }
+now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+rand() { head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' | cut -c1-24; }
+app_url() { printf 'http://localhost:%s/' "$APP_PORT"; }
+
+# ------------------------------------------------------------------- init ----
+cmd_init() {
+  mkdir -p "$ENVD" && chmod 700 "$ENVD"
+  [ -f "$CRED" ] && return 0
+  ( umask 077
+    jq -r '.credentials.users // {} | to_entries[] | "\(.key|ascii_upcase) \(.value.username)"' <<<"$CFG" \
+      | while read -r u name; do
+          printf 'E2E_USER_%s_USERNAME=%s\nE2E_USER_%s_PASSWORD=%s\n' "$u" "$name" "$u" "$(rand)"
+        done > "$CRED.tmp"
+    jq -r '.credentials.secrets // [] | .[] | ascii_upcase' <<<"$CFG" \
+      | while read -r s; do printf 'QI_SECRET_%s=%s\n' "$s" "$(rand)"; done >> "$CRED.tmp"
+    mv -f "$CRED.tmp" "$CRED" )
+  say "seeded the test credentials"
+}
+
+# --------------------------------------------------------------------- up ----
+# k3s and kubectl come with the image; helm does not, so a pinned release goes into the home.
+ensure_helm() {
+  local bin="$HOME_DIR/.local/bin" arch tmp
+  export PATH="$bin:$PATH"
+  [ "$(helm version --short 2>/dev/null | cut -d+ -f1)" = "$HELM_VERSION" ] && return 0
+  case "$(uname -m)" in (x86_64) arch=amd64;; (aarch64|arm64) arch=arm64;; (*) die "unsupported arch $(uname -m)";; esac
+  tmp="/tmp/quality-inspector-helm"; rm -rf "$tmp"; mkdir -p "$tmp" "$bin"
+  curl -fsSL --max-time 120 "https://get.helm.sh/helm-$HELM_VERSION-linux-$arch.tar.gz" | tar -xz -C "$tmp" \
+    || { rm -rf "$tmp"; die "helm $HELM_VERSION download failed (allow get.helm.sh)"; }
+  mv -f "$tmp/linux-$arch/helm" "$bin/helm" && chmod 755 "$bin/helm"; rm -rf "$tmp"
+}
+
+k3s_running() { kc get --raw=/readyz >/dev/null 2>&1; }
+start_k3s() {
+  k3s_running && return 0
+  # The VM reaches the outside only through the paired gateway, so containerd and helm
+  # need the agent's proxy; cluster-internal ranges bypass it.
+  local np="${NO_PROXY:-${no_proxy:-}}"
+  np="${np:+$np,}localhost,127.0.0.1,::1,10.42.0.0/16,10.43.0.0/16,.svc,.cluster.local"
+  export NO_PROXY="$np" no_proxy="$np"
+  [ -n "${HTTPS_PROXY:-${https_proxy:-}}" ] && export CONTAINERD_HTTPS_PROXY="${HTTPS_PROXY:-$https_proxy}" CONTAINERD_NO_PROXY="$np"
+  [ -n "${HTTP_PROXY:-${http_proxy:-}}" ] && export CONTAINERD_HTTP_PROXY="${HTTP_PROXY:-$http_proxy}"
+  say "starting k3s"
+  (umask 022; k3s server >/var/log/k3s.log 2>&1 &)
+  local i; for i in $(seq 1 60); do k3s_running && break; sleep 5; done
+  k3s_running || die "k3s did not become ready in 5 minutes (see /var/log/k3s.log)"
+  kc wait --for=condition=Ready node --all --timeout=180s >/dev/null || die "node not Ready"
+}
+
+traefik_port() {
+  [ "$(cfgv .traefik_port)" = true ] || return 0
+  kc apply -f - >/dev/null <<YAML || die "traefik port config failed"
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |
+    ports:
+      app:
+        port: $APP_PORT
+        expose:
+          default: true
+        exposedPort: $APP_PORT
+        protocol: TCP
+YAML
+}
+
+step_wait() { # <step json>
+  local ns; ns="$(jq -r '.wait.namespace // empty' <<<"$1")"; [ -n "$ns" ] || return 0
+  if [ "$(jq -r '.wait.deployments // false' <<<"$1")" = true ]; then
+    kc -n "$ns" wait --for=condition=Available deployment --all --timeout=300s >/dev/null || die "$(jq -r .name <<<"$1"): deployments not Available"
+  fi
+  local r; r="$(jq -r '.wait.rollout // empty' <<<"$1")"
+  [ -z "$r" ] || kc -n "$ns" rollout status "$r" --timeout=300s >/dev/null || die "$(jq -r .name <<<"$1"): $r not rolled out"
+}
+
+# Prerequisites are installed once, in order, and never upgraded by `up`.
+prerequisites() {
+  local step kind name unless
+  while IFS= read -r step; do
+    kind="$(jq -r .kind <<<"$step")"; name="$(jq -r .name <<<"$step")"
+    case "$kind" in
+      manifest)
+        unless="$(jq -r '.unless // empty' <<<"$step")"
+        if [ -n "$unless" ] && kc get "$unless" >/dev/null 2>&1; then :; else
+          say "installing $name"; kc apply -f "$(jq -r .url <<<"$step")" >/dev/null || die "$name: manifest apply failed"
+        fi ;;
+      helm)
+        if ! helm -n "$(jq -r .namespace <<<"$step")" status "$name" >/dev/null 2>&1; then
+          say "installing $name"
+          local sets=(); while IFS= read -r kv; do [ -n "$kv" ] && sets+=(--set "$kv"); done \
+            < <(jq -r '.set // {} | to_entries[] | "\(.key)=\(.value)"' <<<"$step")
+          helm install "$name" "$(jq -r .chart <<<"$step")" --repo "$(jq -r .repo <<<"$step")" \
+            -n "$(jq -r .namespace <<<"$step")" --create-namespace --version "$(jq -r .version <<<"$step")" \
+            --wait --timeout 10m ${sets[@]+"${sets[@]}"} >/dev/null || die "$name: helm install failed"
+        fi ;;
+      adopt-crds)
+        # Stamp Helm ownership so a release of the cluster's own (e.g. k3s' bundled
+        # traefik-crd) adopts CRDs another prerequisite installed out of band.
+        local rel ns crd; rel="$(jq -r .release <<<"$step")"; ns="$(jq -r .namespace <<<"$step")"
+        for crd in $(jq -r '.crds[]' <<<"$step"); do
+          kc label crd "$crd" app.kubernetes.io/managed-by=Helm --overwrite >/dev/null 2>&1 || true
+          kc annotate crd "$crd" meta.helm.sh/release-name="$rel" meta.helm.sh/release-namespace="$ns" --overwrite >/dev/null 2>&1 || true
+        done ;;
+      *) die "unknown prerequisite kind '$kind' ($name)" ;;
+    esac
+    step_wait "$step"
+  done < <(jq -c '.prerequisites // [] | .[]' <<<"$CFG")
+}
+
+cmd_up() {
+  local tag="${1:?tag}" tmp chartdir
+  [ -f "$CRED" ] || cmd_init
+  ensure_helm
+  start_k3s
+  traefik_port
+  prerequisites
+  tmp="/tmp/quality-inspector-chart-$tag"; rm -rf "$tmp"; mkdir -p "$tmp"
+  helm pull "$CHART" --version "$tag" --untar --untardir "$tmp" >/dev/null 2>&1 || { rm -rf "$tmp"; die "helm pull $tag failed"; }
+  chartdir="$(find "$tmp" -mindepth 1 -maxdepth 1 -type d | head -1)"
+  # Helm never upgrades a chart's crds/ on an existing release — apply them first.
+  if [ "$(cfgv .apply_chart_crds)" = true ] && [ -d "$chartdir/crds" ]; then
+    kc apply --server-side --force-conflicts -f "$chartdir/crds/" >/dev/null || { rm -rf "$tmp"; die "CRD apply failed"; }
+  fi
+  ( umask 077; node "$ENGINE_DIR/lib/render.mjs" values "$CRED" <<<"$CFG" > "$ENVD/values.json" ) \
+    || { rm -rf "$tmp"; die "values rendering failed"; }
+  say "installing $RELEASE at $tag"
+  helm upgrade --install "$RELEASE" "$chartdir" -n "$NS" --create-namespace -f "$ENVD/values.json" \
+      --timeout 20m --wait >/dev/null 2>"$tmp/helm.err" \
+    || { local e; e="$(tail -5 "$tmp/helm.err")"; rm -rf "$tmp"; die "helm upgrade to $tag failed: $e"; }
+  rm -rf "$tmp"
+  kc -n "$NS" wait --for=condition=Available deployment --all --timeout=600s >/dev/null || die "deployments not Available"
+  local i code; for i in $(seq 1 60); do
+    code="$(curl -s -o /dev/null -w '%{http_code}' --noproxy '*' --max-time 10 "$(app_url)" 2>/dev/null)"
+    case "$code" in (2??|3??) break;; esac; sleep 10
+  done
+  case "$code" in (2??|3??) ;; (*) die "app not reachable at $(app_url) (last HTTP $code)";; esac
+  printf '{"build":"%s","installed_utc":"%s"}\n' "$tag" "$(now)" > "$ENVD/STATE.json"
+  say "$RELEASE $tag is up at $(app_url)"
+}
+
+cmd_reset() {
+  k3s_running || die "k3s is not running"
+  ensure_helm
+  helm -n "$NS" uninstall "$RELEASE" --wait --timeout 10m >/dev/null 2>&1 || true
+  kc -n "$NS" delete pvc --all --wait=true --timeout=300s >/dev/null 2>&1 || true
+  rm -f "$ENVD/STATE.json"
+}
+
+cmd_status() {
+  local running=false build="" ui=000
+  k3s_running && running=true
+  [ -f "$ENVD/STATE.json" ] && build="$(jq -r .build "$ENVD/STATE.json" 2>/dev/null)"
+  [ "$running" = true ] && ui="$(curl -s -o /dev/null -w '%{http_code}' --noproxy '*' --max-time 10 "$(app_url)" 2>/dev/null)"
+  jq -nc --argjson r "$running" --arg b "$build" --arg u "$ui" '{running:$r, build:(if $b=="" then null else $b end), ui_http:$u}'
+}
+
+cmd_down() { pkill -f 'k3s server' 2>/dev/null || true; }
+
+case "${1:-}" in
+  init)   cmd_init ;;
+  up)     cmd_up "${2:-}" ;;
+  reset)  cmd_reset ;;
+  status) cmd_status ;;
+  down)   cmd_down ;;
+  *) echo "usage: $0 init|up <tag>|reset|status|down" >&2; exit 2 ;;
+esac

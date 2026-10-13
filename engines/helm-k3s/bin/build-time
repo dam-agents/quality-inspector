@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# bin/build-time <tag> — when that chart build was published, ISO-8601 UTC. Read-only.
+set -u
+. "$(dirname "$0")/../lib/common.sh"
+. "$ENGINE_DIR/lib/registry.sh"
+CFG="$(engine_config)" || exit 1
+read -r HOST REPO < <(ref_parts "$(jq -r .chart <<<"$CFG")")
+created_at "$(jq -r '.registry_api // "oci"' <<<"$CFG")" "$HOST" "$REPO" "${1:?tag}" || { echo "no publish time for ${1}" >&2; exit 1; }

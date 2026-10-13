@@ -73,6 +73,15 @@ schedules:
       Weekly self-audit. Run `bash "$HOME/scripts/preflight.sh" audit`, then follow
       CLAUDE.md → "Audit run": read docs/audit.md and report.
 
+# Rules every deployment shares; the target-specific ones are the operator's (README →
+# Black-box boundary), because the target repository is an instance value.
+egressRules:
+  - host: registry.npmjs.org
+    method: GET
+  - host: api.anthropic.com
+  - host: raw.githubusercontent.com
+    verdict: deny
+
 resources:
   cpu: "8"
   memory: 16Gi

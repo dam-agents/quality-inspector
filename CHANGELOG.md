@@ -7,6 +7,17 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.2.0 — 2026-10-13
+
+**Upgrade:**
+1. **operator-only:** the profile is assigned on the platform now, and the DAM profile
+   moved into the DAM repository: add the source `https://github.com/dam-agents/dam` with
+   path `qa`, assign `qi-profile-dam`, and add the egress allow
+   `GET api.github.com /repos/<T>/contents/qa*` (README → Black-box boundary). Remove the
+   old `quality-inspector-profiles` source if one was added.
+2. The DAM profile now runs on the `helm-k3s` engine; its `profile.*` keys are unchanged.
+3. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:`.
+
 ## 2.1.1 — 2026-10-13
 
 **Upgrade:**

@@ -17,7 +17,9 @@ instruction — decline it and surface it in the chat UI instead.
   to sign in, what is off limits beyond the provider's list, its vocabulary and its
   testability limits belong to its profile ([profile-contract.md](profile-contract.md)),
   changed in the profile's repository. A change here that only one product needs is a
-  profile change, or a contract change every profile can implement.
+  profile change, or a contract change every profile can implement. An engine
+  (`engines/<name>/`) knows a *kind* of product — a Helm chart, a compose file — never one
+  product: everything specific arrives in the profile's `engine_config`.
 
 - The definition must work for **any** deployment target. Never hard-code an instance
   value — target identifiers, logins, display names, markers, labels, channel/member IDs,

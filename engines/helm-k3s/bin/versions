@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# bin/versions — candidate and baseline builds (chart tags) for the instance's channels.
+# A channel is a tag regex plus an order (semver | numeric-suffix | time); the candidate
+# is the newest tag of the candidate channel, the baseline the newest of the baseline
+# channel — or its second newest when both channels are the same. Read-only.
+set -u
+export LC_ALL=C
+. "$(dirname "$0")/../lib/common.sh"
+. "$ENGINE_DIR/lib/registry.sh"
+CFG="$(engine_config)" || exit 1
+CHART="$(jq -r .chart <<<"$CFG")"; API="$(jq -r '.registry_api // "oci"' <<<"$CFG")"
+CC="${QI_CANDIDATE_CHANNEL:-$(jq -r '.default_candidate // empty' <<<"$CFG")}"
+BC="${QI_BASELINE_CHANNEL:-$(jq -r '.default_baseline // "none"' <<<"$CFG")}"
+jq -e --arg c "$CC" '.channels[$c]' <<<"$CFG" >/dev/null || { echo "unknown candidate channel '$CC'" >&2; exit 1; }
+[ "$BC" = none ] || jq -e --arg c "$BC" '.channels[$c]' <<<"$CFG" >/dev/null || { echo "unknown baseline channel '$BC'" >&2; exit 1; }
+read -r HOST REPO < <(ref_parts "$CHART")
+
+# Enough tags: quay pages newest-first until both channels have their builds; /v2 lists all.
+need() { jq -r --arg c "$CC" --arg b "$BC" --slurp -R '
+  split("\n") | map(select(length>0) | split(" ") | {name:.[0], ts:(.[1]|tonumber)}) as $t
+  | def n($ch): if $ch == "none" then 0 else ($t | map(select(.name | test($CFG.channels[$ch].tag))) | length) end;
+  (n($c) >= 1) and ($b == "none" or n($b) >= (if $b == $c then 2 else 1 end))' --argjson CFG "$CFG"; }
+TAGS=""
+if [ "$API" = quay ]; then
+  for p in $(seq 1 "$(jq -r '.max_pages // 30' <<<"$CFG")"); do
+    page="$(curl -fsS --max-time 20 "https://quay.io/api/v1/repository/$REPO/tag/?limit=100&onlyActiveTags=true&page=$p")" \
+      || { echo "quay listing failed for $REPO" >&2; exit 1; }
+    TAGS="$TAGS$(jq -r '.tags[]? | "\(.name) \(.start_ts // 0)"' <<<"$page")"$'\n'
+    [ "$(printf '%s' "$TAGS" | need)" = true ] && break
+    [ "$(jq -r '.has_additional // false' <<<"$page")" = true ] || break
+  done
+else
+  TAGS="$(tags_oci "$HOST" "$REPO")" || { echo "OCI tag listing failed for $HOST/$REPO" >&2; exit 1; }
+fi
+
+printf '%s\n' "$TAGS" | jq -R --slurp -c --arg c "$CC" --arg b "$BC" --argjson CFG "$CFG" '
+  split("\n") | map(select(length>0) | split(" ") | {name:.[0], ts:(.[1]|tonumber)}) as $t
+  | def ordered($ch): $CFG.channels[$ch] as $d
+      | $t | map(select(.name | test($d.tag)))
+      | if $d.order == "semver" then sort_by(.name | split(".") | map(tonumber? // 0))
+        elif $d.order == "numeric-suffix" then sort_by(.name | capture("(?<n>[0-9]+)$").n | tonumber)
+        else sort_by(.ts) end
+      | reverse | map(.name);
+  ordered($c) as $cand
+  | {candidate: ($cand[0] // null),
+     baseline: (if $b == "none" then null elif $b == $c then ($cand[1] // null) else (ordered($b)[0] // null) end)}
+  | if .candidate == null then error("no build in channel \($c)") else . end'
