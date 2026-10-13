@@ -40,13 +40,15 @@ Black-box boundary has the commands). The core's own needs:
 
 | Host | Allowed | Denied |
 | --- | --- | --- |
-| `api.github.com` | `GET` the issues paths above; `POST …/issues/*/comments`; `DELETE …/issues/*/labels/*` | every other path under `/repos/<T>/` |
-| `raw.githubusercontent.com`, `codeload.github.com` | — | everything |
+| `api.github.com` | `GET /repos/<T>/issues*`; `POST …/issues/*/comments*`; `DELETE …/issues/*/labels/*` | `…/issues/*/timeline*`, `…/issues/*/events*` (longer, so they win), every other path under `/repos/<T>/` |
+| `codeload.github.com` | skill and definition downloads of other repositories | `/<T>/*` — the target's tarballs |
+| `raw.githubusercontent.com` | — | everything |
 | `github.com` | this agent's definition and profile repositories | everything under `/<T>` |
 | `registry.npmjs.org` | `GET` (the `e2e` framework) | — |
 | `api.anthropic.com` | model calls for agent steps | — |
 | `cdn.playwright.dev`, `playwright.download.prss.microsoft.com` | `GET`, only when `e2e`'s Playwright differs from the image's | — |
 
+Patterns end in `*` wherever a query string may follow: the matched path includes it.
 Plus every entry of the profile's `egress`. An unmatched request is **held** for approval
 on the operator's Home. Approve nothing on the deny side; a held probe shows as `warn`
 until it is an explicit deny.

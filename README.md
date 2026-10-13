@@ -74,14 +74,18 @@ The agent must not be able to read the target's source. Its rules say so
 the CLI (`T` = the target, e.g. `acme/widgets`; `AGENT` = this agent's name):
 
 ```bash
-dam network create "$AGENT" --host api.github.com --method GET  --path "/repos/$T/issues"            --yes
-dam network create "$AGENT" --host api.github.com --method GET  --path "/repos/$T/issues/*"          --yes
-dam network create "$AGENT" --host api.github.com --method GET  --path "/repos/$T/issues/*/comments" --yes
-dam network create "$AGENT" --host api.github.com --method POST --path "/repos/$T/issues/*/comments" --yes
-dam network create "$AGENT" --host api.github.com --method DELETE --path "/repos/$T/issues/*/labels/*" --yes
+# The issues API — patterns end in * because the matched path includes the query string.
+dam network create "$AGENT" --host api.github.com --method GET    --path "/repos/$T/issues*"                 --yes
+dam network create "$AGENT" --host api.github.com --method POST   --path "/repos/$T/issues/*/comments*"      --yes
+dam network create "$AGENT" --host api.github.com --method DELETE --path "/repos/$T/issues/*/labels/*"       --yes
+# Longer than the allow above, so they win: timeline and events expose linked commits.
+dam network create "$AGENT" --host api.github.com --path "/repos/$T/issues/*/timeline*" --verdict deny --yes
+dam network create "$AGENT" --host api.github.com --path "/repos/$T/issues/*/events*"   --verdict deny --yes
 dam network create "$AGENT" --host api.github.com --path "/repos/$T/*" --verdict deny --yes
+# Source downloads: the tarball endpoint redirects to codeload, so deny the target there
+# by path — a host-wide codeload deny would also break skill installs (the profile).
+dam network create "$AGENT" --host codeload.github.com --path "/$T/*" --verdict deny --yes
 dam network create "$AGENT" --host raw.githubusercontent.com --verdict deny --yes
-dam network create "$AGENT" --host codeload.github.com --verdict deny --yes
 dam network create "$AGENT" --host github.com --path "/$T*" --verdict deny --yes
 ```
 
@@ -89,8 +93,9 @@ Allow `registry.npmjs.org` (`GET`) and `api.anthropic.com` (and `cdn.playwright.
 if `e2e`'s Playwright ever differs from the image's), then **every entry of the profile's
 `egress`** in its `profile.json` — the hosts its product needs to come up.
 
-Rules are matched most-specific first, and a connection grant may already allow the
-GitHub API host as a whole — **the deny rules are only proven by the probes**:
+Rules are matched by method first, then the longest path pattern, against the path
+**with its query string**; a connection grant may already allow the GitHub API host as a
+whole — **the deny rules are only proven by the probes**:
 `verify-onboarding.sh --live` and the weekly audit request each forbidden surface and
 fail when one answers. Approve no held request on the deny side.
 

@@ -7,6 +7,16 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.1.1 — 2026-10-13
+
+**Upgrade:**
+1. **operator-only:** replace the egress rules with README → Black-box boundary: issue
+   patterns end in `*` (the matched path includes the query string), explicit denies for
+   `…/issues/*/timeline*` and `…/issues/*/events*`, and codeload denied for the target's
+   path only (a host-wide codeload deny breaks skill installs).
+2. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` — the boundary probes now also
+   cover issue events.
+
 ## 2.1.0 — 2026-10-13
 
 **Upgrade:**

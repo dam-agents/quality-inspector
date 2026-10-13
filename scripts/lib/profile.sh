@@ -45,7 +45,7 @@ profile_run() { # <bin> [args…]
 boundary_targets() { # <owner/repo>
   local r="$1" dir p
   printf '%s\n' "gh repos/$r/contents/" "gh repos/$r/pulls?per_page=1" "gh repos/$r/commits?per_page=1" \
-    "gh repos/$r/git/refs/heads" "gh repos/$r/issues/1/timeline" \
+    "gh repos/$r/git/refs/heads" "gh repos/$r/issues/1/timeline" "gh repos/$r/issues/1/events" \
     "url https://raw.githubusercontent.com/$r/HEAD/README.md" "url https://codeload.github.com/$r/tar.gz/HEAD"
   dir="$(profile_dir)" || return 0
   jq -r '.boundary.github_paths[]? // empty' "$dir/profile.json" | while read -r p; do printf 'gh repos/%s/%s\n' "$r" "${p#/}"; done
