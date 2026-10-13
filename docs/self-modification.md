@@ -198,6 +198,9 @@ refuse and explain instead:
 - Every judged AC ships its evidence (issue runs use `--evidence full`; the report comes
   from `scripts/render-report.mjs`), and only tests tagged `issue-<n>` are published —
   never the sign-in setup test.
+- The benchmark's ground truth (`work/benchmark/cases.json`) never reaches the pipeline
+  that runs a case, and a benchmark run never writes production state (QA rows, tiers,
+  comments) ([benchmark.md](benchmark.md)).
 - Issue comments stay opt-in (`issue_comments`); nested credentials never leave
   `work/env/` except as e2e credentials.
 

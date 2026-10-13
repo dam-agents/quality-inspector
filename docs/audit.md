@@ -24,6 +24,9 @@ when `audit_report: disabled` (still append the log line).
      `verified` without a baseline failure; every tested AC has a candidate video and its
      `AC-<k>` screenshot; AC blocks contain checks only; no internal identifiers or
      credentials in the text, the screenshots or the first and last frames you look at.
+   - Benchmark: the newest line of `work/benchmark/history.jsonl` — its age, accuracy and
+     `false_verified` (above 0 is a red line until a later run is clean); a benchmark
+     never run, or older than two months with cases defined, is a warn.
    - Spec quality: this week's `not-testable` verdicts and `testable: no` ACs by reason,
      issues without "Done when", and how many suggested rewrites authors adopted (an
      issue that became due again by `ac_changed` after a `spec-feedback` file).

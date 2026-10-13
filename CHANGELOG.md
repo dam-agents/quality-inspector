@@ -7,6 +7,16 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.1.0 — 2026-10-13
+
+**Upgrade:**
+1. `mkdir -p "$HOME/work/benchmark"`.
+2. Create the schedule `quality-inspector-benchmark-monthly` from its `kit.yaml` entry
+   (name, cron, `sessionMode: fresh`, precheck, task text verbatim), **disabled** — a
+   suggested schedule the operator turns on once `work/benchmark/cases.json` holds cases
+   ([docs/benchmark.md](docs/benchmark.md)).
+3. Offer once: writing a first set of benchmark cases with the operator.
+
 ## 2.0.0 — 2026-10-13
 
 **Upgrade:** (major — the product moved into a profile)

@@ -86,7 +86,7 @@ Leak check: `git status --porcelain` **must be clean**. Anything under `work/`, 
 Create only what is missing; never overwrite an existing state file.
 
 ```bash
-mkdir -p /home/agent/work/issues /home/agent/work/logs /home/agent/work/inventory /home/agent/work/regression
+mkdir -p /home/agent/work/issues /home/agent/work/logs /home/agent/work/inventory /home/agent/work/regression /home/agent/work/benchmark
 cd /home/agent/work
 [ -f QA.md ] || cat > QA.md <<'EOF'
 # QA state — one row per issue (docs/issue-qa.md → State)
@@ -212,7 +212,8 @@ the criteria files and the replay cache are not reconstructable.
 ## Step 5 — Schedules
 
 Start from `mcp__platform-outbound__list_schedules`. Expected: `quality-inspector-issues-1h`,
-`quality-inspector-regression-nightly`, `quality-inspector-audit-weekly`.
+`quality-inspector-regression-nightly`, `quality-inspector-benchmark-monthly`,
+`quality-inspector-audit-weekly`.
 
 - Present → leave alone, including its enabled state; the regression and audit schedules
   arrive switched off on purpose — offer to turn them on, never flip them unasked.

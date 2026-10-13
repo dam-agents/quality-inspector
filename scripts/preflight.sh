@@ -12,7 +12,7 @@
 #   .nothing_to_do == true  -> the agent ends the run immediately.
 #   otherwise               -> the agent processes the arrays per CLAUDE.md + docs/.
 #
-# Modes: issues (default) | regression | audit.
+# Modes: issues (default) | regression | audit | benchmark.
 # Requires: bash, jq, gh, curl, sed/grep/awk, GNU date (Linux pod).
 
 set -u
@@ -271,7 +271,16 @@ mode_audit() {
     '{mode:"audit", nothing_to_do:false, checks:$c, failures:$f, stats:$s, logs:$logs}'
 }
 
+# ========================================================== BENCHMARK MODE ====
+mode_benchmark() {
+  local d; d="$(bash "$SCRIPT_DIR/benchmark.sh" due 2>/dev/null)" || fail_out "benchmark due-check failed"
+  log "$(jq -r .reason <<<"$d")"
+  runlog BENCHMARK "due=$(jq -r .due <<<"$d") cases=$(jq -r .cases <<<"$d")"
+  jq -nc --argjson d "$d" --argjson logs "$(logs_json)" '{mode:"benchmark", nothing_to_do:($d.due | not), cases:$d.cases, last_run:$d.last_run, logs:$logs}'
+}
+
 case "$MODE" in
+  benchmark)  mode_benchmark ;;
   issues)     mode_issues ;;
   regression) mode_regression ;;
   audit)      mode_audit ;;

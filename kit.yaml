@@ -55,6 +55,16 @@ schedules:
       report its logs in one line and end the run. Otherwise follow CLAUDE.md →
       "Regression run": read docs/regression.md and replay the regression tier
       against the worklist's candidate.
+  - name: quality-inspector-benchmark-monthly
+    cron: "0 2 1 * *"
+    sessionMode: fresh
+    enabled: false
+    precheck: 'bash "$HOME/scripts/precheck.sh" benchmark'
+    task: >-
+      QA benchmark run. Run `bash "$HOME/scripts/preflight.sh" benchmark` first unless
+      its worklist is already appended below. If its JSON says nothing_to_do, report its
+      logs in one line and end the run. Otherwise follow CLAUDE.md → "Benchmark run":
+      read docs/benchmark.md and run every case.
   - name: quality-inspector-audit-weekly
     cron: "0 7 * * 5"
     sessionMode: fresh
