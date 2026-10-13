@@ -1,28 +1,36 @@
 # quality-inspector
 
-A black-box QA agent for the platform, running on the platform. For every issue of a
-target repository labelled `qa:ready`, it turns the issue's **Done when** section into
-frozen acceptance criteria, installs the newest dev chart into a **nested k3s cluster
-inside its own VM**, tests the criteria **through the UI** with
+A black-box QA agent that tests **any product with a web UI**, running on the DAM agent
+platform. For every issue of a target repository labelled `qa:ready`, it turns the
+issue's **Done when** section into frozen acceptance criteria, brings the newest build of
+the product up **inside its own VM**, tests the criteria **through the UI** with
 [e2e](https://github.com/tester-army/e2e) (Playwright with an LLM fallback and a replay
-cache) and the image's built-in Chromium, confirms each result red-green against the
-last release, and publishes a per-criterion verdict with evidence. It never reads the
-platform's source code. The target repository is configured at onboarding, not baked in.
+cache) and the image's built-in Chromium, confirms each result red-green against the last
+release, and publishes a per-criterion verdict with video evidence. It never reads the
+product's source code.
+
+Everything product-specific — how to run it, which builds exist, how to sign in, what is
+off limits, what a tester should know — comes from a **product profile**, a skill installed
+at onboarding ([docs/profile-contract.md](docs/profile-contract.md)). The first profile,
+for DAM itself, is `qi-profile-dam` in
+[quality-inspector-profiles](https://github.com/dam-agents/quality-inspector-profiles).
+The agent uses the platform's own primitives: schedules with Prechecks, the artifact
+library for evidence, the skill catalog for profiles, sub-agents for independent review.
 
 ## How it works
 
 - **Issues run** (hourly) — the pre-flight lists labelled issues in one call, hashes each
-  issue's criteria text and resolves the newest chart versions from the registry; an
+  issue's criteria text and asks the profile for the newest builds; an
   issue is due when it is new, its text changed, or it carries `qa:retest`. The schedule's
   Precheck declines idle hours before any model wakes. The agent then freezes the
-  criteria, brings up the nested platform, writes one e2e test per criterion, runs it on
+  criteria, brings the product up, writes one e2e test per criterion, runs it on
   the last release and on the candidate, and reports (docs/issue-qa.md).
 - **Regression run** (nightly, off by default) — replays the tests the operator promoted
   against each new candidate; recorded steps replay without model calls, the LLM steps in
   only where the UI changed (docs/regression.md).
 - **Weekly audit** (off by default) — health, the black-box boundary probes, assertion
   drift, cache efficiency (docs/audit.md).
-- Scripts only detect and set up the local nested environment; every judgment and every
+- Scripts only detect, and the profile only sets up the nested product; every judgment and every
   external write is the agent's, per `docs/`. `CLAUDE.md` is the small always-loaded
   core; the definition is versioned (`VERSION` + `CHANGELOG.md`).
 
@@ -34,13 +42,16 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
 2. **Grant the GitHub connection** (required) — reads the target's issues; with issue
    comments enabled it also posts verdicts and removes the retest label, so the account
    needs issue write access on the target. Use a dedicated bot account.
-3. **Create the agent on the vm backend.** The nested cluster needs root inside a
-   microVM; a container-backend agent cannot run it. The kit asks for 8 CPU, 16 Gi and
-   80 Gi.
-4. **Make sure agent steps can reach Anthropic** through the gateway with an injected
+3. **Create the agent on the vm backend** when the profile requires root (most nested
+   products do). The kit asks for 8 CPU, 16 Gi and 80 Gi; the profile's README says what
+   its product needs.
+4. **Connect the skill source that holds the profile** (Skills → Sources), e.g.
+   `https://github.com/dam-agents/quality-inspector-profiles`. Onboarding installs the
+   profile from it.
+5. **Make sure agent steps can reach Anthropic** through the gateway with an injected
    credential (the agent's provider connection). Onboarding checks it.
-5. **Apply the egress rules** below, then answer the onboarding dialog. Schedules are
-   held until onboarding completes, which includes a smoke test of the nested platform.
+6. **Apply the egress rules** below, then answer the onboarding dialog. Schedules are
+   held until onboarding completes, which includes a smoke test of the nested product.
 
 Not in a catalog yet? Add one entry to the catalog repository's `catalog.yaml`:
 
@@ -74,12 +85,9 @@ dam network create "$AGENT" --host codeload.github.com --verdict deny --yes
 dam network create "$AGENT" --host github.com --path "/$T*" --verdict deny --yes
 ```
 
-Allow, method `GET`: `quay.io`, `*.quay.io`, `get.helm.sh`,
-`istio-release.storage.googleapis.com`, `objects.githubusercontent.com`,
-`release-assets.githubusercontent.com`, `registry.npmjs.org` (and `cdn.playwright.dev` only
-if `e2e`'s Playwright ever differs from the image's), and on `github.com` the
-paths `/cert-manager/cert-manager/releases/*` and
-`/kubernetes-sigs/gateway-api/releases/*`; allow `api.anthropic.com`.
+Allow `registry.npmjs.org` (`GET`) and `api.anthropic.com` (and `cdn.playwright.dev` only
+if `e2e`'s Playwright ever differs from the image's), then **every entry of the profile's
+`egress`** in its `profile.json` — the hosts its product needs to come up.
 
 Rules are matched most-specific first, and a connection grant may already allow the
 GitHub API host as a whole — **the deny rules are only proven by the probes**:
@@ -116,23 +124,22 @@ configuration.
 
 | Key | Filled at onboarding by | Purpose |
 | --- | --- | --- |
+| `profile` | chosen and installed | The product profile skill, e.g. `qi-profile-dam`. |
+| `profile.<key>` | asked or defaulted, per the profile | The profile's own settings ([docs/profile-contract.md](docs/profile-contract.md)). |
 | `target_repo` | asked | Repository whose issues are tested. `QI_TARGET_REPO` overrides. |
 | `issue_comments` | asked, default `disabled` | Opt-in: post verdicts on the issue. |
 | `spec_feedback` | asked, default `disabled` | Opt-in: suggest an observable "Done when" on issues with nothing testable. |
-| `media_retention_days` | default `14` | Local evidence kept after delivery. |
-| `mock_image` | asked, default empty | Mock harness image for the nested platform. |
 | `marker_prefix` | default `quality-inspector` | Dedup marker; **immutable once a comment exists**. |
 | `qa_label`, `retest_label` | defaults | The gates (`qa:ready`, `qa:retest`). |
-| `chart_ref`, `candidate_channel`, `baseline_channel` | defaults | What is tested against what. |
+| `candidate_channel`, `baseline_channel` | the profile's defaults | What is tested against what (`none` turns red-green off). |
 | `artifact_reports`, `include_comments`, `max_issues_per_run`, `lock_ttl_min`, `display_name` | defaults | Reporting and pacing. |
 | `e2e_version`, `e2e_web_version`, `e2e_model` | defaults | Test framework pins and the model for agent steps. |
-| `istio_version`, `cert_manager_version`, `gateway_api_version`, `helm_version` | defaults | Nested prerequisites. |
-| `audit_report`, `log_level` | defaults | Audit and diagnostics. |
+| `audit_report`, `log_level`, `media_retention_days` | defaults | Audit, diagnostics, local evidence retention. |
 
 ## Runtime requirements
 
-- **Platform:** a vm-backend agent (root in a microVM; k3s, kubectl, Node, Playwright
-  1.63 with its Chromium baked in the image), `$HOME` on a persistent volume, the
+- **Platform:** a DAM agent (vm backend when the profile requires root; Node ≥ 24.8 and
+  Playwright with its Chromium baked in the image), `$HOME` on a persistent volume, the
   gateway for credentials, `mcp__platform-outbound__*` for schedules and the artifact
   tools.
 - **Identity:** the GitHub connection's account — a dedicated bot; read access to the
@@ -140,8 +147,8 @@ configuration.
 - **External surfaces:** artifacts in the platform's artifact library (private by
   default); with `issue_comments: enabled`, **public comments** on the target's issues,
   and removal of the retest label.
-- **Cost:** idle hours wake no model. One issue costs three chart installs (15–25 min
-  each, no tokens) plus authoring — expect a few hundred thousand tokens for the first
+- **Cost:** idle hours wake no model. One issue costs three installs of the product (time,
+  no tokens) plus authoring — expect a few hundred thousand tokens for the first
   run of an issue; replays of promoted tests are mostly free, except `agent.assert`
   checks, which always call the model.
 
@@ -160,7 +167,8 @@ platform's Kit Update and never touch `work/` ([docs/persistence.md](docs/persis
 - [`ONBOARDING.md`](ONBOARDING.md) — first-run setup, ending in a nested smoke test and
   `scripts/verify-onboarding.sh --live`.
 - [`docs/`](docs/) — procedures, read on demand.
-- [`scripts/`](scripts/) — pre-flight and Precheck, the nested environment (`env.sh`),
+- [`scripts/`](scripts/) — pre-flight and Precheck, the environment lock and profile
+  dispatch (`env.sh`),
   the suite runner (`suite.sh`), the evidence page renderer (`render-report.mjs`), the
   assertion guard, verification, offline tests.
 - [`VERSION`](VERSION) + [`CHANGELOG.md`](CHANGELOG.md) — semver and upgrade steps.

@@ -5,7 +5,7 @@ when `audit_report: disabled` (still append the log line).
 
 1. Run `bash "$HOME/scripts/preflight.sh" audit`. Its `checks[]` are the deterministic
    half: GitHub identity, issues reachability, **the black-box boundary probes**, the
-   registry, root/k3s/disk, `work/` not a repo, leftovers, stale locks, assertion drift,
+   profile and its builds, the profile's requirements, disk, `work/` not a repo, leftovers, stale locks, assertion drift,
    the issues pre-flight cadence, definition cleanliness and version. `failures[]` groups
    the week's error events; `stats` counts verdicts.
 2. Add the judgment half:
@@ -28,7 +28,7 @@ when `audit_report: disabled` (still append the log line).
      issues without "Done when", and how many suggested rewrites authors adopted (an
      issue that became due again by `ac_changed` after a `spec-feedback` file).
    - Flakiness: rows added to `work/FLAKY.md` this week, tests `quarantined`, and whether
-     one cause dominates (the same page, the nested platform right after `up`).
+     one cause dominates (the same page, the nested product right after `up`).
    - Triage health: heals this week from `work/HEALS.md` (each one's basis is a UI-map
      change or an issue — sample one), tests at three heals a month, `needs-review` items
      the operator has not answered, `retired` tests.

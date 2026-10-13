@@ -1,8 +1,8 @@
 # Issue QA — one `issues_due` entry, end to end
 
 Read for every `issues_due` entry and for "test #N". The worklist gives `issue`, `ac_hash`,
-`kind`, `takeover`, `has_done_when` and the run's `candidate` / `baseline` chart
-versions. `T` below is the configured `target_repo`; never print it outside the issue.
+`kind`, `takeover`, `has_done_when`, `spec` and the run's `candidate` / `baseline`
+builds (from the profile). `T` below is the configured `target_repo`; never print it outside the issue.
 
 ## State
 

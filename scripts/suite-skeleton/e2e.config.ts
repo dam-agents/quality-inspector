@@ -10,7 +10,7 @@ export default {
     {
       name: 'web',
       engine: web({ browser: 'chromium' }),
-      app: { url: process.env.APP_URL ?? 'http://localhost:4444' },
+      app: { url: process.env.APP_URL ?? 'http://localhost' },
     },
   ],
   tests: ['tests/**/*.e2e.ts'],

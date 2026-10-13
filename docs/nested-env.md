@@ -1,59 +1,46 @@
-# The nested platform
+# The nested product
 
-The system under test runs inside this agent's own VM: k3s, its prerequisites, and the
-published chart at the version under test. Everything is driven by
-`scripts/env.sh` (usage in its header); this file is the why and the recovery path.
+The system under test runs **inside this agent's own VM**, at the build under test, brought
+up by the profile ([profile-contract.md](profile-contract.md)). `scripts/env.sh` is the one
+entry: it holds the lock and hands every other command to the profile's `bin/env`. This
+file is the why and the recovery path; how one product is installed is the profile's.
 
 ## Shape
 
-- **vm backend only.** The agent runs as root in a microVM, so it can start k3s
-  (`k3s server`, state under the home volume — it survives restarts, processes do not).
-  A container-backend agent cannot host it; `verify-onboarding.sh --live` fails there.
-- **Prerequisites** — cert-manager, the Gateway API CRDs, Istio ambient (base, istiod,
-  cni, ztunnel) — install once, at the pinned config versions, and are never upgraded by
-  `env.sh up`. Changing a version key means `env.sh down`, deleting the k3s state
-  (operator decision), and a fresh `up`.
-- **The chart** is pulled at the exact version, its `crds/` applied server-side first,
-  then `helm upgrade --install` with `work/env/values.yaml` (seeded by `env.sh init`:
-  `localhost:4444`, a QA terms text, a generated Keycloak admin and test-user password in
-  `work/env/credentials.env`). That values file is the chart's documented operator
-  interface; edit it only from `helm show values <chart_ref> --version <v>`.
-- **Mock harness.** With `mock_image` set, `up` adds a `mock` harness template so tests
-  can create agents that answer without a model. Without it, nested agents cannot run.
-- **One user of the environment at a time** — `env.sh lock <owner>` / `unlock`; the
-  pre-flight treats a live lock as an idle occurrence.
-
-## Tools
-
-kubectl and k3s come with the image; helm does not, so `env.sh up` installs
-`helm_version` into `~/.local/bin` on first use. Use `k3s kubectl` and that helm for
-diagnosis — read-only commands (`get`, `describe`, `logs`) are fine at any time.
+- **Inside the VM only.** The product answers at the profile's `app.url` on `localhost`;
+  `suite.sh`, `e2e-mcp.sh` and `ui-inventory.mjs` refuse any other base URL, and no
+  procedure ever drives the platform this agent itself runs on.
+- **One user of the environment at a time** — `env.sh lock <owner>` / `unlock <owner>`;
+  the pre-flight treats a live lock as an idle occurrence, and a lock past `lock_ttl_min`
+  is the next holder's to take over.
+- **Credentials are the profile's** — `env.sh init` makes it write
+  `work/env/credentials.env` (mode 600). Tests reach them only as `e2e` credentials.
+- **Builds move forward only.** To run an older build (the baseline) after a newer one,
+  always `env.sh reset` first — a downgrade over newer data is undefined. The red-green
+  order in [issue-qa.md](issue-qa.md) step 6 is built around that.
+- What the nested product cannot do (no outbound network for its own components, no
+  email, a single user…) is in the profile's `SKILL.md`; it decides `testable: no`
+  ([acceptance-criteria.md](acceptance-criteria.md)).
 
 ## Network
 
-The VM reaches the outside only through the paired gateway. `env.sh` passes the agent's
-`HTTPS_PROXY` to k3s's containerd and exempts the cluster ranges, so images pull from the
-registry through the gateway; pods inside the nested cluster have **no** direct egress,
-which is why nested agents need the mock harness. The hosts this needs are listed in
-README → Black-box boundary.
-
-## Switching versions
-
-Upgrades go forward only. To run an older chart (the baseline) after a newer one, always
-`env.sh reset` first — a downgrade over a newer database is undefined. The red-green order
-in [issue-qa.md](issue-qa.md) step 6 is built around that.
+The VM reaches the outside only through the paired gateway, by the agent's egress rules.
+The hosts a profile needs are its `egress` list; the operator applies them. A pull that is
+held or refused surfaces as a failing `env.sh up`, and the fix is the operator's.
 
 ## Failures
 
-An `env.sh` exit 1 or a failing smoke run is an **environment failure**, never a
-verdict. Before giving up on the entry:
+An `env.sh` exit other than 0, or a failing smoke run, is an **environment failure** —
+never a verdict. Before giving up on the entry:
 
-1. `bash "$HOME/scripts/env.sh" status`, then `k3s kubectl get pods -A | grep -v Running`.
-2. One repair attempt that the evidence supports: a crash-looping pod's logs, a pending
-   pod's events, `env.sh reset` + `up` for a release stuck mid-upgrade.
-3. Still failing → abort the entry ([issue-qa.md](issue-qa.md) step 4) with the
-   evidence in the log. A cause you reproduced goes to `work/LESSONS.md` with its
-   evidence; a definition bug is the audit's to file.
+1. `bash "$HOME/scripts/env.sh" status`, then the diagnosis the profile's README names
+   (read-only commands only).
+2. One repair attempt the evidence supports — usually `env.sh reset`, then `up` again,
+   for an install stuck half-way.
+3. Still failing → abort the entry ([issue-qa.md](issue-qa.md) step 4) with the evidence
+   in the log. A cause you reproduced goes to `work/LESSONS.md`; a profile defect is an
+   issue on the profile's repository, never a local patch to the profile.
 
-Never "fix" the product inside the nested cluster (patching deployments, editing its
-database) to make a test pass — that tests your patch, not the build.
+Never "fix" the product inside the environment (its files, its database, its
+configuration beyond what the profile sets) to make a test pass — that tests your patch,
+not the build.

@@ -32,7 +32,7 @@ logs_json() { printf '%s\n' "${LOGS[@]:-}" | jq -R . | jq -sc '[.[] | select(len
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/config.sh" || { echo "cannot source lib/config.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/state.sh" || { echo "cannot source lib/state.sh" >&2; exit 1; }
-. "$SCRIPT_DIR/lib/charts.sh" || { echo "cannot source lib/charts.sh" >&2; exit 1; }
+. "$SCRIPT_DIR/lib/profile.sh" || { echo "cannot source lib/profile.sh" >&2; exit 1; }
 
 iso2epoch() { date -d "$1" +%s 2>/dev/null \
               || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
@@ -41,9 +41,10 @@ iso2epoch() { date -d "$1" +%s 2>/dev/null \
 TARGET="${QI_TARGET_REPO:-$(cfg target_repo)}"
 QA_LABEL="$(cfg qa_label)"; QA_LABEL="${QA_LABEL:-qa:ready}"
 RETEST_LABEL="$(cfg retest_label)"; RETEST_LABEL="${RETEST_LABEL:-qa:retest}"
-CHART_REF="$(cfg chart_ref)"; CHART_REF="${CHART_REF:-oci://quay.io/dam-agents/charts/platform}"
-CAND_CH="$(cfg candidate_channel)"; CAND_CH="${CAND_CH:-main}"
-BASE_CH="$(cfg baseline_channel)"; BASE_CH="${BASE_CH:-release}"
+# Builds come from the product profile: {"candidate": …, "baseline": …|null}.
+versions_json() { # [baseline-channel override, e.g. none]
+  QI_BASELINE_OVERRIDE="${1:-}" profile_run versions | jq -ce 'select(.candidate != null and .candidate != "")' 2>/dev/null
+}
 MAX_ISSUES="$(cfg max_issues_per_run)"; MAX_ISSUES="${MAX_ISSUES:-1}"
 LOCK_TTL_MIN="$(cfg lock_ttl_min)"; LOCK_TTL_MIN="${LOCK_TTL_MIN:-180}"
 case "$MAX_ISSUES" in (''|*[!0-9]*) MAX_ISSUES=1;; esac
@@ -111,9 +112,9 @@ mode_issues() {
   env_busy_out ISSUES
 
   local versions candidate baseline
-  versions="$(chart_versions "$CHART_REF" "$CAND_CH" "$BASE_CH" 2>/tmp/quality-inspector-pf-err.$$)" \
-    || { local e; e="$(cat /tmp/quality-inspector-pf-err.$$ 2>/dev/null)"; rm -f /tmp/quality-inspector-pf-err.$$; fail_out "cannot resolve chart versions: $e"; }
-  rm -f /tmp/quality-inspector-pf-err.$$
+  versions="$(versions_json 2>/tmp/quality-inspector-pf-e2.$$)" \
+    || { local e; e="$(tail -3 /tmp/quality-inspector-pf-e2.$$ 2>/dev/null)"; rm -f /tmp/quality-inspector-pf-e2.$$; fail_out "cannot resolve product builds: $e"; }
+  rm -f /tmp/quality-inspector-pf-e2.$$
   candidate="$(printf '%s' "$versions" | jq -r .candidate)"
   baseline="$(printf '%s' "$versions" | jq -r '.baseline // empty')"
 
@@ -124,49 +125,14 @@ mode_issues() {
   printf '%s' "$listing" | jq -e 'type == "array"' >/dev/null 2>&1 \
     || fail_out "issue listing returned no array"
 
-  local due='[]' reports='[]' deferred=0 n=0 row
-  while IFS= read -r item; do
-    [ -n "$item" ] || continue
-    local num title body hash retest kind="" takeover=false dw=false
-    num="$(printf '%s' "$item" | jq -r .number)"
-    title="$(printf '%s' "$item" | jq -r '.title // ""')"
-    body="$(printf '%s' "$item" | jq -r '.body // ""')"
-    retest="$(printf '%s' "$item" | jq -r --arg l "$RETEST_LABEL" '[.labels[]?.name] | index($l) != null')"
-    hash="$(text_hash "$(issue_spec_text "$title" "$body")")"
-    local spec; spec="$(spec_lint "$title" "$body")"
-    has_done_when "$body" && dw=true
-    row="$(qa_row "$num")"
-    if [ -z "$row" ]; then
-      kind=first
-    else
-      local r_hash r_status r_upd age silent
-      r_hash="$(cell "$row" 2)"; r_status="$(cell "$row" 6)"; r_upd="$(cell "$row" 7)"
-      if [ "$r_status" = in_progress ]; then
-        age=$(( (NOW_EPOCH - $(iso2epoch "$r_upd")) / 60 ))
-        silent=$(( (NOW_EPOCH - $(last_event_epoch "$num")) / 60 ))
-        if [ "$age" -ge "$LOCK_TTL_MIN" ] && [ "$silent" -ge 30 ]; then
-          kind=takeover; takeover=true
-          log "issue #$num: stale lock (${age}m old, ${silent}m silent) — takeover"
-        else
-          log "issue #$num: in progress (${age}m) — skip"; continue
-        fi
-      elif [ "$retest" = true ]; then kind=retest
-      elif [ "$r_hash" != "$hash" ]; then kind=ac_changed
-      elif [ "$r_status" = report_pending ]; then
-        reports="$(printf '%s' "$reports" | jq -c --argjson i "$num" '. + [{issue:$i}]')"
-        log "issue #$num: report pending delivery — due"; continue
-      else
-        log "issue #$num: done at ac=$hash — skip"; continue
-      fi
-    fi
-    if [ "$n" -ge "$MAX_ISSUES" ]; then deferred=$((deferred+1)); log "issue #$num: $kind — deferred (max_issues_per_run)"; continue; fi
-    n=$((n+1))
-    due="$(printf '%s' "$due" | jq -c --argjson i "$num" --arg h "$hash" --arg k "$kind" \
-          --argjson t "$takeover" --argjson d "$dw" --argjson r "$retest" --argjson s "$spec" \
-          '. + [{issue:$i, ac_hash:$h, kind:$k, takeover:$t, has_done_when:$d, retest_label_present:$r, spec:$s}]')"
-    log "issue #$num: $kind (ac=$hash) — due"
-  done < <(printf '%s' "$listing" | jq -c 'map(select(.pull_request == null)) | sort_by(.number) | .[]')
-
+  local scan due reports deferred tmp="/tmp/quality-inspector-listing.$$"
+  printf '%s' "$listing" > "$tmp"
+  scan="$(QI_RETEST_LABEL="$RETEST_LABEL" QI_MAX_ISSUES="$MAX_ISSUES" QI_LOCK_TTL_MIN="$LOCK_TTL_MIN" QI_NOW_EPOCH="$NOW_EPOCH" \
+          node "$SCRIPT_DIR/lib/scan-issues.mjs" "$tmp" "$WORK/QA.md" "$WORK/logs" 2>/dev/null)"
+  rm -f "$tmp"
+  [ -n "$scan" ] || fail_out "the issue scan failed (node scripts/lib/scan-issues.mjs)"
+  due="$(jq -c .due <<<"$scan")"; reports="$(jq -c .reports <<<"$scan")"; deferred="$(jq -r .deferred <<<"$scan")"
+  while IFS= read -r l; do log "$l"; done < <(jq -r '.logs[]' <<<"$scan")
   local count rc; count="$(printf '%s' "$due" | jq length)"; rc="$(printf '%s' "$reports" | jq length)"
   runlog ISSUES "candidate=$candidate baseline=${baseline:-none} due=$count reports=$rc deferred=$deferred"
   jq -nc --arg mode issues --arg c "$candidate" --arg b "$baseline" \
@@ -186,7 +152,7 @@ mode_regression() {
     jq -nc --argjson logs "$(logs_json)" '{mode:"regression", nothing_to_do:true, logs:$logs}'; return
   fi
   env_busy_out REGRESSION
-  versions="$(chart_versions "$CHART_REF" "$CAND_CH" none 2>/dev/null)" || fail_out "cannot resolve the candidate chart version"
+  versions="$(versions_json none 2>/dev/null)" || fail_out "cannot resolve the candidate build"
   candidate="$(printf '%s' "$versions" | jq -r .candidate)"
   last="$(grep -o 'ran candidate=[^ ]*' "$WORK/REGRESSION.log" 2>/dev/null | tail -1 | cut -d= -f2)"
   if [ "$last" = "$candidate" ]; then
@@ -222,26 +188,29 @@ mode_audit() {
     if probe_gh "repos/$REPO_PATH/issues?per_page=1"; then check issues_read ok "issues endpoint reachable"
     else check issues_read fail "cannot list issues of the target repository"; fi
     # black-box boundary: each of these must be refused (docs/black-box.md)
-    local p r
-    for p in "repos/$REPO_PATH/contents/" "repos/$REPO_PATH/pulls?per_page=1" "repos/$REPO_PATH/commits?per_page=1" "repos/$REPO_PATH/git/refs/heads"; do
-      probe_gh "$p"; r=$?
+    local kind target r
+    while read -r kind target; do
+      if [ "$kind" = gh ]; then probe_gh "$target"; else probe_url "$target"; fi; r=$?
       case $r in
-        (0) check "boundary:${p%%\?*}" fail "source surface is reachable — add the deny rule (README → Black-box boundary)";;
-        (2) check "boundary:${p%%\?*}" warn "request was held, not denied — make the rule an explicit deny";;
-        (*) check "boundary:${p%%\?*}" ok "refused";;
+        (0) check "boundary:${target%%\?*}" fail "source surface is reachable — add the deny rule (README → Black-box boundary)";;
+        (2) check "boundary:${target%%\?*}" warn "request was held, not denied — make the rule an explicit deny";;
+        (*) check "boundary:${target%%\?*}" ok "refused";;
       esac
-    done
-    probe_url "https://raw.githubusercontent.com/$REPO_PATH/HEAD/README.md"; r=$?
-    case $r in (0) check boundary:raw fail "raw.githubusercontent.com serves the repository";; (2) check boundary:raw warn "raw host held, not denied";; (*) check boundary:raw ok "refused";; esac
+    done < <(boundary_targets "$REPO_PATH")
   else
     check config_target fail "target_repo not configured"
   fi
-  chart_versions "$CHART_REF" "$CAND_CH" "$BASE_CH" >/dev/null 2>&1 \
-    && check registry ok "chart tags listable" || check registry fail "cannot list chart tags at $CHART_REF"
+  if profile_dir >/dev/null; then check profile ok "$(profile_field '.product') profile at $(profile_dir)"
+  else check profile fail "profile '$(cfg profile)' is not installed"; fi
+  versions_json >/dev/null 2>&1 && check builds ok "profile lists builds" || check builds fail "the profile cannot list builds"
 
   # environment
-  [ "$(id -u)" = 0 ] && check vm_root ok "running as root (vm backend)" || check vm_root fail "not root — the nested cluster needs the vm backend"
-  command -v k3s >/dev/null 2>&1 && check k3s_binary ok "k3s present" || check k3s_binary fail "k3s missing from the image"
+  if [ "$(profile_field '.requires.root')" = true ]; then
+    [ "$(id -u)" = 0 ] && check vm_root ok "running as root (vm backend)" || check vm_root fail "not root — the profile needs the vm backend"
+  fi
+  local c; for c in $(profile_field '.requires.commands[]?'); do
+    command -v "$c" >/dev/null 2>&1 && check "command:$c" ok "present" || check "command:$c" fail "$c missing"
+  done
   local used; used="$(df -P "$HOME_DIR" 2>/dev/null | awk 'NR==2 {gsub("%","",$5); print $5}')"
   if [ -z "$used" ]; then check disk warn "not measured"
   elif [ "$used" -ge 85 ]; then check disk warn "home volume ${used}% used"

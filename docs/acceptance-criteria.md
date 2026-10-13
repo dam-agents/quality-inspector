@@ -1,7 +1,7 @@
 # Freezing acceptance criteria
 
 Step 3 of [issue-qa.md](issue-qa.md). The criteria file is the test oracle: it is written
-from the issue text alone, before you open the nested platform, and never edited
+from the issue text alone, before you open the nested product, and never edited
 afterwards. A changed issue text is a new `ac_hash` and a new file.
 
 ## Input
@@ -41,9 +41,9 @@ testable: yes | no — <reason when no>
   surface or the UI cannot show the outcome.
 - Keep the issue's words for names and messages; do not guess exact copy the issue does
   not state — "an error is shown" stays an `agent.assert`, not an exact string.
-- An AC that needs an external service the nested platform has no credentials for
-  (Slack, a real model provider, GitHub) is `testable: no — external dependency`, unless
-  `mock_image` makes the needed agent behaviour available.
+- An AC that needs an external service the nested product cannot reach (the
+  profile's `SKILL.md` lists them) is `testable: no — external dependency`, unless the
+  profile says how the nested product stands in for it.
 - Vague text ("works better", "is faster") → `testable: no — not observable`; quote it.
 - Never add criteria the issue does not state, however obvious they seem.
 

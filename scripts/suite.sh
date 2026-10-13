@@ -26,20 +26,26 @@ CONFIG="$WORK/CONFIG.md"
 SUITE="$WORK/suite"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/config.sh" || { echo "cannot source lib/config.sh" >&2; exit 1; }
+. "$SCRIPT_DIR/lib/profile.sh" || { echo "cannot source lib/profile.sh" >&2; exit 1; }
 if ! . "$SCRIPT_DIR/log.sh" 2>/dev/null; then logev() { :; }; fi
 
 E2E_VERSION="$(cfg e2e_version)"; E2E_VERSION="${E2E_VERSION:-0.17.0}"
 E2E_WEB_VERSION="$(cfg e2e_web_version)"; E2E_WEB_VERSION="${E2E_WEB_VERSION:-0.12.0}"
 E2E_MODEL="$(cfg e2e_model)"; E2E_MODEL="${E2E_MODEL:-claude-sonnet-5}"
-APP_URL="${APP_URL:-http://localhost:4444}"
+APP_URL="${APP_URL:-$(profile_field '.app.url')}"
 
 die() { echo "suite: $*" >&2; logev error suite_failed "$*"; exit 1; }
 
 cmd_init() {
   mkdir -p "$SUITE"
-  ( cd "$SCRIPT_DIR/suite-skeleton" && find . -type f ) | while read -r f; do
-    [ -e "$SUITE/$f" ] && continue
-    mkdir -p "$SUITE/$(dirname "$f")" && cp "$SCRIPT_DIR/suite-skeleton/$f" "$SUITE/$f"
+  # The core skeleton, then the profile's own suite/ files (fixtures, helpers); missing files only.
+  local src pdir; pdir="$(profile_dir 2>/dev/null)"
+  for src in "$SCRIPT_DIR/suite-skeleton" ${pdir:+"$pdir/suite"}; do
+    [ -d "$src" ] || continue
+    ( cd "$src" && find . -type f ) | while read -r f; do
+      [ -e "$SUITE/$f" ] && continue
+      mkdir -p "$SUITE/$(dirname "$f")" && cp "$src/$f" "$SUITE/$f"
+    done
   done
   if [ "$(jq -r .version "$SUITE/node_modules/e2e/package.json" 2>/dev/null)" != "$E2E_VERSION" ] \
      || [ "$(jq -r .version "$SUITE/node_modules/@e2e-dev/web/package.json" 2>/dev/null)" != "$E2E_WEB_VERSION" ]; then

@@ -9,15 +9,16 @@ schemaVersion: v1
 id: quality-inspector
 name: Quality Inspector
 description: >-
-  Black-box QA for the platform itself. For every GitHub issue carrying the QA label it
-  freezes acceptance criteria from the issue's "Done when" section, installs the newest
-  dev chart into a nested k3s cluster inside its own VM, drives that nested platform
-  through the built-in Chromium with the e2e framework (Playwright plus an LLM fallback
-  with a replay cache), checks the result red-green against the last release, and
-  publishes a per-criterion verdict with evidence to the artifact library and,
-  optionally, as an issue comment. It never reads the platform's source code.
+  Black-box QA for any product with a web UI, through a product profile skill. For every
+  GitHub issue carrying the QA label it freezes acceptance criteria from the issue's
+  "Done when" section, brings the newest build up inside its own VM, drives it through
+  the built-in Chromium with the e2e framework (Playwright plus an LLM fallback with a
+  replay cache), checks each criterion red-green against the last release, and publishes
+  a per-criterion verdict with video evidence. Nightly it replays promoted tests with
+  awareness of what changed, telling redesigns from regressions. It never reads the
+  product's source code.
 category: software
-tagline: Tests issues against a nested platform through the UI, without reading the code.
+tagline: Tests issues through the UI against a nested build, without reading the code.
 icon: flask
 
 seed:
@@ -28,7 +29,8 @@ connections:
   - accepts: [github]
     required: true
     note: >-
-      Reads issues of the target repository and, when issue comments are enabled,
+      Reads issues of the target repository (and the profile's skill source when it is
+      private) and, when issue comments are enabled,
       posts verdict comments and removes the retest label. Egress rules must confine
       it to the issues endpoints (README → Black-box boundary).
 
@@ -66,8 +68,9 @@ resources:
   memory: 16Gi
   storage: 80Gi
   note: >-
-    Runs a nested k3s with Istio ambient, cert-manager and the full platform chart
-    (Keycloak, Postgres, Redis) plus Chromium; 80Gi holds two platform image sets
-    (candidate and baseline) and the e2e evidence.
+    Sized for a full product stack nested in the VM plus Chromium, with room for two
+    builds (candidate and baseline) and the e2e evidence; the profile's README states
+    what its product needs. Create the agent on the vm backend when the profile
+    requires root.
 
 harnesses: [claude-code]

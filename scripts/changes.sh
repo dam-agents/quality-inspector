@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# changes.sh — what landed between two chart builds, told by the issues alone: every
-# issue of the target closed as completed between the two tags' push times, with its
+# changes.sh — what landed between two product builds, told by the issues alone: every
+# issue of the target closed as completed between the two builds' publish times (from the
+# profile's bin/build-time), with its
 # title, labels and spec text (the "Done when" section). No PR, commit or code is read
 # (docs/black-box.md). Read-only. Rationale: docs/change-awareness.md.
 #
-#   changes.sh <from-tag> <to-tag>   -> one JSON object on stdout
+#   changes.sh <from-build> <to-build>   -> one JSON object on stdout
 #
 # The window is approximate by nature: an issue closed minutes before a build may land
 # in the next one. Consumers treat it as context for judgment, never as proof.
@@ -18,22 +19,15 @@ CONFIG="$WORK/CONFIG.md"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/config.sh" || { echo "cannot source lib/config.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/state.sh" || { echo "cannot source lib/state.sh" >&2; exit 1; }
+. "$SCRIPT_DIR/lib/profile.sh" || { echo "cannot source lib/profile.sh" >&2; exit 1; }
 
 FROM="${1:?from-tag}"; TO="${2:?to-tag}"
 TARGET="${QI_TARGET_REPO:-$(cfg target_repo)}"
-CHART_REF="$(cfg chart_ref)"; CHART_REF="${CHART_REF:-oci://quay.io/dam-agents/charts/platform}"
 [ -n "$TARGET" ] || { jq -nc '{error:"target_repo is not configured"}'; exit 0; }
 HA=(); RP="$TARGET"
 if [ "$(printf '%s' "$TARGET" | tr -cd '/' | wc -c | tr -d ' ')" = 2 ]; then HA=(--hostname "${TARGET%%/*}"); RP="${TARGET#*/}"; fi
 
-# Push time of one tag, from the registry.
-tag_utc() {
-  local repo="${CHART_REF#oci://quay.io/}" ts
-  ts="$(curl -fsS --max-time 20 "https://quay.io/api/v1/repository/$repo/tag/?limit=10&onlyActiveTags=true&filter_tag_name=eq:$1" 2>/dev/null \
-        | jq -r '.tags[0].start_ts // empty')" || return 1
-  [ -n "$ts" ] || return 1
-  date -u -d "@$ts" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$ts" +%Y-%m-%dT%H:%M:%SZ
-}
+tag_utc() { profile_run build-time "$1" 2>/dev/null | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}T' | head -1 | grep . ; }
 
 from_utc="$(tag_utc "$FROM")" || { jq -nc --arg t "$FROM" '{error:("cannot read the push time of " + $t)}'; exit 0; }
 to_utc="$(tag_utc "$TO")" || { jq -nc --arg t "$TO" '{error:("cannot read the push time of " + $t)}'; exit 0; }

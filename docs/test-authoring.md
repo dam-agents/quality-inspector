@@ -66,10 +66,11 @@ onboarding): open a session, look at the screen, use its `locate` tool to turn a
 ## CLI and API criteria
 
 Same file, same AC blocks; there is no browser video for these, so print the command
-and its output into the test's log and keep the evidence textual. CLI: install the published CLI once into `work/suite`
-(`npm i -D @dam-agents/cli`), run it with `execa`, `DAM_SERVER=http://localhost:4444` and
-a `DAM_TOKEN` API key minted through the UI in the test's setup; assert on `--json`
-output and exit codes. API: `fetch` against `app.baseUrl` with the same token. **Run it,
+and its output into the test's log and keep the evidence textual. Which CLI and API the
+product publishes, and how a test gets a token for them, is in the profile's `SKILL.md`.
+For a CLI: install the published package once into `work/suite`, run it with `execa`
+against `app.baseUrl` and a token the test's setup mints through the UI; assert on
+machine-readable output and exit codes. API: `fetch` against `app.baseUrl` with the same token. **Run it,
 never read it**: the installed CLI's files are product code ([black-box.md](black-box.md)).
 
 ## Repairing a failing test

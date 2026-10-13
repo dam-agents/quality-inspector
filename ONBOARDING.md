@@ -6,7 +6,8 @@ sentinel; all steps are idempotent, so a failed run is safe to re-run from the t
 | Path | Repo | Purpose |
 | --- | --- | --- |
 | `/home/agent` | the **definition repo** (`origin`) | Agent definition, evolved via PRs. |
-| `/home/agent/work` | **plain data directory** (not a repo), local-only | Runtime state, the test suite, the nested environment's values. |
+| `/home/agent/work` | **plain data directory** (not a repo), local-only | Runtime state, the test suite, the product environment's state. |
+| `$HOME/.agents/skills/<profile>` | the **product profile** skill, installed from its source | How to run and know the product ([docs/profile-contract.md](docs/profile-contract.md)). |
 
 ## Guard — skip if already onboarded
 
@@ -30,12 +31,15 @@ Tell the two apart by what is already there; never assume.
 **Open the checklist first.** Call `set_onboarding_checklist` with exactly these
 operator-only steps, and tick each with `complete_onboarding_step` as it is settled:
 
-1. *Backend* — confirm the agent runs on the **vm** backend with ≥ 16 Gi memory.
-2. *Target repository* — the `target_repo` whose issues are tested.
-3. *Egress rules* — apply the rules in README → Black-box boundary.
-4. *Issue comments* — enable or keep disabled.
-5. *Mock harness image* — an image ref for `mock_image`, or none.
-6. *Model credential* — confirm agent steps reach Anthropic through the gateway.
+1. *Product profile* — connect the skill source that holds it (Skills → Sources) and
+   name the profile, e.g. `qi-profile-dam`.
+2. *Backend* — the agent runs on the backend and size the profile's README asks for
+   (vm backend when it requires root).
+3. *Target repository* — the `target_repo` whose issues are tested.
+4. *Egress rules* — apply README → Black-box boundary, plus the profile's `egress`.
+5. *Issue comments* — enable or keep disabled.
+6. *Profile settings* — a value for every profile key it marks `ask`.
+7. *Model credential* — confirm agent steps reach Anthropic through the gateway.
 
 The schedules are **held** until Step 7 marks onboarding complete.
 
@@ -43,13 +47,10 @@ The schedules are **held** until Step 7 marks onboarding complete.
 
 1. `gh api user --jq .login` — fails → the GitHub connection is not granted; stop and
    tell the operator.
-2. `id -u` must print `0` and `command -v k3s` must succeed. Otherwise this is not a vm
-   agent: stop — checklist item 1 cannot be ticked, the operator must recreate the agent
-   on the vm backend.
-3. `git -C /home/agent remote get-url origin` names the definition repo (kit path). No
+2. `git -C /home/agent remote get-url origin` names the definition repo (kit path). No
    checkout → on the kit path the seed failed: say so and stop; by hand, derive the repo
    from the URL of this runbook the operator gave you.
-4. `gh auth setup-git`.
+3. `gh auth setup-git`.
 
 ## Step 1 — Make `/home/agent` the definition repo
 
@@ -66,7 +67,21 @@ git branch --set-upstream-to=origin/main main 2>/dev/null || true
 Leak check: `git status --porcelain` **must be clean**. Anything under `work/`, `.ssh`,
 `.claude` or `.config` showing up → stop and fix `.gitignore`.
 
-## Step 2 — Provision `work/`
+## Step 2 — Install the product profile
+
+1. `list_skill_sources` (platform MCP). The operator's profile source missing → checklist
+   item 1 is not done; ask for it and wait.
+2. `list_skills_in_source` on it; a profile is a skill with a `profile.json`. Confirm the
+   name with the operator, then `install_skill` — it lands in
+   `$HOME/.agents/skills/<name>/`. Already installed → leave its version alone.
+3. Check it answers the contract: `jq -r .schema "$HOME/.agents/skills/<name>/profile.json"`
+   prints `qi-profile/v1`, and `bin/env`, `bin/versions`, `bin/build-time` are executable.
+4. Its `requires`: `root: true` → `id -u` must print `0`, else stop — checklist item 2
+   (recreate the agent on the vm backend); each `commands` entry must be on `PATH`.
+5. Read its `SKILL.md` once and tell the operator in two lines what the profile says the
+   nested product cannot do. Tick item 1.
+
+## Step 2b — Provision `work/`
 
 Create only what is missing; never overwrite an existing state file.
 
@@ -125,39 +140,46 @@ bash "$HOME/scripts/suite.sh" init
 claude mcp get e2e >/dev/null 2>&1 || claude mcp add --scope user e2e -- bash "$HOME/scripts/e2e-mcp.sh"
 ```
 
-`suite.sh init` needs `registry.npmjs.org` — if it is held or denied, checklist item 3
-is not done yet: ask the operator to apply the egress rules, then re-run this block.
+`env.sh init` runs the profile's `bin/env init` (it writes `work/env/credentials.env`).
+`suite.sh init` needs `registry.npmjs.org` — if it is held or denied, checklist item 4 is
+not done yet: ask the operator to apply the egress rules, then re-run this block. Write
+`- profile: <name>` into `work/CONFIG.md` first (Step 3 completes the file) — both
+scripts find the profile through it.
 
 ## Step 3 — Configure (`work/CONFIG.md`, interactive)
 
 Key semantics: `CLAUDE.md` → **Runtime configuration** (read it first). Re-onboarding
 with an existing file → keep its values, ask only for missing keys. Ask, validate, write:
 
-1. **`target_repo`** — ask. Validate with `gh api repos/<owner>/<repo>/issues?per_page=1`
-   (host flag for a three-segment ref). Tick item 2.
-2. **`issue_comments`** — ask, default `disabled`. State the consequence: comments are
+1. **`profile`** — the name installed in Step 2.
+2. **`target_repo`** — ask. Validate with `gh api repos/<owner>/<repo>/issues?per_page=1`
+   (host flag for a three-segment ref). Tick item 3.
+3. **`issue_comments`** — ask, default `disabled`. State the consequence: comments are
    posted publicly on the target's issues as the connection's account, and the
-   connection then needs write access to issues. Tick item 4.
-3. **`spec_feedback`** — ask, default `disabled`: when an issue has nothing testable, the
+   connection then needs write access to issues. Tick item 5.
+4. **`spec_feedback`** — ask, default `disabled`: when an issue has nothing testable, the
    agent comments a suggested observable "Done when" on it (public, as the connection's
    account).
-4. **`mock_image`** — ask, default empty; explain that without it ACs needing a working
-   nested agent end `blocked`. Tick item 5.
-5. Everything else — defaults; show them and change only what the operator asks for.
+5. **The profile's keys** — every `config` entry of its `profile.json`, written as
+   `- profile.<key>: <value>`: ask those marked `"ask": true` (its `about` text is the
+   question), default the rest. Tick item 6.
+6. **Channels** — `candidate_channel` / `baseline_channel` empty = the profile's defaults;
+   offer `baseline_channel: none` only if the operator wants no red-green.
+7. Everything else — defaults; show them and change only what the operator asks for.
 
-Write the file in exactly this shape:
+Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s keys):
 
 ```markdown
 # quality-inspector configuration
 
+- profile: qi-profile-dam
 - target_repo: acme/widgets
 - display_name: Quality Inspector
 - qa_label: qa:ready
 - retest_label: qa:retest
 - marker_prefix: quality-inspector
-- chart_ref: oci://quay.io/dam-agents/charts/platform
-- candidate_channel: main
-- baseline_channel: release
+- candidate_channel:
+- baseline_channel:
 - issue_comments: disabled
 - artifact_reports: enabled
 - include_comments: disabled
@@ -168,13 +190,11 @@ Write the file in exactly this shape:
 - e2e_version: 0.17.0
 - e2e_web_version: 0.12.0
 - e2e_model: claude-sonnet-5
-- mock_image:
-- istio_version: 1.29.1
-- cert_manager_version: v1.21.2
-- gateway_api_version: v1.2.0
-- helm_version: v3.19.0
 - audit_report: enabled
 - log_level: info
+
+- profile.chart_ref: oci://quay.io/dam-agents/charts/platform
+- profile.mock_image:
 ```
 
 Then `bash "$HOME/scripts/verify-onboarding.sh" --config`, apply every `fix:`, and show the
@@ -202,9 +222,9 @@ Start from `mcp__platform-outbound__list_schedules`. Expected: `quality-inspecto
 
 Save the final listing to `/tmp/quality-inspector-schedules.json` for Step 7.
 
-## Step 6 — Smoke-test the nested platform
+## Step 6 — Smoke-test the nested product
 
-The agent is useless until the nested platform comes up, so this is a gate:
+The agent is useless until the product comes up, so this is a gate:
 
 ```bash
 CAND=$(bash "$HOME/scripts/preflight.sh" issues | jq -r '.candidate // empty')
@@ -213,14 +233,15 @@ bash "$HOME/scripts/env.sh" up "$CAND" && bash "$HOME/scripts/suite.sh" run smok
 bash "$HOME/scripts/env.sh" unlock operator
 ```
 
-- No candidate → the pre-flight's `error` names the cause (registry egress, target).
+- No candidate → the pre-flight's `error` names the cause (the profile's `bin/versions`,
+  its egress, the target).
 - `env.sh up` fails → [docs/nested-env.md](docs/nested-env.md) → Failures. Report what
-  broke; a repeated proxy or pull failure usually means checklist item 3.
+  broke; a repeated proxy or pull failure usually means checklist item 4.
 - The smoke run fails in the setup test → adjust `work/suite/tests/auth.setup.e2e.ts`
   to what the nested sign-in really shows (keep its final checks), re-run.
-- An `agent.act` step fails with a model or provider error → checklist item 6: the
+- An `agent.act` step fails with a model or provider error → checklist item 7: the
   gateway does not inject an Anthropic credential for this agent; the operator fixes the
-  connection. Tick item 6 once a smoke run passes.
+  connection. Tick item 7 once a smoke run passes.
 
 ## Step 7 — Version, sentinel, verify, release, report
 
@@ -232,10 +253,10 @@ rm -f /tmp/quality-inspector-schedules.json
 ```
 
 Apply every `FAIL` line's `fix:` and re-run until `PASS`. A `FAIL boundary:*` is never
-waved through: the agent could read source — checklist item 3 is not done. Report the
+waved through: the agent could read source — checklist item 4 is not done. Report the
 remaining `warn` lines.
 
-Then tick item 3 (the boundary probes passed) and item 1, and call
+Then tick item 4 (the boundary probes passed) and item 2, and call
 `mark_onboarding_complete` — only now. It releases the schedules.
 
 **Summary for the operator:**

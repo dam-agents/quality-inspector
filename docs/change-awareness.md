@@ -7,13 +7,13 @@ sources, never from code or pull requests ([black-box.md](black-box.md)).
 ## The two sources
 
 1. **What was merged — the issues.** `bash "$HOME/scripts/changes.sh" <previous> <candidate>`
-   lists every target issue closed as *completed* between the two chart tags' push times,
+   lists every target issue closed as *completed* between the two builds' publish times,
    with title, labels and its "Done when" text. It is the product team's own statement of
    intended change. The window is approximate (an issue closed minutes before a build may
    ship in the next); treat it as context, and an issue just outside the window as
    possibly in it.
 2. **What the UI looks like now — the UI map.** `node "$HOME/scripts/ui-inventory.mjs"
-   work/inventory/<build>` signs in and walks the nested platform read-only: every page
+   work/inventory/<build>` signs in and walks the nested product read-only: every page
    reachable through links, navigation items and tabs, with its headings, nav items,
    buttons, tabs, fields and links (repeated data rows and cards excluded), an
    accessibility snapshot and a screenshot. `node "$HOME/scripts/ui-diff.mjs" <old> <new>`

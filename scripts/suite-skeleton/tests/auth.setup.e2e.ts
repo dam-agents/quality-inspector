@@ -10,7 +10,7 @@ test.setup('the owner signs in', { sessions: ['owner'] }, async ({ app, agent, b
     params: { username: owner.username, password: owner.password },
   });
   await agent.act('if a terms or consent page is shown, accept it; otherwise do nothing');
-  await expect(browser).toHaveURL(/^http:\/\/localhost:4444\//);
+  await expect(browser).toHaveURL(new RegExp('^' + (process.env.APP_URL ?? 'http://localhost')));
   await agent.assert('the application is shown to a signed-in user, not a sign-in page');
   await session.save('owner');
 });

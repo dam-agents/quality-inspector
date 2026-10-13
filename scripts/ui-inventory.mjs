@@ -4,7 +4,7 @@
 // links, plus an accessibility snapshot and a screenshot. Two maps diff into what was
 // added, removed, renamed or moved (ui-diff.mjs). Rationale: docs/change-awareness.md.
 //
-//   node ui-inventory.mjs <out-dir> [--base http://localhost:4444] [--max-pages 60] [--depth 3]
+//   node ui-inventory.mjs <out-dir> [--base <app url>] [--max-pages 60] [--depth 3]
 //
 // Signs in with E2E_USER_OWNER_USERNAME / _PASSWORD (work/env/credentials.env), then only
 // navigates: it follows same-origin links and clicks navigation items and tabs (each name
@@ -18,7 +18,7 @@ const args = process.argv.slice(2);
 const out = args.find((a) => !a.startsWith('--') && !/^\d+$/.test(a) && !a.startsWith('http'));
 const opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 if (!out) { console.error('usage: ui-inventory.mjs <out-dir> [--base URL] [--max-pages N] [--depth N]'); process.exit(2); }
-const base = new URL(opt('base', process.env.APP_URL ?? 'http://localhost:4444'));
+const base = new URL(opt('base', process.env.APP_URL ?? 'http://localhost'));
 if (!['localhost', '127.0.0.1'].includes(base.hostname)) { console.error(`refusing ${base}: only the nested platform`); process.exit(2); }
 const maxPages = Number(opt('max-pages', 60));
 const maxDepth = Number(opt('depth', 3));

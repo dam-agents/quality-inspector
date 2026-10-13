@@ -9,7 +9,8 @@ for a change to the agent definition itself.
 | --- | --- | --- |
 | `/home/agent` (outer) | git repo, remote `origin` (the kit's seed) | Definition: `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `docs/`, `scripts/`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `LICENSE`. |
 | `/home/agent/work` | **plain data directory** (no `.git`), local-only | Config, `QA.md`, `SUITE.md`, `LESSONS.md`, `issues/`, `suite/` (tests, replay cache, `node_modules`), `env/` (values, credentials, lock), logs. |
-| `~/.local/share/k3s`, `~/.local/bin` | nested cluster state, helm | Rebuildable by `scripts/env.sh`. |
+| `$HOME/.agents/skills/<profile>` | the product profile skill | Reinstalled from its source; never edited here. |
+| the profile's own paths (its README) | the nested product's state and tools | Rebuildable by `scripts/env.sh` through the profile. |
 
 `work/` is never a git repo: the home volume is virtiofs over NFS, and a `.git` mutated
 there under concurrent runs corrupts. The outer `.gitignore` is an allowlist, so `work/`

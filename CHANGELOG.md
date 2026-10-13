@@ -7,6 +7,19 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.0.0 — 2026-10-13
+
+**Upgrade:** (major — the product moved into a profile)
+1. **operator-only:** connect the skill source holding the product's profile (for DAM:
+   `https://github.com/dam-agents/quality-inspector-profiles`), then install it as in
+   `ONBOARDING.md` Step 2 and write `- profile: <name>` into `work/CONFIG.md`.
+2. Move the product keys into the profile's namespace, keeping their values:
+   `chart_ref`, `mock_image`, `istio_version`, `cert_manager_version`,
+   `gateway_api_version`, `helm_version` → `profile.<same key>`. Delete the old bullets.
+   Empty `candidate_channel` / `baseline_channel` now mean the profile's defaults.
+3. `work/env/values.yaml` and `credentials.env` stay; the profile's `bin/env` reads them.
+4. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:`.
+
 ## 1.1.0 — 2026-10-12
 
 **Upgrade:**

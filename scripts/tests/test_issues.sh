@@ -70,8 +70,8 @@ assert "cap of one" '(.issues_due | length) == 1 and (.logs | map(select(test("d
 # failures are reported as errors, never as an empty worklist
 out="$(STUB_GH_FAIL=1 bash "$SCRIPTS/preflight.sh" issues)"
 assert "gh failure is an error" '.nothing_to_do==true and (.error | test("listing failed"))' "$out"
-out="$(STUB_CURL_FAIL=1 bash "$SCRIPTS/preflight.sh" issues)"
-assert "registry failure is an error" '(.error | test("chart versions"))' "$out"
+out="$(STUB_VERSIONS_FAIL=1 bash "$SCRIPTS/preflight.sh" issues)"
+assert "profile build listing failure is an error" '(.error | test("product builds"))' "$out"
 : > "$WORK_DIR/CONFIG.md"
 out="$(bash "$SCRIPTS/preflight.sh" issues)"
 assert "missing target is an error" '(.error | test("target_repo"))' "$out"

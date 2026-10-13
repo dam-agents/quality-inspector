@@ -50,12 +50,12 @@ warn() { WARNS=$((WARNS+1)); printf 'warn %s — %s\n' "$1" "$2"; }
 
 . "$SCRIPT_DIR/lib/config.sh" || { echo "cannot source lib/config.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/state.sh" || { echo "cannot source lib/state.sh" >&2; exit 1; }
+. "$SCRIPT_DIR/lib/profile.sh" || { echo "cannot source lib/profile.sh" >&2; exit 1; }
 
 SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-audit-weekly"
-KNOWN_KEYS="target_repo display_name qa_label retest_label marker_prefix chart_ref candidate_channel
+KNOWN_KEYS="profile target_repo display_name qa_label retest_label marker_prefix candidate_channel
 baseline_channel issue_comments artifact_reports include_comments max_issues_per_run lock_ttl_min
-e2e_version e2e_web_version e2e_model mock_image istio_version cert_manager_version gateway_api_version helm_version
-audit_report log_level media_retention_days spec_feedback"
+e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback"
 
 if [ "$STRUCTURE" = 1 ]; then
   # ------------------------------------------------------------- definition
@@ -111,12 +111,11 @@ if [ "$STRUCTURE" = 1 ]; then
     perm="$(stat -c %a "$WORK/env/credentials.env" 2>/dev/null || stat -f %Lp "$WORK/env/credentials.env" 2>/dev/null)"
     [ "$perm" = 600 ] && ok env_credentials "mode 600" || fail env_credentials "mode $perm" "chmod 600 work/env/credentials.env"
     for k in E2E_USER_OWNER_USERNAME E2E_USER_OWNER_PASSWORD; do
-      grep -q "^$k=." "$WORK/env/credentials.env" || fail env_credentials "$k missing" "delete work/env/credentials.env and values.yaml, run scripts/env.sh init"
+      grep -q "^$k=." "$WORK/env/credentials.env" || fail env_credentials "$k missing" "run scripts/env.sh init (the profile writes it)"
     done
   else
     fail env_credentials "work/env/credentials.env missing" "bash \"\$HOME/scripts/env.sh\" init"
   fi
-  [ -f "$WORK/env/values.yaml" ] && ok env_values "present" || fail env_values "work/env/values.yaml missing" "bash \"\$HOME/scripts/env.sh\" init"
   [ -f "$WORK/suite/e2e.config.ts" ] && ok suite_project "present" || fail suite_project "work/suite not initialized" "bash \"\$HOME/scripts/suite.sh\" init"
   [ -d "$WORK/suite/node_modules/e2e" ] && ok suite_deps "e2e $(jq -r .version "$WORK/suite/node_modules/e2e/package.json" 2>/dev/null)" \
     || fail suite_deps "e2e not installed" "bash \"\$HOME/scripts/suite.sh\" init"
@@ -130,16 +129,31 @@ if [ -f "$CONFIG" ]; then
     && ok cfg:target_repo "set" || fail cfg:target_repo "missing or not [host/]owner/repo" "ask the operator (ONBOARDING.md Step 3)"
   enum() { local v; v="$(cfg "$1")"; [ -z "$v" ] && { ok "cfg:$1" "default"; return; }
     case " $2 " in (*" $v "*) ok "cfg:$1" "$v";; (*) fail "cfg:$1" "'$v' is not one of: $2" "set a documented value (CLAUDE.md → Runtime configuration)";; esac; }
-  enum candidate_channel "main release"; enum baseline_channel "release none"
   enum issue_comments "enabled disabled"; enum artifact_reports "enabled disabled"
   enum include_comments "enabled disabled"; enum audit_report "enabled disabled"; enum log_level "info debug"
   enum spec_feedback "enabled disabled"
   for k in max_issues_per_run lock_ttl_min media_retention_days; do
     v="$(cfg "$k")"; case "$v" in (''|*[!0-9]*) [ -z "$v" ] && ok "cfg:$k" "default" || fail "cfg:$k" "'$v' is not a number" "set a positive integer";; (*) ok "cfg:$k" "$v";; esac
   done
-  v="$(cfg chart_ref)"; case "$v" in (''|oci://*) ok cfg:chart_ref "${v:-default}";; (*) fail cfg:chart_ref "'$v' is not an oci:// ref" "set an oci:// chart ref";; esac
-  unknown="$(sed -n 's/^- \([A-Za-z0-9_]*\):.*/\1/p' "$CONFIG" | while read -r k; do
-    printf '%s\n' $KNOWN_KEYS | grep -qx "$k" || printf '%s ' "$k"; done)"
+  # ---------------------------------------------------------------- profile
+  if pd="$(profile_dir)"; then
+    ok profile "$(profile_field '.product') at $pd"
+    [ "$(profile_field '.schema')" = qi-profile/v1 ] && ok profile_schema "qi-profile/v1" \
+      || fail profile_schema "profile.json schema is not qi-profile/v1" "install a profile built for this contract (docs/profile-contract.md)"
+    for b in env versions build-time; do
+      [ -x "$pd/bin/$b" ] && ok "profile_bin:$b" "executable" || fail "profile_bin:$b" "missing or not executable" "fix the profile (docs/profile-contract.md → The bin/ contract)"
+    done
+    case "$(profile_field '.app.url')" in
+      (http://localhost*|http://127.0.0.1*) ok profile_app_url "$(profile_field '.app.url')";;
+      (*) fail profile_app_url "app.url '$(profile_field '.app.url')' is not local" "the product must run inside this VM (docs/profile-contract.md)";;
+    esac
+    PKEYS="$(jq -r '.config // {} | keys[]' "$pd/profile.json" 2>/dev/null | sed 's/^/profile./')"
+  else
+    fail profile "profile '$(cfg profile)' is not installed" "install it with the skill tools (ONBOARDING.md Step 3)"
+    PKEYS=""
+  fi
+  unknown="$(sed -n 's/^- \([A-Za-z0-9_.]*\):.*/\1/p' "$CONFIG" | while read -r k; do
+    printf '%s\n' $KNOWN_KEYS $PKEYS | grep -qx "$k" || printf '%s ' "$k"; done)"
   [ -z "$unknown" ] && ok config_keys "all keys known" \
     || fail config_keys "unknown keys (invisible to the runtime): $unknown" "rename to a documented key or remove (CLAUDE.md → Runtime configuration)"
 else
@@ -154,23 +168,18 @@ if [ "$LIVE" = 1 ]; then
   [ -n "$login" ] && ok github_identity "acting as $login" || fail github_identity "gh api user failed" "grant the GitHub connection to this agent (README → Setup)"
   timeout 20 gh api ${HA[@]+"${HA[@]}"} "repos/$RP/issues?per_page=1" >/dev/null 2>&1 \
     && ok issues_read "target issues readable" || fail issues_read "cannot list target issues" "check target_repo and the connection's repository access"
-  for p in "contents/" "pulls?per_page=1" "commits?per_page=1" "git/refs/heads" "issues/1/timeline"; do
-    timeout 20 gh api ${HA[@]+"${HA[@]}"} "repos/$RP/$p" >/dev/null 2>&1; r=$?
+  while read -r kind target; do
+    if [ "$kind" = gh ]; then timeout 20 gh api ${HA[@]+"${HA[@]}"} "$target" >/dev/null 2>&1; r=$?
+    else code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$target" 2>/dev/null)"
+      case "$code" in (2??) r=0;; (000) r=124;; (*) r=1;; esac; fi
     case $r in
-      (0)   fail "boundary:${p%%\?*}" "source surface reachable" "the operator adds the deny rule from README → Black-box boundary";;
-      (124) warn "boundary:${p%%\?*}" "request held for approval — make it an explicit deny so nobody approves it by accident";;
-      (*)   ok "boundary:${p%%\?*}" "refused";;
+      (0)   fail "boundary:${target%%\?*}" "source surface reachable" "the operator adds the deny rule (README → Black-box boundary)";;
+      (124) warn "boundary:${target%%\?*}" "request held for approval — make it an explicit deny so nobody approves it by accident";;
+      (*)   ok "boundary:${target%%\?*}" "refused";;
     esac
-  done
-  code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://raw.githubusercontent.com/$RP/HEAD/README.md" 2>/dev/null)"
-  case "$code" in
-    (2??) fail boundary:raw "raw.githubusercontent.com serves the repository" "deny raw.githubusercontent.com (README → Black-box boundary)";;
-    (000) warn boundary:raw "request held or timed out — make it an explicit deny";;
-    (*)   ok boundary:raw "refused (HTTP $code)";;
-  esac
-  . "$SCRIPT_DIR/lib/charts.sh"
-  cv="$(chart_versions "$(cfg chart_ref | sed 's/^$/oci:\/\/quay.io\/dam-agents\/charts\/platform/')" "$(cfg candidate_channel)" "$(cfg baseline_channel)" 2>&1)" \
-    && ok registry "versions $cv" || fail registry "$cv" "allow quay.io in the egress rules (README → Black-box boundary)"
+  done < <(boundary_targets "$RP")
+  cv="$(profile_run versions 2>&1)" && printf '%s' "$cv" | jq -e '.candidate' >/dev/null 2>&1 \
+    && ok builds "$cv" || fail builds "$cv" "fix the profile's bin/versions or its egress (profile README)"
   code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 https://api.anthropic.com/v1/models \
           -H 'x-api-key: injected-by-gateway' -H 'anthropic-version: 2023-06-01' 2>/dev/null)"
   case "$code" in
@@ -178,21 +187,25 @@ if [ "$LIVE" = 1 ]; then
     (401|403) warn model_provider "Anthropic answered $code — the gateway does not inject a key for agent steps; set one per README → Setup";;
     (*) fail model_provider "Anthropic unreachable (HTTP $code)" "allow api.anthropic.com in the egress rules";;
   esac
-  [ "$(id -u)" = 0 ] && ok vm_root "root" || fail vm_root "not running as root" "recreate the agent on the vm backend (README → Setup)"
-  command -v k3s >/dev/null 2>&1 && ok k3s "$(k3s --version 2>/dev/null | head -1)" || fail k3s "k3s not in the image" "use an agent image that bakes k3s"
-  PATH="$HOME_DIR/.local/bin:$PATH" command -v helm >/dev/null 2>&1 && ok helm "present" \
-    || warn helm "not installed yet — the first scripts/env.sh up installs it (allow get.helm.sh)"
+  if [ "$(profile_field '.requires.root')" = true ]; then
+    [ "$(id -u)" = 0 ] && ok vm_root "root" || fail vm_root "not running as root" "recreate the agent on the vm backend (README → Setup)"
+  fi
+  for c in $(profile_field '.requires.commands[]?'); do
+    command -v "$c" >/dev/null 2>&1 && ok "command:$c" "present" || fail "command:$c" "missing" "use an agent image that has $c (profile README)"
+  done
   nv="$(node -p 'process.versions.node' 2>/dev/null)"
   case "$nv" in
     (2[4-9].*|[3-9][0-9].*) [ "${nv%%.*}" -gt 24 ] || [ "$(echo "$nv" | cut -d. -f2)" -ge 8 ] \
       && ok node "$nv" || fail node "$nv is older than 24.8" "use an agent image with Node >= 24.8 (e2e requires it)";;
     (*) fail node "${nv:-missing}" "use an agent image with Node >= 24.8 (e2e requires it)";;
   esac
-  mem="$(awk '/MemTotal/ {printf "%d", $2/1048576}' /proc/meminfo 2>/dev/null)"
-  [ -n "$mem" ] && [ "$mem" -ge 12 ] && ok memory "${mem}Gi" || warn memory "${mem:-?}Gi — the nested platform needs about 12Gi"
+  need="$(profile_field '.requires.memory_gi')"; mem="$(awk '/MemTotal/ {printf "%d", $2/1048576}' /proc/meminfo 2>/dev/null)"
+  if [ -n "$need" ]; then
+    [ -n "$mem" ] && [ "$mem" -ge "$need" ] && ok memory "${mem}Gi" || warn memory "${mem:-?}Gi — the profile asks for ${need}Gi"
+  fi
   st="$(bash "$SCRIPT_DIR/env.sh" status 2>/dev/null)"
-  printf '%s' "$st" | jq -e '.k3s_running and (.ui_http | test("^[23]"))' >/dev/null 2>&1 \
-    && ok nested_platform "$(printf '%s' "$st" | jq -r .version)" || warn nested_platform "not up: $st (docs/nested-env.md)"
+  printf '%s' "$st" | jq -e '.running and (.ui_http | test("^[23]"))' >/dev/null 2>&1 \
+    && ok product_env "$(printf '%s' "$st" | jq -r .build)" || warn product_env "not up: $st (docs/nested-env.md)"
   for m in issues regression; do
     out="$(bash "$SCRIPT_DIR/preflight.sh" "$m" 2>/dev/null)"
     if printf '%s' "$out" | jq -e 'type == "object"' >/dev/null 2>&1; then
