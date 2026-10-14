@@ -5,7 +5,7 @@
 #   suite.sh init                 create work/suite from scripts/suite-skeleton/ (missing
 #                                 files only), install the pinned deps, pick the browser
 #   suite.sh run <label> [--evidence full|failures] [--strict] [e2e run args…]
-#                                 run against the nested platform; <label> names the output
+#                                 run against the nested product; <label> names the output
 #                                 dir (.e2e/runs/<label>) and the summary JSON on stdout.
 #                                 `full` records video and a trace page for every test (issue
 #                                 verification); `failures` (default) keeps them for failures.
@@ -18,7 +18,7 @@
 #                                 value (docs/explorations.md → Identities)
 #   suite.sh budget <claim-iso>   the per-issue budgets since the claim, JSON with `exceeded`
 #
-# The base URL is fixed to the nested platform; any APP_URL that is not localhost
+# The base URL is fixed to the nested product; any APP_URL that is not localhost
 # is refused (CLAUDE.md → Hard invariants: nested target only). After every run the
 # credential values of work/env/credentials.env are masked in the run dir's text files
 # and in every summary (lib/secrets.mjs; the audit's secrets_in_runs proves it).
@@ -122,7 +122,7 @@ cmd_run() {
   case "$label" in (*[!A-Za-z0-9._-]*) die "label must be [A-Za-z0-9._-]";; esac
   case "$APP_URL" in
     (http://localhost:*|http://localhost/*|http://localhost|http://127.0.0.1:*) ;;
-    (*) die "refusing APP_URL=$APP_URL — only the nested platform on localhost is a test target";;
+    (*) die "refusing APP_URL=$APP_URL — only the nested product on localhost is a test target";;
   esac
   [ -d "$SUITE/node_modules/e2e" ] || die "suite not initialized — run: bash \"\$HOME/scripts/suite.sh\" init"
   [ -f "$CRED" ] || die "work/env/credentials.env missing — run: bash \"\$HOME/scripts/env.sh\" init"

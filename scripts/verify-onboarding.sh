@@ -53,12 +53,13 @@ warn() { WARNS=$((WARNS+1)); printf 'warn %s — %s\n' "$1" "$2"; }
 . "$SCRIPT_DIR/lib/profile.sh" || { echo "cannot source lib/profile.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/boundary.sh" || { echo "cannot source lib/boundary.sh" >&2; exit 1; }
 
-SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-benchmark-monthly quality-inspector-security-weekly quality-inspector-audit-weekly"
+SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-benchmark-monthly quality-inspector-security-weekly quality-inspector-audit-weekly quality-inspector-scenarios-weekly"
 KNOWN_KEYS="profile target_repo display_name qa_label retest_label marker_prefix candidate_channel
 baseline_channel issue_comments artifact_reports include_comments max_issues_per_run lock_ttl_min
 e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback
 explorations max_explorations_per_ac auto_promote security_checks security_failed_logins
-confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi"
+confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi
+scenario_discovery scenario_channel max_scenarios_per_run max_scenarios_per_day"
 
 if [ "$STRUCTURE" = 1 ]; then
   # ------------------------------------------------------------- definition
@@ -113,6 +114,10 @@ if [ "$STRUCTURE" = 1 ]; then
     && ok flaky_log "header intact" || fail flaky_log "work/FLAKY.md missing or header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
   [ "$(grep '^|' "$WORK/COVERAGE.md" 2>/dev/null | head -1)" = "$COVERAGE_HEADER" ] \
     && ok coverage_table "header intact" || fail coverage_table "work/COVERAGE.md missing or header changed" "re-seed per ONBOARDING.md Step 2b"
+  [ "$(grep '^|' "$WORK/SCENARIOS.md" 2>/dev/null | head -1)" = "$SCENARIOS_HEADER" ] && [ -d "$WORK/scenarios" ] \
+    && ok scenarios_table "header intact" || fail scenarios_table "work/SCENARIOS.md or work/scenarios/ missing, or the header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
+  bad="$(table_rows "$WORK/SCENARIOS.md" | awk -F'|' 'NF!=11 || $2 !~ /^ *S-[0-9]+ *$/ || $3 !~ /^ *(slack|operator|discovery) *$/ || $8 !~ /^ *(passed|failed|regression|needs-review|blocked|flaky|not-testable|-) *$/ || $9 !~ /^ *(proposed|queued|in_progress|report_pending|reported|rejected) *$/' | head -3)"
+  [ -z "$bad" ] && ok scenarios_rows "row format" || fail scenarios_rows "malformed rows (a scenario is never verified): $bad" "fix the rows to the format in docs/scenarios.md → State"
   [ -f "$WORK/LESSONS.md" ] && ok lessons "present" || fail lessons "work/LESSONS.md missing" "ONBOARDING.md Step 2b"
   # perf-trend.mjs creates it on first use; missing is only worth a note.
   [ -d "$WORK/perf" ] && ok perf_dir "present" || warn perf_dir "work/perf missing — mkdir -p work/perf (ONBOARDING.md Step 2b)"
@@ -142,8 +147,13 @@ if [ -f "$CONFIG" ]; then
   enum include_comments "enabled disabled"; enum audit_report "enabled disabled"; enum log_level "info debug"
   enum spec_feedback "enabled disabled"; enum explorations "enabled disabled"; enum auto_promote "disabled verified"
   enum security_checks "enabled disabled"; enum confirm_regressions "enabled disabled"
+  enum scenario_discovery "disabled propose run"
+  v="$(cfg scenario_channel)"
+  if [ -z "$v" ]; then ok cfg:scenario_channel "empty — proposals stay in the chat UI"
+  elif printf '%s' "$v" | grep -qE '^[CDG][A-Z0-9]{6,}$'; then ok cfg:scenario_channel "$v"
+  else fail cfg:scenario_channel "'$v' is not a Slack conversation id" "set the C…/G…/D… id of a conversation this agent is bound to, or leave it empty"; fi
   for k in max_issues_per_run lock_ttl_min media_retention_days max_explorations_per_ac security_failed_logins bisect_max_steps \
-           max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi; do
+           max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi max_scenarios_per_run max_scenarios_per_day; do
     v="$(cfg "$k")"; case "$v" in (''|*[!0-9]*) [ -z "$v" ] && ok "cfg:$k" "default" || fail "cfg:$k" "'$v' is not a number" "set a positive integer";; (*) ok "cfg:$k" "$v";; esac
   done
   case "$(cfg bisect_max_steps)" in (''|0|*[!0-9]*) ;; (*) [ "$(cfg confirm_regressions)" = enabled ] \
@@ -222,7 +232,7 @@ if [ "$LIVE" = 1 ]; then
   st="$(bash "$SCRIPT_DIR/env.sh" status 2>/dev/null)"
   printf '%s' "$st" | jq -e '.running and (.ui_http | test("^[23]"))' >/dev/null 2>&1 \
     && ok product_env "$(printf '%s' "$st" | jq -r .build)" || warn product_env "not up: $st (docs/nested-env.md)"
-  for m in issues regression; do
+  for m in issues regression discovery; do
     out="$(bash "$SCRIPT_DIR/preflight.sh" "$m" 2>/dev/null)"
     if printf '%s' "$out" | jq -e 'type == "object"' >/dev/null 2>&1; then
       err="$(printf '%s' "$out" | jq -r '.error // empty')"

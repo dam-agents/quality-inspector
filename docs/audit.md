@@ -12,10 +12,11 @@ when `audit_report: disabled` (still append the log line).
    value left in a raw run's text files; a `fail` names the paths, never the value),
    **coverage** of the newest UI map (`warn` while pages are uncovered, never `fail`;
    [change-awareness.md](change-awareness.md) → Coverage), and `criteria_injection` (the
-   week's criteria files holding URLs, code fences or HTML comments; the week's
-   `issue_injection_suspect` events) — a `warn` lists the issues: sample one and check its
-   instruction sentences are `testable: no`. `failures[]` groups the week's error events;
-   `stats` counts verdicts and `stats.coverage` the pages.
+   week's criteria files of issues and scenarios holding URLs, code fences or HTML comments;
+   the week's `issue_injection_suspect` and `scenario_injection_suspect` events) — a `warn`
+   lists the issues and `S-<k>`: sample one and check its instruction sentences are
+   `testable: no`. `failures[]` groups the week's error events; `stats` counts verdicts and
+   `stats.coverage` the pages.
    - `ledger_reconcile` ([logging.md](logging.md) → **Ledger of external writes**): for
      the newest 20 `reported` QA rows of the week, one `GET …/issues/<n>/comments?since=`
      each; every comment of the agent's login (`gh api user`) created this week (and after
@@ -53,6 +54,9 @@ when `audit_report: disabled` (still append the log line).
    - Spec quality: this week's `not-testable` verdicts and `testable: no` ACs by reason,
      issues without "Done when", and how many suggested rewrites authors adopted (an
      issue that became due again by `ac_changed` after a `spec-feedback` file).
+   - Scenarios (`stats.scenarios_7d`, by source and verdict): `needs-review` left by judge
+     disagreements, the `rejected` share, saves and by whom (`scenario_saved`), days the cap
+     was hit. A `passed` scenario whose `judge-verdict-*.json` disagrees is red.
    - Flakiness: rows added to `work/FLAKY.md` this week, tests `quarantined`, and whether
      one cause dominates (the same page, the nested product right after `up`).
    - Triage health: heals this week from `work/HEALS.md` (each one's basis is a UI-map

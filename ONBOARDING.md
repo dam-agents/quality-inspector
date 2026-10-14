@@ -89,7 +89,7 @@ The operator assigns the profile on the platform; you never install it yourself.
 Create only what is missing; never overwrite an existing state file.
 
 ```bash
-mkdir -p /home/agent/work/issues /home/agent/work/logs /home/agent/work/inventory /home/agent/work/regression /home/agent/work/benchmark /home/agent/work/perf /home/agent/work/security
+mkdir -p /home/agent/work/issues /home/agent/work/scenarios /home/agent/work/logs /home/agent/work/inventory /home/agent/work/regression /home/agent/work/benchmark /home/agent/work/perf /home/agent/work/security
 cd /home/agent/work
 touch SECURITY.log
 [ -f QA.md ] || cat > QA.md <<'EOF'
@@ -103,6 +103,12 @@ EOF
 
 | test | issue | tier | assert_hash | promoted_utc |
 | --- | --- | --- | --- | --- |
+EOF
+[ -f SCENARIOS.md ] || cat > SCENARIOS.md <<'EOF'
+# Scenarios — one row per scenario (docs/scenarios.md → State)
+
+| id | source | requester | thread | spec_hash | build | verdict | status | updated_utc |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 EOF
 [ -f HEALS.md ] || cat > HEALS.md <<'EOF'
 # Repaired checks — append-only, one row per heal (docs/triage.md → Healing rules)
@@ -180,7 +186,14 @@ with an existing file → keep its values, ask only for missing keys. Ask, valid
    question), default the rest. Tick item 6.
 6. **Channels** — `candidate_channel` / `baseline_channel` empty = the profile's defaults;
    offer `baseline_channel: none` only if the operator wants no red-green.
-7. Everything else — defaults; show them and change only what the operator asks for.
+7. **Scenarios** ([docs/scenarios.md](docs/scenarios.md)) — say that a Slack channel the
+   operator connects to this agent (optional, on the platform) takes scenario requests
+   from anyone in it, up to `max_scenarios_per_day` runs a day. Ask `scenario_discovery`,
+   default `disabled`: `propose` drafts up to `max_scenarios_per_run` judged proposals a
+   week (tens of thousands of tokens), `run` also tests them (a few hundred thousand per
+   scenario). With discovery on and a channel connected, ask `scenario_channel` (its
+   `C…` id; empty keeps the digest in chat).
+8. Everything else — defaults; show them and change only what the operator asks for.
 
 Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s keys):
 
@@ -217,6 +230,10 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - max_explorations_per_ac: 3
 - security_checks: enabled
 - security_failed_logins: 10
+- scenario_discovery: disabled
+- scenario_channel:
+- max_scenarios_per_run: 3
+- max_scenarios_per_day: 10
 
 - profile.chart_ref: oci://quay.io/dam-agents/charts/platform
 - profile.mock_image:
@@ -240,7 +257,8 @@ the criteria files and the replay cache are not reconstructable.
 
 Start from `mcp__platform-outbound__list_schedules`. Expected: `quality-inspector-issues-1h`,
 `quality-inspector-regression-nightly`, `quality-inspector-benchmark-monthly`,
-`quality-inspector-security-weekly`, `quality-inspector-audit-weekly`.
+`quality-inspector-security-weekly`, `quality-inspector-scenarios-weekly`,
+`quality-inspector-audit-weekly`.
 
 - Present → leave alone, including its enabled state; every schedule but the issues one
   arrives switched off on purpose — offer to turn them on, never flip them unasked.
@@ -296,4 +314,5 @@ Then tick item 4 (the boundary probes passed) and item 2, and call
    `qa:retest` to test it again; say "promote #N" (or "promote all pending") to move
    tests into the nightly regression; "test #N" runs one now; reports land in the artifact library (and on the
    issue when comments are enabled); `marker_prefix` cannot change after the first
-   comment.
+   comment. In a connected Slack channel, "@<agent> test that …" tests a scenario and
+   "save S-<k>" queues it for "promote all pending".

@@ -15,8 +15,10 @@ description: >-
   the built-in Chromium with the e2e framework (Playwright plus an LLM fallback with a
   replay cache), checks each criterion red-green against the last release, and publishes
   a per-criterion verdict with video evidence. Nightly it replays promoted tests with
-  awareness of what changed, telling redesigns from regressions. It never reads the
-  product's source code.
+  awareness of what changed, telling redesigns from regressions. In a Slack channel it
+  tests the scenarios people describe and queues them for the regression on request, and
+  it can propose scenarios of its own; an independent judge sub-agent checks every
+  scenario and every scenario verdict. It never reads the product's source code.
 category: software
 tagline: Tests issues through the UI against a nested build, without reading the code.
 icon: flask
@@ -33,6 +35,13 @@ connections:
       private) and, when issue comments are enabled,
       posts verdict comments and removes the retest label. Egress rules must confine
       it to the issues endpoints (README → Black-box boundary).
+
+channels:
+  - type: slack
+    note: >-
+      Optional. Connect a channel where people ask for scenarios to be tested ("test that
+      …"); anyone in it may ask, within max_scenarios_per_day. With scenario_channel set,
+      the weekly scenario proposals land there too. Skip it to keep everything in chat.
 
 schedules:
   - name: quality-inspector-issues-1h
@@ -75,6 +84,16 @@ schedules:
       worklist is already appended below. If its JSON says nothing_to_do, report its
       logs in one line and end the run. Otherwise follow CLAUDE.md → "Security run":
       read docs/security.md and run every check against the worklist's candidate.
+  - name: quality-inspector-scenarios-weekly
+    cron: "0 6 * * 3"
+    sessionMode: fresh
+    enabled: false
+    precheck: 'bash "$HOME/scripts/precheck.sh" discovery'
+    task: >-
+      Scenario discovery run. Run `bash "$HOME/scripts/preflight.sh" discovery` first
+      unless its worklist is already appended below. If its JSON says nothing_to_do,
+      report its logs in one line and end the run. Otherwise follow CLAUDE.md →
+      "Scenario discovery run": read docs/scenarios.md → Discovery and propose scenarios.
   - name: quality-inspector-audit-weekly
     cron: "0 7 * * 5"
     sessionMode: fresh

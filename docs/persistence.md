@@ -8,7 +8,7 @@ for a change to the agent definition itself.
 | Path | Kind | Holds |
 | --- | --- | --- |
 | `/home/agent` (outer) | git repo, remote `origin` (the kit's seed) | Definition: `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `docs/`, `scripts/`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `LICENSE`, `engines/`. |
-| `/home/agent/work` | **plain data directory** (no `.git`), local-only | Config, `QA.md`, `SUITE.md`, `LESSONS.md`, `issues/`, `suite/` (tests, replay cache, `node_modules`), `env/` (values, credentials, lock), logs. |
+| `/home/agent/work` | **plain data directory** (no `.git`), local-only | Config, `QA.md`, `SUITE.md`, `SCENARIOS.md`, `LESSONS.md`, `issues/`, `scenarios/`, `suite/` (tests, replay cache, `node_modules`), `env/` (values, credentials, lock), logs. |
 | `$HOME/.agents/skills/<profile>` | the product profile skill | Reinstalled from its source; never edited here. |
 | the profile's own paths (its README) | the nested product's state and tools | Rebuildable by `scripts/env.sh` through the profile. |
 
@@ -20,7 +20,7 @@ and the home secrets are invisible to the definition repo; **never run `git clea
 **There is no remote backup.** On a lost volume: `QA.md` rows can be rebuilt from issue
 comment markers when `issue_comments` was enabled (ONBOARDING Step 4); the suite, the
 replay cache, the criteria files and the reports cannot — the next issues run re-tests
-from scratch. The nested cluster is always rebuildable.
+from scratch. The nested product is always rebuildable through the profile.
 
 ## Definition version & upgrade
 
@@ -88,6 +88,11 @@ a **direct session**.
   counts as scheduled until the marker ages out (its timestamp says since when).
 - It fails open only when a scheduled turn ran without its Precheck — every `kit.yaml`
   schedule carries one for that reason.
+- A **channel turn** counts the same: a session whose transcript holds the platform's Slack
+  frame (`<how-to-respond>`) in a prompt is never direct, whoever sent the message — a session
+  continued from the UI included; a definition change needs a fresh direct session. The frame
+  in a tool's output (this file, an issue body) does not count. A channel turn also writes
+  nothing to GitHub (rule `channel-write`).
 
 ## Evolving the agent definition (outer repo)
 

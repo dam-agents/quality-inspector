@@ -27,7 +27,8 @@ await expect(screen.getByRole('tab', { name: 'API keys' })).toBeVisible();
 // AC-1 end
 T
 printf "await app.open('/');\n" > "$SANDBOX/issue-2.e2e.ts"
-i="$(node "$SCRIPTS/impact.mjs" "$SANDBOX/diff.json" "$SANDBOX/issue-1.e2e.ts" "$SANDBOX/issue-2.e2e.ts")"
+i="$(node "$SCRIPTS/impact.mjs" "$SANDBOX/diff.json" "$SANDBOX/issue-1.e2e.ts" "$SANDBOX/issue-2.e2e.ts" "$SANDBOX/scenario-*.e2e.ts")"
+assert "an unexpanded glob is skipped" '(.impacted | length) + (.clear | length) == 2' "$i"
 assert "renamed tab hits the AC block" '.impacted[0].hits | map(select(.inAcBlock and (.change | test("Access tokens")))) | length == 1' "$i"
 assert "untouched test is clear" '.clear | length == 1' "$i"
 

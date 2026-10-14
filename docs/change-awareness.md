@@ -46,7 +46,7 @@ node "$HOME/scripts/ui-diff.mjs" work/inventory/<previous>/inventory.json work/i
 node "$HOME/scripts/iface-snapshot.mjs" <candidate> "$HOME/work/inventory/<candidate>"
 node "$HOME/scripts/iface-diff.mjs" work/inventory/<previous>/iface.json work/inventory/<candidate>/iface.json > /tmp/quality-inspector-iface.json
 bash "$HOME/scripts/changes.sh" <previous> <candidate> > /tmp/quality-inspector-changes.json
-node "$HOME/scripts/impact.mjs" /tmp/quality-inspector-diff.json --iface /tmp/quality-inspector-iface.json work/suite/tests/issue-*.e2e.ts
+node "$HOME/scripts/impact.mjs" /tmp/quality-inspector-diff.json --iface /tmp/quality-inspector-iface.json work/suite/tests/{issue,scenario}-*.e2e.ts
 ```
 
 (Source `work/env/credentials.env` for the map's sign-in.) `impact.mjs` names, per test,
@@ -63,7 +63,7 @@ The triage ([triage.md](triage.md)) compares outcomes against these expectations
 ## Coverage
 
 ```bash
-node "$HOME/scripts/coverage.mjs" work/inventory/<build>/inventory.json work/SUITE.md work/suite/tests/issue-*.e2e.ts --md > work/COVERAGE.md
+node "$HOME/scripts/coverage.mjs" work/inventory/<build>/inventory.json work/SUITE.md work/suite/tests/{issue,scenario}-*.e2e.ts --md > work/COVERAGE.md
 ```
 
 Without `--md` it prints the JSON (`pages[]` with `tests` and `covered`, `uncovered[]`,

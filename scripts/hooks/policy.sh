@@ -12,9 +12,10 @@
 # <T> = target_repo (QI_TARGET_REPO wins); a parameter expansion in its place ($T, ${T},
 # $OWNER/$REPO) counts as <T> in gh-api-path, gh-search, gh-cli, codeload and repo-web, a
 # command substitution $(…) does not (docs/persistence.md opens the definition PR with
-# one). "scheduled" = a fresh work/env/RUN_MODE
-# (docs/persistence.md → Scheduled or direct session). Every rule id below has a deny
-# fixture in scripts/tests/policy-fixtures.jsonl; the validator fails without one.
+# one). "scheduled" = a fresh work/env/RUN_MODE, or a channel turn — a session whose
+# transcript holds the platform's Slack frame `<how-to-respond>` in a prompt, not in a
+# tool's output (docs/persistence.md → Scheduled or direct session). Every rule id below
+# has a deny fixture in scripts/tests/policy-fixtures.jsonl; the validator fails without one.
 #
 #   rule             tools                 denies
 #   gh-api-path      Bash                  a GitHub API path under /repos/<T>/ other than issues, issues/<n>,
@@ -46,6 +47,9 @@
 #                                          (a method other than GET, or a field or --input) whose endpoint
 #                                          is not under the target's issues — so a pull request over REST too
 #   policy-tamper    Bash (scheduled)      any command naming RUN_MODE, scripts/hooks/ or .claude/settings
+#   channel-write    Bash (channel turn)   any `gh api` write, issues paths included, and `gh issue|pr`
+#                                          comment|create|edit|close|merge|review|… — a Slack message
+#                                          never writes to GitHub
 #
 # Every denial logs one `policy_denied` event (scripts/log.sh): `tool=<name> rule=<id>`
 # plus `at=<host/path or file>` — never a full command or a query string.
@@ -76,7 +80,8 @@ VARS="$(jq -r '
   "TOOL=\(.tool_name | s) SESSION=\(.session_id | s) CWD=\(.cwd | s)",
   "CMD=\(.tool_input.command | s) FPATH=\((.tool_input.file_path // .tool_input.notebook_path) | s)",
   "GPATH=\(.tool_input.path | s) GPAT=\(.tool_input.pattern | s) GGLOB=\(.tool_input.glob | s)",
-  "URL=\(.tool_input.url | s) QUERY=\(((.tool_input.query // "") + " " + ((.tool_input.allowed_domains // []) | join(" "))) | s)"' 2>/dev/null)" \
+  "URL=\(.tool_input.url | s) QUERY=\(((.tool_input.query // "") + " " + ((.tool_input.allowed_domains // []) | join(" "))) | s)",
+  "TRANSCRIPT=\(.transcript_path | s)"' 2>/dev/null)" \
   || deny bad-input "" "the tool call could not be parsed"
 eval "$VARS"
 [ -n "$CWD" ] || CWD="$PWD"
@@ -102,11 +107,34 @@ load_profile() { # lazily: only a rule that needs the profile's boundary reads i
 }
 
 iso2epoch() { date -u -d "$1" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
+CHAN=""
+channel_turn() { # anyone in a bound conversation speaks there, never the operator. The frame
+  # counts in a prompt line only: a tool result (a Read of docs/persistence.md, an issue body),
+  # a tool's progress, a compaction summary or the agent's own message quoting it is data. A
+  # line that holds the frame but does not parse fails closed. The frame stays in a session
+  # continued from the UI, so that session stays non-direct.
+  [ -n "$CHAN" ] && { [ "$CHAN" = 1 ]; return; }
+  CHAN=0
+  local hits out
+  [ -n "$TRANSCRIPT" ] || return 1
+  hits="$(grep -F '<how-to-respond>' "$TRANSCRIPT" 2>/dev/null)" || return 1
+  out="$(printf '%s\n' "$hits" | jq -Rr '(fromjson? // "unparsable") as $l
+    | if ($l | type) != "object" then "y"
+      elif ($l.type == "assistant" or $l.type == "progress" or $l.isCompactSummary == true) then empty
+      else ($l | del(.toolUseResult)
+            | (if (.message.content | type) == "array" then .message.content |= map(select(.type != "tool_result")) else . end)
+            | tojson | select(contains("<how-to-respond>")) | "y")
+      end' 2>/dev/null)" || out=y
+  [ -n "$out" ] && CHAN=1
+  [ "$CHAN" = 1 ]
+}
 SCHED=""
-scheduled() { # a RUN_MODE written (content time) or touched (mtime) within lock_ttl_min
+scheduled() { # a RUN_MODE written (content time) or touched (mtime) within lock_ttl_min, or a
+  # channel turn (above)
   [ -n "$SCHED" ] && { [ "$SCHED" = 1 ]; return; }
   SCHED=0
   local f="$WORK/env/RUN_MODE" ttl now t1 t2 kind iso
+  channel_turn && { SCHED=1; return 0; }
   [ -e "$f" ] || return 1
   ttl="$(cfg lock_ttl_min)"; case "$ttl" in (''|*[!0-9]*) ttl=180;; esac
   now="$(date -u +%s)"
@@ -341,10 +369,16 @@ check_simple() { # <one simple command>
           check_repo_paths "$rest"
           if [ -n "$T" ]; then case "$rest" in (*search/code*"$T"*|*search/commits*"$T"*) deny gh-search "$API_HOST/search" "searching the target's code or commits is off limits";; esac; fi
           case "$rest" in (*search/code*\$[A-Za-z_{]*|*search/commits*\$[A-Za-z_{]*) deny gh-search "$API_HOST/search" "searching the target's code or commits is off limits";; esac
-          gh_api_write "$((i+1))" && ! issues_endpoint "$GH_EP" && scheduled \
-            && deny scheduled-git "" "a scheduled run writes only the target's issue comments and labels";;
+          if gh_api_write "$((i+1))"; then
+            channel_turn && deny channel-write "" "a channel turn writes nothing to GitHub"
+            issues_endpoint "$GH_EP" || { scheduled \
+              && deny scheduled-git "" "a scheduled run writes only the target's issue comments and labels"; }
+          fi;;
         (pr) case "$rest" in (" pr create "*|" pr merge "*) scheduled && deny scheduled-git "" "a scheduled run never opens or merges a PR";; esac;;
       esac
+      case "$sub" in (issue|pr)
+        case "${rest# "$sub" }" in (comment\ *|create\ *|edit\ *|close\ *|reopen\ *|delete\ *|lock\ *|unlock\ *|transfer\ *|pin\ *|unpin\ *|develop\ *|merge\ *|review\ *|ready\ *)
+          channel_turn && deny channel-write "" "a channel turn writes nothing to GitHub";; esac;; esac
       case "$sub" in (pr|repo|release|run|workflow|browse|gist|search|cache|attestation|codespace|ruleset|project)
         if [ -n "$T" ]; then case "$rest" in (*"$T"*) deny gh-cli "$GH_HOST/$T" "only the target's issues may be read";; esac; fi
         gh_repo_var "$i" && deny gh-cli "$GH_HOST/<variable>" "only the target's issues may be read";; esac;;
