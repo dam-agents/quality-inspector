@@ -105,6 +105,11 @@ whole — **the deny rules are only proven by the probes**:
 `verify-onboarding.sh --live` and the weekly audit request each forbidden surface and
 fail when one answers. Approve no held request on the deny side.
 
+Inside the VM, a Claude Code `PreToolUse` hook and a `permissions.deny` list, merged into
+`~/.claude/settings.json` at onboarding, refuse the same surfaces before a tool call runs —
+plus `git clean`, container filesystems, writes outside `work/`, and commits or definition
+edits from a scheduled run ([docs/black-box.md](docs/black-box.md) → Enforcement layers).
+
 ## What a report looks like
 
 Every tested issue gets one evidence page in the artifact library (and, with comments

@@ -198,6 +198,32 @@ if [ -d scripts ]; then
   done
 fi
 
+# --------------------------------------------------------------- policy hook ----
+# The harness half of the black-box boundary (docs/black-box.md → Enforcement layers).
+# Every rule id in the hook's header table needs a deny fixture, and the fixtures must
+# hold — a change that drops or weakens a denial fails here and in the offline suite.
+HOOK=scripts/hooks/policy.sh FIX=scripts/tests/policy-fixtures.jsonl
+if [ ! -f "$HOOK" ]; then
+  fail "missing $HOOK (the PreToolUse policy hook)"
+else
+  { [ -x "$HOOK" ] || [ "$(git ls-files -s "$HOOK" 2>/dev/null | cut -c1-6)" = 100755 ]; } \
+    && pass "$HOOK is executable" || fail "$HOOK is not executable (chmod +x, and commit the mode)"
+  bash -n "$HOOK" 2>/dev/null && pass "bash -n: $HOOK" || fail "syntax error: $HOOK (bash -n)"
+  [ -f scripts/hooks/install.sh ] && bash -n scripts/hooks/install.sh 2>/dev/null \
+    && pass "scripts/hooks/install.sh present" || fail "scripts/hooks/install.sh missing or broken"
+  rules="$(sed -n '/^#   rule  /,/^#$/p' "$HOOK" | sed -nE 's/^#   ([a-z][a-z-]+)  .*/\1/p' | grep -vx rule)"
+  [ -n "$rules" ] || fail "$HOOK has no rule table in its header"
+  for r in $rules; do
+    jq -e --arg r "$r" 'select(.expect == "deny" and .rule == $r)' "$FIX" 2>/dev/null | grep -q . \
+      && pass "policy rule $r has a deny fixture" || fail "policy rule $r has no deny fixture in $FIX"
+  done
+  if [ -f scripts/tests/test_policy_hook.sh ] && bash scripts/tests/test_policy_hook.sh >/dev/null 2>&1; then
+    pass "policy fixtures hold (scripts/tests/test_policy_hook.sh)"
+  else
+    fail "policy fixtures fail — run bash scripts/tests/test_policy_hook.sh"
+  fi
+fi
+
 # ------------------------------------------------------ config reader parity ----
 # The runtime and the verifier must read CONFIG.md identically. Two copies of a
 # parser drift silently, so there is exactly one: scripts/lib/config.sh, sourced

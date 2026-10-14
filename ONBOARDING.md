@@ -148,6 +148,11 @@ not done yet: ask the operator to apply the egress rules, then re-run this block
 `- profile: <name>` into `work/CONFIG.md` first (Step 3 completes the file) — both
 scripts find the profile through it.
 
+**2e — the policy hook:** `bash "$HOME/scripts/hooks/install.sh"` merges the PreToolUse
+hook and the deny list into `$HOME/.claude/settings.json` (other keys kept; re-running
+changes nothing); it applies from the next session ([docs/black-box.md](docs/black-box.md)
+→ **Enforcement layers**).
+
 ## Step 3 — Configure (`work/CONFIG.md`, interactive)
 
 Key semantics: `CLAUDE.md` → **Runtime configuration** (read it first). Re-onboarding

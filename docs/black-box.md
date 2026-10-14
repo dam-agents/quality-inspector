@@ -1,11 +1,8 @@
 # The black-box boundary
 
 This agent judges the product the way a user meets it. Reading its implementation — even
-once, even to "understand a failure" — would let the code define what correct means. The
-boundary is enforced twice: by these rules, and by the agent's egress rules, which
-`verify-onboarding.sh --live` and the audit probe from the outside
-(`scripts/lib/profile.sh` → `boundary_targets`: the provider's list plus the profile's
-`boundary`).
+once, even to "understand a failure" — would let the code define what correct means.
+These rules are enforced, not only stated (**Enforcement layers** below).
 
 ## You may read
 
@@ -32,6 +29,20 @@ boundary is enforced twice: by these rules, and by the agent's egress rules, whi
 
 A need that seems to require one of these is a criterion you mark `blocked` or
 `not-testable` with the reason — never a reason to look.
+
+## Enforcement layers
+
+| Layer | Holds | Proven by |
+| --- | --- | --- |
+| Egress rules (below) | the network: what the VM may reach at all | the boundary probes of `verify-onboarding.sh --live` and the audit (`boundary_targets` in `scripts/lib/profile.sh`: the provider's list plus the profile's `boundary`) |
+| PreToolUse hook [`scripts/hooks/policy.sh`](../scripts/hooks/policy.sh) | every tool call before it runs — its header is the rule table: the surfaces above, `git clean`, container filesystems, writes outside `work/`, and commits, pushes and definition edits in a scheduled run ([persistence.md](persistence.md) → **Scheduled or direct session**) | `scripts/tests/test_policy_hook.sh` and the validator in CI; `policy_hook` in `verify-onboarding.sh` and the audit |
+| `permissions.deny` | the commands static patterns can express, as a second net | the same `policy_hook` check |
+
+`scripts/hooks/install.sh` merges the hook and the deny list into
+`$HOME/.claude/settings.json` (ONBOARDING Step 2e). A refusal reads `policy: denied
+(<rule>)` and logs `policy_denied`; it is final — treat it like the list above, never
+look for another route. The hook matches command text, so the egress rules remain the
+layer that holds against a deliberate bypass.
 
 ## Egress rules the operator applies
 

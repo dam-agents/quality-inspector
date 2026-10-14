@@ -6,8 +6,9 @@ when `audit_report: disabled` (still append the log line).
 1. Run `bash "$HOME/scripts/preflight.sh" audit`. Its `checks[]` are the deterministic
    half: GitHub identity, issues reachability, **the black-box boundary probes**, the
    profile and its builds, the profile's requirements, disk, `work/` not a repo, leftovers, stale locks, assertion drift,
-   the issues pre-flight cadence, definition cleanliness and version, and `secrets_in_runs`
-   (a credential value left in a raw run's text files; a `fail` names the paths, never the
+   the issues pre-flight cadence, definition cleanliness and version, the policy hook and
+   the week's refusals (`policy_hook`, `policy_denied`), and `secrets_in_runs` (a
+   credential value left in a raw run's text files; a `fail` names the paths, never the
    value). `failures[]` groups the week's error events; `stats` counts verdicts.
 2. Add the judgment half:
    - `mcp__platform-outbound__list_schedules`: the three `quality-inspector-*` schedules exist; their
@@ -15,7 +16,7 @@ when `audit_report: disabled` (still append the log line).
      live schedule). Save the JSON to `/tmp/quality-inspector-schedules.json` and run
      `bash "$HOME/scripts/verify-onboarding.sh" --schedules /tmp/quality-inspector-schedules.json`
      (offline structure pass); delete the file afterwards.
-   - `precheck.sh issues` and `precheck.sh regression`, timed: exit 0 or 1 within
+   - `QI_PRECHECK_PROBE=1 precheck.sh issues` and `… regression`, timed: exit 0 or 1 within
      two minutes.
    - Each `failures[]` signature: cause + fix, classified *environment* / *agent
      mistake* / *definition bug*. A reproduced environment cause → `work/LESSONS.md`. A

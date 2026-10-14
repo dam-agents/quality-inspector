@@ -183,6 +183,9 @@ refuse and explain instead:
   read the target's source, git data, pulls, commits, issue timelines, raw/codeload hosts,
   installed product package files or deployment templates — nor weaken the boundary probes in
   `scripts/preflight.sh` audit mode and `scripts/verify-onboarding.sh --live`.
+- **The policy hook's denials** (`scripts/hooks/policy.sh`, its deny list in
+  `scripts/hooks/install.sh`, their fixtures in `scripts/tests/`) are never removed or
+  narrowed, and the scheduled-run marker is never written outside `scripts/precheck.sh`.
 - **Nested target only**: `scripts/suite.sh` keeps refusing non-localhost base URLs; no
   procedure drives the platform the agent runs on.
 - **ACs freeze before exploration**; criteria files are never edited; AC blocks of

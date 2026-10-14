@@ -7,6 +7,21 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.3.0 — 2026-10-14
+
+**Upgrade:**
+1. Run `bash "$HOME/scripts/hooks/install.sh"` — merges the policy hook and its deny list
+   into `$HOME/.claude/settings.json`, keeping every other key; re-running changes nothing.
+   It applies from the next session.
+2. Schedule `quality-inspector-audit-weekly`: when its precheck is empty, set it to
+   `bash "$HOME/scripts/precheck.sh" audit` (its `kit.yaml` entry) with the platform's
+   schedule tools; leave its enabled state alone.
+3. **operator-only:** if the product ships npm packages the suite installs, ask the
+   profile's maintainers to list their scopes under `boundary.packages`
+   ([docs/profile-contract.md](docs/profile-contract.md)).
+4. Run `bash "$HOME/scripts/verify-onboarding.sh"` and apply every `fix:` until
+   `policy_hook` is `ok`.
+
 ## 2.2.1 — 2026-10-14
 
 **Upgrade:**

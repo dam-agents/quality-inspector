@@ -67,6 +67,8 @@ if [ "$STRUCTURE" = 1 ]; then
   else
     fail definition_repo "\$HOME is not a git checkout" "re-run ONBOARDING.md Step 1"
   fi
+  ph="$(bash "$SCRIPT_DIR/hooks/install.sh" --check 2>&1)" && ok policy_hook "$ph" \
+    || fail policy_hook "$ph" "bash \"\$HOME/scripts/hooks/install.sh\" (ONBOARDING.md Step 2e), then start a new session"
   [ "$(grep -v '^[[:space:]]*#' "$HOME_DIR/.gitignore" 2>/dev/null | grep -v '^[[:space:]]*$' | head -1)" = '/*' ] \
     && ok gitignore_allowlist "first rule is /*" \
     || fail gitignore_allowlist ".gitignore is not an allowlist" "restore .gitignore from origin/main"
@@ -215,7 +217,7 @@ if [ "$LIVE" = 1 ]; then
     else
       fail "preflight:$m" "no JSON" "bash -x scripts/preflight.sh $m and fix"
     fi
-    s=$(date +%s); bash "$SCRIPT_DIR/precheck.sh" "$m" >/dev/null 2>&1; rc=$?; d=$(( $(date +%s) - s ))
+    s=$(date +%s); QI_PRECHECK_PROBE=1 bash "$SCRIPT_DIR/precheck.sh" "$m" >/dev/null 2>&1; rc=$?; d=$(( $(date +%s) - s ))
     case "$rc" in (0|1) [ "$d" -lt 90 ] && ok "precheck:$m" "exit $rc in ${d}s" || fail "precheck:$m" "took ${d}s" "make the $m pre-flight faster than 2 minutes";;
       (*) fail "precheck:$m" "exit $rc" "fix scripts/precheck.sh / preflight.sh $m";; esac
   done

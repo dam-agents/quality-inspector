@@ -56,7 +56,8 @@ own business) as `QI_ENGINE_CONFIG`, and never product facts of its own.
   "issues": { "provider": "github" },
   "boundary": {
     "github_paths": ["actions/runs"],
-    "urls": ["https://docs.internal.example/architecture/"]
+    "urls": ["https://docs.internal.example/architecture/"],
+    "packages": ["@acme"]
   },
   "egress": [{ "host": "registry.example.com", "method": "GET", "why": "product images" }],
   "requires": { "root": true, "commands": ["docker"], "memory_gi": 8 },
@@ -73,7 +74,9 @@ own business) as `QI_ENGINE_CONFIG`, and never product facts of its own.
   `target_repo`.
 - `boundary` — what the black-box probes must find refused **in addition** to the core's
   own list for the provider ([black-box.md](black-box.md)): repository API paths under
-  `/repos/<target>/`, and full URLs.
+  `/repos/<target>/`, and full URLs. Optional `packages` — the
+  product's npm scopes or package names; the policy hook refuses reading their files
+  under any `node_modules/` (without it, nothing is refused there).
 - `egress` — hosts the product environment needs, for README and the operator's egress
   rules. Listed, never applied by the agent.
 - `requires` — checked by `verify-onboarding.sh --live`: root (a vm-backend agent), the

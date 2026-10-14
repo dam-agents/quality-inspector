@@ -173,6 +173,7 @@ mode_regression() {
 # grep -c prints 0 AND exits 1 on no match; never let `|| echo 0` double it.
 count_lines() { local n; n="$(grep -c -- "$1" "$2" 2>/dev/null)"; echo "${n:-0}"; }
 CHECKS='[]'
+POLICY_DENIED_WARN=3   # weekly policy_denied events above this are a warn
 check() { CHECKS="$(printf '%s' "$CHECKS" | jq -c --arg id "$1" --arg s "$2" --arg d "$3" '. + [{id:$id, status:$s, detail:$d}]')"; }
 
 # 0 = the request succeeded (reachable), 1 = refused/failed, 2 = held (timed out).
@@ -259,6 +260,21 @@ mode_audit() {
          | .sig = (.event + ": " + (.msg | gsub("[0-9]+"; "N") | .[0:120]))]
     | group_by(.sig) | map({signature: .[0].sig, count: length, first: (map(.ts)|min), last: (map(.ts)|max)})' 2>/dev/null)"
   [ -n "$failures" ] || failures='null'
+
+  # harness policy (docs/black-box.md → Enforcement layers): registered, and how often it refused
+  local ph denied n
+  ph="$(bash "$SCRIPT_DIR/hooks/install.sh" --check 2>&1)" && check policy_hook ok "$ph" \
+    || check policy_hook fail "$ph — run scripts/hooks/install.sh (ONBOARDING.md Step 2e)"
+  denied="$(cat "$WORK"/logs/events-*.jsonl 2>/dev/null | jq -rs --arg since "$week_ago" '
+    [.[] | select(.event == "policy_denied" and .ts >= $since) | ((.msg | capture("rule=(?<r>[^ ]+)").r) // "?")]
+    | "\(length) \(group_by(.) | map("\(.[0])×\(length)") | join(", "))"' 2>/dev/null)"
+  n="${denied%% *}"
+  case "$n" in
+    (''|*[!0-9]*) check policy_denied warn "not measured";;
+    (0) check policy_denied ok "no refusals this week";;
+    (*) if [ "$n" -gt "$POLICY_DENIED_WARN" ]; then check policy_denied warn "$n refusals this week (${denied#* }) — injection attempts or a definition bug"
+        else check policy_denied ok "$n refusals this week (${denied#* })"; fi;;
+  esac
   find "$WORK/logs" -name 'events-*.jsonl' -mtime +14 -delete 2>/dev/null || true
   # UI maps: the newest three builds; the newest is the next diff's starting point.
   ls -1dt "$WORK"/inventory/*/ 2>/dev/null | tail -n +4 | while read -r d; do rm -rf "$d"; done

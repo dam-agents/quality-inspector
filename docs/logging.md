@@ -33,6 +33,7 @@ run type (`issues`, `regression`, `audit`, `session`).
 | `env_up` / `env_reset` / `env_failed` / `env_lock_takeover` | `scripts/env.sh` | free text |
 | `suite_run` / `suite_failed` | `scripts/suite.sh` | `<label> exit=<rc>` / free text |
 | `onboarding_verify` | `scripts/verify-onboarding.sh` | free text |
+| `policy_denied` (warn) | `scripts/hooks/policy.sh` | `tool=<name> rule=<id>[ at=<host/path or file>]` — never a command or query string |
 
 The issue events are what the pre-flight's lock liveness reads: it matches
 `issue=<n>` followed by a space or the end of `msg`. Log an `issue_milestone` at every
