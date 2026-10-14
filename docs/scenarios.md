@@ -150,8 +150,9 @@ promotes it. Otherwise reply what is missing.
 
 The issues pre-flight lists `scenarios_due[]` (`id`, `kind`), oldest first — `queued` and
 `takeover` only while today's cap leaves room. After the `issues_due` entries: `queued` and
-`takeover` (an `in_progress` row past `lock_ttl_min`) → step 1 (admission counts again),
-then the pipeline from step 5; `report` → **The reply** only.
+`takeover` (an `in_progress` row while no run holds the environment, or past
+`lock_ttl_min`) → step 1 (admission counts again), then the pipeline from step 5; `report`
+→ **The reply** only.
 
 ## Discovery
 

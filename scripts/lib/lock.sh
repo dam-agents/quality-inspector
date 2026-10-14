@@ -8,15 +8,20 @@
 # line without a session (older versions, a harness without the variable) or a runtime
 # that does not answer falls back to age: free once older than lock_ttl_min.
 
-# session_running <id>: 0 running a turn · 1 not running, or unknown to the runtime ·
-# 2 no runtime to ask, or it did not answer.
+# session_running <id>: 0 running a turn · 1 not running, or unknown to the runtime (an
+# empty list) · 2 no runtime to ask, it did not answer, or it listed only other sessions.
+# Only the entry whose id is <id> counts — never the first entry of the list.
 session_running() {
   local out
   case "${1:-}" in (''|-|*[!A-Za-z0-9_-]*) return 2;; esac
   [ -n "${PLATFORM_RUNTIME_URL:-}" ] || return 2
   out="$(curl -fsS --max-time 5 --get --data-urlencode "input={\"sessionId\":\"$1\"}" \
     "$PLATFORM_RUNTIME_URL/api/trpc/sessions.list" 2>/dev/null)" || return 2
-  case "$(printf '%s' "$out" | jq -r '.result.data.sessions | if type == "array" then (.[0].running // false) else "unknown" end' 2>/dev/null)" in
+  case "$(printf '%s' "$out" | jq -r --arg id "$1" '.result.data.sessions
+      | if type != "array" then "unknown"
+        elif length == 0 then false
+        else (map(select((.id // .sessionId) == $id)) | if length == 0 then "unknown" else (first | .running == true) end)
+        end' 2>/dev/null)" in
     (true) return 0;; (false) return 1;; (*) return 2;;
   esac
 }

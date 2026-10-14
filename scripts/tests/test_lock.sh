@@ -10,6 +10,7 @@ cat > "$SANDBOX/bin/curl" <<'S'
 case "$*" in (*/api/trpc/sessions.list*) ;; (*) exit 22;; esac
 [ "${STUB_RUNTIME_DOWN:-0}" = 1 ] && exit 7
 id="$(printf '%s' "$*" | sed -n 's/.*"sessionId":"\([^"]*\)".*/\1/p')"
+[ "${STUB_UNFILTERED:-0}" = 1 ] && { printf '{"result":{"data":{"sessions":[{"id":"other","running":false}]}}}'; exit 0; }
 case " ${STUB_RUNNING:-} " in
   (*" $id "*) printf '{"result":{"data":{"sessions":[{"id":"%s","running":true}]}}}' "$id";;
   (*) printf '{"result":{"data":{"sessions":[]}}}';;
@@ -39,6 +40,9 @@ echo "issues $(iso_ago 20) sess-a" > "$L"
 assert_eq "runtime down, young lock: busy" 1 "$(STUB_RUNTIME_DOWN=1 lk sess-b lock regression)"
 echo "issues $(iso_ago 400) sess-a" > "$L"
 assert_eq "runtime down, past the TTL: taken" 0 "$(STUB_RUNTIME_DOWN=1 lk sess-b lock regression)"
+# A runtime that lists only other sessions says nothing about the holder: age decides.
+echo "issues $(iso_ago 20) sess-a" > "$L"
+assert_eq "only another session listed, young lock: busy" 1 "$(STUB_UNFILTERED=1 lk sess-b lock regression)"
 # A line from before sessions: the same owner is re-entrant, another one waits for the TTL.
 echo "issues $(iso_ago 20)" > "$L"
 assert_eq "legacy line, same owner" 0 "$(lk sess-a lock issues)"

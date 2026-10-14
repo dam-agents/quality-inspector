@@ -20,8 +20,8 @@
 #                                                 lock_ttl_min, logs `scenario_run`.
 #
 # `admit` counts today's `scenario_run` events against `max_scenarios_per_day`: runs that
-# took the environment, from Slack and discovery alike. `env.busy` is a live lock held by
-# anyone — the caller's own scenario never holds it yet.
+# took the environment, from Slack and discovery alike. `env.busy` is a lock held by anyone
+# (lib/lock.sh: live, or held) — the caller's own scenario never holds it yet.
 
 set -u
 export LC_ALL=C
@@ -32,6 +32,7 @@ CONFIG="$WORK/CONFIG.md"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/config.sh" || { echo "cannot source lib/config.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/state.sh" || { echo "cannot source lib/state.sh" >&2; exit 1; }
+. "$SCRIPT_DIR/lib/lock.sh" || { echo "cannot source lib/lock.sh" >&2; exit 1; }
 if ! . "$SCRIPT_DIR/log.sh" 2>/dev/null; then logev() { :; }; fi
 export LOG_JOB="${LOG_JOB:-scenario}"
 
@@ -126,13 +127,12 @@ cmd_set() {
 }
 
 cmd_admit() {
-  local cap runs ttl held="" ts="" busy=false
+  local cap runs ttl state held ts sess busy=false
   cap="$(cfg max_scenarios_per_day)"; case "$cap" in (''|*[!0-9]*) cap=10;; esac
   ttl="$(cfg lock_ttl_min)"; case "$ttl" in (''|*[!0-9]*) ttl=180;; esac
   runs="$(scenario_runs_today)"
-  if [ -f "$WORK/env/LOCK" ] && read -r held ts < "$WORK/env/LOCK"; then
-    [ $(( ($(date -u +%s) - $(iso2epoch "$ts")) / 60 )) -lt "$ttl" ] && busy=true
-  fi
+  read -r state held ts sess <<<"$(lock_state "$WORK/env/LOCK" "$ttl")"
+  case "$state" in (live|held) busy=true;; esac
   jq -nc --argjson r "${runs:-0}" --argjson c "$cap" --argjson b "$busy" --arg h "$held" --arg s "$ts" \
     '{runs_today:$r, cap:$c, admit:($r < $c),
       env:{busy:$b, holder:(if $b then $h else null end), since:(if $b then $s else null end)}}'

@@ -151,9 +151,10 @@ mode_issues() {
 }
 
 # Scenarios this run takes over (docs/scenarios.md → Waiting scenarios): frozen and
-# waiting for the environment, abandoned in_progress past the TTL, or finished with an
-# undelivered report. Oldest first. A full daily cap holds back the runs (not the
-# deliveries), so a waiting queue does not wake a model every hour for nothing.
+# waiting for the environment, in_progress with no run holding the environment (ENV_LOCK
+# free or dead) or past the TTL, or finished with an undelivered report. Oldest first. A
+# full daily cap holds back the runs (not the deliveries), so a waiting queue does not wake
+# a model every hour for nothing.
 SCEN_CAP="$(cfg max_scenarios_per_day)"; case "$SCEN_CAP" in (''|*[!0-9]*) SCEN_CAP=10;; esac
 scenarios_due() {
   local row id st upd kind full=0
@@ -164,7 +165,8 @@ scenarios_due() {
     case "$st" in
       (queued) [ "$full" = 0 ] && kind=queued ;;
       (report_pending) kind=report ;;
-      (in_progress) [ "$full" = 0 ] && [ $(( (NOW_EPOCH - $(iso2epoch "$upd")) / 60 )) -ge "$LOCK_TTL_MIN" ] && kind=takeover ;;
+      (in_progress) [ "$full" = 0 ] && { case "$ENV_LOCK" in (free|dead) true;; (*) false;; esac \
+          || [ $(( (NOW_EPOCH - $(iso2epoch "$upd")) / 60 )) -ge "$LOCK_TTL_MIN" ]; } && kind=takeover ;;
     esac
     [ -n "$kind" ] && printf '%s\t%s\t%s\n' "$upd" "$id" "$kind"
   done | sort | jq -R 'split("\t") | {id: .[1], kind: .[2]}' | jq -sc .
