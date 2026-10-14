@@ -149,7 +149,7 @@ if [ -f "$CONFIG" ]; then
   if [ -z "$w" ]; then ok cfg:work_repo "unset — work/ is local-only"
   elif ! printf '%s' "$w" | grep -qE '^([A-Za-z0-9.-]+/)?[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'; then
     fail cfg:work_repo "'$w' is not [host/]owner/repo" "name the private backup repository, or remove the key"
-  elif [ "$(printf '%s' "$w" | tr 'A-Z' 'a-z')" = "$(printf '%s' "$t" | tr 'A-Z' 'a-z')" ]; then
+  elif [ "$(_bb_lower "$(_bb_host "$w")/$(_bb_repo "$w")")" = "$(_bb_lower "$(_bb_host "$t")/$(_bb_repo "$t")")" ]; then
     fail cfg:work_repo "is the target repository" "name a separate private repository (docs/persistence.md → Backup & restore)"
   else ok cfg:work_repo "$w"; fi
   enum() { local v; v="$(cfg "$1")"; [ -z "$v" ] && { ok "cfg:$1" "default"; return; }

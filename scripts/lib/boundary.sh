@@ -72,14 +72,15 @@ EOF
 }
 
 # The rules of the work backup repository (work_repo; docs/persistence.md → Backup & restore),
-# same line format; nothing when it is unset. Their paths are longer than the deny-by-default
-# `/*` of the target's GitHub hosts, so they win; their method `*` loses to no GET deny there.
+# same line format; nothing when it is unset. Only what work-backup.sh requests: the
+# repository's metadata and the git fetch and push. Their paths are longer than the
+# deny-by-default `/*` of the target's GitHub hosts, so they win; the git rule's method `*`
+# loses to no GET deny there.
 work_repo_rules() {
   local w h r api p
   w="$(cfg work_repo)"; [ -n "$w" ] || return 0
   h="$(_bb_host "$w")"; r="$(_bb_repo "$w")"; api="$(_bb_api_host "$h")"; p="$(_bb_api_prefix "$h")"
-  printf 'allow GET %s %s\nallow * %s %s\nallow * %s %s\nallow * %s %s\n' \
-    "$api" "$p/repos/$r" "$api" "$p/repos/$r/*" "$h" "/$r/*" "$h" "/$r.git/*"
+  printf 'allow GET %s %s\nallow * %s %s\n' "$api" "$p/repos/$r" "$h" "/$r.git/*"
 }
 
 # The probes, one "<kind> <target>" per line: gh <api path> (GET), gql (a GraphQL call),

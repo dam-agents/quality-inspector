@@ -16,7 +16,8 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    to after every turn, so the suite, replay cache, criteria and state survive a lost volume or
    a move to another pod ([docs/persistence.md](docs/persistence.md) → **Backup & restore**). On a
    yes — **operator-only:** create the private repository (empty), give the connection's account
-   Contents read & write on it, protect its `main` for that account, run the work backup lines
+   Contents read & write on it, protect its `main` for that account where the GitHub plan offers
+   protection on a private repository, run the work backup lines
    `bash "$HOME/scripts/egress-rules.sh"` prints; then write the key and run
    `bash "$HOME/scripts/work-backup.sh" persist` and `… check` in the direct session.
 3. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:`.

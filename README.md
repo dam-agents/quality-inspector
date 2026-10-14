@@ -58,7 +58,8 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
    the target — no Contents, Pull requests or Actions. The egress, not the token, keeps
    forks and mirrors out of reach: a public target's are readable by anyone. With a work
    backup (`work_repo`), add Contents read & write on that one private repository, and
-   protect its `main` so only this account pushes.
+   protect its `main` so only this account pushes (a private repository needs a paid GitHub
+   plan for that; without it, the next persist logs and reverts a foreign commit).
 3. **Create the agent on the vm backend** when the profile requires root (most nested
    products do). The kit asks for 8 CPU, 16 Gi and 80 Gi; the profile's README says what
    its product needs.

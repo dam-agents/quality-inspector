@@ -88,7 +88,7 @@ definition's repository (from `origin`), `<S>` each `--source`:
 | `api.github.com` (target) | `GET /user`; `GET /repos/<T>/issues*`; `POST …/issues/*/comments*`; `DELETE …/issues/*/labels/<retest_label>` — that label only, URL-encoded (`qa%3Aretest`); `GET /repos/<T>/contents/<profile_source_path>/*` and `…/<profile_source_path>?*` (below); `/repos/<D>/*`; `GET /repos/<S>/*` | `GET …/issues/*/timeline*`, `GET …/issues/*/events*`, `GET …/issues/events*`; `/*` |
 | `github.com` (target) | `/<D>/*`, `/<D>.git/*`; the profile's `egress` paths | `/*` |
 | `codeload.github.com` (target) | `GET /<S>/*` | `/*` |
-| `api.github.com`, `github.com` (`work_repo`) | the private work backup: `GET /repos/<W>`, `/repos/<W>/*`, `/<W>/*`, `/<W>.git/*` — longer than the deny-by-default `/*` ([persistence.md](persistence.md) → **Backup & restore**) | — |
+| `api.github.com`, `github.com` (`work_repo`) | the private work backup: `GET /repos/<W>` (its metadata), `/<W>.git/*` (fetch and push) — longer than the deny-by-default `/*` ([persistence.md](persistence.md) → **Backup & restore**) | — |
 | `raw.githubusercontent.com`, gists, GitLab, Bitbucket, Codeberg, Gitea, Azure DevOps, Sourcegraph, SourceHut (kit) | — | `/*` |
 | `registry.npmjs.org` (kit) | `GET` (the `e2e` framework) | — |
 | `api.anthropic.com` (kit) | model calls for agent steps | — |

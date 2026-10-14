@@ -145,7 +145,7 @@ git_l() { git -C "$LOCAL" "$@"; }
 seed_clone() {
   if [ "$(git_l remote get-url origin 2>/dev/null)" != "$REMOTE" ]; then
     rm -rf "$LOCAL"
-    if ! git clone -q "$REMOTE" "$LOCAL" 2>/dev/null; then
+    if ! git clone -q --branch "$BRANCH" "$REMOTE" "$LOCAL" 2>/dev/null; then   # no main yet: a fresh history
       rm -rf "$LOCAL"; mkdir -p "$LOCAL" && git_l init -q && git_l remote add origin "$REMOTE" || return 1
     fi
   fi
@@ -194,7 +194,9 @@ do_persist() {
       # shellcheck disable=SC2086 # PROTECTED is a path list by design
       gone="$(git_l diff --cached --diff-filter=D --name-only -- $PROTECTED 2>/dev/null | head -5 | paste -sd' ' -)"
       n="$(git_l diff --cached --diff-filter=D --name-only | wc -l | tr -d ' ')"
-      [ -z "$gone" ] && [ "$n" -gt 0 ] && [ $(( n * 2 )) -gt "$(git_l ls-tree -r --name-only HEAD 2>/dev/null | wc -l)" ] \
+      # (only over a backup: a new repository's README is mirrored away)
+      [ -z "$gone" ] && [ "$n" -gt 0 ] && git_l cat-file -e HEAD:CONFIG.md 2>/dev/null \
+        && [ $(( n * 2 )) -gt "$(git_l ls-tree -r --name-only HEAD 2>/dev/null | wc -l)" ] \
         && gone="$n of the backed-up files"
       if [ -n "$gone" ]; then
         git_l reset -q --hard; say "refused: the snapshot deletes protected records ($gone) — restore work/ first"
@@ -287,7 +289,7 @@ table_rows_n() { table_rows "$1" | grep -c . ; }
 # when the destination is fine; unbacked counts files of the set (logs/ aside) changed after the
 # last push and more than an hour ago. Reads only: metadata, ls-remote, the event logs, mtimes.
 check() {
-  local problem="" last_push last_err ref unbacked prune=() d
+  local problem="" last_push last_err ref unbacked
   if [ -z "$REF" ]; then jq -nc '{configured:false}'; return 0; fi
   rm -f "$VERIFIED"
   verify_repo || problem="$WHY"
@@ -298,8 +300,7 @@ check() {
   ref="$(mktemp)"
   TZ=UTC touch -t "$(date -u -d "${last_push:-1970-01-01T00:00:00Z}" +%Y%m%d%H%M.%S 2>/dev/null \
     || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "${last_push:-1970-01-01T00:00:00Z}" +%Y%m%d%H%M.%S)" "$ref" 2>/dev/null
-  for d in $PRUNE_DIRS logs; do prune+=(-path "./$d" -o); done
-  unbacked="$(cd "$WORK" && find . \( "${prune[@]}" -false \) -prune -o -type f -newer "$ref" -mmin +60 -print 2>/dev/null | wc -l | tr -d ' ')"
+  unbacked="$(find_set -newer "$ref" -mmin +60 ! -size +"${MAX_FILE_KB}"k 2>/dev/null | grep -vc '^logs/')"
   rm -f "$ref"
   jq -nc --arg r "$REF" --arg p "$problem" --arg l "${last_push:-}" --argjson e "${last_err:-null}" --argjson u "${unbacked:-0}" \
     '{configured:true, repo:$r, problem:(if $p == "" then null else $p end),

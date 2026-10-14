@@ -93,6 +93,8 @@ persist; assert_eq "a public repository is refused" $((base + 1)) "$(commits)"
 echo '{"private":true,"fork":true,"parent":{"full_name":"Acme/Widgets"}}' > "$STUB_DIR/repo-acme_widgets-qa.json"; rm -f "$QI_WORK_BACKUP_LOCAL.verified"
 persist; assert_eq "a fork of the target is refused" $((base + 1)) "$(commits)"
 assert "check names the problem" '.configured and (.problem | test("fork of the target"))' "$(bash "$WB" check)"
+assert "audit: work_backup fails" '.checks[] | select(.id == "work_backup") | .status == "fail" and (.detail | test("fork of the target"))' \
+  "$(bash "$SCRIPTS/preflight.sh" audit 2>/dev/null)"
 echo '{"private":true,"fork":false}' > "$STUB_DIR/repo-acme_widgets-qa.json"; rm -f "$QI_WORK_BACKUP_LOCAL.verified"
 sed -i.bak 's|^- work_repo: .*|- work_repo: ACME/widgets|' "$WORK_DIR/CONFIG.md" && rm -f "$WORK_DIR/CONFIG.md.bak"
 persist; assert_eq "the target is refused" $((base + 1)) "$(commits)"
@@ -110,7 +112,7 @@ for _ in $(seq 1 120); do [ "$(commits)" -gt $((base + 1)) ] && [ ! -d "$QI_WORK
 assert_eq "hook pushed the pending change (detached)" $((base + 2)) "$(commits)"
 
 # A foreign commit is logged and reverted by the next snapshot.
-other="$SANDBOX/other"; git clone -q "$REMOTE" "$other"
+other="$SANDBOX/other"; git clone -q --branch main "$REMOTE" "$other"   # the remote HEAD follows init.defaultBranch
 echo edited > "$other/LESSONS.md"; git -C "$other" -c user.name=alice -c user.email=a@example.invalid commit -qam edit
 git -C "$other" push -q origin HEAD:main
 echo 'test("#9 AC-1", async () => {});' > "$WORK_DIR/suite/tests/issue-9.e2e.ts"
@@ -119,19 +121,33 @@ assert_eq "pushed on top of the foreign commit" $((base + 4)) "$(commits)"
 assert "foreign commit logged" 'map(select(.level == "error")) | any(.msg | test("foreign commits on acme/widgets-qa@main.*alice"))' "$(events work_backup)"
 assert_eq "foreign edit reverted" "$(cat "$WORK_DIR/LESSONS.md")" "$(git --git-dir="$REMOTE" show main:LESSONS.md)"
 
-# Another work_repo: the first persist there is no rewritten history, and it does not wait
-# for a new change.
+# Another work_repo, created with a README: the first persist there is no rewritten history,
+# it mirrors the README away instead of refusing a mass deletion, and it does not wait for a
+# new change.
 OTHER="$SANDBOX/other.git"; git init -q --bare "$OTHER"
+seed="$SANDBOX/seed"; git init -q "$seed"; echo '# widgets-qa2' > "$seed/README.md"
+git -C "$seed" add README.md && git -C "$seed" commit -qm init && git -C "$seed" push -q "$OTHER" HEAD:refs/heads/main
 echo '{"private":true,"fork":false}' > "$STUB_DIR/repo-acme_widgets-qa2.json"
 sed -i.bak 's|^- work_repo: .*|- work_repo: acme/widgets-qa2|' "$WORK_DIR/CONFIG.md" && rm -f "$WORK_DIR/CONFIG.md.bak"
 touch -t 202001010000 "$WORK_DIR/CONFIG.md"
 QI_WORK_BACKUP_REMOTE="$OTHER" bash "$WB" persist >/dev/null
-assert_eq "the new work_repo gets the full state at once" 1 "$(git --git-dir="$OTHER" rev-list --count main 2>/dev/null || echo 0)"
+assert_eq "the new work_repo gets the full state at once" 2 "$(git --git-dir="$OTHER" rev-list --count main 2>/dev/null || echo 0)"
+git --git-dir="$OTHER" ls-tree -r --name-only main 2>/dev/null | grep -qx README.md && { echo "  the README of a new work_repo was not mirrored away"; FAILED=1; }
 assert "no false rewrite alarm" 'map(select(.msg | test("history was rewritten"))) | length == 0' "$(events work_backup)"
 sed -i.bak 's|^- work_repo: .*|- work_repo: acme/widgets-qa|' "$WORK_DIR/CONFIG.md" && rm -f "$WORK_DIR/CONFIG.md.bak"
 
 c="$(bash "$WB" check)"
 assert "check after a push" '.configured and .problem == null and (.last_push_utc | test("Z$")) and .unbacked == 0' "$c"
+assert "audit: work_backup ok" '.checks[] | select(.id == "work_backup") | .status == "ok"' "$(bash "$SCRIPTS/preflight.sh" audit 2>/dev/null)"
+
+# unbacked counts only files that travel: a push 2 h ago, then an old state file and old media.
+ago() { date -u -d "@$(( $(date -u +%s) - $1 * 60 ))" +%Y%m%d%H%M.%S 2>/dev/null || date -u -r $(( $(date -u +%s) - $1 * 60 )) +%Y%m%d%H%M.%S; }
+printf '{"ts":"%s","level":"info","event":"external_write","msg":"surface=backup action=done issue=- key=0 target=acme/widgets-qa"}\n' \
+  "$(iso_ago 120)" >> "$(ls "$WORK_DIR"/logs/events-*.jsonl | tail -1)"
+echo note > "$WORK_DIR/issues/7/old.md"; echo png > "$WORK_DIR/issues/7/report-abc-1/media/AC-2.png"
+TZ=UTC touch -t "$(ago 90)" "$WORK_DIR/issues/7/old.md" "$WORK_DIR/issues/7/report-abc-1/media/AC-2.png"
+assert "unbacked skips media" '.unbacked == 1' "$(bash "$WB" check)"
+rm -f "$WORK_DIR/issues/7/old.md" "$WORK_DIR/issues/7/report-abc-1/media/AC-2.png"
 
 # Restore onto a fresh work/: verified, refuses over state, reports pending media.
 FRESH="$SANDBOX/fresh"; mkdir -p "$FRESH"; printf -- '- target_repo: acme/widgets\n- work_repo: acme/widgets-qa\n' > "$FRESH/CONFIG.md"

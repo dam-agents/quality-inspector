@@ -11,7 +11,7 @@ cat > "$QI_PROFILE_DIR/profile.json" <<'J'
  "egress":[{"host":"github.com","method":"GET","path":"/cert-manager/cert-manager/releases/*","why":"manifest"},
            {"host":"*.quay.io","method":"GET","why":"image layers"}]}
 J
-printf -- '- profile_source_path: /qa/\n' >> "$WORK_DIR/CONFIG.md"
+printf -- '- profile_source_path: /qa/\n- work_repo: acme/widgets-qa\n' >> "$WORK_DIR/CONFIG.md"
 export QI_DEFINITION_REPO=github.com/acme/quality-inspector
 cmds="$(bash "$SCRIPTS/egress-rules.sh" --kit --source acme/profiles)"
 assert_eq "the commands start with the AGENT guard" ': "${AGENT:?set AGENT to this agent'"'"'s name}"' "$(printf '%s\n' "$cmds" | head -1)"
@@ -103,6 +103,13 @@ deny GET https://dev.azure.com/acme/widgets/_git/widgets
 deny GET https://acme.visualstudio.com/widgets/_git/widgets
 deny GET https://sourcegraph.com/search?q=repo:acme/widgets
 deny GET https://git.sr.ht/~acme/widgets
+allow GET https://api.github.com/repos/acme/widgets-qa
+allow GET https://github.com/acme/widgets-qa.git/info/refs?service=git-receive-pack
+allow POST https://github.com/acme/widgets-qa.git/git-receive-pack
+deny GET https://api.github.com/repos/acme/widgets-qa/contents/QA.md
+deny GET https://github.com/acme/widgets-qa/blob/main/QA.md
+deny GET https://github.com/acme/widgets-qa2.git/info/refs?service=git-upload-pack
+deny GET https://api.github.com/repos/acme/widgets-qa2
 R
 ))"
 assert_eq "every request meets its expected verdict" "" "$verdicts"
@@ -110,6 +117,16 @@ assert_eq "every request meets its expected verdict" "" "$verdicts"
 # The target is never a --source: a profile there gets its directory, not the repository.
 bash "$SCRIPTS/egress-rules.sh" --source ACME/Widgets >/dev/null 2>&1
 assert_eq "a source naming the target is refused" "2" "$?"
+
+# work_repo is never the target, in any spelling: egress-rules.sh prints nothing, the verifier fails.
+printf -- '- target_repo: acme/widgets\n- work_repo: github.com/ACME/Widgets\n' > "$WORK_DIR/CONFIG.md"
+bash "$SCRIPTS/egress-rules.sh" >/dev/null 2>&1
+assert_eq "a work_repo naming the target is refused" "1" "$?"
+bash "$SCRIPTS/verify-onboarding.sh" --config 2>/dev/null | grep -q '^FAIL cfg:work_repo — is the target repository' \
+  || { echo "  assertion failed: verify-onboarding --config fails a work_repo that is the target"; FAILED=1; }
+printf -- '- target_repo: acme/widgets\n- work_repo: https://github.com/acme/widgets-qa\n' > "$WORK_DIR/CONFIG.md"
+bash "$SCRIPTS/verify-onboarding.sh" --config 2>/dev/null | grep -q "^FAIL cfg:work_repo — 'https://github.com/acme/widgets-qa' is not \[host/\]owner/repo" \
+  || { echo "  assertion failed: verify-onboarding --config fails a work_repo that is a URL"; FAILED=1; }
 
 # A GitHub Enterprise Server target: the API under /api/v3 on the same host, which is
 # deny-by-default as a whole; the definition on github.com gets nothing there, and a
