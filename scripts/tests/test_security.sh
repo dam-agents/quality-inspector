@@ -6,12 +6,14 @@ command -v node >/dev/null || { echo "  node missing"; exit 1; }
 seed_work
 mkdir -p "$WORK_DIR/env"
 printf 'E2E_USER_OWNER_USERNAME=qa\nE2E_USER_OWNER_PASSWORD=owner-secret-pw\nE2E_USER_OUTSIDER_USERNAME=out\nE2E_USER_OUTSIDER_PASSWORD=out-secret-pw\n' > "$WORK_DIR/env/credentials.env"
+# `export`, quotes and an empty role, read as suite.sh roles reads them (lib/profile.sh).
+printf 'export E2E_USER_MEMBER_USERNAME="mem"\nE2E_USER_MEMBER_PASSWORD='"'"'mem-secret-pw'"'"'\nE2E_USER_VIEWER_USERNAME=""\n' >> "$WORK_DIR/env/credentials.env"
 
 # ---------------------------------------------------------------- pre-flight
 out="$(bash "$SCRIPTS/preflight.sh" security)"
 assert "never run -> due" '.mode=="security" and .nothing_to_do==false and .candidate=="0.0.0-main.bbb2222" and .previous_candidate==null' "$out"
 assert "no map yet -> inventory null" '.inventory == null' "$out"
-assert "role names only" '.roles == ["owner","outsider"] and (tostring | test("secret-pw") | not)' "$out"
+assert "role names only, the suite.sh roles reading" '.roles == ["member","outsider","owner"] and (tostring | test("secret-pw") | not)' "$out"
 assert "stub profile has no deployment" '.deployment_checks == false' "$out"
 mkdir -p "$WORK_DIR/inventory/0.0.0-main.bbb2222"
 echo '{"routes":{}}' > "$WORK_DIR/inventory/0.0.0-main.bbb2222/inventory.json"

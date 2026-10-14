@@ -9,7 +9,10 @@
 # unparsable input → deny. It matches command TEXT — it stops mistakes and injected
 # instructions; the egress rules stay the boundary against a deliberate bypass.
 #
-# <T> = target_repo (QI_TARGET_REPO wins); "scheduled" = a fresh work/env/RUN_MODE
+# <T> = target_repo (QI_TARGET_REPO wins); a parameter expansion in its place ($T, ${T},
+# $OWNER/$REPO) counts as <T> in gh-api-path, gh-search, gh-cli, codeload and repo-web, a
+# command substitution $(…) does not (docs/persistence.md opens the definition PR with
+# one). "scheduled" = a fresh work/env/RUN_MODE
 # (docs/persistence.md → Scheduled or direct session). Every rule id below has a deny
 # fixture in scripts/tests/policy-fixtures.jsonl; the validator fails without one.
 #
@@ -30,7 +33,8 @@
 #   source-map       Bash WebFetch Read Glob Grep  a *.map URL; a *.map file under work/ or /tmp/quality-inspector-*
 #   product-package  Bash Read Glob Grep   node_modules/<entry> for each profile boundary.packages entry
 #   chart-template   Bash Read Glob Grep   templates/ under work/env/, anything under /tmp/quality-inspector-chart-*,
-#                                          helm pull|fetch|template|get manifest|get all|show values|show all
+#                                          helm pull|fetch|template|get manifest|get all|get hooks|show values|
+#                                          show all, helm get values -a|--all, helm install|upgrade --dry-run
 #   git-clean        Bash                  git clean, anywhere
 #   container-fs     Bash                  kubectl (k3s too) exec|cp|debug|attach, ctr, crictl,
 #                                          docker|podman|nerdctl exec|cp|export|save|run|create
@@ -152,6 +156,13 @@ repo_is_target() { # <owner> <repo>
   case "$1$2" in (*'$'*|*'{'*|*'*'*) return 0;; esac
   return 1
 }
+# A parameter expansion ($NAME, ${NAME}) where <T> would stand; `$(` is a command substitution.
+is_var() { case "$1" in (*'$'[A-Za-z_{]*) return 0;; esac; return 1; }
+path_repo_var() { # <path>: its leading /<owner>/<repo> given as a variable
+  local s="${1#/}" r=""; s="${s%%[?#]*}"
+  case "$s" in (*/*) r="${s#*/}"; r="${r%%/*}";; esac
+  is_var "${s%%/*}/$r"
+}
 RE_ISSUES='^issues(/[^/]+(/comments|/labels/[^/]+)?)?$'
 rest_allowed() { # <path after owner/repo>
   local r="${1%%[?#]*}"; r="${r%/}"; r="${r#/}"
@@ -178,14 +189,20 @@ check_url() { # <host> <path> <url without scheme>
   case "$h" in (raw.githubusercontent.com) deny raw-host "$h$p" "raw.githubusercontent.com is off limits";; esac
   case "$h" in (codeload.github.com|codeload."$GH_HOST")
     [ -z "$T" ] && deny codeload "$h$p" "codeload is off limits without a configured target"
-    case "$p" in (/"$T"|/"$T"/*) deny codeload "$h$p" "the target's archives are off limits";; esac;; esac
+    case "$p" in (/"$T"|/"$T"/*) deny codeload "$h$p" "the target's archives are off limits";; esac
+    path_repo_var "$p" && deny codeload "$h$p" "the target's archives are off limits";; esac
   if [[ "$h" == "$API_HOST" || "$h" == api.github.com ]]; then
     check_repo_paths "$p"
     case "$p" in (/search/code*|/search/commits*|/api/v3/search/code*|/api/v3/search/commits*)
-      [ -z "$T" ] || case "$3" in (*"$T"*) deny gh-search "$h${p%%\?*}" "searching the target's code or commits is off limits";; esac;; esac
+      if { [ -n "$T" ] && [[ "$3" == *"$T"* ]]; } || is_var "$3"; then
+        deny gh-search "$h${p%%\?*}" "searching the target's code or commits is off limits"
+      fi;; esac
   fi
-  if [[ "$h" == "$GH_HOST" ]] && [ -n "$T" ]; then
-    case "$p" in (/"$T"|/"$T"/*|/"$T".git*|/"$T"\?*|/"$T"#*) deny repo-web "$h/$T" "the target's web pages and git remote are off limits";; esac
+  if [[ "$h" == "$GH_HOST" ]]; then
+    if [ -n "$T" ]; then
+      case "$p" in (/"$T"|/"$T"/*|/"$T".git*|/"$T"\?*|/"$T"#*) deny repo-web "$h/$T" "the target's web pages and git remote are off limits";; esac
+    fi
+    path_repo_var "$p" && deny repo-web "$h${p%%[?#]*}" "the target's web pages and git remote are off limits"
   fi
   case "${p%%[?#]*}" in (*.map) deny source-map "$h${p%%[?#]*}" "source maps are off limits";; esac
   load_profile
@@ -265,6 +282,21 @@ issues_endpoint() { # <endpoint>
   [[ "$e" =~ $RE_ISSUES_EP_VAR ]] && return 0
   [[ "$e" =~ $RE_ISSUES_EP ]] && repo_is_target "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
 }
+# Within check_simple (its w and n): the repository a gh subcommand at word <i> names — a
+# -R/--repo value, a `repo:` search qualifier, or `gh repo <verb> <repo>` — is a variable.
+# `[ = ]` compares exactly: under nocasematch, -R would also match -r (--reviewer, --ref).
+gh_repo_var() { # <i>
+  local j=$(( $1 + 1 )) prev="" v
+  while [ "$j" -lt "$n" ]; do
+    unq "${w[$j]}"; v="$U"
+    if [ "$prev" = -R ] || [ "$prev" = --repo ]; then is_var "$v" && return 0; fi
+    case "$v" in (--repo=*) is_var "${v#*=}" && return 0;; (repo:*) is_var "${v#repo:}" && return 0;; esac
+    if [ "${v:0:2}" = -R ] && [ "${#v}" -gt 2 ]; then is_var "${v:2}" && return 0; fi
+    prev="$v"; j=$((j + 1))
+  done
+  unq "${w[$1]:-}"; [ "$U" = repo ] || return 1
+  unq "${w[$(( $1 + 2 ))]:-}"; is_var "$U"
+}
 
 check_simple() { # <one simple command>
   local -a w; local i=0 n cmd sub x rest=" "
@@ -297,7 +329,10 @@ check_simple() { # <one simple command>
     (docker|podman|nerdctl)
       case "$rest" in (*" exec "*|*" cp "*|*" export "*|*" save "*|*" run "*|*" create "*) deny container-fs "" "container and image filesystems are off limits";; esac;;
     (helm)
-      case "$rest" in (*" pull "*|*" fetch "*|*" template "*|*" get manifest "*|*" get all "*|*" show values "*|*" show all "*) deny chart-template "" "chart templates and default values are off limits";; esac;;
+      case "$rest" in (*" pull "*|*" fetch "*|*" template "*|*" get manifest "*|*" get all "*|*" get hooks "*|*" show values "*|*" show all "*) deny chart-template "" "chart templates and default values are off limits";; esac
+      # the computed values hold the chart's defaults; a dry run prints the rendered templates
+      case "$rest" in (*" get values"*" -a "*|*" get values"*" --all"*|*" install"*" --dry-run"*|*" upgrade"*" --dry-run"*|*" --dry-run"*" install"*|*" --dry-run"*" upgrade"*)
+        deny chart-template "" "chart templates and default values are off limits";; esac;;
     (gh)
       unq "${w[$i]:-}"; sub="$U"
       case "$sub" in
@@ -305,12 +340,14 @@ check_simple() { # <one simple command>
           case "$rest" in (*" graphql "*|*" /graphql "*) deny gh-graphql "$API_HOST/graphql" "GraphQL is off limits; use the issues REST endpoints";; esac
           check_repo_paths "$rest"
           if [ -n "$T" ]; then case "$rest" in (*search/code*"$T"*|*search/commits*"$T"*) deny gh-search "$API_HOST/search" "searching the target's code or commits is off limits";; esac; fi
+          case "$rest" in (*search/code*\$[A-Za-z_{]*|*search/commits*\$[A-Za-z_{]*) deny gh-search "$API_HOST/search" "searching the target's code or commits is off limits";; esac
           gh_api_write "$((i+1))" && ! issues_endpoint "$GH_EP" && scheduled \
             && deny scheduled-git "" "a scheduled run writes only the target's issue comments and labels";;
         (pr) case "$rest" in (" pr create "*|" pr merge "*) scheduled && deny scheduled-git "" "a scheduled run never opens or merges a PR";; esac;;
       esac
       case "$sub" in (pr|repo|release|run|workflow|browse|gist|search|cache|attestation|codespace|ruleset|project)
-        if [ -n "$T" ]; then case "$rest" in (*"$T"*) deny gh-cli "$GH_HOST/$T" "only the target's issues may be read";; esac; fi;; esac;;
+        if [ -n "$T" ]; then case "$rest" in (*"$T"*) deny gh-cli "$GH_HOST/$T" "only the target's issues may be read";; esac; fi
+        gh_repo_var "$i" && deny gh-cli "$GH_HOST/<variable>" "only the target's issues may be read";; esac;;
     (curl|wget|http|https|xh|aria2c|lynx|w3m) FETCHES=1;;
   esac
   return 0

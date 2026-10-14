@@ -420,8 +420,8 @@ mode_security() {
   fi
   # A map from before api_requests existed cannot drive the access checks: rebuild it.
   inv="$WORK/inventory/$candidate/inventory.json"; jq -e 'has("api_requests")' "$inv" >/dev/null 2>&1 || inv=""
-  # Role names only, never values (docs/profile-contract.md → The bin/ contract).
-  roles="$(sed -n 's/^E2E_USER_\([A-Z0-9]*\)_USERNAME=..*/\1/p' "$WORK/env/credentials.env" 2>/dev/null | tr '[:upper:]' '[:lower:]' | jq -R . | jq -sc .)"
+  # Role names only, never values — the reader suite.sh roles uses (lib/profile.sh).
+  roles="$(provided_roles "$WORK/env/credentials.env" 2>/dev/null)"
   eng="$(profile_field '.engine')"
   if [ "$eng" = helm-k3s ] || profile_field '.requires.commands[]?' | grep -qx kubectl; then dep=true; else dep=false; fi
   log "candidate $candidate is new (last security run: ${last:-never}) — due"
