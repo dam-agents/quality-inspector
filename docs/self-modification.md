@@ -216,6 +216,9 @@ refuse and explain instead:
 - Issue comments stay opt-in (`issue_comments`); nested credentials never leave
   `work/env/` except as e2e credentials, and `scripts/suite.sh` keeps masking them in run
   artefacts (audit check `secrets_in_runs`).
+- Scenario verdicts never claim `verified`; every scenario's criteria and verdicts pass the
+  independent judge; a channel turn is never a direct session for the policy hook
+  ([scenarios.md](scenarios.md)).
 - Security findings reach only a private artifact and the operator's chat — never an issue
   comment or other public surface; their oracles stay frozen in [security.md](security.md),
   and source maps are probed by status only.

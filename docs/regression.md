@@ -13,7 +13,7 @@
   was `verified`, the file passed `--strict` on the candidate, no step inside an AC block
   was `judged`, and `scripts/check-asserts.sh --agent-asserts <file>` prints nothing. Like
   `exploratory` otherwise (not replayed, not drift-checked); the queue for "promote all
-  pending". With `auto_promote: verified` the issues run promotes such a file itself
+  pending". A saved scenario joins it ([scenarios.md](scenarios.md) → Saving). With `auto_promote: verified` the issues run promotes such a file itself
   (tier `regression`, `assert_hash`, `promoted_utc` now) — the risk: an AC freeze the
   operator never read then gates every nightly run.
 - `regression` — promoted by the operator ("promote #N", "promote all pending" →
@@ -23,6 +23,9 @@
 - `retired` — superseded by a completed issue ([triage.md](triage.md)); kept, not replayed.
 - `quarantined` — flaky on two builds within 14 days ([triage.md](triage.md) → Flaky tests
   and quarantine); kept, not replayed until the operator re-promotes it.
+- A scenario's row (`tests/scenario-<k>.e2e.ts`, `S-<k>` in the `issue` column) is tagged
+  `scenario-<k>`: wherever this file and [triage.md](triage.md) say `issue-<n>`, use that
+  tag, and its report entries carry `scenario` instead of `issue`.
 
 ## The regression run
 

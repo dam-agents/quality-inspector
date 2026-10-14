@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# e2e-mcp.sh — start the e2e MCP server for exploring the nested platform
+# e2e-mcp.sh — start the e2e MCP server for exploring the nested product
 # (docs/test-authoring.md → Finding the steps). Registered once at onboarding as the
 # harness's `e2e` MCP server. Runs from work/suite so the suite's config and
 # credentials apply; the target is always the profile's nested product on localhost.

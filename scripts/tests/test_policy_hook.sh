@@ -22,8 +22,13 @@ while IFS= read -r fx; do
     (stale) printf 'scheduled %s -\n' "$(iso_ago 400)" > "$WORK_DIR/env/RUN_MODE"; touch -t 202001010000 "$WORK_DIR/env/RUN_MODE";;
     (*) rm -f "$WORK_DIR/env/RUN_MODE";;
   esac
-  call="$(jq -c --arg w "$WORK_DIR" '{session_id:"test", cwd:(.input.cwd // $w), hook_event_name:"PreToolUse",
-            tool_name:.tool, tool_input:(.input | del(.cwd))}' <<<"$fx")"
+  # A channel turn's transcript holds the platform's Slack frame; a direct one does not.
+  case "$(jq -r '.mode // "direct"' <<<"$fx")" in
+    (channel) printf '{"type":"user","message":{"content":"<how-to-respond>\\nreply …\\n</how-to-respond>"}}\n' > "$SANDBOX/transcript.jsonl";;
+    (*) printf '{"type":"user","message":{"content":"promote #7"}}\n' > "$SANDBOX/transcript.jsonl";;
+  esac
+  call="$(jq -c --arg w "$WORK_DIR" --arg t "$SANDBOX/transcript.jsonl" '{session_id:"test", cwd:(.input.cwd // $w), hook_event_name:"PreToolUse",
+            transcript_path:$t, tool_name:.tool, tool_input:(.input | del(.cwd))}' <<<"$fx")"
   err="$(printf '%s' "$call" | "$HOOK" 2>&1 >/dev/null)"; rc=$?
   case "$want:$rc" in
     (allow:0) ;;

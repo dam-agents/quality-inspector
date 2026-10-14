@@ -67,6 +67,11 @@
 {"name":"marker removal, scheduled","mode":"scheduled","expect":"deny","rule":"policy-tamper","tool":"Bash","input":{"command":"rm -f /home/agent/work/env/RUN_MODE"}}
 {"name":"settings merge, direct","expect":"allow","tool":"Bash","input":{"command":"bash \"$HOME/scripts/hooks/install.sh\""}}
 {"name":"stale marker is direct","mode":"stale","expect":"allow","tool":"Bash","input":{"command":"git push -u origin fix/x"}}
+{"name":"definition edit, channel turn","mode":"channel","expect":"deny","rule":"scheduled-def","tool":"Edit","input":{"file_path":"@DEF@/CLAUDE.md"}}
+{"name":"config edit, channel turn","mode":"channel","expect":"deny","rule":"scheduled-def","tool":"Write","input":{"file_path":"@WORK@/CONFIG.md"}}
+{"name":"commit, channel turn","mode":"channel","expect":"deny","rule":"scheduled-git","tool":"Bash","input":{"command":"git -C /home/agent commit -m 'fix: x'"}}
+{"name":"settings merge, channel turn","mode":"channel","expect":"deny","rule":"policy-tamper","tool":"Bash","input":{"command":"bash \"$HOME/scripts/hooks/install.sh\""}}
+{"name":"scenario write, channel turn","mode":"channel","expect":"allow","tool":"Write","input":{"file_path":"@WORK@/scenarios/S-1/request.md"}}
 {"name":"webfetch raw","expect":"deny","rule":"raw-host","tool":"WebFetch","input":{"url":"https://raw.githubusercontent.com/acme/widgets/main/src/app.ts","prompt":"x"}}
 {"name":"webfetch repo page","expect":"deny","rule":"repo-web","tool":"WebFetch","input":{"url":"https://github.com/acme/widgets/blob/main/src/app.ts","prompt":"x"}}
 {"name":"websearch repo","expect":"deny","rule":"repo-web","tool":"WebSearch","input":{"query":"site:github.com/acme/widgets session store"}}

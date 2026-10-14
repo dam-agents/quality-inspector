@@ -9,8 +9,9 @@
 # unparsable input → deny. It matches command TEXT — it stops mistakes and injected
 # instructions; the egress rules stay the boundary against a deliberate bypass.
 #
-# <T> = target_repo (QI_TARGET_REPO wins); "scheduled" = a fresh work/env/RUN_MODE
-# (docs/persistence.md → Scheduled or direct session). Every rule id below has a deny
+# <T> = target_repo (QI_TARGET_REPO wins); "scheduled" = a fresh work/env/RUN_MODE, or a
+# channel turn — a session whose transcript holds the platform's Slack frame
+# `<how-to-respond>` (docs/persistence.md → Scheduled or direct session). Every rule id below has a deny
 # fixture in scripts/tests/policy-fixtures.jsonl; the validator fails without one.
 #
 #   rule             tools                 denies
@@ -72,7 +73,8 @@ VARS="$(jq -r '
   "TOOL=\(.tool_name | s) SESSION=\(.session_id | s) CWD=\(.cwd | s)",
   "CMD=\(.tool_input.command | s) FPATH=\((.tool_input.file_path // .tool_input.notebook_path) | s)",
   "GPATH=\(.tool_input.path | s) GPAT=\(.tool_input.pattern | s) GGLOB=\(.tool_input.glob | s)",
-  "URL=\(.tool_input.url | s) QUERY=\(((.tool_input.query // "") + " " + ((.tool_input.allowed_domains // []) | join(" "))) | s)"' 2>/dev/null)" \
+  "URL=\(.tool_input.url | s) QUERY=\(((.tool_input.query // "") + " " + ((.tool_input.allowed_domains // []) | join(" "))) | s)",
+  "TRANSCRIPT=\(.transcript_path | s)"' 2>/dev/null)" \
   || deny bad-input "" "the tool call could not be parsed"
 eval "$VARS"
 [ -n "$CWD" ] || CWD="$PWD"
@@ -99,10 +101,13 @@ load_profile() { # lazily: only a rule that needs the profile's boundary reads i
 
 iso2epoch() { date -u -d "$1" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
 SCHED=""
-scheduled() { # a RUN_MODE written (content time) or touched (mtime) within lock_ttl_min
+scheduled() { # a RUN_MODE written (content time) or touched (mtime) within lock_ttl_min, or a
+  # channel turn: anyone in a bound conversation speaks there, never the operator. The frame
+  # stays in a session continued from the UI, so that session stays non-direct (fails closed).
   [ -n "$SCHED" ] && { [ "$SCHED" = 1 ]; return; }
   SCHED=0
   local f="$WORK/env/RUN_MODE" ttl now t1 t2 kind iso
+  [ -n "$TRANSCRIPT" ] && grep -qF '<how-to-respond>' "$TRANSCRIPT" 2>/dev/null && { SCHED=1; return 0; }
   [ -e "$f" ] || return 1
   ttl="$(cfg lock_ttl_min)"; case "$ttl" in (''|*[!0-9]*) ttl=180;; esac
   now="$(date -u +%s)"

@@ -32,6 +32,14 @@ library for evidence, the skill catalog for profiles, sub-agents for independent
 - **Security run** (weekly, off by default) — frozen black-box checks of each new candidate:
   access without or with the wrong session, stored XSS, headers, leaks, the deployment;
   findings go to a private artifact only, never to an issue (docs/security.md).
+- **Scenarios** — in a connected Slack channel anyone can ask "test that …" or write the
+  steps and the expected outcome; the agent freezes it, has an independent judge sub-agent
+  check the scenario, tests it on the newest build (and on the last release when it fails,
+  to tell a regression from an old defect), lets the judge check the evidence, and answers
+  in the thread with a video report. "save S-<k>" queues a passing scenario for the
+  operator's "promote all pending". A weekly discovery run (off by default) proposes
+  scenarios of its own from uncovered pages and completed issues, and can test them too
+  (docs/scenarios.md, docs/judge.md).
 - **Weekly audit** (off by default) — health, the black-box boundary probes, assertion
   drift, cache efficiency (docs/audit.md).
 - Scripts only detect, and the profile only sets up the nested product; every judgment and every
@@ -60,6 +68,7 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
 6. **Apply the egress rules** (Black-box boundary below), then answer the onboarding
    dialog. Schedules are held until onboarding completes, which includes a smoke test of
    the nested product.
+7. *Optional:* **connect a Slack channel** to the agent for scenario requests.
 
 Not in a catalog yet? Add one entry to the catalog repository's `catalog.yaml`:
 
@@ -91,7 +100,7 @@ fail when one answers. Approve no held request on the deny side.
 Inside the VM, a Claude Code `PreToolUse` hook and a `permissions.deny` list, merged into
 `~/.claude/settings.json` at onboarding, refuse the same surfaces before a tool call runs —
 plus `git clean`, container filesystems, writes outside `work/`, and commits or definition
-edits from a scheduled run ([docs/black-box.md](docs/black-box.md) → Enforcement layers).
+edits from a scheduled run or a Slack turn ([docs/black-box.md](docs/black-box.md) → Enforcement layers).
 
 ## What a report looks like
 
@@ -128,6 +137,8 @@ configuration.
 | `target_repo` | asked | Repository whose issues are tested. `QI_TARGET_REPO` overrides. |
 | `issue_comments` | asked, default `disabled` | Opt-in: post verdicts on the issue. |
 | `spec_feedback` | asked, default `disabled` | Opt-in: suggest an observable "Done when" on issues with nothing testable. |
+| `scenario_discovery`, `scenario_channel` | asked, default `disabled` / empty | Opt-in: weekly scenario proposals (`propose`), also tested (`run`); the Slack conversation for their digest. |
+| `max_scenarios_per_run`, `max_scenarios_per_day` | defaults (`3`, `10`) | Proposals per discovery run; scenario runs a day. |
 | `auto_promote` | default `disabled` | `verified`: tests whose every criterion was verified join the nightly regression without the operator's "promote". |
 | `marker_prefix` | default `quality-inspector` | Dedup marker; **immutable once a comment exists**. |
 | `qa_label`, `retest_label` | defaults | The gates (`qa:ready`, `qa:retest`). |
@@ -150,11 +161,14 @@ configuration.
   target's issues, plus issues write when comments are enabled.
 - **External surfaces:** artifacts in the platform's artifact library (private by
   default); with `issue_comments: enabled`, **public comments** on the target's issues,
-  and removal of the retest label.
+  and removal of the retest label; optionally a Slack channel bound to the agent (replies
+  in request threads; with `scenario_channel`, one weekly digest post).
 - **Cost:** idle hours wake no model. One issue costs three installs of the product (time,
   no tokens) plus authoring — expect a few hundred thousand tokens for the first
   run of an issue (explorations, on by default, add roughly 30–60 %); replays of promoted
-  tests are mostly free, except `agent.assert` checks, which always call the model.
+  tests are mostly free, except `agent.assert` checks, which always call the model. A
+  scenario costs about what an issue does; discovery adds tens of thousands of tokens a
+  week (`propose`), or that plus one scenario per proposal (`run`).
 
 ## Persistence
 

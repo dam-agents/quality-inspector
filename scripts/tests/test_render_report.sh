@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # render-report.mjs: every tested AC gets its video and captioned screenshot; the setup test never appears;
 # explorations render apart from the verdict, and a verdicts file without them renders as before;
-# a baseline blocked reason and a regression's build interval are shown.
+# a baseline blocked reason and a regression's build interval are shown; a scenario's evidence is
+# found by its own tag and carries the judge's reading.
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 R="$SANDBOX/runs"
-mk_run() { # <label> <ac-1 status>
+mk_run() { # <label> <ac-1 status> [owner tag]
   local d="$R/$1/artifacts/web/t1/default/attempt-0"
   mkdir -p "$d/video" "$d/screenshots" "$R/$1/artifacts/web/setup/default/attempt-0/video"
   printf 'webm' > "$d/video/video.webm"; printf 'png' > "$d/screenshots/001-AC-1.png"
@@ -13,7 +14,7 @@ mk_run() { # <label> <ac-1 status>
   cat > "$R/$1/report.json" <<J
 {"run":{"results":[
  {"titlePath":["the owner signs in"],"tags":[],"status":"passed","attempts":[{"artifacts":[{"id":"s:0","kind":"video","path":"web/setup/default/attempt-0/video/video.webm","producer":{"kind":"attempt"}}],"steps":[]}]},
- {"titlePath":["#42 AC-1: renamed"],"tags":["issue-42","ac-1"],"status":"$2","attempts":[{"durationMs":900,
+ {"titlePath":["#42 AC-1: renamed"],"tags":["${3:-issue-42}","ac-1"],"status":"$2","attempts":[{"durationMs":900,
   "error":$( [ "$2" = failed ] && echo '{"code":"ASSERTION_FAILED","message":"expected visible"}' || echo null ),
   "artifacts":[{"id":"a:0","kind":"screenshot","path":"web/t1/default/attempt-0/screenshots/001-AC-1.png","producer":{"kind":"step","stepId":"x:1"}},
                {"id":"a:1","kind":"video","path":"web/t1/default/attempt-0/video/video.webm","producer":{"kind":"attempt"}}],
@@ -96,4 +97,19 @@ QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/r2.json" "$SANDBOX
 h="$(cat "$SANDBOX/rout2/index.html")"
 case "$h" in *'Regressed between</b> <code>c1.5</code> (passes) and <code>c2</code> (fails) · adjacent builds'*) ;; *) echo "  regressed_between not rendered"; FAILED=1;; esac
 case "$h" in *'removed flag --force'*) ;; *) echo "  interface diff not rendered"; FAILED=1;; esac
+
+# Scenario mode: tests tagged scenario-<k>, the judge's reading, the channel reply as comment.md.
+mk_run s-cand failed scenario-7; mk_run s-base passed scenario-7
+cat > "$SANDBOX/s.json" <<'J'
+{"mode":"scenario","scenario":"S-7","title":"Export the usage table","source":"slack","spec_hash":"def","candidate":"c1","baseline":"b1",
+ "candidate_run":"s-cand","baseline_run":"s-base","verdict":"regression",
+ "acs":[{"id":"AC-1","name":"csv downloads","then":"a CSV file downloads","testable":true,"verdict":"regression",
+         "judge":{"agree":true,"call":"product-defect","reason":"the AC-1 screenshot shows no download"}}]}
+J
+out="$(QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/s.json" "$SANDBOX/s-out")"
+assert "scenario: both sides found by the scenario tag" '.videos == 2 and .screenshots == 2' "$out"
+h="$(cat "$SANDBOX/s-out/index.html")"
+case "$h" in *'S-7 — Export the usage table'*) ;; *) echo "  scenario title missing"; FAILED=1;; esac
+case "$h" in *'agrees (product-defect)'*) ;; *) echo "  judge reading missing"; FAILED=1;; esac
+grep -q '^• AC-1 csv downloads — regression$' "$SANDBOX/s-out/comment.md" || { echo "  scenario reply line missing"; FAILED=1; }
 exit $FAILED

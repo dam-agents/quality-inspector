@@ -52,6 +52,9 @@ when `audit_report: disabled` (still append the log line).
    - Spec quality: this week's `not-testable` verdicts and `testable: no` ACs by reason,
      issues without "Done when", and how many suggested rewrites authors adopted (an
      issue that became due again by `ac_changed` after a `spec-feedback` file).
+   - Scenarios (`stats.scenarios_7d`, by source and verdict): `needs-review` left by judge
+     disagreements, the `rejected` share, saves and by whom (`scenario_saved`), days the cap
+     was hit. A `passed` scenario whose `judge-verdict-*.json` disagrees is red.
    - Flakiness: rows added to `work/FLAKY.md` this week, tests `quarantined`, and whether
      one cause dominates (the same page, the nested product right after `up`).
    - Triage health: heals this week from `work/HEALS.md` (each one's basis is a UI-map
