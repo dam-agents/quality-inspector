@@ -16,9 +16,9 @@ jobs:
         run: |
           set -e
           find scripts -name '*.sh' -print0 | xargs -0 -n1 bash -n
-          for f in engines/*/bin/* engines/*/lib/*.sh; do bash -n "$f"; done
+          for f in engines/*/bin/* engines/*/lib/*.sh skills/*/templates/bin/*; do bash -n "$f"; done
       - name: node --check the Node scripts
-        run: for f in scripts/*.mjs scripts/lib/*.mjs engines/*/lib/*.mjs; do node --check "$f"; done
+        run: for f in scripts/*.mjs scripts/lib/*.mjs engines/*/lib/*.mjs skills/*/scripts/*.mjs; do node --check "$f"; done
       - name: structural validator
         run: bash scripts/validate-definition.sh .
       # Cross-file section references ("<file>.md -> **Label**"). They are prose,

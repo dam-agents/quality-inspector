@@ -1,0 +1,402 @@
+#!/usr/bin/env node
+// check-profile.mjs — check a quality-inspector product profile against the contract
+// (docs/profile-contract.md of the quality-inspector definition) before it ships.
+//
+//   node check-profile.mjs [--core <dir>] [--live] [--set <key>=<value>]...
+//                          [--candidate <channel>] [--baseline <channel>] <profile-dir>
+//
+// --core      the quality-inspector definition (default: $QI_CORE, else the definition
+//             this skill ships in); needed for engine profiles and the engine's own check.
+// --live      also run the read-only commands (bin/versions, bin/build-time) against the
+//             real registry. bin/env is never run.
+// --set       a non-default profile setting, as an instance would write it.
+// Prints PASS/WARN/FAIL lines; exit 0 = no FAIL, 1 = at least one, 2 = usage.
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, delimiter, dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const usage = (code = 2) => {
+  console.error('usage: check-profile.mjs [--core <dir>] [--live] [--set <key>=<value>]... [--candidate <channel>] [--baseline <channel>] <profile-dir>');
+  process.exit(code);
+};
+let core = process.env.QI_CORE || '';
+let live = false;
+let dir = '';
+let candidate = '';
+let baseline = '';
+const sets = {};
+const argv = process.argv.slice(2);
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i];
+  if (a === '--core') core = argv[++i] ?? usage();
+  else if (a === '--live') live = true;
+  else if (a === '--candidate') candidate = argv[++i] ?? usage();
+  else if (a === '--baseline') baseline = argv[++i] ?? usage();
+  else if (a === '--set') {
+    const kv = argv[++i] ?? usage();
+    const j = kv.indexOf('=');
+    if (j < 1) usage();
+    sets[kv.slice(0, j)] = kv.slice(j + 1);
+  } else if (a === '-h' || a === '--help') usage(0);
+  else if (a.startsWith('--') || dir) usage();
+  else dir = a;
+}
+if (!dir) usage();
+
+let fails = 0;
+let warns = 0;
+const pass = (m) => console.log(`PASS  ${m}`);
+const warn = (m) => { warns++; console.log(`WARN  ${m}`); };
+const fail = (m) => { fails++; console.log(`FAIL  ${m}`); };
+const finish = () => {
+  console.log(`\ncheck-profile: ${fails} fail, ${warns} warn`);
+  process.exit(fails ? 1 : 0);
+};
+const obj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const str = (v) => typeof v === 'string' && v.trim().length > 0;
+const read = (f) => { try { return readFileSync(f, 'utf8'); } catch { return null; } };
+const isExec = (f) => { try { return (statSync(f).mode & 0o111) !== 0; } catch { return false; } };
+// The same node for every child (an older system node may come first on PATH).
+const PATH = `${dirname(process.execPath)}${delimiter}${process.env.PATH ?? ''}`;
+
+// ------------------------------------------------------------------ the core ----
+if (!core) {
+  const own = resolve(dirname(realpathSync(fileURLToPath(import.meta.url))), '../../..');
+  if (existsSync(join(own, 'docs/profile-contract.md'))) core = own;
+}
+if (core && !existsSync(join(core, 'docs/profile-contract.md'))) {
+  fail(`--core ${core} is not the quality-inspector definition (no docs/profile-contract.md)`);
+  core = '';
+}
+if (core) pass(`core: ${core} (${(read(join(core, 'VERSION')) ?? '?').trim()})`);
+else warn('no core given (--core or QI_CORE) — engine and suite checks are skipped');
+
+// --------------------------------------------------------------- the files ----
+dir = resolve(dir);
+if (!existsSync(dir) || !statSync(dir).isDirectory()) { fail(`no such profile directory: ${dir}`); finish(); }
+const name = basename(dir);
+const files = [];
+const rel = (f) => relative(dir, f);
+// A profile is fetched by directory: plain files only, so a symlink or a submodule fails.
+const odd = new Set();
+const notPlain = (p, what) => { if (!odd.has(p)) { odd.add(p); fail(`${p}: ${what} — a profile fetched by directory holds plain files only`); } };
+const walk = (d) => {
+  for (const e of readdirSync(d, { withFileTypes: true })) {
+    const p = join(d, e.name);
+    if (e.name === '.git') { if (d !== dir) notPlain(rel(d), 'a git submodule'); continue; }
+    if (e.name === 'node_modules') continue;
+    if (e.isSymbolicLink()) notPlain(rel(p), 'a symlink');
+    else if (e.isDirectory()) walk(p);
+    else if (e.isFile()) files.push(p);
+  }
+};
+walk(dir);
+// What git tracks there, too: an uninitialised submodule is an empty directory on disk.
+const tracked = spawnSync('git', ['-C', dir, 'ls-files', '-s', '--', '.'], { encoding: 'utf8' });
+if (tracked.status === 0) {
+  for (const line of tracked.stdout.split('\n')) {
+    const t = line.match(/^(120000|160000) \S+ \d+\t(.+)$/);
+    if (t) notPlain(t[2], t[1] === '160000' ? 'a git submodule' : 'a symlink');
+  }
+}
+
+// ------------------------------------------------------------- profile.json ----
+const manifestText = read(join(dir, 'profile.json'));
+let m = null;
+if (manifestText === null) fail('profile.json: missing');
+else {
+  try { m = JSON.parse(manifestText); pass('profile.json parses'); } catch (e) { fail(`profile.json: not JSON (${e.message})`); }
+}
+if (m !== null && !obj(m)) { fail('profile.json: not an object'); m = null; }
+
+if (m) {
+  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'security', 'interfaces', 'config'];
+  for (const k of Object.keys(m)) if (!TOP.includes(k)) warn(`profile.json: unknown key '${k}' — the core ignores it`);
+  m.schema === 'qi-profile/v1' ? pass('schema qi-profile/v1') : fail(`schema '${m.schema ?? ''}' is not qi-profile/v1`);
+  str(m.product) ? pass(`product: ${m.product}`) : fail('product: missing');
+
+  const url = obj(m.app) ? m.app.url : undefined;
+  /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?(\/|$)/.test(String(url ?? ''))
+    ? pass(`app.url ${url}`)
+    : fail(`app.url '${url ?? ''}' must be http://localhost or http://127.0.0.1 — the product runs inside the agent's VM`);
+
+  if (m.issues === undefined) warn('issues.provider: missing — github is the only provider today');
+  else if (!obj(m.issues) || m.issues.provider !== 'github') fail(`issues.provider '${obj(m.issues) ? m.issues.provider ?? '' : ''}' is not github`);
+  else pass('issues.provider github');
+
+  // How it runs: the profile's own bin/<cmd>, else its engine's.
+  const engine = m.engine;
+  let engineDir = '';
+  if (engine !== undefined) {
+    if (!str(engine)) fail('engine: not a name');
+    else if (!core) warn(`engine '${engine}': not verified without the core`);
+    else if (!existsSync(join(core, 'engines', engine))) fail(`engine '${engine}': the core has no engines/${engine}`);
+    else { engineDir = join(core, 'engines', engine); pass(`engine ${engine}`); }
+    if (!obj(m.engine_config)) fail('engine_config: missing or not an object (the engine reads its product from it)');
+  } else if (m.engine_config !== undefined) warn('engine_config without engine — nothing reads it');
+
+  for (const cmd of ['env', 'versions', 'build-time']) {
+    const own = join(dir, 'bin', cmd);
+    if (existsSync(own)) {
+      if (!isExec(own)) fail(`bin/${cmd}: not executable (chmod +x)`);
+      const first = (read(own) ?? '').split('\n')[0];
+      if (!first.startsWith('#!')) fail(`bin/${cmd}: no shebang line`);
+      else if (/\b(ba)?sh\b/.test(first)) {
+        const r = spawnSync('bash', ['-n', own], { encoding: 'utf8' });
+        if (r.error) warn(`bin/${cmd}: bash -n could not run — ${r.error.message}`);
+        else r.status === 0 ? pass(`bin/${cmd}: own, bash -n clean`) : fail(`bin/${cmd}: syntax error — ${(r.stderr || '').trim().split('\n')[0]}`);
+      } else pass(`bin/${cmd}: own`);
+    } else if (engineDir && isExec(join(engineDir, 'bin', cmd))) pass(`bin/${cmd}: from engine ${engine}`);
+    else if (engine !== undefined && !engineDir) warn(`bin/${cmd}: expected from engine '${engine}', not verified`);
+    else fail(`bin/${cmd}: neither the profile nor an engine provides it`);
+  }
+  const binDir = join(dir, 'bin');
+  if (existsSync(binDir)) {
+    for (const f of readdirSync(binDir)) {
+      if (!['env', 'versions', 'build-time'].includes(f)) warn(`bin/${f}: not a contract command — the core never calls it`);
+    }
+  }
+
+  // boundary
+  if (m.boundary !== undefined) {
+    if (!obj(m.boundary)) fail('boundary: not an object');
+    else {
+      const gp = m.boundary.github_paths ?? [];
+      if (!Array.isArray(gp) || gp.some((p) => !str(p))) fail('boundary.github_paths: must be a list of paths');
+      else if (gp.some((p) => /^\/?repos\//.test(p))) fail('boundary.github_paths: paths are relative to repos/<target>/ — drop the repos/ prefix');
+      const urls = m.boundary.urls ?? [];
+      if (!Array.isArray(urls) || urls.some((u) => !/^https?:\/\/\S+$/.test(String(u)))) fail('boundary.urls: must be a list of full URLs');
+      const pk = m.boundary.packages ?? [];
+      if (!Array.isArray(pk) || pk.some((p) => !str(p) || /[\s\\]|^[./]|node_modules/.test(p))) {
+        fail('boundary.packages: must be a list of npm scopes or package names (@acme, acme-cli)');
+      }
+      if (Array.isArray(gp) && Array.isArray(urls) && Array.isArray(pk)) {
+        pass(`boundary: ${gp.length} repository path(s), ${urls.length} URL(s) probed, ${pk.length} package(s) refused under node_modules/`);
+      }
+    }
+  } else warn('boundary: none — the core\'s own probes only');
+
+  // egress
+  if (m.egress === undefined || (Array.isArray(m.egress) && !m.egress.length)) {
+    warn('egress: empty — does the install download nothing?');
+  } else if (!Array.isArray(m.egress)) fail('egress: not a list');
+  else {
+    let ok = true;
+    for (const [i, e] of m.egress.entries()) {
+      const id = `egress[${i}]`;
+      if (!obj(e) || !str(e.host) || /[/:\s]/.test(e.host)) { fail(`${id}: host must be a bare host name (no scheme, port or path)`); ok = false; continue; }
+      // The keys scripts/egress-rules.sh reads: verdict, method, host, pathPattern (or path), why.
+      if (e.method !== undefined && !['*', 'GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(e.method)) { fail(`${id} (${e.host}): method '${e.method}' is not * or an HTTP method`); ok = false; }
+      if (e.verdict !== undefined && !['allow', 'deny'].includes(e.verdict)) { fail(`${id} (${e.host}): verdict '${e.verdict}' is not allow or deny`); ok = false; }
+      for (const k of ['path', 'pathPattern']) {
+        if (e[k] !== undefined && !(e[k] === '*' || String(e[k]).startsWith('/'))) { fail(`${id} (${e.host}): ${k} must be * or start with /`); ok = false; }
+      }
+      if (e.path !== undefined && e.pathPattern !== undefined) warn(`${id} (${e.host}): both path and pathPattern — pathPattern wins`);
+      if (!str(e.why)) warn(`${id} (${e.host}): no why — the operator applies it without knowing what it is for`);
+    }
+    if (ok) pass(`egress: ${m.egress.length} host rule(s)`);
+  }
+
+  // requires
+  if (m.requires === undefined) warn('requires: none — onboarding cannot check the VM fits the product');
+  else if (!obj(m.requires)) fail('requires: not an object');
+  else {
+    const r = m.requires;
+    const before = fails;
+    if (r.root !== undefined && typeof r.root !== 'boolean') fail('requires.root: must be true or false');
+    if (r.commands !== undefined && (!Array.isArray(r.commands) || r.commands.some((c) => !str(c) || /\s/.test(c)))) fail('requires.commands: must be a list of command names');
+    if (r.memory_gi !== undefined && !(typeof r.memory_gi === 'number' && r.memory_gi > 0)) fail('requires.memory_gi: must be a positive number');
+    if (fails === before) pass(`requires: root ${r.root === true}, commands ${(r.commands ?? []).join(' ') || '-'}, memory ${r.memory_gi ?? '-'} GiB`);
+  }
+
+  // security and interfaces: optional; without them the core skips what needs them.
+  if (m.security === undefined) warn('security: none — the security run skips its entity checks');
+  else if (!obj(m.security)) fail('security: not an object');
+  else {
+    const s = m.security;
+    const before = fails;
+    if (s.entity !== undefined && !str(s.entity)) fail('security.entity: must be the noun of the main object a user creates');
+    if (s.namespace !== undefined && !/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(String(s.namespace))) fail(`security.namespace '${s.namespace}' is not a Kubernetes name`);
+    if (fails === before) pass(`security: entity ${s.entity ?? '-'}, namespace ${s.namespace ?? '-'}`);
+  }
+  if (m.interfaces !== undefined) {
+    const it = m.interfaces;
+    const before = fails;
+    if (!obj(it)) fail('interfaces: not an object');
+    else {
+      if (it.cli !== undefined && !str(it.cli)) fail('interfaces.cli: must be the published CLI\'s command');
+      if (it.openapi !== undefined && !/^\/\S*$/.test(String(it.openapi))) fail('interfaces.openapi: must be a path under app.url (/…)');
+      if (fails === before) pass(`interfaces: cli ${it.cli ?? '-'}, openapi ${it.openapi ?? '-'}`);
+    }
+  }
+
+  // config
+  const config = m.config ?? {};
+  if (!obj(config)) fail('config: not an object');
+  else {
+    let ok = true;
+    for (const [k, d] of Object.entries(config)) {
+      if (!/^[a-z][a-z0-9_]*$/.test(k)) { fail(`config.${k}: names are [a-z][a-z0-9_]* (placeholders and CONFIG.md match nothing else)`); ok = false; }
+      if (!obj(d)) { fail(`config.${k}: not an object`); ok = false; continue; }
+      if (typeof d.default !== 'string') { fail(`config.${k}: default must be a string ("" when empty)`); ok = false; }
+      if (!str(d.about)) { fail(`config.${k}: about is the onboarding question — one sentence`); ok = false; }
+      if (d.ask !== undefined && typeof d.ask !== 'boolean') { fail(`config.${k}: ask must be true or false`); ok = false; }
+    }
+    if (ok) pass(`config: ${Object.keys(config).length} key(s), asked: ${Object.keys(config).filter((k) => config[k].ask === true).join(' ') || '-'}`);
+  }
+  for (const k of Object.keys(sets)) if (!obj(config) || !(k in config)) fail(`--set ${k}: not a config key of this profile`);
+}
+
+// ------------------------------------------------------------------ SKILL.md ----
+const skill = read(join(dir, 'SKILL.md'));
+if (skill === null) fail('SKILL.md: missing — the tester\'s knowledge of the product');
+else {
+  const fm = skill.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!fm) fail('SKILL.md: no frontmatter (--- name, description ---)');
+  else {
+    const head = fm[1].split(/\r?\n/);
+    const field = (k) => {
+      const i = head.findIndex((l) => l.startsWith(`${k}:`));
+      if (i < 0) return '';
+      const v = head[i].slice(k.length + 1).trim();
+      if (!/^[>|][-+]?$/.test(v)) return v.replace(/^["']|["']$/g, '');
+      const out = [];
+      for (const l of head.slice(i + 1)) { if (/^\S/.test(l)) break; out.push(l.trim()); }
+      return out.join(' ').trim();
+    };
+    const sname = field('name');
+    if (sname !== name) fail(`SKILL.md: name '${sname}' differs from the directory '${name}' — the platform installs the skill under its name`);
+    else if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(sname)) fail(`SKILL.md: name '${sname}' is not lowercase-hyphenated`);
+    else pass(`SKILL.md: name ${sname}`);
+    if (!sname.startsWith('qi-profile-')) warn('SKILL.md: name does not start with qi-profile- (the convention)');
+    const desc = field('description');
+    if (!desc) fail('SKILL.md: no description');
+    else if (!/quality-inspector/i.test(desc)) warn('SKILL.md: description does not say it is a quality-inspector profile — the harness loads skills by it');
+    else pass('SKILL.md: description');
+    const body = fm[2];
+    const lines = body.split('\n').length;
+    lines > 120 ? warn(`SKILL.md: ${lines} lines — it is read for every issue; aim for about 80`) : pass(`SKILL.md: ${lines} lines`);
+    if (!/^#+ .*cannot/im.test(body)) warn('SKILL.md: no "cannot do" section — it is what makes criteria testable: no');
+    // Black-box hints: things a user could not have written.
+    const code = body.match(/(?:^|[\s`("'])((?:src|lib|pkg|internal|cmd|apps?|packages|server|backend|frontend|services)\/[\w./-]+|[\w./-]+\.(?:ts|tsx|jsx|mjs|py|go|rs|java|kt|rb|php|cs|sql|proto))(?=$|[\s`)"',.;:])/gm);
+    if (code) warn(`SKILL.md: looks like source paths — ${[...new Set(code.map((s) => s.trim().replace(/^[`("']/, '')))].slice(0, 3).join(', ')} (user-facing knowledge only)`);
+    const links = body.match(/https?:\/\/(?:www\.)?(?:github\.com|gitlab\.com|bitbucket\.org)\/[^\s)]*\/(?:blob|tree|commit|pull|merge_requests|-\/blob)\/[^\s)]*/g);
+    if (links) warn(`SKILL.md: links into a code host — ${links.slice(0, 2).join(', ')}`);
+  }
+}
+existsSync(join(dir, 'README.md')) ? pass('README.md present') : warn('README.md: missing — maintainers need delivery, channels, config and diagnosis');
+
+// -------------------------------------------- template leftovers and secrets ----
+const SECRETS = [
+  [/-----BEGIN [A-Z ]*PRIVATE KEY-----/, 'a private key'],
+  [/\bgh[pousr]_[A-Za-z0-9]{30,}/, 'a GitHub token'],
+  [/\bgithub_pat_[A-Za-z0-9_]{30,}/, 'a GitHub token'],
+  [/\bsk-ant-[A-Za-z0-9_-]{20,}/, 'an Anthropic key'],
+  [/\bsk-[A-Za-z0-9]{32,}/, 'an API key'],
+  [/\bAKIA[0-9A-Z]{16}\b/, 'an AWS key'],
+  [/\bxox[abprs]-[A-Za-z0-9-]{10,}/, 'a Slack token'],
+  [/"(?:password|passwd|secret|token|api_?key)"\s*:\s*"(?!\{\{)[^"]+"/i, 'a literal credential (generate it in bin/env init, or use a {{user:…}} / {{secret:…}} placeholder)'],
+];
+let leftovers = 0;
+for (const f of files) {
+  const t = read(f);
+  if (t === null || t.includes('\0')) continue;
+  const at = t.split('\n').flatMap((line, i) => (/<fill:|TODO\(profile\)/.test(line) ? [i + 1] : []));
+  if (at.length) {
+    leftovers += at.length;
+    fail(`${rel(f)}: ${at.length} unresolved template marker(s) (<fill: …> / TODO(profile)) on line ${at.slice(0, 8).join(', ')}${at.length > 8 ? ', …' : ''}`);
+  }
+  for (const [re, what] of SECRETS) if (re.test(t)) fail(`${rel(f)}: looks like ${what}`);
+}
+if (!leftovers) pass('no template markers left');
+
+// --------------------------------------------------------------------- suite/ ----
+const suiteFiles = files.filter((f) => rel(f).startsWith(`suite${'/'}`));
+for (const f of suiteFiles) {
+  const p = rel(f).slice('suite/'.length);
+  if (/\.e2e\.ts$/.test(p)) warn(`suite/${p}: tests belong to the agent's suite, not the profile`);
+  if (core && existsSync(join(core, 'scripts/suite-skeleton', p))) warn(`suite/${p}: the core skeleton has this path — this copy is never used`);
+}
+
+// ---------------------------------------------------- the resolved config ----
+const resolved = {};
+if (m && obj(m.config)) for (const [k, d] of Object.entries(m.config)) resolved[k] = obj(d) && typeof d.default === 'string' ? d.default : '';
+Object.assign(resolved, sets);
+const childEnv = (work) => ({
+  ...process.env,
+  PATH,
+  QI_WORK: work,
+  QI_ENV_DIR: join(work, 'env'),
+  QI_PROFILE_DIR: dir,
+  QI_PROFILE_CONFIG: JSON.stringify(resolved),
+  QI_ENGINE_CONFIG: JSON.stringify(m && obj(m.engine_config) ? m.engine_config : {}),
+  QI_CANDIDATE_CHANNEL: candidate,
+  QI_BASELINE_CHANNEL: baseline,
+});
+
+// -------------------------------------------------- the engine's own check ----
+const engineCheck = m && core && str(m.engine) ? join(core, 'engines', m.engine, 'bin', 'check') : '';
+if (engineCheck && isExec(engineCheck)) {
+  const work = mkdtempSync(join(tmpdir(), 'quality-inspector-check-'));
+  try {
+    const r = spawnSync(engineCheck, [], { cwd: work, env: childEnv(work), encoding: 'utf8', timeout: 60000 });
+    let said = 0;
+    for (const line of (r.stdout || '').split('\n')) {
+      const mm = line.match(/^(FAIL|WARN) (.*)$/);
+      if (!mm) continue;
+      said++;
+      (mm[1] === 'FAIL' ? fail : warn)(`engine_config: ${mm[2]}`);
+    }
+    if (r.status === 0 && !said) pass(`engine_config: ${m.engine}'s check is clean`);
+    else if (r.status !== 0 && !(r.stdout || '').includes('FAIL ')) fail(`engine_config: ${m.engine}'s check exited ${r.status} — ${(r.stderr || r.error?.message || 'no output').trim().split('\n').pop()}`);
+  } finally { rmSync(work, { recursive: true, force: true }); }
+} else if (engineCheck && existsSync(join(core, 'engines', m.engine))) {
+  pass(`engine_config: ${m.engine} has no offline check`);
+}
+
+// ---------------------------------------------------------------------- live ----
+if (live && m) {
+  const exe = (cmd) => {
+    const own = join(dir, 'bin', cmd);
+    if (existsSync(own)) return own;
+    if (core && str(m.engine)) { const e = join(core, 'engines', m.engine, 'bin', cmd); if (existsSync(e)) return e; }
+    return '';
+  };
+  const work = mkdtempSync(join(tmpdir(), 'quality-inspector-check-'));
+  const run = (cmd, args, env = {}) => {
+    const r = spawnSync(exe(cmd), args, { cwd: work, env: { ...childEnv(work), ...env }, encoding: 'utf8', timeout: 120000 });
+    return { ok: r.status === 0, out: (r.stdout || '').trim(), err: (r.stderr || r.error?.message || '').trim().split('\n').pop() };
+  };
+  const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+  try {
+    if (!exe('versions') || !exe('build-time')) fail('live: bin/versions or bin/build-time cannot be resolved');
+    else {
+      const t0 = Date.now();
+      const v = run('versions', []);
+      const secs = Math.round((Date.now() - t0) / 1000);
+      if (secs > 30) warn(`live: bin/versions took ${secs}s — the pre-flight calls it inside a two-minute budget (references/custom-bin.md)`);
+      let builds = null;
+      try { builds = v.ok ? JSON.parse(v.out) : null; } catch { builds = null; }
+      if (!v.ok) fail(`live: bin/versions failed — ${v.err || `exit without output`}`);
+      else if (!obj(builds) || !str(builds.candidate) || !(builds.baseline === null || str(builds.baseline))) {
+        fail(`live: bin/versions printed '${v.out.slice(0, 120)}', not {"candidate": "<build>", "baseline": "<build>"|null}`);
+      } else {
+        pass(`live: candidate ${builds.candidate}, baseline ${builds.baseline ?? 'none'}`);
+        for (const b of [builds.candidate, builds.baseline].filter(Boolean)) {
+          const t = run('build-time', [b]);
+          t.ok && ISO.test(t.out) ? pass(`live: ${b} published ${t.out}`)
+            : fail(`live: bin/build-time ${b} — ${t.ok ? `'${t.out.slice(0, 60)}' is not ISO-8601 UTC` : t.err || 'failed'}`);
+        }
+        const n = run('versions', [], { QI_BASELINE_CHANNEL: 'none' });
+        let nb = null;
+        try { nb = n.ok ? JSON.parse(n.out) : null; } catch { nb = null; }
+        obj(nb) && nb.baseline === null && str(nb.candidate) ? pass('live: baseline none gives no baseline')
+          : fail(`live: with baseline_channel none, bin/versions must print baseline null — got ${n.ok ? n.out.slice(0, 80) : n.err}`);
+      }
+    }
+  } finally { rmSync(work, { recursive: true, force: true }); }
+}
+
+finish();

@@ -1,0 +1,43 @@
+# <fill: profile name>
+
+The <fill: Product> profile for the quality-inspector agent — black-box QA that tests <fill: Product> through its UI, build by build, without reading its source.
+<fill: one sentence on what runs it, e.g. "It is data only: the inspector's `helm-k3s` engine installs the published chart in a nested k3s cluster inside the inspector's VM." or "Its own `bin/` scripts run the published image in …">
+Contract: quality-inspector `docs/profile-contract.md`.
+
+- `profile.json` — <fill: the artifact, its channels, prerequisites, the owner account, egress, requirements, config keys>.
+- `SKILL.md` — <fill: Product> from a tester's point of view. User-facing only — never implementation detail.
+TODO(profile): a bullet for `bin/` and any file it ships, or delete this line.
+
+## Delivery
+
+The inspector's operator adds this repository as a skill source with path `<fill: the profile's parent directory>` and assigns `<fill: profile name>`.
+When this repository is also the inspector's target, that path is the instance's `profile_source_path`; otherwise the operator runs quality-inspector `scripts/egress-rules.sh --source <fill: owner/repo>`. Either way the rules are the ones `scripts/egress-rules.sh` prints (quality-inspector `docs/black-box.md` → Egress rules). Keep symlinks and submodules out of this directory.
+
+## Channels
+
+| Channel | Builds | Default |
+| --- | --- | --- |
+| `<fill: main>` | <fill: what a build looks like and when one is published> | candidate |
+| `<fill: release>` | <fill: …> | baseline |
+
+`baseline_channel: none` turns red-green off.
+
+## Config (`work/CONFIG.md` of the inspector)
+
+| Key | Default | Purpose |
+| --- | --- | --- |
+| `profile.<fill: key>` | <fill: default, or "empty (asked)"> | <fill: its `about`> |
+
+## Egress
+
+Every entry of `profile.json` → `egress`, applied by the operator.
+TODO(profile): one line per `boundary.urls` entry the operator must deny, or delete this line.
+
+## Diagnosis (read-only)
+
+<fill: the commands that show why an install failed, e.g. "quality-inspector `engines/helm-k3s/README.md` → Diagnosis", or this profile's own logs under `$QI_ENV_DIR`>
+
+## Keep it in step with the product
+
+A change that alters what a fresh install needs — <fill: a new prerequisite, a renamed value the QA install sets, a new outside service> — updates this profile in the same pull request.
+A renamed config key is unknown to every instance that set it: say in the pull request what instances change.

@@ -1,0 +1,40 @@
+---
+name: <fill: the directory name, e.g. qi-profile-acme>
+description: >-
+  Product profile for testing <fill: Product> with the quality-inspector agent, and what a
+  tester should know about <fill: Product> from a user's point of view.
+  Load when quality-inspector freezes acceptance criteria or writes tests for <fill: Product>.
+---
+
+# <fill: Product> — what a tester needs to know
+
+<fill: one sentence: what the product does for its users.>
+The nested install is a fresh, <fill: single-user> instance at `<fill: app.url>`, signed in as the test owner from `credentials.env`.
+
+## Vocabulary a user sees
+
+- **<fill: Term>** — <fill: what it is to a user, and where it appears>.
+
+## Where things are
+
+- **<fill: Navigation label>** — <fill: what a user does there>.
+
+## Test accounts
+
+- `owner` — <fill: its role and what it may do>.
+TODO(profile): one bullet per further role — `member`, `viewer`, `outsider` (E2E_USER_<ROLE>_*) — with what it may and may not do, or delete this line.
+
+## What the nested install cannot do
+
+- No outbound network for the product itself: <fill: the outside services it calls>.
+  An AC that needs any of them is `testable: no — external dependency`<fill: , unless it only checks that the UI offers or records something>.
+- <fill: one user, or the accounts above>. ACs about other users' access need a second account — `testable: no — single user`.
+TODO(profile): a bullet per further limit — email, payment, SSO, scale — or per stand-in and how a user observes it.
+
+## CLI and API
+
+TODO(profile): the published CLI or API, how a test gets a token through the UI, the auth scheme, machine-readable output — or delete this section.
+
+## Builds
+
+<fill: what a build name looks like, e.g. `0.0.0-main.<n>` after every merge to main, `X.Y.Z` for releases.>

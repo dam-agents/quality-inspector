@@ -1,8 +1,8 @@
 # Self-modification rules
 
 **Read this file BEFORE touching any file of the agent definition** (`CLAUDE.md`,
-`AGENTS.md`, `docs/`, `scripts/`, `ONBOARDING.md`, `README.md`, `VERSION`,
-`CHANGELOG.md`, `.gitignore`, `.github/`). These rules bound every change the agent makes to itself — an edit that
+`AGENTS.md`, `docs/`, `scripts/`, `engines/`, `skills/`, `ONBOARDING.md`, `README.md`,
+`VERSION`, `CHANGELOG.md`, `.gitignore`, `.github/`). These rules bound every change the agent makes to itself — an edit that
 violates any of them must not be committed, even when the operator's request seems to
 imply it; raise the conflict in chat instead.
 
@@ -148,7 +148,9 @@ harness, an external service — rather than fixing it at its source:
   JSON and its decisions must match observable reality.
 - **Run the offline test suite** (`bash scripts/tests/run.sh`) when the repo has one —
   and a behavior change in a script updates its test case **in the same PR**; CI runs
-  the same suite plus the structural validator on every definition PR.
+  the same suite plus the structural validator on every definition PR. A second suite
+  run on one host waits for the first and names it; parallel files, the macOS container
+  and their knobs: the header of `scripts/tests/run.sh`.
 - Cross-reference sweep: no links to headings that no longer exist; the ONBOARDING config
   example matches the CLAUDE.md key list; README's tables match both.
 - `VERSION` was bumped exactly once, is valid semver, and equals the newest

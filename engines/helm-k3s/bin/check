@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# bin/check — offline validation of the profile's engine_config (README → Check). Read-only,
+# no network; called by the profile checker, never by a run. FAIL/WARN lines on stdout.
+set -u
+exec node "$(dirname "$0")/../lib/check.mjs"
