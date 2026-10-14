@@ -7,7 +7,7 @@ for a change to the agent definition itself.
 
 | Path | Kind | Holds |
 | --- | --- | --- |
-| `/home/agent` (outer) | git repo, remote `origin` (the kit's seed) | Definition: `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `docs/`, `scripts/`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `LICENSE`, `engines/`. |
+| `/home/agent` (outer) | git repo, remote `origin` (the kit's seed) | Definition: `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `docs/`, `scripts/`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `LICENSE`, `engines/`, `skills/`. |
 | `/home/agent/work` | **plain data directory** (no `.git`), local-only | Config, `QA.md`, `SUITE.md`, `SCENARIOS.md`, `LESSONS.md`, `issues/`, `scenarios/`, `suite/` (tests, replay cache, `node_modules`), `env/` (values, credentials, lock), logs. |
 | `$HOME/.agents/skills/<profile>` | the product profile skill | Reinstalled from its source; never edited here. |
 | the profile's own paths (its README) | the nested product's state and tools | Rebuildable by `scripts/env.sh` through the profile. |
@@ -106,7 +106,7 @@ scheduled run:
 ```bash
 git -C /home/agent fetch origin main
 git -C /home/agent checkout -b "fix/<short-slug>" origin/main
-git -C /home/agent add -- kit.yaml CLAUDE.md AGENTS.md ONBOARDING.md README.md VERSION CHANGELOG.md .gitignore LICENSE docs scripts engines
+git -C /home/agent add -- kit.yaml CLAUDE.md AGENTS.md ONBOARDING.md README.md VERSION CHANGELOG.md .gitignore LICENSE docs scripts engines skills
 git -C /home/agent commit -m "<describe the change>"
 git -C /home/agent push -u origin "fix/<short-slug>"
 o="$(git -C /home/agent remote get-url origin)"; o="${o#https://}"; o="${o%.git}"; pulls="repos/${o#*/}/pulls"
@@ -118,7 +118,8 @@ The agent's job ends at "PR opened". Use fresh descriptive branch names; runtime
 never goes to this repo.
 
 The definition repository may sit on a different GitHub host than the target: the PR
-call takes the host from `origin`, plain `git fetch`/`push` need nothing extra. It is
+call takes the host from `origin`; plain `git fetch`/`push` need only the allows
+`egress-rules.sh` prints for this repository when it shares the target's host. It is
 REST on purpose — `gh pr create` speaks GraphQL, which the egress denies
 ([black-box.md](black-box.md) → **Egress rules**); the path sits in a variable because the
 policy hook reads `repos/<variable>/…` as the target's.

@@ -14,10 +14,9 @@ agent does not install it), which lands in the agent's skill path
 (`$HOME/.agents/skills/<name>/`, also seen as `$HOME/.claude/skills/<name>/`). It usually
 lives **in the product's own repository** — a source on that repository with `path` set
 to the profile's parent directory — so the product team versions it with the product.
-The platform installs it from that repository's whole tarball, through this agent's
-gateway — which the black-box rules deny for the target, so a profile inside the target
-repository fails to (re)install while they hold ([black-box.md](black-box.md) →
-**Egress rules**).
+In the target repository, that path is `profile_source_path`: the egress allows only it,
+so the platform fetches only that directory ([black-box.md](black-box.md) → **Egress
+rules**); keep symlinks and submodules out of it.
 `scripts/lib/profile.sh` resolves it; `QI_PROFILE_DIR` overrides the lookup (tests,
 local development). The core never edits a profile; changes go to its own repository.
 
@@ -46,7 +45,17 @@ describes its product as data in `"engine_config"`. A profile that ships its own
 
 A new engine is a new directory with `bin/env`, `bin/versions`, `bin/build-time` and a
 README of its configuration; it receives the profile's `engine_config` (placeholders its
-own business) as `QI_ENGINE_CONFIG`, and never product facts of its own.
+own business) as `QI_ENGINE_CONFIG`, and never product facts of its own. An optional
+`bin/check` validates that configuration offline (`FAIL <problem>` / `WARN <note>` lines,
+exit 1 on any `FAIL`); only the profile checker below calls it.
+
+## Writing a profile
+
+The product team writes it with the
+[`qi-profile-creator`](../skills/qi-profile-creator/SKILL.md) skill: discovery and a brief
+they confirm, the files from templates, and
+`skills/qi-profile-creator/scripts/check-profile.mjs`, which checks a profile against
+this contract (`--live` also lists its builds).
 
 ## `profile.json`
 

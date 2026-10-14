@@ -20,6 +20,7 @@
 !/docs/
 !/scripts/
 !/engines/
+!/skills/
 !/.github/
 
 # The suite skeleton is copied into work/suite; its installs never come back here.
