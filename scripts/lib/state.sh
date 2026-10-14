@@ -11,6 +11,7 @@ HEALS_HEADER='| utc | test | ac | build | old_hash | new_hash | basis |'
 FLAKY_HEADER='| utc | test | ac | build | runs | passes |'
 COVERAGE_HEADER='| page | title | tests | covered |'   # written by scripts/coverage.mjs --md
 SCENARIOS_HEADER='| id | source | requester | thread | spec_hash | build | verdict | status | updated_utc |'
+CATALOG_HEADER='| collection | members |'   # work/CATALOG.md, the operator's collections (docs/catalog.md)
 
 # Data rows of a markdown table file (everything after the header + separator).
 table_rows() { grep '^|' "$1" 2>/dev/null | tail -n +3; }

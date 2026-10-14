@@ -111,7 +111,8 @@ Classify each message; several intents → handle each, then send **one** reply:
 12. **Deliver.** The artifact as [reporting.md](reporting.md) → Delivery step 1 (disabled →
     the link reads "evidence kept by the agent"), then `report_pending`, then **The
     reply**, then `reported` as the next write; every send is ledgered. Log
-    `scenario_done id=S-<k> verdict=<v>`. `env.sh unlock S-<k>`.
+    `scenario_done id=S-<k> verdict=<v>`. `env.sh unlock S-<k>`. Then the catalog
+    ([catalog.md](catalog.md) → **Build and publish**).
 
 **Budgets** hold per scenario as per issue: `suite.sh budget <claim time>` at every step
 from 6 on ([nested-env.md](nested-env.md) → **Budgets**); exceeded → the remaining ACs

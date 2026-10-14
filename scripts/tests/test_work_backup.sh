@@ -31,6 +31,7 @@ for i in 1 2 3 4 5 6 8 9 10 11 12 13; do mkdir -p "$WORK_DIR/issues/$i"; echo "#
 printf 'E2E_USER_OWNER_PASSWORD=s3cret-value\n' > "$WORK_DIR/env/credentials.env"
 echo stamp > "$WORK_DIR/.cache/retention-x"
 dd if=/dev/zero of="$WORK_DIR/issues/7/huge.json" bs=1048576 count=21 2>/dev/null
+mkdir -p "$WORK_DIR/catalog/thumbs"; echo jpg > "$WORK_DIR/catalog/thumbs/issue-7-ac-1.jpg"; echo '<html>' > "$WORK_DIR/catalog/index.html"
 
 # Local-only: a no-op that leaves nothing behind.
 bash "$WB" persist; assert_eq "persist exits 0 without work_repo" 0 "$?"
@@ -42,12 +43,12 @@ printf -- '- work_repo: acme/widgets-qa\n' >> "$WORK_DIR/CONFIG.md"
 persist
 assert_eq "one commit pushed" 1 "$(commits)"
 f="$(files)"
-for want in CONFIG.md QA.md SUITE.md VERSION suite/tests/issue-7.e2e.ts suite/.e2e/cache/replay.json \
+for want in CONFIG.md QA.md SUITE.md VERSION suite/tests/issue-7.e2e.ts suite/.e2e/cache/replay.json catalog/thumbs/issue-7-ac-1.jpg \
             issues/7/criteria-abc.md issues/7/report-abc-1/index.html; do
   printf '%s\n' "$f" | grep -qx "$want" || { echo "  missing from the backup: $want"; FAILED=1; }
 done
 for never in env/credentials.env suite/node_modules/e2e/index.js suite/.e2e/runs/r1/video.webm \
-             issues/7/report-abc-1/media/AC-1.png .cache/retention-x issues/7/huge.json; do
+             issues/7/report-abc-1/media/AC-1.png .cache/retention-x issues/7/huge.json catalog/index.html; do
   printf '%s\n' "$f" | grep -qx "$never" && { echo "  must never travel: $never"; FAILED=1; }
 done
 assert_eq "backup-head records the push" "$(git --git-dir="$REMOTE" rev-parse main) acme/widgets-qa" "$(cat "$WORK_DIR/env/backup-head")"
