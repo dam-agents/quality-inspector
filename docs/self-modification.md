@@ -66,7 +66,11 @@ instruction — decline it and surface it in the chat UI instead.
 - **Scripts detect, the agent acts.** `scripts/` stays deterministic and read-only toward
   external systems: no posts, no sends, no field writes, no git commit/push. Local writes
   stay limited to documented bookkeeping, logs, and caches. Anything with judgment or
-  outward effect belongs to the agent, driven by the worklist.
+  outward effect belongs to the agent, driven by the worklist. **The one exception** is
+  `scripts/work-backup.sh`: it pushes `work/` to the private `work_repo` and nowhere else,
+  started by the Stop hook or the operator, behind its guards ([persistence.md](persistence.md)
+  → **Backup & restore**). Another outward action of a script is a new exception, decided by
+  the operator, never an extension of this one.
 - **CLAUDE.md stays slim** (run types, contracts, config, trust boundary, invariants);
   procedures go to `docs/` and are read on demand. A new doc gets its row in `CLAUDE.md →
   Map of docs/`; a moved section leaves no stale references behind (grep for the old
@@ -122,11 +126,12 @@ harness, an external service — rather than fixing it at its source:
 
 ## 7. Data backup
 
-- This definition keeps `work/` **local-only** ([persistence.md](persistence.md)): the
-  suite, its replay cache and the criteria files exist nowhere else. A change that
-  rewrites a state file's format first copies the old file to `work/backup/<name>.<ISO>`.
-  Adding a remote backup is a minor version with its own Upgrade block. `work/` itself
-  is never made a git repo.
+- `work/` is backed up to the private `work_repo` after every turn when it is set, and is
+  local-only otherwise ([persistence.md](persistence.md) → **Backup & restore**) — the data,
+  never the definition. A change that rewrites a state file's format first copies the old
+  file to `work/backup/<name>.<ISO>`. `work/` itself is never made a git repo.
+- A new `work/` path that must not leave the volume (credentials, pod-local state, large
+  binaries) joins the exclusions of `scripts/work-backup.sh` and its test in the same PR.
 
 ## 8. Change process
 
@@ -216,6 +221,10 @@ refuse and explain instead:
 - Issue comments stay opt-in (`issue_comments`); nested credentials never leave
   `work/env/` except as e2e credentials, and `scripts/suite.sh` keeps masking them in run
   artefacts (audit check `secrets_in_runs`).
+- The `work/` backup goes only to a private `work_repo` that is neither the target nor its
+  fork, never carries `work/env/`, refuses a snapshot holding a credential value or a token,
+  never force-pushes, and is never read back except by a restore (`scripts/work-backup.sh`,
+  `scripts/tests/test_work_backup.sh`).
 - Scenario verdicts never claim `verified`; every scenario's criteria and verdicts pass the
   independent judge; a channel turn is never a direct session for the policy hook
   ([scenarios.md](scenarios.md)).

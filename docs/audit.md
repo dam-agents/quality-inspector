@@ -7,8 +7,11 @@ when `audit_report: disabled` (still append the log line).
    half: GitHub identity, issues reachability, **the black-box boundary probes**, the
    profile and its builds, the profile's requirements, disk (use and `min_free_disk_gi`),
    `work/` not a repo, leftovers, stale locks, the write ledger, assertion drift,
-   the issues pre-flight cadence, definition cleanliness and version, the policy hook and
-   the week's refusals (`policy_hook`, `policy_denied`), `secrets_in_runs` (a credential
+   the issues pre-flight cadence, definition cleanliness and version, the policy and backup
+   hooks and the week's refusals (`policy_hook`, `policy_denied`), the work backup
+   (`work_backup`: `fail` when `work_repo` is not private, is the target or its fork, or is
+   unreachable; `warn` for files changed over an hour ago and not pushed, or a backup error
+   since the last push), `secrets_in_runs` (a credential
    value left in a raw run's text files; a `fail` names the paths, never the value),
    **coverage** of the newest UI map (`warn` while pages are uncovered, never `fail`;
    [change-awareness.md](change-awareness.md) → Coverage), and `criteria_injection` (the

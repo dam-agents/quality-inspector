@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Offline gh stub: answers from files in $STUB_DIR; STUB_GH_FAIL=1 fails every call.
 # A single issue (…/issues/<n>) is $STUB_DIR/issue-<n>.json, else its entry of issues.json.
-# Every call is appended to $STUB_DIR/gh.calls; a comments listing reads comments-<n>.json.
+# Every call is appended to $STUB_DIR/gh.calls; a comments listing reads comments-<n>.json;
+# a repository's metadata (gh api repos/<owner>/<repo>) reads repo-<owner>_<repo>.json.
 [ "${STUB_GH_FAIL:-0}" = 1 ] && { echo "stub: failure" >&2; exit 1; }
 args="$*"
 printf '%s\n' "$args" >> "$STUB_DIR/gh.calls" 2>/dev/null
@@ -18,5 +19,8 @@ case "$args" in
     if [ -f "$STUB_DIR/comments-$n.json" ]; then cat "$STUB_DIR/comments-$n.json"; else echo '[]'; fi
     exit 0 ;;
   *"/issues"*) cat "$STUB_DIR/issues.json"; exit 0 ;;
+  *" repos/"*)   # repository metadata: $STUB_DIR/repo-<owner>_<repo>.json
+    r="${args##* repos/}"; r="${r%% *}"; f="$STUB_DIR/repo-$(printf '%s' "$r" | tr '/' '_').json"
+    [ -f "$f" ] && { cat "$f"; exit 0; } ;;
 esac
 echo "stub gh: unhandled: $args" >&2; exit 1

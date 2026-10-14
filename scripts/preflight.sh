@@ -370,6 +370,14 @@ mode_audit() {
   local ph denied n
   ph="$(bash "$SCRIPT_DIR/hooks/install.sh" --check 2>&1)" && check policy_hook ok "$ph" \
     || check policy_hook fail "$ph — run scripts/hooks/install.sh (ONBOARDING.md Step 2e)"
+  # the work backup (docs/persistence.md → Backup & restore): the destination, and nothing left unpushed
+  local wb; wb="$(bash "$SCRIPT_DIR/work-backup.sh" check 2>/dev/null)"
+  if ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$wb"; then check work_backup warn "not measured"
+  elif [ "$(jq -r .configured <<<"$wb")" != true ]; then check work_backup ok "local-only (work_repo not set)"
+  elif jq -e '.problem' >/dev/null <<<"$wb"; then check work_backup fail "$(jq -r .problem <<<"$wb")"
+  elif jq -e '.unbacked > 0 or .last_error' >/dev/null <<<"$wb"; then
+    check work_backup warn "$(jq -r '"\(.unbacked) file(s) changed since the last push (\(.last_push_utc // "never"))" + (if .last_error then "; last error: " + .last_error.msg else "" end)' <<<"$wb")"
+  else check work_backup ok "$(jq -r '"pushed to \(.repo) at \(.last_push_utc // "?")"' <<<"$wb")"; fi
   denied="$(cat "$WORK"/logs/events-*.jsonl 2>/dev/null | jq -rs --arg since "$week_ago" '
     [.[] | select(.event == "policy_denied" and .ts >= $since) | ((.msg | capture("rule=(?<r>[^ ]+)").r) // "?")]
     | "\(length) \(group_by(.) | map("\(.[0])×\(length)") | join(", "))"' 2>/dev/null)"

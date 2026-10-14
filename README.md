@@ -56,7 +56,9 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
    needs issue write access on the target. Use a dedicated bot account, and where the
    connection allows it (a GitHub App installation, a fine-grained token) only Issues on
    the target — no Contents, Pull requests or Actions. The egress, not the token, keeps
-   forks and mirrors out of reach: a public target's are readable by anyone.
+   forks and mirrors out of reach: a public target's are readable by anyone. With a work
+   backup (`work_repo`), add Contents read & write on that one private repository, and
+   protect its `main` so only this account pushes.
 3. **Create the agent on the vm backend** when the profile requires root (most nested
    products do). The kit asks for 8 CPU, 16 Gi and 80 Gi; the profile's README says what
    its product needs.
@@ -144,6 +146,7 @@ configuration.
 | `profile.<key>` | asked or defaulted, per the profile | The profile's own settings ([docs/profile-contract.md](docs/profile-contract.md)). |
 | `target_repo` | asked | Repository whose issues are tested. `QI_TARGET_REPO` overrides. |
 | `profile_source_path` | asked when the profile lives in `target_repo` | Its skill source's path there (DAM: `qa`) — the one directory the egress opens. |
+| `work_repo` | asked, default unset (local-only) | A private repository the Stop hook backs `work/` up to after every turn; a fresh volume or another pod restores from it ([docs/persistence.md](docs/persistence.md) → Backup & restore). |
 | `issue_comments` | asked, default `disabled` | Opt-in: post verdicts on the issue. |
 | `spec_feedback` | asked, default `disabled` | Opt-in: suggest an observable "Done when" on issues with nothing testable. |
 | `scenario_discovery`, `scenario_channel` | asked, default `disabled` / empty | Opt-in: weekly scenario proposals (`propose`), also tested (`run`); the Slack conversation for their digest. |
@@ -171,7 +174,8 @@ configuration.
 - **External surfaces:** artifacts in the platform's artifact library (private by
   default); with `issue_comments: enabled`, **public comments** on the target's issues,
   and removal of the retest label; optionally a Slack channel bound to the agent (replies
-  in request threads; with `scenario_channel`, one weekly digest post).
+  in request threads; with `scenario_channel`, one weekly digest post); with `work_repo`,
+  pushes of the `work/` backup to that private repository.
 - **Cost:** idle hours wake no model. One issue costs three installs of the product (time,
   no tokens) plus authoring — expect a few hundred thousand tokens for the first
   run of an issue (explorations, on by default, add roughly 30–60 %); replays of promoted
@@ -181,10 +185,13 @@ configuration.
 
 ## Persistence
 
-`work/` is **local-only** by choice: the suite, its replay cache, the frozen criteria and
-the reports live only on the agent's volume. A lost volume loses them; verdict rows can be
-rebuilt from issue comments when comments were enabled. Definition updates arrive as the
-platform's Kit Update and never touch `work/` ([docs/persistence.md](docs/persistence.md)).
+With `work_repo` set, a Claude Code `Stop` hook pushes `work/` — the suite, its replay
+cache, the frozen criteria, the state tables and the reports' text, never credentials or
+media — to that **private** repository after every turn; a fresh volume or another pod
+restores it at onboarding. The backup is never read back otherwise and refuses a public
+repository, the target or its fork. Without it, `work/` is local-only and a lost volume
+loses it. Definition updates arrive as the platform's Kit Update and never touch `work/`
+([docs/persistence.md](docs/persistence.md) → Backup & restore).
 
 ## Files
 
@@ -200,6 +207,6 @@ platform's Kit Update and never touch `work/` ([docs/persistence.md](docs/persis
 - [`scripts/`](scripts/) — pre-flight and Precheck, the environment lock and profile
   dispatch (`env.sh`),
   the suite runner (`suite.sh`), the evidence page renderer (`render-report.mjs`), the
-  assertion guard, verification, offline tests.
+  work backup (`work-backup.sh`), the assertion guard, verification, offline tests.
 - [`VERSION`](VERSION) + [`CHANGELOG.md`](CHANGELOG.md) — semver and upgrade steps.
 - [`LICENSE`](LICENSE) — Apache-2.0.

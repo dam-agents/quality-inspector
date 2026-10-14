@@ -7,6 +7,9 @@
 //   secrets.mjs mask <credentials.env> <dir>     rewrite the dir's text files in place
 //   secrets.mjs filter <credentials.env>         stdin -> stdout, masked
 //   secrets.mjs scan <credentials.env> <dir>…    -> {"files":[paths still holding a value],"unmaskable":n}
+//   secrets.mjs scan-all <credentials.env> <dir>… the same over EVERY regular file (bytes, any
+//                                                 extension, .git skipped), plus well-known token
+//                                                 shapes — the gate of scripts/work-backup.sh
 //
 // Text files: .log .txt .md .json .jsonl .html (recursive; binaries such as videos and
 // trace.zip are untouched). A value shorter than MIN is never replaced (it would corrupt
@@ -49,6 +52,19 @@ function* textFiles(dir) {
   }
 }
 
+// Every regular file but a .git directory's, for the backup gate.
+function* allFiles(dir) {
+  if (!existsSync(dir)) return;
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name);
+    if (e.isSymbolicLink() || (e.isDirectory() && e.name === '.git')) continue;
+    if (e.isDirectory()) yield* allFiles(p);
+    else if (e.isFile()) yield p;
+  }
+}
+// Tokens no credentials file names: the shapes scripts/log.sh masks.
+const TOKENS = [/gh[pousr]_[A-Za-z0-9]{36,}/, /github_pat_[A-Za-z0-9_]{40,}/, /xox[baprs]-[A-Za-z0-9-]{10,}/, /sk-ant-[A-Za-z0-9_-]{20,}/];
+
 const [cmd, envFile, ...dirs] = process.argv.slice(2);
 const { forms, short } = values(envFile);
 
@@ -68,7 +84,14 @@ if (cmd === 'mask' && dirs.length === 1) {
     if (forms.some(f => s.includes(f))) files.push(p);
   }
   process.stdout.write(`${JSON.stringify({ files, unmaskable: short })}\n`);
+} else if (cmd === 'scan-all' && dirs.length) {
+  const files = [], needles = forms.map(f => Buffer.from(f));
+  for (const d of dirs) for (const p of allFiles(d)) {
+    const b = readFileSync(p);
+    if (needles.some(n => b.includes(n)) || TOKENS.some(r => r.test(b.toString('latin1')))) files.push(p);
+  }
+  process.stdout.write(`${JSON.stringify({ files, unmaskable: short })}\n`);
 } else {
-  console.error('usage: secrets.mjs mask <credentials.env> <dir> | filter <credentials.env> | scan <credentials.env> <dir>…');
+  console.error('usage: secrets.mjs mask <credentials.env> <dir> | filter <credentials.env> | scan|scan-all <credentials.env> <dir>…');
   process.exit(2);
 }
