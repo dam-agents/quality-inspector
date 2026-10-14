@@ -279,7 +279,7 @@ mode_audit() {
     # black-box boundary: each of these must be refused (docs/black-box.md)
     local status id detail
     while read -r status id detail; do
-      [ "$status" = fail ] && detail="$detail — add the deny rule (bash scripts/egress-rules.sh)"
+      [ "$status" = fail ] && detail="${detail%% — *} — $(boundary_fix "$detail")"
       check "$id" "$status" "$detail"
     done < <(boundary_probe "$TARGET")
   else

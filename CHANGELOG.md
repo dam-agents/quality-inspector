@@ -7,10 +7,35 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 2.12.1 — 2026-10-14
+## 2.14.1 — 2026-10-14
 
 **Upgrade:**
 Nothing — engine scripts are read per run.
+
+## 2.14.0 — 2026-10-14
+
+**Upgrade:**
+Nothing — the `qi-profile-creator` skill (`skills/`) is for product teams writing a
+profile, and the helm-k3s engine's `bin/check` runs only when a profile is checked;
+neither runs on a deployed instance.
+
+## 2.13.0 — 2026-10-14
+
+**Upgrade:**
+1. Add `- profile_source_path: <path>` to `work/CONFIG.md` unless present: the skill
+   source's path when the profile's source is `target_repo` (for DAM: source
+   `dam-agents/dam`, path `qa`), else empty.
+2. **operator-only:** run the commands `bash "$HOME/scripts/egress-rules.sh"` prints (add
+   `--source <owner>/<repo>` per other GitHub skill source), skipping the rules the agent
+   already has, then delete the target rules it no longer prints — among them the
+   `…/contents/<path>*` allow of 2.2.0 ([docs/black-box.md](docs/black-box.md) → **Egress
+   rules**). The target's GitHub hosts become deny-by-default: forks, other-case spellings
+   of the target and other repositories were readable.
+3. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:` — the
+   probes now also cover the target in the other case and a dot segment out of the
+   profile's directory, and check that directory is readable and symlink-free. A `fail`
+   on `…/contents/<path>/..` is the platform's gateway: its `fix:` empties
+   `profile_source_path` and drops the profile allows; report the gateway.
 
 ## 2.12.0 — 2026-10-14
 

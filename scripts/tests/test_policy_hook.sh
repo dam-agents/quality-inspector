@@ -4,7 +4,8 @@
 . "$(dirname "$0")/lib.sh"
 HOOK="$SCRIPTS/hooks/policy.sh"; DEF="$(cd "$SCRIPTS/.." && pwd)"
 export HOME="$SANDBOX/home"; mkdir -p "$HOME" "$WORK_DIR/env"
-printf -- '- target_repo: acme/widgets\n- lock_ttl_min: 180\n' > "$WORK_DIR/CONFIG.md"
+# profile_source_path opens the egress for the platform and the probe, never for a tool call.
+printf -- '- target_repo: acme/widgets\n- profile_source_path: qa\n- lock_ttl_min: 180\n' > "$WORK_DIR/CONFIG.md"
 pd="$SANDBOX/profile"; mkdir -p "$pd"; export QI_PROFILE_DIR="$pd"
 cat > "$pd/profile.json" <<'J'
 {"schema":"qi-profile/v1","product":"Stub","app":{"url":"http://localhost:8080"},

@@ -7,6 +7,9 @@
 {"name":"issue timeline","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/1/timeline"}}
 {"name":"issue events","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/1/events"}}
 {"name":"contents, profile dir included","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets/contents/qa"}}
+{"name":"contents, the profile dir as the platform asks for it","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api 'repos/acme/widgets/contents/qa?ref=HEAD'"}}
+{"name":"contents, a sibling of the profile dir","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets/contents/qa-internal/notes.md"}}
+{"name":"contents, a dot segment out of the profile dir","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets/contents/qa/../src/index.ts"}}
 {"name":"commits over curl, mixed case","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"curl -s -H 'Accept: application/json' https://api.github.com/repos/Acme/Widgets/commits"}}
 {"name":"git refs through a variable","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api \"repos/${T}/git/refs/heads\""}}
 {"name":"graphql","expect":"deny","rule":"gh-graphql","tool":"Bash","input":{"command":"gh api graphql -f query='{ viewer { login } }'"}}
