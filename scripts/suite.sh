@@ -16,6 +16,7 @@
 #   suite.sh roles                the e2e identities the profile provided, as a JSON array
 #                                 of role names (`["owner","member"]`) — names only, never a
 #                                 value (docs/explorations.md → Identities)
+#   suite.sh budget <claim-iso>   the per-issue budgets since the claim, JSON with `exceeded`
 #
 # The base URL is fixed to the nested platform; any APP_URL that is not localhost
 # is refused (CLAUDE.md → Hard invariants: nested target only). After every run the
@@ -165,10 +166,32 @@ cmd_roles() {
 masked_summary() { summarize "$1" "$2" | unsecret; [ "${PIPESTATUS[0]}${PIPESTATUS[1]}" = 00 ]; }
 cmd_summary() { local f="$SUITE/.e2e/runs/${1:?label}/report.json"; [ -f "$f" ] || die "no report for $1"; masked_summary "$f" "$1"; }
 
+# Per-issue budgets (docs/nested-env.md → Budgets): minutes since the claim, and the
+# model-backed steps — agent.act / agent.assert not replayed from the cache — of every run
+# written since then (the environment lock makes those runs this issue's).
+cmd_budget() { # <claim-iso>
+  local since="${1:-}" wall cap se el f m n=0 steps=0 k
+  wall="$(cfg max_wallclock_min_per_issue)"; case "$wall" in (''|*[!0-9]*) wall=150;; esac
+  cap="$(cfg max_model_steps_per_issue)"; case "$cap" in (''|*[!0-9]*) cap=400;; esac
+  se="$(date -u -d "$since" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$since" +%s 2>/dev/null)"
+  [ -n "$se" ] || { echo "suite: budget needs the claim time as ISO UTC, got '$since'" >&2; exit 2; }
+  el=$(( ($(date -u +%s) - se) / 60 ))
+  while IFS= read -r f; do
+    m="$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null)"; [ "${m:-0}" -ge "$se" ] || continue
+    k="$(jq '[.run.results[]?.attempts[]? | .. | objects | (.api? // "") as $a
+              | select(($a == "agent.act" or $a == "agent.assert") and .cache.mode? != "self-finalized")] | length' "$f" 2>/dev/null)"
+    n=$((n+1)); steps=$((steps + ${k:-0}))
+  done < <(find "$SUITE/.e2e/runs" -mindepth 2 -maxdepth 2 -name report.json 2>/dev/null)
+  jq -nc --arg s "$since" --argjson el "$el" --argjson w "$wall" --argjson n "$n" --argjson k "$steps" --argjson c "$cap" \
+    '{since:$s, elapsed_min:$el, max_wallclock_min:$w, runs:$n, model_steps:$k, max_model_steps:$c,
+      exceeded: ([if $el > $w then "wallclock" else empty end, if $k > $c then "model_steps" else empty end])}'
+}
+
 case "${1:-}" in
   init)    cmd_init ;;
   run)     shift; cmd_run "$@" ;;
   summary) cmd_summary "${2:-}" ;;
   roles)   cmd_roles ;;
-  *) echo "usage: $0 init | run <label> [--evidence full|failures] [--strict] [e2e run args…] | summary <label> | roles" >&2; exit 2 ;;
+  budget)  cmd_budget "${2:-}" ;;
+  *) echo "usage: $0 init | run <label> [--evidence full|failures] [--strict] [e2e run args…] | summary <label> | roles | budget <claim-iso>" >&2; exit 2 ;;
 esac

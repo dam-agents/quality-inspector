@@ -5,6 +5,7 @@
 #
 #   env.sh lock <owner> | unlock <owner>     one run at a time (exit 1 when a live holder has it)
 #   env.sh init | up <build> | reset | status | down    → the profile
+#                                            (`up` first checks min_free_disk_gi)
 #   env.sh between <from> <to>   read-only: the profile's `bin/versions --between` — a JSON
 #                                array of builds between the two, oldest first; exit 2 when
 #                                the profile does not implement it (no array), 1 when it
@@ -68,11 +69,24 @@ cmd_between() { # <from> <to>
     || { echo "env: bin/versions ignores --between (no JSON array) — treated as not implemented" >&2; return 2; }
 }
 
+# An install needs room for images and data: refuse `up` below min_free_disk_gi free on
+# the home volume — an environment failure, never a verdict. Unmeasurable → go ahead.
+disk_gate() {
+  local min free
+  min="$(cfg min_free_disk_gi)"; case "$min" in (''|*[!0-9]*) min=10;; esac
+  free="$(df -Pk "$HOME_DIR" 2>/dev/null | awk 'NR==2 && $4 ~ /^[0-9]+$/ {print int($4/1048576)}')"
+  [ -n "$free" ] || { echo "env: free disk space not measurable — continuing" >&2; return 0; }
+  [ "$free" -ge "$min" ] && return 0
+  echo "env: only ${free}Gi free on the home volume, min_free_disk_gi is $min — free space before an install (docs/nested-env.md → Failures)" >&2
+  logev error env_failed "up refused: ${free}Gi free on the home volume, below min_free_disk_gi $min"
+  exit 1
+}
+
 case "${1:-}" in
   between) [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "usage: $0 between <from> <to>" >&2; exit 1; }; cmd_between "$2" "$3" ;;
   lock)   cmd_lock "${2:-}" ;;
   unlock) cmd_unlock "${2:-}" ;;
   init|reset|status|down) delegate "$1" ;;
-  up)     [ -n "${2:-}" ] || { echo "usage: $0 up <build>" >&2; exit 2; }; delegate up "$2" ;;
+  up)     [ -n "${2:-}" ] || { echo "usage: $0 up <build>" >&2; exit 2; }; disk_gate; delegate up "$2" ;;
   *) echo "usage: $0 lock <owner>|unlock <owner>|init|up <build>|reset|status|down|between <from> <to>" >&2; exit 2 ;;
 esac

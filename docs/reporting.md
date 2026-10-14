@@ -80,10 +80,11 @@ dir and its summary.
 
 ## Delivery
 
-Order per effect is **send-then-record**: deliver, then set `status: reported` as the very
-next write. A failed delivery leaves `report_pending`, is logged, and the next run's
-`reports_due` retries only the delivery — the tests are not re-run. Never retry within
-the same run.
+Order per effect is **send-then-record**: its `intent` ledger line, the send, its
+`done`/`failed` line ([logging.md](logging.md) → **Ledger of external writes**), then
+`status: reported` as the next state write. A failed delivery leaves `report_pending`, is
+logged, and the next run's `reports_due` retries only the delivery — the tests are not
+re-run. Never retry within the same run.
 
 1. **Artifact** (`artifact_reports: enabled`): publish the report directory with the
    platform's artifact tools — `index.html` as the artifact, `media/` beside it
@@ -116,4 +117,4 @@ the same run.
    the chat UI; still set `reported`.
 
 Every delivery outcome is one event (`report_delivered` / `report_failed`, with
-`issue=<n>` and the surface) — [logging.md](logging.md).
+`issue=<n>` and the surface), beside the ledger pair of each send — [logging.md](logging.md).

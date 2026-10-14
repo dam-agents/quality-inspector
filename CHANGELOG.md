@@ -7,6 +7,21 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.10.0 — 2026-10-14
+
+**Upgrade:**
+1. Offer the operator the new `work/CONFIG.md` keys at their defaults, adding only the
+   ones the file lacks (`grep -q '^- <key>:' work/CONFIG.md` first):
+   `max_wallclock_min_per_issue: 150`, `max_model_steps_per_issue: 400` (per-issue
+   budgets, [docs/nested-env.md](docs/nested-env.md) → **Budgets**) and
+   `min_free_disk_gi: 10` (`env.sh up` refuses below it). Keep `lock_ttl_min` above the
+   wall-clock budget.
+2. Unless an event of the last 14 days already has `"event":"ledger_start"`
+   (`grep -l '"event":"ledger_start"' work/logs/events-*.jsonl`), log one:
+   `. "$HOME/scripts/log.sh"; logev info ledger_start "external-write ledger begins"` —
+   the audit's `ledger_reconcile` does not judge comments older than it.
+3. Run `bash "$HOME/scripts/verify-onboarding.sh" --config` and apply every `fix:`.
+
 ## 2.9.0 — 2026-10-14
 
 **Upgrade:**

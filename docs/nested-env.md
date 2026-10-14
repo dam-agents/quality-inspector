@@ -28,10 +28,24 @@ The VM reaches the outside only through the paired gateway, by the agent's egres
 The hosts a profile needs are its `egress` list; the operator applies them. A pull that is
 held or refused surfaces as a failing `env.sh up`, and the fix is the operator's.
 
+## Budgets
+
+One issue may hold the environment for at most `max_wallclock_min_per_issue` minutes and
+`max_model_steps_per_issue` model-backed steps. `suite.sh budget <claim time>` measures
+both deterministically: minutes since the claim, and the `agent.act` / `agent.assert`
+steps of every suite run written since then, replays from the cache excluded — the only
+cost proxy a script can count (your own exploring turns are not in it). When `exceeded`
+is non-empty: stop testing, judge what already ran, mark every remaining AC `blocked` with
+the note `budget exceeded`, log `issue_budget_exceeded` per budget
+([logging.md](logging.md)), and finish from step 8 of [issue-qa.md](issue-qa.md) — the
+row ends `report_pending` or `reported`, never `in_progress`. `lock_ttl_min` stays above
+the wall-clock budget so a live run never looks stale (`verify-onboarding.sh` checks it).
+
 ## Failures
 
 An `env.sh` exit other than 0, or a failing smoke run, is an **environment failure** —
-never a verdict. Before giving up on the entry:
+never a verdict. `env.sh up` itself refuses (exit 1, `env_failed`) while the home volume
+has less than `min_free_disk_gi` free. Before giving up on the entry:
 
 1. `bash "$HOME/scripts/env.sh" status`, then the diagnosis the profile's README names
    (read-only commands only).

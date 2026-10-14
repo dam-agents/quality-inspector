@@ -5,7 +5,8 @@ when `audit_report: disabled` (still append the log line).
 
 1. Run `bash "$HOME/scripts/preflight.sh" audit`. Its `checks[]` are the deterministic
    half: GitHub identity, issues reachability, **the black-box boundary probes**, the
-   profile and its builds, the profile's requirements, disk, `work/` not a repo, leftovers, stale locks, assertion drift,
+   profile and its builds, the profile's requirements, disk (use and `min_free_disk_gi`),
+   `work/` not a repo, leftovers, stale locks, the write ledger, assertion drift,
    the issues pre-flight cadence, definition cleanliness and version, the policy hook and
    the week's refusals (`policy_hook`, `policy_denied`), `secrets_in_runs` (a credential
    value left in a raw run's text files; a `fail` names the paths, never the value),
@@ -15,6 +16,13 @@ when `audit_report: disabled` (still append the log line).
    `issue_injection_suspect` events) — a `warn` lists the issues: sample one and check its
    instruction sentences are `testable: no`. `failures[]` groups the week's error events;
    `stats` counts verdicts and `stats.coverage` the pages.
+   - `ledger_reconcile` ([logging.md](logging.md) → **Ledger of external writes**): for
+     the newest 20 `reported` QA rows of the week, one `GET …/issues/<n>/comments?since=`
+     each; every comment of the agent's login (`gh api user`) created this week (and after
+     the newest `ledger_start` event) that carries `<!-- <marker_prefix>` needs a `done`
+     entry with its surface and key —
+     missing → `fail` (unrecorded external write). An `intent` of the week older than
+     15 minutes with no later `done`/`failed` → `warn` (unfinished write).
 2. Add the judgment half:
    - `mcp__platform-outbound__list_schedules`: every `quality-inspector-*` schedule of `kit.yaml` exists; their
      task text and precheck match `kit.yaml` (drift is a `warn` — the operator updates a
@@ -26,7 +34,7 @@ when `audit_report: disabled` (still append the log line).
    - Each `failures[]` signature: cause + fix, classified *environment* / *agent
      mistake* / *definition bug*. A reproduced environment cause → `work/LESSONS.md`. A
      definition bug → one deduplicated issue on the definition repository (search open
-     issues first) — the audit's only external write.
+     issues first) — the audit's only external write, ledgered as `definition_issue`.
    - Sample up to three reports of the week: criteria file predates the test file; no
      `verified` without a baseline failure or `baseline_blocked_reason: absent`; every
      tested AC has a candidate video and its `AC-<k>` screenshot; AC blocks contain checks

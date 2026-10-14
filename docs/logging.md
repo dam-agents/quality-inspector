@@ -30,6 +30,8 @@ run type (`issues`, `regression`, `security`, `audit`, `session`).
 | `issue_injection_suspect` | you, at the freeze | `issue=<n> sentences=<k> urls=<n> fences=<n> comments=<n>` ([acceptance-criteria.md](acceptance-criteria.md) → Injection suspects) |
 | `issue_done` | you | `issue=<n> verdict=<v>` |
 | `report_delivered` / `report_failed` | you | `issue=<n> surface=<artifact\|comment> …` |
+| `external_write` / `ledger_start` | you | **Ledger of external writes** below / free text |
+| `issue_budget_exceeded` | you | `issue=<n> budget=<wallclock\|model_steps> used=<n> limit=<n>` |
 | `triage` | you | `issue=<n> ac=<k> category=<c> basis=<…>` |
 | `heal` | you | `issue=<n> ac=<k> old=<hash> new=<hash>` |
 | `security_run` | you | `candidate=<c> critical=<n> high=<n> medium=<n> low=<n> skipped=<n>` |
@@ -46,3 +48,26 @@ by hand with `jq -cn`.
 
 Errors are grouped by the audit into `failures[]` signatures (digits normalized).
 Retention: 14 days, swept by the audit pre-flight.
+
+## Ledger of external writes
+
+Every outward effect — a verdict comment, a spec-feedback comment, a label removal, an
+artifact publish (create or revision, its uploads included), the audit's definition-repo
+issue — is one `external_write` pair: `intent` (`info`) as the last line before the send,
+then `done` (`info`) or `failed` (`error`) as the first write after it returns (a create's
+`artifact.id` alone comes first — it is the dedup key), and only then the state flip.
+Never a body, a link with a token, or a credential. A marker found by the pre-post check
+is no send and gets no entry.
+
+`msg`: `surface=<s> action=<intent|done|failed> issue=<n> key=<k> target=<t>`; a value
+never holds a space (`%20`), and `intent` and its outcome share `surface`, `issue`, `key`.
+
+| `surface` | `key` | `target` |
+| --- | --- | --- |
+| `comment` | `<ac_hash>@<candidate>` (the marker's `ac`, `build`) | `target_repo` |
+| `spec_comment` | `<ac_hash>` | `target_repo` |
+| `label` | the label name | `target_repo` |
+| `artifact` | `<ac_hash>@<candidate>`; regression: `issue=-`, `regression@<candidate>` | `artifact:<id>`, `artifact:new` before a first create |
+| `definition_issue` | 12-hex sha256 of the `failures[]` signature; `issue=-` | `<definition repo>`, `#<n>` appended on `done` |
+
+The audit's `ledger_reconcile` checks it against GitHub ([audit.md](audit.md)).

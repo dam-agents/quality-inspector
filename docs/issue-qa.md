@@ -27,8 +27,8 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
 
 1. **Claim.** `bash "$HOME/scripts/env.sh" lock issues` (exit 1 → someone holds the
    environment: end this entry untouched, log it). Write the row as `in_progress` with
-   this run's `ac_hash`, `candidate`, `baseline`, verdict `-`, now. Remember the previous
-   row — an abort restores it. Log `issue_start issue=<n> kind=<kind>`
+   this run's `ac_hash`, `candidate`, `baseline`, verdict `-`, now — the claim time the
+   budgets count from. Remember the previous row — an abort restores it. Log `issue_start issue=<n> kind=<kind>`
    ([logging.md](logging.md)).
 2. **Re-check at action time.** `gh api repos/$T/issues/<n>` (host flag per CLAUDE.md
    when `T` names one). The issue must still carry `qa_label` (or `retest_label`). Gone →
@@ -86,12 +86,16 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
 
 A failure between steps 5 and 8 that is not an environment failure → finish with the
 evidence you have: the ACs you could not judge are `blocked` with the reason. Never
-leave the row `in_progress` at run end.
+leave the row `in_progress` at run end. **Budgets:** at every milestone from step 4 on,
+`bash "$HOME/scripts/suite.sh" budget <claim time>`; a non-empty `exceeded` ends the
+work the same way ([nested-env.md](nested-env.md) → **Budgets**).
 
 ## Self-check before ending the run
 
 - Every `issues_due` entry ended `reported`, `report_pending` (delivery failed, logged),
   or restored with an `issue_abort` event.
+- Every send of this run has its `intent` and `done`/`failed` ledger lines
+  ([logging.md](logging.md) → **Ledger of external writes**).
 - `criteria-<ac_hash>.md` and `explorations-<ac_hash>.md` predate the first test file edit of this run.
 - No observation changed an AC or issue verdict.
 - No AC is `verified` without a candidate pass and a baseline failure or

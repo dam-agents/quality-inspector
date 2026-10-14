@@ -204,6 +204,9 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - bisect_max_steps: 0
 - max_issues_per_run: 1
 - lock_ttl_min: 180
+- max_wallclock_min_per_issue: 150
+- max_model_steps_per_issue: 400
+- min_free_disk_gi: 10
 - e2e_version: 0.17.0
 - e2e_web_version: 0.12.0
 - e2e_model: claude-sonnet-5

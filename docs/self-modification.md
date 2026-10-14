@@ -202,7 +202,9 @@ refuse and explain instead:
   and the marker-scan-before-post re-check, counting only comments by the agent's own
   login; `marker_prefix` immutable once used.
 - Record ordering: send-then-record for comments and artifacts, with `report_pending`
-  as the retry state; no same-run retry.
+  as the retry state; no same-run retry. Every external write is ledgered — an `intent`
+  log line before the send (bookkeeping, never a state record), `done`/`failed` after it
+  ([logging.md](logging.md) → **Ledger of external writes**).
 - Every judged AC ships its evidence (issue runs use `--evidence full`; the report comes
   from `scripts/render-report.mjs`), and only tests tagged `issue-<n>` (its explorations:
   `issue-<n>-ex`) are published — never the sign-in setup test.

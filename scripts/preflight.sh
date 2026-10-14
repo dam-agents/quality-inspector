@@ -191,9 +191,64 @@ probe_gh() { timeout 20 gh api ${GH_HOST_ARGS[@]+"${GH_HOST_ARGS[@]}"} "$1" >/de
 probe_url() { local c; c="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$1" 2>/dev/null)"
   case "$c" in (2??) return 0;; (000) return 2;; (*) return 1;; esac; }
 
+epoch2iso() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$1" +%Y-%m-%dT%H:%M:%SZ; }
+# "<used %> <free GiB>" of the home volume; nothing when df cannot tell.
+disk_home() { df -Pk "$HOME_DIR" 2>/dev/null | awk 'NR==2 && $4 ~ /^[0-9]+$/ {gsub("%","",$5); print $5, int($4/1048576)}'; }
+MIN_FREE_GI="$(cfg min_free_disk_gi)"; case "$MIN_FREE_GI" in (''|*[!0-9]*) MIN_FREE_GI=10;; esac
+
+# The ledger of external writes (docs/logging.md → Ledger of external writes) against
+# GitHub: every marker comment the agent's login made this week, on an issue reported this
+# week, has its `done` event; every `intent` has its `done`/`failed`. One comments GET per
+# issue (the allowed issues endpoint), the newest LEDGER_CAP issues only.
+LEDGER_CAP=20
+ledger_reconcile() { # <login> <since-iso>
+  local login="$1" since="$2" prefix pre ledger start csince issues total n c unrec="" dangling bad=0 seen=0 fresh scope
+  if [ -z "$TARGET" ] || [ -z "$login" ]; then check ledger_reconcile warn "not measured — no target or no GitHub identity"; return; fi
+  prefix="$(cfg marker_prefix)"; prefix="${prefix:-quality-inspector}"
+  pre="$(printf '%s' "$prefix" | sed 's/[][\.*^$+?(){}|/]/\\&/g')"
+  ledger="$(cat "$WORK"/logs/events-*.jsonl 2>/dev/null | jq -sc '[.[] | select(.event == "external_write")
+    | . + ((.msg // "") | [scan("([a-z_]+)=([^ ]+)")] | map({(.[0]): .[1]}) | add // {})]' 2>/dev/null)"
+  [ -n "$ledger" ] || ledger='[]'
+  # comments older than the ledger itself (the 2.10.0 upgrade logs `ledger_start`) are not judged
+  start="$(cat "$WORK"/logs/events-*.jsonl 2>/dev/null | jq -rs '[.[] | select(.event == "ledger_start") | .ts] | max // empty' 2>/dev/null)"
+  csince="$since"; [ -n "$start" ] && [[ "$start" > "$since" ]] && csince="$start"
+  issues="$(table_rows "$WORK/QA.md" | awk -F'|' -v since="$since" '{n=$2; s=$7; u=$8; gsub(/[ \t]/,"",n); gsub(/[ \t]/,"",s); gsub(/[ \t]/,"",u)}
+            s=="reported" && u>=since {print u, n}' | sort -r | awk '{print $2}')"
+  total="$(printf '%s\n' "$issues" | grep -c .)"
+  for n in $(printf '%s\n' "$issues" | head -"$LEDGER_CAP"); do
+    if ! c="$(gh api ${GH_HOST_ARGS[@]+"${GH_HOST_ARGS[@]}"} "repos/$REPO_PATH/issues/$n/comments?since=$since&per_page=100" 2>/dev/null)" \
+       || ! printf '%s' "$c" | jq -e 'type == "array"' >/dev/null 2>&1; then bad=$((bad+1)); continue; fi
+    seen=$((seen+1))
+    unrec="$unrec$(printf '%s' "$c" | jq -r --arg login "$login" --arg since "$csince" --arg raw "<!-- $prefix" \
+        --arg p "$pre" --arg n "$n" --argjson led "$ledger" '
+      .[] | select(.user.login == $login and .created_at >= $since and ((.body // "") | contains($raw))) | (.body // "")
+      | ((capture("<!-- " + $p + "-spec issue=[0-9]+ ac=(?<a>[^ ]+) -->") | {surface: "spec_comment", key: .a})
+         // (capture("<!-- " + $p + " issue=[0-9]+ ac=(?<a>[^ ]+) build=(?<b>[^ ]+) -->") | {surface: "comment", key: "\(.a)@\(.b)"})
+         // {surface: "comment", key: "?"})
+      | . as $w | select([$led[] | select(.action == "done" and .issue == $n and .surface == $w.surface and .key == $w.key)] | length == 0)
+      | " #\($n) \(.surface) \(.key)"' 2>/dev/null | tr '\n' ',')"
+  done
+  unrec="${unrec%,}"
+  fresh="$(epoch2iso $((NOW_EPOCH - 900)))"   # an intent younger than 15 min may still be in flight
+  dangling="$(jq -r --arg since "$since" --arg fresh "$fresh" '
+    [.[] | select(.action == "done" or .action == "failed")] as $out
+    | [.[] | select(.action == "intent" and .ts >= $since and .ts < $fresh) | . as $i
+       | select([$out[] | select(.surface == $i.surface and .issue == $i.issue and .key == $i.key and .ts >= $i.ts)] | length == 0)
+       | "\(.surface) issue=\(.issue) key=\(.key)"] | unique | join(", ")' <<<"$ledger" 2>/dev/null)"
+  scope="$seen of $total reported issue(s) of the week checked (cap $LEDGER_CAP)"
+  [ "$bad" = 0 ] || scope="$scope, $bad comment listing(s) failed"
+  if [ -n "$unrec" ]; then check ledger_reconcile fail "unrecorded external write:$unrec${dangling:+; unfinished write: $dangling} — $scope"
+  elif [ -n "$dangling" ]; then check ledger_reconcile warn "unfinished write: $dangling — $scope"
+  elif [ "$bad" != 0 ]; then check ledger_reconcile warn "$scope"
+  else check ledger_reconcile ok "every agent comment has its ledger entry — $scope"; fi
+}
+
 mode_audit() {
+  local login week_ago
+  week_ago="$(epoch2iso $((NOW_EPOCH - 7*86400)))"
   # connectivity & identity
-  if gh api ${GH_HOST_ARGS[@]+"${GH_HOST_ARGS[@]}"} user --jq .login >/dev/null 2>&1; then check github_auth ok "token resolves an identity"
+  login="$(gh api ${GH_HOST_ARGS[@]+"${GH_HOST_ARGS[@]}"} user --jq .login 2>/dev/null)"
+  if [ -n "$login" ]; then check github_auth ok "token resolves an identity"
   else check github_auth fail "gh api user failed — the GitHub connection is not injected"; fi
   if [ -n "$TARGET" ]; then
     if probe_gh "repos/$REPO_PATH/issues?per_page=1"; then check issues_read ok "issues endpoint reachable"
@@ -222,10 +277,11 @@ mode_audit() {
   local c; for c in $(profile_field '.requires.commands[]?'); do
     command -v "$c" >/dev/null 2>&1 && check "command:$c" ok "present" || check "command:$c" fail "$c missing"
   done
-  local used; used="$(df -P "$HOME_DIR" 2>/dev/null | awk 'NR==2 {gsub("%","",$5); print $5}')"
+  local used free; read -r used free <<<"$(disk_home)"
   if [ -z "$used" ]; then check disk warn "not measured"
-  elif [ "$used" -ge 85 ]; then check disk warn "home volume ${used}% used"
-  else check disk ok "home volume ${used}% used"; fi
+  elif [ "$free" -lt "$MIN_FREE_GI" ]; then check disk warn "home volume ${free}Gi free — env.sh up refuses below min_free_disk_gi ($MIN_FREE_GI)"
+  elif [ "$used" -ge 85 ]; then check disk warn "home volume ${used}% used, ${free}Gi free"
+  else check disk ok "home volume ${used}% used, ${free}Gi free"; fi
   [ -d "$WORK/.git" ] && check work_not_git fail "work/.git exists" || check work_not_git ok "work/ is a plain directory"
   # nested credentials left in raw runs (scripts/suite.sh masks them); paths only, never a value
   local sec; sec="$(node "$SCRIPT_DIR/lib/secrets.mjs" scan "$WORK/env/credentials.env" "$WORK/suite/.e2e/runs" 2>/dev/null)"
@@ -246,6 +302,7 @@ mode_audit() {
     [ $(( (NOW_EPOCH - $(iso2epoch "$r_upd")) / 60 )) -ge "$LOCK_TTL_MIN" ] && stale=$((stale+1))
   done < <(table_rows "$WORK/QA.md")
   [ "$stale" = 0 ] && check stale_locks ok "none" || check stale_locks warn "$stale in_progress rows past the TTL"
+  ledger_reconcile "$login" "$week_ago"
   local drift; drift="$(bash "$SCRIPT_DIR/check-asserts.sh" --json 2>/dev/null | jq -c '.drift // []' 2>/dev/null)"
   if [ -z "$drift" ]; then check assert_drift warn "not measured"
   elif [ "$drift" = '[]' ]; then check assert_drift ok "regression assertions match their promoted hashes"
@@ -279,8 +336,7 @@ mode_audit() {
   [ "$v_co" = "${v_ad:-1.0.0}" ] && check version ok "$v_co adopted" || check version warn "checked out $v_co, adopted ${v_ad:-1.0.0}"
 
   # error signatures + retention
-  local week_ago failures
-  week_ago="$(date -u -d "@$((NOW_EPOCH - 7*86400))" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r $((NOW_EPOCH - 7*86400)) +%Y-%m-%dT%H:%M:%SZ)"
+  local failures
   failures="$(cat "$WORK"/logs/events-*.jsonl 2>/dev/null | jq -sc --arg since "$week_ago" '
     [.[] | select(.level=="error" and .ts >= $since)
          | .sig = (.event + ": " + (.msg | gsub("[0-9]+"; "N") | .[0:120]))]
