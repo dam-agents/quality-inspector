@@ -20,10 +20,13 @@ printf '%s\n' "$cmds" | grep -qxF 'dam network create "$AGENT" --host "*.gitlab.
 printf '%s\n' "$cmds" | grep -qxF 'dam network create "$AGENT" --host "*.quay.io" --method GET --yes  # image layers' \
   || { echo "  assertion failed: profile egress line"; FAILED=1; }
 
-# A model of the platform's match (egress-rules-repository findMatch): the exact host,
-# then *.parent, then *; a named method over *; a path over *; the longer path; '*' in a
-# pattern is SQL LIKE '%' (a literal '%' is one too, '_' any one character). The `trusted` preset and the
-# GitHub connection hold host-wide allows on these hosts before the kit's rules land.
+# A model of the platform's gate and match (ext-authz gate, egress-rules-repository
+# findMatch): a path with a '.' or '..' segment (raw, %2e, with a ';' suffix) is denied
+# first; the host compares in any case; then the exact host, *.parent, *; a named method
+# over *; a path over *; the longer path. '*' in a pattern is SQL LIKE '%' (a literal '%'
+# is one too, '_' any one character); on GitHub's hosts a deny matches in any case, an
+# allow in exact case. The `trusted` preset and the GitHub connection hold host-wide
+# allows on these hosts before the kit's rules land.
 verdicts="$(printf '%s\n' "$cmds" | node -e '
 const lines = require("fs").readFileSync(0, "utf8").split("\n").filter(l => l.startsWith("dam network create"));
 const arg = (l, f) => { const m = l.match(new RegExp(f + " (\"[^\"]*\"|\\S+)")); return m ? m[1].replace(/"/g, "") : null; };
@@ -32,12 +35,16 @@ const rules = lines.map(l => ({ host: arg(l, "--host"), method: arg(l, "--method
 for (const h of ["github.com", "api.github.com", "codeload.github.com", "raw.githubusercontent.com",
                  "objects.githubusercontent.com", "gitlab.com", "codeberg.org", "registry.npmjs.org"])
   rules.push({ host: h, method: "*", path: "*", verdict: "allow" });
-const like = p => new RegExp("^" + [...p].map(c => c === "*" || c === "%" ? ".*" : c === "_" ? "." : c.replace(/[.+?^${}()|[\]\\\/]/g, "\\$&")).join("") + "$", "s");
+const like = (p, flags) => new RegExp("^" + [...p].map(c => c === "*" || c === "%" ? ".*" : c === "_" ? "." : c.replace(/[.+?^${}()|[\]\\\/]/g, "\\$&")).join("") + "$", flags);
 const rank = (r, host) => [r.host === host ? 0 : r.host === "*" ? 2 : 1, r.method === "*" ? 1 : 0, r.path === "*" ? 1 : 0, -r.path.length];
+const githubHost = h => ["github.com", "api.github.com", "codeload.github.com", "raw.githubusercontent.com"].includes(h) || h.endsWith(".ghe.com");
+const dotSegment = p => p.split("?")[0].split(/\/|\\|%2f|%5c/i).some(s => [".", ".."].includes(s.replace(/%2e/gi, ".").split(";")[0]));
 function decide(method, url) {
-  const u = new URL(url), host = u.hostname, path = u.pathname + u.search;
+  const m = url.match(/^https:\/\/([^/]+)(\/.*)$/), host = m[1].toLowerCase(), path = m[2];
+  if (dotSegment(path)) return "deny";
   const cands = host.includes(".") ? [host, "*." + host.slice(host.indexOf(".") + 1), "*"] : [host, "*"];
-  const hits = rules.filter(r => cands.includes(r.host) && (r.method === method || r.method === "*") && like(r.path).test(path));
+  const matches = r => like(r.path, "s").test(path) || (r.verdict === "deny" && githubHost(host) && like(r.path, "si").test(path));
+  const hits = rules.filter(r => cands.includes(r.host) && (r.method === method || r.method === "*") && matches(r));
   hits.sort((a, b) => { const x = rank(a, host), y = rank(b, host); for (let i = 0; i < 4; i++) if (x[i] !== y[i]) return x[i] - y[i]; return 0; });
   return hits.length ? hits[0].verdict : "hold";
 }
@@ -76,6 +83,16 @@ allow GET https://api.github.com/repos/acme/widgets/contents/qa?ref=HEAD
 allow GET https://api.github.com/repos/acme/widgets/contents/qa/qi-profile-stub?ref=0123abc
 allow GET https://api.github.com/repos/acme/widgets/contents/qa/qi-profile-stub/SKILL.md?ref=0123abc
 deny GET https://api.github.com/repos/acme/widgets/contents?ref=0123abc
+deny GET https://api.github.com/repos/acme/widgets/contents/qa
+deny GET https://api.github.com/repos/acme/widgets/contents/qa/../src/index.ts?ref=0123abc
+deny GET https://api.github.com/repos/acme/widgets/contents/qa/%2e%2e/src/index.ts
+deny GET https://api.github.com/repos/acme/widgets/contents/qa/..;x/src/index.ts
+allow GET https://api.github.com/repos/acme/widgets
+allow GET https://api.github.com/repos/acme/widgets/git/refs/heads/main
+deny GET https://api.github.com/repos/acme/widgets/git/refs/heads
+deny GET https://api.github.com/repos/acme/widgets/git/trees/main?recursive=1
+deny GET https://api.github.com/repos/acme/widgets/commits/HEAD
+deny GET https://API.GitHub.com/repos/acme/widgets/contents/src/index.ts
 deny GET https://api.github.com/repos/acme/widgets/contents/qa-internal/notes.md
 deny GET https://api.github.com/repos/ACME/Widgets/contents/src/index.ts
 deny GET https://api.github.com/repos/someone/widgets/contents/src/index.ts

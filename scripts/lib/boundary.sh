@@ -53,9 +53,12 @@ deny GET $api $p/repos/$r/issues/*/events*
 deny GET $api $p/repos/$r/issues/events*
 EOF
   # The platform fetches a skill by directory when the archive is denied and this path
-  # is not: `contents/<path>?ref=…`, then everything below `<path>/`.
-  [ -n "$pp" ] && _bb_profile_path_ok "$pp" && printf 'allow GET %s %s\nallow GET %s %s\n' \
-    "$api" "$p/repos/$r/contents/$pp/*" "$api" "$p/repos/$r/contents/$pp?*"
+  # is not: `contents/<path>?ref=…`, then everything below `<path>/`. Its scan of a
+  # private source reads the head from the default branch's ref (repository metadata,
+  # then one SHA), never from the head commit, whose diff shows files outside the path.
+  [ -n "$pp" ] && _bb_profile_path_ok "$pp" && printf 'allow GET %s %s\n' \
+    "$api" "$p/repos/$r/contents/$pp/*" "$api" "$p/repos/$r/contents/$pp?*" \
+    "$api" "$p/repos/$r" "$api" "$p/repos/$r/git/refs/heads/*"
   if read -r dh dr < <(_bb_definition) && [ "$dh" = "$h" ] && [ "$(_bb_lower "$dr")" != "$(_bb_lower "$r")" ]; then
     printf 'allow * %s %s\nallow * %s %s\nallow * %s %s\n' "$api" "$p/repos/$dr/*" "$h" "/$dr/*" "$h" "/$dr.git/*"
   fi

@@ -10,6 +10,9 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 ## 2.13.0 — 2026-10-14
 
 **Upgrade:**
+0. **operator-only, a precondition for a profile inside the target repository:** the
+   platform carries dam-agents/dam#4909 (README → Runtime requirements). Before it, the
+   profile allow opens the repository through `<path>/..`, and step 3 fails on it.
 1. Add `- profile_source_path: <path>` to `work/CONFIG.md` unless present: the skill
    source's path when the profile's source is `target_repo` (for DAM: source
    `dam-agents/dam`, path `qa`), else empty.
