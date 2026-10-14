@@ -64,3 +64,14 @@ boundary_targets() { # <owner/repo>
   jq -r '.boundary.github_paths[]? // empty' "$dir/profile.json" | while read -r p; do printf 'gh repos/%s/%s\n' "$r" "${p#/}"; done
   jq -r '.boundary.urls[]? // empty' "$dir/profile.json" | sed "s|{repo}|$r|g; s|^|url |"
 }
+
+# The e2e roles a credentials.env provides (docs/profile-contract.md → The `bin/` contract):
+# each non-empty E2E_USER_<ROLE>_USERNAME, with `export` and one layer of quotes allowed. A
+# sorted JSON array of lowercase names — never a value; `[]` when the file is missing.
+provided_roles() { # <credentials.env>
+  [ -f "$1" ] || { echo '[]'; return; }
+  awk '/^(export[ \t]+)?E2E_USER_[A-Z0-9_]+_USERNAME=/ {
+    k = $0; sub(/^export[ \t]+/, "", k); v = substr(k, index(k, "=") + 1); sub(/=.*/, "", k)
+    gsub(/^["\047]|["\047][ \t]*$/, "", v); if (v == "") next
+    sub(/^E2E_USER_/, "", k); sub(/_USERNAME$/, "", k); print tolower(k) }' "$1" | jq -R . | jq -sc 'unique'
+}

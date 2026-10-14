@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-asserts.sh: only AC blocks count, whitespace does not; EX blocks hash apart; agent.assert inside an AC block is named; --lint names blocks without unique() data.
+# check-asserts.sh: only AC blocks count, whitespace does not; EX blocks hash apart; agent.assert inside an AC block is named; --lint names blocks without unique() data and EX blocks an AC run selects.
 . "$(dirname "$0")/lib.sh"
 f="$SANDBOX/t.e2e.ts"
 printf 'await agent.act("a");\n// AC-1 begin\nawait expect(x).toBeVisible();\n// AC-1 end\n' > "$f"
@@ -47,4 +47,23 @@ assert "lint finds the unique() identifiers" '.unique_ids == ["name","other_id"]
 assert "lint lists static-only and near-miss blocks" '.no_unique_ref == ["AC-2","AC-3"]' "$l"
 printf '// AC-1 begin\nawait expect(x).toBeVisible();\n// AC-1 end\n' > "$f"
 assert "no unique() at all lists every block" '.no_unique_ref == ["AC-1"] and .unique_ids == []' "$(bash "$SCRIPTS/check-asserts.sh" --lint "$f")"
+# An EX test tagged issue-<n> would run in red-green and nightly (docs/explorations.md → Tests).
+cat > "$f" <<'T'
+test('#42 AC-1: x', { session: 'owner', tags: ['issue-42', 'ac-1'] }, async () => {
+  // AC-1 begin
+  await expect(x).toBeVisible();
+  // AC-1 end
+});
+test('#42 EX-1: y', { session: 'viewer', tags: ['issue-42-ex', 'ex-1', 'from-ac-1'] }, async () => {
+  // EX-1 begin
+  await expect(y).toHaveCount(0);
+  // EX-1 end
+});
+test('#42 EX-2: z', { tags: ["issue-42", 'ex-2', 'from-ac-1'] }, async () => {
+  // EX-2 begin
+  await expect(z).toBeVisible();
+  // EX-2 end
+});
+T
+assert "lint names only the EX block whose test carries issue-<n>" '.ex_with_issue_tag == ["EX-2"]' "$(bash "$SCRIPTS/check-asserts.sh" --lint "$f")"
 exit $FAILED

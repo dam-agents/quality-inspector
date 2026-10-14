@@ -152,14 +152,11 @@ cmd_run() {
   masked_summary "$SUITE/$out/report.json" "$label"
 }
 
-# A role is provided when credentials.env sets a non-empty E2E_USER_<ROLE>_USERNAME.
+# A role is provided when credentials.env sets a non-empty E2E_USER_<ROLE>_USERNAME (lib/profile.sh).
 cmd_roles() {
   local f="$WORK/env/credentials.env"
   [ -f "$f" ] || die "work/env/credentials.env missing — run: bash \"\$HOME/scripts/env.sh\" init"
-  awk '/^(export[ \t]+)?E2E_USER_[A-Z0-9_]+_USERNAME=/ {
-    k = $0; sub(/^export[ \t]+/, "", k); v = substr(k, index(k, "=") + 1); sub(/=.*/, "", k)
-    gsub(/^["\047]|["\047][ \t]*$/, "", v); if (v == "") next
-    sub(/^E2E_USER_/, "", k); sub(/_USERNAME$/, "", k); print tolower(k) }' "$f" | jq -R . | jq -sc 'unique'
+  provided_roles "$f"
 }
 
 # The summary on stdout is masked too; fails when either half of the pipe failed.
