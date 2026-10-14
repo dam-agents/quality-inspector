@@ -74,19 +74,19 @@ if ! engine_up; then
   echo "tests: the docker daemon does not answer (start Docker / Rancher Desktop)"; exit 1
 fi
 
-# A path argument becomes a path inside the container's copy of the checkout.
+# Resolve each argument as run.sh does — a bare name of this directory stays one,
+# anything else is a path from the caller's directory — and map a path into the
+# container's copy of the checkout. A typo fails here, before the lock.
 ARGS=""
 for a in "$@"; do
   case "$a" in (*[[:space:]]*) echo "tests: test file path has whitespace: $a"; exit 1;; esac
-  case "$a" in
-    (*/*) p="$a"; case "$p" in (/*) ;; (*) p="$CALLER_DIR/$a";; esac
-          [ -f "$p" ] || { echo "tests: no such test file: $a"; exit 1; }
-          p="$(cd "$(dirname "$p")" && pwd)/$(basename "$p")"
-          case "$p" in
-            ("$CHECKOUT"/*) ARGS="$ARGS /home/tester/qi/${p#"$CHECKOUT"/}";;
-            (*) echo "tests: test file is outside the checkout: $a"; exit 1;;
-          esac;;
-    (*) ARGS="$ARGS $a";;
+  if [ "${a#*/}" = "$a" ] && [ -f "$a" ]; then ARGS="$ARGS $a"; continue; fi
+  p="$a"; case "$p" in (/*) ;; (*) p="$CALLER_DIR/$a";; esac
+  [ -f "$p" ] || { echo "tests: no such test file: $a"; exit 1; }
+  p="$(cd "$(dirname "$p")" && pwd)/$(basename "$p")"
+  case "$p" in
+    ("$CHECKOUT"/*) ARGS="$ARGS /home/tester/qi/${p#"$CHECKOUT"/}";;
+    (*) echo "tests: test file is outside the checkout: $a"; exit 1;;
   esac
 done
 

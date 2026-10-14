@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # run.sh and its suite lock (suite-lock.sh): one suite per host — a live holder is
 # waited for or named, a dead or ownerless one reclaimed; named files run alone and
-# a failing file fails the run; docker.sh holds the lock too; on macOS run.sh moves
-# into docker.sh, which starts a stopped Rancher Desktop and, with no engine, runs
-# on the host. Every case points QI_TEST_LOCK into the sandbox — the suite running
+# a failing file fails the run; QI_TEST_JOBS=1 runs files one at a time and 2 at
+# once; a worker that dies without a verdict fails the run; docker.sh holds the lock
+# too and maps file arguments into the container; on macOS run.sh moves into
+# docker.sh, which starts a stopped Rancher Desktop and, with no engine, runs on the
+# host. Every case points QI_TEST_LOCK into the sandbox — the suite running
 # this file holds the host lock itself.
 . "$(dirname "$0")/lib.sh"
 FAKE_HOME="$SANDBOX/home"; mkdir -p "$FAKE_HOME"
@@ -73,6 +75,27 @@ assert_eq "parallel: one failing file fails the run" 1 "$RC"
 assert_eq "parallel: output keeps the given order" "dummy bad ran|FAIL  bad.sh|dummy ok ran|PASS  ok.sh|tests: 1 pass, 1 fail" \
   "$(printf '%s\n' "$OUT" | paste -sd '|' -)"
 
+# slow.sh is busy for a second; peek.sh records "overlap" when it sees slow.sh busy
+overlap_pair() {
+  printf '#!/usr/bin/env bash\ntouch "%s/slow.busy"; sleep 1; rm -f "%s/slow.busy"; touch "%s/slow.done"\n' \
+    "$SANDBOX" "$SANDBOX" "$SANDBOX" > "$SANDBOX/slow.sh"
+  printf '#!/usr/bin/env bash\nfor i in $(seq 1 50); do\n  [ -e "%s/slow.busy" ] && { touch "%s/overlap"; exit 0; }\n  [ -e "%s/slow.done" ] && exit 0\n  sleep 0.1\ndone\n' \
+    "$SANDBOX" "$SANDBOX" "$SANDBOX" > "$SANDBOX/peek.sh"
+  rm -f "$SANDBOX"/slow.busy "$SANDBOX"/slow.done "$SANDBOX"/overlap
+}
+for j in 1 2; do
+  reset; overlap_pair
+  OUT="$(QI_TEST_DOCKER=0 QI_TEST_JOBS=$j QI_TEST_LOCK="$SANDBOX/lock" QI_TEST_LOCK_WAIT=0 \
+    bash "$TESTS_DIR/run.sh" "$SANDBOX/slow.sh" "$SANDBOX/peek.sh" 2>/dev/null)"; RC=$?
+  assert_eq "QI_TEST_JOBS=$j: both files pass" 0 "$RC"
+  [ "$j" = 1 ] && want=no || want=yes
+  assert_eq "QI_TEST_JOBS=$j: the files overlap = $want" "$want" "$(has "$SANDBOX/overlap")"
+done
+
+reset; printf '#!/usr/bin/env bash\necho "dying"\nkill -9 $PPID\n' > "$SANDBOX/die.sh"; run_suite 0 "$SANDBOX/die.sh"
+assert_eq "a worker that dies without a .rc fails the run" 1 "$RC"
+assert_eq "it is reported as FAIL" yes "$(out_has 'FAIL  die.sh')"
+
 # docker stub: `info` answers once $SANDBOX/engine-up exists, `image inspect` passes,
 # `run` records its args and whether the host lock was held, drains the archive, passes.
 # rdctl reports the VM state of $SANDBOX/vm-state (none = the app is down) and brings
@@ -100,6 +123,19 @@ assert_eq "macOS: the container runs under the host lock" yes "$(has "$SANDBOX/d
 grep -q 'run.sh test_audit.sh' "$SANDBOX/docker-args" 2>/dev/null || { echo "  the named file does not reach run.sh in the container"; FAILED=1; }
 assert_eq "macOS: an answering engine is not started again" no "$(has "$SANDBOX/rdctl-started")"
 assert_eq "macOS: the lock is released at exit" no "$(has "$SANDBOX/lock")"
+
+reset; stubs up; run_mac '' "$TESTS_DIR/test_audit.sh"
+grep -q 'run.sh /home/tester/qi/scripts/tests/test_audit.sh' "$SANDBOX/docker-args" 2>/dev/null \
+  || { echo "  a path in the checkout does not become its path in the container"; FAILED=1; }
+
+reset; stubs up; f="$(dummy_test ok 0)"; run_mac '' "$f"
+assert_eq "macOS: a file outside the checkout fails the run" 1 "$RC"
+assert_eq "the failure names the cause" yes "$(out_has 'outside the checkout')"
+
+reset; stubs up; run_mac '' test_no_such_file.sh
+assert_eq "macOS: an unknown bare name fails the run" 1 "$RC"
+assert_eq "the failure names the cause" yes "$(out_has 'no such test file')"
+assert_eq "macOS: no container starts for an unknown name" no "$(has "$SANDBOX/docker-args")"
 
 reset; stubs up; hold_lock "$$"; run_mac '' test_audit.sh
 assert_eq "macOS: a live holder fails the container run" 1 "$RC"

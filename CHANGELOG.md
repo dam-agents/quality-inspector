@@ -10,7 +10,7 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 ## 2.12.1 — 2026-10-14
 
 **Upgrade:**
-Nothing — the offline suite's runner changed; deployed instances do not run it.
+Nothing — only the offline suite's runner changed.
 
 ## 2.12.0 — 2026-10-14
 
