@@ -40,16 +40,35 @@ profile_bin() { # <cmd>
   return 1
 }
 
+# The agent's own model connection, lent to the nested product (lend_model: enabled) as its
+# placeholder only — `platform:conn:<id>`, which the gateway swaps for the key on the way
+# out; the key never enters the VM. Prints `<key>|<kind>|<base url>`, or `||` when off or
+# when this agent has no connection to lend. kind: api-key | oauth | auth-token | bedrock
+# | unknown — from which variable the platform gives the agent's own harness.
+model_env() {
+  [ "$(cfg lend_model)" = enabled ] && [ -n "${PLATFORM_PROVIDER:-}" ] || { echo '||'; return 0; }
+  local f="$HOME/.platform/runtime-env.json" keys kind base
+  keys="$(jq -r --arg id "$PLATFORM_PROVIDER" '.providers[]? | select(.id == $id) | .env // {} | keys[]' "$f" 2>/dev/null)"
+  case "$keys" in
+    (*CLAUDE_CODE_OAUTH_TOKEN*) kind=oauth;; (*AWS_BEARER_TOKEN_BEDROCK*) kind=bedrock;;
+    (*ANTHROPIC_AUTH_TOKEN*) kind=auth-token;; (*ANTHROPIC_API_KEY*) kind=api-key;; (*) kind=unknown;;
+  esac
+  base="$(jq -r --arg id "$PLATFORM_PROVIDER" '.providers[]? | select(.id == $id) | .env.ANTHROPIC_BASE_URL // empty' "$f" 2>/dev/null)"
+  printf 'platform:conn:%s|%s|%s\n' "$PLATFORM_PROVIDER" "$kind" "$base"
+}
+
 # Run a profile command with the contract's environment. Its exit code is returned.
 profile_run() { # <bin> [args…]
-  local dir exe bin="$1"; shift
+  local dir exe bin="$1" mk mkind mbase; shift
   dir="$(profile_dir)" || { echo "profile not installed (config key 'profile')" >&2; return 3; }
   exe="$(profile_bin "$bin")" || { echo "profile has no bin/$bin and its engine none either" >&2; return 3; }
   local work="${WORK:-${WORK_DIR:-$HOME/work}}"
+  IFS='|' read -r mk mkind mbase <<<"$(model_env)"
   ( cd "$work" 2>/dev/null || cd /
     QI_WORK="$work" QI_ENV_DIR="$work/env" QI_PROFILE_CONFIG="$(profile_config)" QI_PROFILE_DIR="$dir" \
     QI_ENGINE_CONFIG="$(jq -c '.engine_config // {}' "$dir/profile.json")" \
     QI_CANDIDATE_CHANNEL="$(cfg candidate_channel)" QI_BASELINE_CHANNEL="${QI_BASELINE_OVERRIDE:-$(cfg baseline_channel)}" \
+    QI_MODEL_KEY="$mk" QI_MODEL_KIND="$mkind" QI_MODEL_BASE_URL="$mbase" \
       "$exe" "$@" )
 }
 

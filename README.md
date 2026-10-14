@@ -33,7 +33,12 @@ library for evidence, the skill catalog for profiles, sub-agents for independent
   access without or with the wrong session, stored XSS, headers, leaks, the deployment;
   findings go to a private artifact only, never to an issue (docs/security.md).
 - **Weekly audit** (off by default) — health, the black-box boundary probes, assertion
-  drift, cache efficiency (docs/audit.md).
+  drift, cache efficiency, and the week's speed and cost per issue (docs/audit.md).
+- **From Slack** (off by default) — a person in the bound channel asks "test #N" and gets
+  the report in the thread; one test at a time, `slack_tests_per_day` a day (docs/slack.md).
+  In the direct session the operator can watch exploration live in the Browser Panel
+  (`live_browser`), and the nested product can call the agent's own model by placeholder
+  instead of a mock (`lend_model`).
 - Scripts only detect, and the profile only sets up the nested product; every judgment and every
   external write is the agent's, per `docs/`. `CLAUDE.md` is the small always-loaded
   core; the definition is versioned (`VERSION` + `CHANGELOG.md`).
@@ -141,6 +146,8 @@ configuration.
 | `explorations`, `max_explorations_per_ac` | defaults (`enabled`, `3`) | Agent-designed scenarios beyond the criteria, reported apart from the verdict ([docs/explorations.md](docs/explorations.md)). |
 | `security_checks`, `security_failed_logins` | defaults (`enabled`, `10`) | The security run ([docs/security.md](docs/security.md)); its schedule ships off. |
 | `max_wallclock_min_per_issue`, `max_model_steps_per_issue`, `min_free_disk_gi` | defaults | Per-issue budgets and the free disk an install needs. |
+| `slack_channel`, `slack_tests_per_day` | asked (optional), default `3` | Slack test requests ([docs/slack.md](docs/slack.md)). |
+| `lend_model`, `live_browser` | offered, default `disabled` | The product calls the agent's model by placeholder; exploration in the browser the operator watches. |
 
 ## Runtime requirements
 
@@ -152,9 +159,11 @@ configuration.
   target's issues, plus issues write when comments are enabled.
 - **External surfaces:** artifacts in the platform's artifact library (private by
   default); with `issue_comments: enabled`, **public comments** on the target's issues,
-  and removal of the retest label.
-- **Cost:** idle hours wake no model. One issue costs three installs of the product (time,
-  no tokens) plus authoring — expect a few hundred thousand tokens for the first
+  and removal of the retest label; with `slack_channel` set, replies in that chat's threads.
+  The platform runtime's session state (`PLATFORM_RUNTIME_URL`) frees a dead run's
+  environment lock at once; without it the lock waits `lock_ttl_min`.
+- **Cost:** idle hours wake no model. One issue costs up to three installs of the product
+  (time, no tokens; an install of the build already up returns at once) plus authoring — expect a few hundred thousand tokens for the first
   run of an issue (explorations, on by default, add roughly 30–60 %); replays of promoted
   tests are mostly free, except `agent.assert` checks, which always call the model.
 

@@ -15,6 +15,11 @@ rm -f "$M"; HOME="$H" bash "$H/scripts/precheck.sh" audit >/dev/null 2>&1; asser
 [ -e "$M" ] || { echo "  the audit did not write the run marker"; FAILED=1; }
 assert_eq "error -> run" 0 "$(run '{"mode":"issues","nothing_to_do":true,"error":"boom"}')"
 assert_eq "not JSON -> run" 0 "$(run 'garbage')"
+# A Slack turn marks itself (docs/slack.md) and is never declined, even on nothing_to_do.
+rm -f "$M"; printf '%s\n' '{"mode":"slack","nothing_to_do":true}' > "$SANDBOX/out"
+o="$(HOME="$H" bash "$H/scripts/precheck.sh" slack 2>/dev/null)"; assert_eq "slack -> run" 0 "$?"
+assert "slack -> the pre-flight's JSON" '.mode == "slack"' "$o"
+grep -qE '^slack [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z -$' "$M" 2>/dev/null || { echo "  a Slack turn did not write its run marker"; FAILED=1; }
 rm -f "$H/scripts/preflight.sh"
 HOME="$H" bash "$H/scripts/precheck.sh" issues >/dev/null 2>&1; assert_eq "missing pre-flight -> run" 0 "$?"
 exit $FAILED

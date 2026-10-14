@@ -28,21 +28,23 @@ run type (`issues`, `regression`, `security`, `audit`, `session`).
 | `issue_milestone` | you | `issue=<n> step=<freeze\|env_up\|authored\|baseline\|candidate>` |
 | `issue_abort` | you | `issue=<n> reason=<environment\|label_removed\|…>` |
 | `issue_injection_suspect` | you, at the freeze | `issue=<n> sentences=<k> urls=<n> fences=<n> comments=<n>` ([acceptance-criteria.md](acceptance-criteria.md) → Injection suspects) |
-| `issue_done` | you | `issue=<n> verdict=<v>` |
+| `issue_done` | you | `issue=<n> verdict=<v> minutes=<m> model_steps=<k>` — the audit's `stats.cost_7d` |
 | `report_delivered` / `report_failed` | you | `issue=<n> surface=<artifact\|comment> …` |
 | `external_write` / `ledger_start` | you | **Ledger of external writes** below / free text |
 | `issue_budget_exceeded` | you | `issue=<n> budget=<wallclock\|model_steps> used=<n> limit=<n>` |
 | `triage` | you | `issue=<n> ac=<k> category=<c> basis=<…>` |
 | `heal` | you | `issue=<n> ac=<k> old=<hash> new=<hash>` |
 | `security_run` | you | `candidate=<c> critical=<n> high=<n> medium=<n> low=<n> skipped=<n>` |
-| `env_up` / `env_reset` / `env_failed` / `env_lock_takeover` | `scripts/env.sh` | free text |
+| `env_up` / `env_reset` / `env_failed` / `env_lock_takeover` | `scripts/env.sh` | free text; `env_up` ends `took_s=<seconds>` |
+| `slack_test` | you, when a Slack test starts | `issue=<n> user=<sender id>` — counted against `slack_tests_per_day` ([slack.md](slack.md)) |
 | `suite_run` / `suite_failed` | `scripts/suite.sh` | `<label> exit=<rc>` / free text |
 | `onboarding_verify` | `scripts/verify-onboarding.sh` | free text |
 | `policy_denied` (warn) | `scripts/hooks/policy.sh` | `tool=<name> rule=<id>[ at=<host/path or file>]` — never a command or query string |
 
-The issue events are what the pre-flight's lock liveness reads: it matches
+The issue events are what the pre-flight's row liveness reads when the environment lock
+cannot tell whether its holder runs ([nested-env.md](nested-env.md) → Shape): it matches
 `issue=<n>` followed by a space or the end of `msg`. Log an `issue_milestone` at every
-step of [issue-qa.md](issue-qa.md) that refreshes the row — a long run that stays silent
+step of [issue-qa.md](issue-qa.md) that refreshes the row — such a run that stays silent
 for 30 minutes past the TTL is taken over. Without `scripts/log.sh`, write the same line
 by hand with `jq -cn`.
 
@@ -53,7 +55,7 @@ Retention: 14 days, swept by the audit pre-flight.
 
 Every outward effect — a verdict comment, a spec-feedback comment, a label removal, an
 artifact publish (create or revision, its uploads included), the audit's definition-repo
-issue — is one `external_write` pair: `intent` (`info`) as the last line before the send,
+issue, a Slack reply — is one `external_write` pair: `intent` (`info`) as the last line before the send,
 then `done` (`info`) or `failed` (`error`) as the first write after it returns (a create's
 `artifact.id` alone comes first — it is the dedup key), and only then the state flip.
 Never a body, a link with a token, or a credential. A marker found by the pre-post check
@@ -69,5 +71,6 @@ never holds a space (`%20`), and `intent` and its outcome share `surface`, `issu
 | `label` | the label name | `target_repo` |
 | `artifact` | `<ac_hash>@<candidate>`; regression: `issue=-`, `regression@<candidate>` | `artifact:<id>`, `artifact:new` before a first create |
 | `definition_issue` | 12-hex sha256 of the `failures[]` signature; `issue=-` | `<definition repo>`, `#<n>` appended on `done` |
+| `slack` | `start` or `report` ([slack.md](slack.md)) | `slack:<slack_channel>` |
 
 The audit's `ledger_reconcile` checks it against GitHub ([audit.md](audit.md)).

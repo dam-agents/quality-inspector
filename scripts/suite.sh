@@ -10,6 +10,8 @@
 #                                 `full` records video and a trace page for every test (issue
 #                                 verification); `failures` (default) keeps them for failures.
 #                                 --strict turns off criterion()'s judged fallback (red-green).
+#                                 A `failures` run attaches to live_browser when lib/config.sh
+#                                 → live_cdp allows it; a `full` (evidence) run never does.
 #                                 Extra args go to `e2e run`; a confirmation re-run adds
 #                                 `--repeat-each 3 --no-cache`, and by_test[].stability reads it
 #   suite.sh summary <label>      re-print the summary of an earlier run
@@ -126,9 +128,11 @@ cmd_run() {
   esac
   [ -d "$SUITE/node_modules/e2e" ] || die "suite not initialized — run: bash \"\$HOME/scripts/suite.sh\" init"
   [ -f "$CRED" ] || die "work/env/credentials.env missing — run: bash \"\$HOME/scripts/env.sh\" init"
-  local out=".e2e/runs/$label"
+  local out=".e2e/runs/$label" cdp=""
+  [ "$evidence" = failures ] && cdp="$(live_cdp)"
   (
     cd "$SUITE" || exit 1
+    [ -n "$cdp" ] && export E2E_CDP_ENDPOINT="$cdp"
     set -a; . "$CRED"; set +a
     export APP_URL E2E_MODEL E2E_TELEMETRY_DISABLED=1 NODE_USE_ENV_PROXY=1 QI_STRICT="$strict"
     # Model calls leave through the gateway, which injects the provider credential.

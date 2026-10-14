@@ -15,7 +15,9 @@ when `audit_report: disabled` (still append the log line).
    week's criteria files holding URLs, code fences or HTML comments; the week's
    `issue_injection_suspect` events) — a `warn` lists the issues: sample one and check its
    instruction sentences are `testable: no`. `failures[]` groups the week's error events;
-   `stats` counts verdicts and `stats.coverage` the pages.
+   `stats` counts verdicts, `stats.coverage` the pages, and `stats.cost_7d` the week's speed
+   and cost: finished issues with their median and total minutes and model steps, installs
+   with their median seconds ([logging.md](logging.md)) — name the median issue in the report.
    - `ledger_reconcile` ([logging.md](logging.md) → **Ledger of external writes**): for
      the newest 20 `reported` QA rows of the week, one `GET …/issues/<n>/comments?since=`
      each; every comment of the agent's login (`gh api user`) created this week (and after

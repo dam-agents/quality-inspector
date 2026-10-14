@@ -37,15 +37,19 @@ allow() { [ -n "${1:-}" ] && printf '%s\n' "$1"; exit 0; }
 # Every exit that lets the turn run — a crash included — marks the session as scheduled
 # for the policy hook (docs/persistence.md → Scheduled or direct session). A decline wakes
 # no model and writes nothing; QI_PRECHECK_PROBE=1 (a timed health check) neither.
+# `slack` is no schedule: a Slack turn runs it first to mark itself the same way
+# (docs/slack.md), and it never declines — a person waits for the answer.
 mark_scheduled() {
   [ "${QI_PRECHECK_PROBE:-0}" = 1 ] && return 0
-  local d="${WORK_DIR:-$HOME_DIR/work}/env"
-  mkdir -p "$d" 2>/dev/null && printf 'scheduled %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  local d="${WORK_DIR:-$HOME_DIR/work}/env" kind=scheduled
+  [ "$MODE" = slack ] && kind=slack
+  mkdir -p "$d" 2>/dev/null && printf '%s %s %s\n' "$kind" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     "${PLATFORM_SCHEDULE_ID:--}" > "$d/RUN_MODE" 2>/dev/null || true
 }
 trap 'rc=$?; [ "$rc" = 1 ] || mark_scheduled' EXIT
 
 [ -n "$MODE" ] || allow "precheck: no mode given — run the pre-flight yourself."
+[ "$MODE" = slack ] && allow "$(bash "$PREFLIGHT" slack 2>/dev/null || echo '{"mode":"slack","error":"the pre-flight failed"}')"
 
 # The audit always runs and its task runs the pre-flight itself (its probes take most of
 # the two minutes); the Precheck is there only for the marker.

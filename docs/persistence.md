@@ -76,7 +76,8 @@ instance the same shape as a fresh one.
 
 Only a schedule runs a Precheck before the agent wakes. Every `scripts/precheck.sh` exit
 that lets the turn run writes `work/env/RUN_MODE` = `scheduled <ISO> <schedule id>`; a
-decline writes nothing, nor does a timed health check (`QI_PRECHECK_PROBE=1`). The policy
+decline writes nothing, nor does a timed health check (`QI_PRECHECK_PROBE=1`). A Slack turn
+runs `precheck.sh slack` first and is marked `slack <ISO> -` ([slack.md](slack.md)). The policy
 hook ([black-box.md](black-box.md) → **Enforcement layers**) reads a marker younger than
 `lock_ttl_min` — by its timestamp or its mtime, whichever is newer — as a **scheduled
 run**: `git commit`/`push`, `gh pr create`/`merge`, a `gh api` write outside the

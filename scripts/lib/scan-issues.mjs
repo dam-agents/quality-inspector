@@ -5,7 +5,7 @@
 // minutes. Byte-for-byte the same spec text and hash as lib/state.sh (test_scan_parity.sh).
 //
 //   scan-issues.mjs <listing.json> <QA.md> <events-dir>   -> {"due":[…],"reports":[…],"logs":[…],"deferred":n}
-// Env: QI_RETEST_LABEL, QI_MAX_ISSUES, QI_LOCK_TTL_MIN, QI_NOW_EPOCH.
+// Env: QI_RETEST_LABEL, QI_MAX_ISSUES, QI_LOCK_TTL_MIN, QI_NOW_EPOCH, QI_ENV_LOCK (lib/lock.sh state).
 
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -77,6 +77,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const retest = process.env.QI_RETEST_LABEL ?? 'qa:retest';
   const max = Number(process.env.QI_MAX_ISSUES ?? 1);
   const ttl = Number(process.env.QI_LOCK_TTL_MIN ?? 180);
+  // free / dead: no run holds the environment, so an in_progress row is an orphan (lib/lock.sh).
+  const orphaned = ['free', 'dead'].includes(process.env.QI_ENV_LOCK ?? '');
   const now = Number(process.env.QI_NOW_EPOCH ?? Math.floor(Date.now() / 1000));
   const listing = JSON.parse(readFileSync(listingPath, 'utf8'));
 
@@ -111,7 +113,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     if (!row) kind = 'first';
     else if (row.status === 'in_progress') {
       const age = mins(row.updated); const silent = Math.floor((now - (lastEvent.get(String(n)) ?? 0)) / 60);
-      if (age >= ttl && silent >= 30) { kind = 'takeover'; takeover = true; logs.push(`issue #${n}: stale lock (${age}m old, ${silent}m silent) — takeover`); }
+      if (orphaned) { kind = 'takeover'; takeover = true; logs.push(`issue #${n}: in progress, but no run holds the environment (${process.env.QI_ENV_LOCK}) — takeover`); }
+      else if (age >= ttl && silent >= 30) { kind = 'takeover'; takeover = true; logs.push(`issue #${n}: stale lock (${age}m old, ${silent}m silent) — takeover`); }
       else { logs.push(`issue #${n}: in progress (${age}m) — skip`); continue; }
     } else if (isRetest) kind = 'retest';
     else if (row.hash !== hash) kind = 'ac_changed';

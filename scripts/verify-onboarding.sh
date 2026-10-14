@@ -52,13 +52,15 @@ warn() { WARNS=$((WARNS+1)); printf 'warn %s — %s\n' "$1" "$2"; }
 . "$SCRIPT_DIR/lib/state.sh" || { echo "cannot source lib/state.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/profile.sh" || { echo "cannot source lib/profile.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/boundary.sh" || { echo "cannot source lib/boundary.sh" >&2; exit 1; }
+. "$SCRIPT_DIR/lib/lock.sh" || { echo "cannot source lib/lock.sh" >&2; exit 1; }
 
 SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-benchmark-monthly quality-inspector-security-weekly quality-inspector-audit-weekly"
 KNOWN_KEYS="profile target_repo display_name qa_label retest_label marker_prefix candidate_channel
 baseline_channel issue_comments artifact_reports include_comments max_issues_per_run lock_ttl_min
 e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback
 explorations max_explorations_per_ac auto_promote security_checks security_failed_logins
-confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi"
+confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi
+lend_model live_browser slack_channel slack_tests_per_day"
 
 if [ "$STRUCTURE" = 1 ]; then
   # ------------------------------------------------------------- definition
@@ -141,9 +143,15 @@ if [ -f "$CONFIG" ]; then
   enum issue_comments "enabled disabled"; enum artifact_reports "enabled disabled"
   enum include_comments "enabled disabled"; enum audit_report "enabled disabled"; enum log_level "info debug"
   enum spec_feedback "enabled disabled"; enum explorations "enabled disabled"; enum auto_promote "disabled verified"
-  enum security_checks "enabled disabled"; enum confirm_regressions "enabled disabled"
+  enum security_checks "enabled disabled"; enum confirm_regressions "enabled disabled"; enum lend_model "enabled disabled"
+  case "$(cfg slack_channel)" in ('') ok cfg:slack_channel "none — Slack orders nothing";;
+    (*) printf '%s' "$(cfg slack_channel)" | grep -qE '^[CGD][A-Z0-9]{6,}$' && ok cfg:slack_channel "$(cfg slack_channel)" \
+          || fail cfg:slack_channel "'$(cfg slack_channel)' is not a Slack chat id" "use the id describe_channel lists, e.g. C0123ABCD (docs/slack.md)";; esac
+  case "$(cfg live_browser)" in (''|disabled) ok cfg:live_browser "disabled";;
+    (http://127.0.0.1:[0-9]*|http://localhost:[0-9]*) ok cfg:live_browser "$(cfg live_browser)";;
+    (*) fail cfg:live_browser "'$(cfg live_browser)' is not a CDP endpoint on this VM" "http://127.0.0.1:<port> from /etc/AGENTS.md, or disabled (docs/test-authoring.md → Watching live)";; esac
   for k in max_issues_per_run lock_ttl_min media_retention_days max_explorations_per_ac security_failed_logins bisect_max_steps \
-           max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi; do
+           max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi slack_tests_per_day; do
     v="$(cfg "$k")"; case "$v" in (''|*[!0-9]*) [ -z "$v" ] && ok "cfg:$k" "default" || fail "cfg:$k" "'$v' is not a number" "set a positive integer";; (*) ok "cfg:$k" "$v";; esac
   done
   case "$(cfg bisect_max_steps)" in (''|0|*[!0-9]*) ;; (*) [ "$(cfg confirm_regressions)" = enabled ] \
@@ -203,6 +211,19 @@ if [ "$LIVE" = 1 ]; then
     (401|403) warn model_provider "Anthropic answered $code — the gateway does not inject a key for agent steps; set one per README → Setup";;
     (*) fail model_provider "Anthropic unreachable (HTTP $code)" "allow api.anthropic.com in the egress rules";;
   esac
+  # The environment lock frees a dead holder at once only when the runtime answers (lib/lock.sh).
+  session_running "${CLAUDE_CODE_SESSION_ID:-}"
+  case $? in
+    (0) ok lock_liveness "the runtime answers — a dead run's lock is freed at once";;
+    (*) warn lock_liveness "the runtime gives no session state here — the environment lock falls back to lock_ttl_min";;
+  esac
+  if [ "$(cfg lend_model)" = enabled ]; then
+    IFS='|' read -r mk mkind _ <<<"$(model_env)"
+    [ -n "$mk" ] && ok lend_model "lends this agent's $mkind connection by its placeholder" \
+      || fail lend_model "this agent has no model connection to lend" "give it one in its settings, or set lend_model: disabled"
+  fi
+  case "$(cfg live_browser)" in (''|disabled) ;;
+    (*) live_cdp >/dev/null 2>&1 && ok live_browser "answers" || warn live_browser "does not answer (or a run marker is fresh) — runs stay headless";; esac
   if [ "$(profile_field '.requires.root')" = true ]; then
     [ "$(id -u)" = 0 ] && ok vm_root "root" || fail vm_root "not running as root" "recreate the agent on the vm backend (README → Setup)"
   fi

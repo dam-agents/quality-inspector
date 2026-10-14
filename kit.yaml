@@ -34,6 +34,12 @@ connections:
       posts verdict comments and removes the retest label. Egress rules must confine
       it to the issues endpoints (README → Black-box boundary).
 
+# Optional. Bound, a person in that chat may order "test #N" and "status #N" there and
+# gets the report in the thread; onboarding records the chat as `slack_channel` (docs/slack.md).
+channels:
+  - type: slack
+    note: People in this channel can ask for an issue test ("test #N") and get the report in their thread.
+
 schedules:
   - name: quality-inspector-issues-1h
     cron: "7 * * * *"
