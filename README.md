@@ -97,8 +97,8 @@ rules depend on the instance, so onboarding prints them — `bash scripts/egress
 agent's name and run them (`--kit` adds the kit's rules for an agent created by hand or
 from a kit before 2.11.0). They make the target's GitHub hosts deny-by-default, so a
 skill from another GitHub repository needs `--source <owner>/<repo>`; a profile inside the
-target gets only its directory (`profile_source_path`). A rule counts only once a probe
-proves it:
+target gets no file outside its directory (`profile_source_path`). A rule counts only once
+a probe proves it:
 `verify-onboarding.sh --live` and the weekly audit request each forbidden surface and
 fail when one answers. Approve no held request on the deny side.
 
@@ -165,7 +165,9 @@ configuration.
 - **Platform:** a DAM agent (vm backend when the profile requires root; Node ≥ 24.8 and
   Playwright with its Chromium baked in the image), `$HOME` on a persistent volume, the
   gateway for credentials, `mcp__platform-outbound__*` for schedules and the artifact
-  tools.
+  tools. Its egress gateway denies paths with dot segments and matches GitHub denies in
+  any letter case (dam-agents/dam#4909) — without that, a profile inside the target
+  repository opens the whole repository.
 - **Identity:** the GitHub connection's account — a dedicated bot; read access to the
   target's issues, plus issues write when comments are enabled.
 - **External surfaces:** artifacts in the platform's artifact library (private by

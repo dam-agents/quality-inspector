@@ -69,7 +69,14 @@ platform picks one rule per request:
 1. the exact host, then its `*.parent` wildcard (one label), then `*`;
 2. a named method over `*` — so a deny that must beat a `GET` allow is a `GET` rule;
 3. a path over `*`, then the longer path. `*` matches anything, `/` and the query string
-   included; the match is SQL `LIKE` — `_` is any one character, and letter case counts.
+   included; the match is SQL `LIKE` — `_` is any one character, and letter case counts,
+   except that on GitHub's hosts a deny matches in any case.
+
+Before any rule, the gateway denies a path with a `.` or `..` segment (raw, `%2e`, or
+with a `;` suffix): GitHub's contents API resolves them, so `<path>/../src` would pass an
+allow for `<path>/*`. The platform must do this and the case-blind GitHub deny (README →
+Runtime requirements); the probes `…/contents/<path>/..` and `…/issues/<n>/TIMELINE` (only
+a case-blind deny beats the `issues*` allow there) show whether it does.
 
 The `trusted` preset and the GitHub connection allow their hosts (`github.com`, its API,
 codeload, raw, `gitlab.com`, `codeberg.org`, …) with method and path `*` before the kit's
@@ -78,14 +85,14 @@ rules land, and a kit rule contradicting one fails the apply. So a deny names a 
 
 **The target's GitHub hosts are deny-by-default.** A deny by the target's name cannot
 hold: the connection — and anyone, for a public target — reads its forks and mirrors, the
-target spelled in another case (`/repos/ACME/Widgets/…`: GitHub ignores the case, the
-match does not), and the same data by number, search or GraphQL. `<D>` is this
-definition's repository (from `origin`), `<S>` each `--source`:
+target spelled in another case (`/repos/ACME/Widgets/…`, which GitHub resolves and a
+platform without case-blind denies misses), and the same data by number, search or
+GraphQL. `<D>` is this definition's repository (from `origin`), `<S>` each `--source`:
 
 | Host | Allowed | Denied |
 | --- | --- | --- |
 | `api.github.com` (kit) | — | `/graphql*`, `/search/code*`, `/search/commits*`, `/repositories/*`, `/gists*` |
-| `api.github.com` (target) | `GET /user`; `GET /repos/<T>/issues*`; `POST …/issues/*/comments*`; `DELETE …/issues/*/labels/<retest_label>` — that label only, URL-encoded (`qa%3Aretest`); `GET /repos/<T>/contents/<profile_source_path>/*` and `…/<profile_source_path>?*` (below); `/repos/<D>/*`; `GET /repos/<S>/*` | `GET …/issues/*/timeline*`, `GET …/issues/*/events*`, `GET …/issues/events*`; `/*` |
+| `api.github.com` (target) | `GET /user`; `GET /repos/<T>/issues*`; `POST …/issues/*/comments*`; `DELETE …/issues/*/labels/<retest_label>` — that label only, URL-encoded (`qa%3Aretest`); `GET /repos/<T>/contents/<profile_source_path>/*` and `…/<profile_source_path>?*`, `GET /repos/<T>` and `GET /repos/<T>/git/refs/heads/*` (below); `/repos/<D>/*`; `GET /repos/<S>/*` | `GET …/issues/*/timeline*`, `GET …/issues/*/events*`, `GET …/issues/events*`; `/*` |
 | `github.com` (target) | `/<D>/*`, `/<D>.git/*`; the profile's `egress` paths | `/*` |
 | `codeload.github.com` (target) | `GET /<S>/*` | `/*` |
 | `raw.githubusercontent.com`, gists, GitLab, Bitbucket, Codeberg, Gitea, Azure DevOps, Sourcegraph, SourceHut (kit) | — | `/*` |
@@ -102,11 +109,13 @@ side; a held probe shows as `warn` until it is an explicit deny.
 
 **A profile inside the target repository** (`profile_source_path`, e.g. `qa`): when the
 egress denies the repository's archive and allows that path, the platform fetches only
-the profile's directory through the contents API, and refuses the install when the path
-is denied too. Two things keep the allow from opening the whole repository, and the
-probes prove both (`boundary:…/contents/<path>/..`, `profile_source`): the gateway
-matches a path only after resolving its dot segments (the contents API resolves
-`<path>/../src`), and the directory holds no symlink or submodule (the contents API
-answers a symlink to a file with that file). The path is plain directory names: a
-pattern character (`*`, `%`, `?`) or a `.`/`..` segment fails `egress-rules.sh`,
-`verify-onboarding.sh --config` and the probe.
+the profile's directory through the contents API — every request with a `?ref=`, so a
+bare `contents/<path>` stays denied — and refuses the install when the path is denied
+too. Its scan of a private source reads the head from `GET /repos/<T>` and
+`GET /repos/<T>/git/refs/heads/<branch>` — metadata and one SHA, never a file. Two
+things keep the allow from opening the whole repository, and the probes prove both
+(`boundary:…/contents/<path>/..`, `profile_source`): the gateway's dot-segment denial
+above, and a directory with no symlink or submodule (the contents API answers a symlink
+to a file with that file). The path is plain directory names: a pattern character (`*`,
+`%`, `?`) or a `.`/`..` segment fails `egress-rules.sh`, `verify-onboarding.sh --config`
+and the probe.
