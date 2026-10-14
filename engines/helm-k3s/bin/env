@@ -166,6 +166,7 @@ cmd_up() {
     kc apply --server-side --force-conflicts -f "$chartdir/crds/" >/dev/null || { rm -rf "$tmp"; die "CRD apply failed"; }
   fi
   say "installing $RELEASE at $tag"
+  rm -f "$ENVD/STATE.json"   # recorded again only once this build answers: a failed upgrade is never "up"
   low helm upgrade --install "$RELEASE" "$chartdir" -n "$NS" --create-namespace -f "$ENVD/values.json" \
       --timeout 20m --wait >/dev/null 2>"$tmp/helm.err" \
     || { local e; e="$(tail -5 "$tmp/helm.err")"; rm -rf "$tmp"; die "helm upgrade to $tag failed: $e"; }

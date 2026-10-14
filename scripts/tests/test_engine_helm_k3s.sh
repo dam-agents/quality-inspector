@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # helm-k3s engine: channels pick the right builds from both registry APIs; --between lists the builds
-# between two, oldest first; values fill placeholders and overlays.
+# between two, oldest first; values fill placeholders and overlays; `up` returns at once for the
+# build already up with the same values, and a failed upgrade never leaves a build recorded.
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 ENG="$SCRIPTS/../engines/helm-k3s"
@@ -60,4 +61,30 @@ me() { ( . "$SCRIPTS/lib/config.sh"; . "$SCRIPTS/lib/profile.sh"; HOME="$SANDBOX
 assert_eq "lend_model off" "||" "$(CONFIG="$WORK_DIR/CONFIG.md" me)"
 echo "- lend_model: enabled" >> "$WORK_DIR/CONFIG.md"
 assert_eq "lend_model on" "platform:conn:p1|oauth|" "$(CONFIG="$WORK_DIR/CONFIG.md" me)"
+
+# up: stubbed cluster (ready), UI (200) and helm (pull unpacks, upgrade fails).
+E="$SANDBOX/envd"; U="$SANDBOX/upbin"; mkdir -p "$E" "$U"
+printf 'E2E_USER_OWNER_USERNAME=qa\nE2E_USER_OWNER_PASSWORD=pw\nQI_SECRET_ADMIN=s\n' > "$E/credentials.env"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$U/k3s"
+printf '#!/usr/bin/env bash\nprintf 200\n' > "$U/curl"
+cat > "$U/helm" <<'S'
+#!/usr/bin/env bash
+case "$1" in
+  version) echo "v3.19.0+gstub";;
+  pull) while [ $# -gt 0 ]; do [ "$1" = --untardir ] && mkdir -p "$2/chart"; shift; done;;
+  *) echo "stub: upgrade refused" >&2; exit 1;;
+esac
+S
+chmod +x "$U"/*
+up() { PATH="$U:$PATH" HOME="$SANDBOX/home" QI_ENV_DIR="$E" QI_ENGINE_CONFIG="$(cfg oci)" QI_PROFILE_CONFIG="$1" \
+       bash "$ENG/bin/env" up 1.0.0 2>"$SANDBOX/uperr" >/dev/null; echo $?; }
+assert_eq "a first install runs (and its stubbed upgrade fails)" 1 "$(up '{"img":"x","mock":""}')"
+grep -q 'helm upgrade to 1.0.0 failed' "$SANDBOX/uperr" || { echo "  no upgrade failure: $(cat "$SANDBOX/uperr")"; FAILED=1; }
+[ -f "$E/STATE.json" ] && { echo "  a failed upgrade left a build recorded"; FAILED=1; }
+h="$( (sha256sum || shasum -a 256) < "$E/values.json" 2>/dev/null | cut -c1-12)"
+printf '{"build":"1.0.0","values":"%s","installed_utc":"x"}\n' "$h" > "$E/STATE.json"
+assert_eq "the same build and values: already up" 0 "$(up '{"img":"x","mock":""}')"
+grep -q 'already up' "$SANDBOX/uperr" || { echo "  fast path not taken: $(cat "$SANDBOX/uperr")"; FAILED=1; }
+assert_eq "other values: installs again" 1 "$(up '{"img":"y","mock":""}')"
+[ -f "$E/STATE.json" ] && { echo "  the old build stayed recorded through a failed upgrade"; FAILED=1; }
 exit $FAILED

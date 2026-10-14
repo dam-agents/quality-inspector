@@ -18,7 +18,7 @@ S
 chmod +x "$SANDBOX/bin/curl"
 export PATH="$SANDBOX/bin:$PATH" PLATFORM_RUNTIME_URL="http://runtime.test"
 L="$WORK_DIR/env/LOCK"
-lk() { CLAUDE_CODE_SESSION_ID="$1" bash "$SCRIPTS/env.sh" "$2" "$3" >/dev/null 2>"$SANDBOX/err"; echo $?; }
+lk() { local s="$1"; shift; CLAUDE_CODE_SESSION_ID="$s" bash "$SCRIPTS/env.sh" "$@" >/dev/null 2>"$SANDBOX/err"; echo $?; }
 events() { cat "$WORK_DIR"/logs/events-*.jsonl 2>/dev/null | jq -sc "[.[] | select(.event == \"$1\")] | length"; }
 
 assert_eq "a free lock is taken" 0 "$(lk sess-a lock issues)"
@@ -49,18 +49,20 @@ rm -f "$L"
 
 # up keeps its result for wait; unlock refuses while an install still runs.
 assert_eq "up through the profile" 0 "$(lk sess-a up 1.0.0)"
-assert_eq "UP records the result" "done 1.0.0 0" "$(awk '{print $1, $2, $4}' "$WORK_DIR/env/UP")"
+assert_eq "UP records the result and its session" "done 1.0.0 0 sess-a" "$(awk '{print $1, $2, $4, $5}' "$WORK_DIR/env/UP")"
 grep -q 'took_s=' <<<"$(cat "$WORK_DIR"/logs/events-*.jsonl)" || { echo "  env_up carries no duration"; FAILED=1; }
-assert_eq "wait after a successful up" 0 "$(lk sess-a wait 1)"
-echo "done 1.0.0 $(iso_ago 1) 1" > "$WORK_DIR/env/UP"
-assert_eq "wait after a failed up" 1 "$(lk sess-a wait 1)"
+assert_eq "wait after a successful up" 0 "$(lk sess-a wait 1.0.0 1)"
+assert_eq "wait for another build" 1 "$(lk sess-a wait 2.0.0 1)"
+assert_eq "wait from another session never reads this result" 1 "$(lk sess-b wait 1.0.0 1)"
+echo "done 1.0.0 $(iso_ago 1) 1 sess-a" > "$WORK_DIR/env/UP"
+assert_eq "wait after a failed up" 1 "$(lk sess-a wait 1.0.0 1)"
 sleep 30 & bg=$!
-echo "running 1.0.0 $(iso_ago 1) $bg" > "$WORK_DIR/env/UP"
-assert_eq "wait while it runs: call again" 3 "$(lk sess-a wait 0)"
+echo "running 1.0.0 $(iso_ago 1) $bg sess-a" > "$WORK_DIR/env/UP"
+assert_eq "wait while it runs: call again" 3 "$(lk sess-a wait 1.0.0 0)"
 lk sess-a lock issues >/dev/null
 assert_eq "unlock refused while it runs" 1 "$(lk sess-a unlock issues)"
 kill "$bg" 2>/dev/null; wait "$bg" 2>/dev/null
-assert_eq "wait on a dead install" 1 "$(lk sess-a wait 1)"
+assert_eq "wait on a dead install" 1 "$(lk sess-a wait 1.0.0 1)"
 assert_eq "unlock once it is gone" 0 "$(lk sess-a unlock issues)"
 
 # The pre-flight reads the same states.

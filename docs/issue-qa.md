@@ -41,7 +41,7 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    when it already exists (a takeover or a retest of the same text), reuse it unchanged.
    Then, unless `explorations: disabled`, the explorations file, same discipline
    ([explorations.md](explorations.md)). No testable AC → verdict `not-testable`, go to step 8.
-4. **Candidate environment.** `bash "$HOME/scripts/env.sh" wait` — again while it exits 3
+4. **Candidate environment.** `bash "$HOME/scripts/env.sh" wait <candidate>` — again while it exits 3
    ([nested-env.md](nested-env.md) → Shape) — then
    `bash "$HOME/scripts/suite.sh" run smoke-<candidate> --tag smoke`. Either failing is
    an **environment failure** ([nested-env.md](nested-env.md) → Failures): restore the
@@ -89,7 +89,7 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    retest of a promoted file never demotes it and never rewrites its hash. Name every
    `promotable` (or auto-promoted) file in the run's chat summary.
 10. **Release.** `env.sh unlock issues` (it refuses while the background install runs:
-    `env.sh wait` first); log `issue_done issue=<n> verdict=<v> minutes=<m> model_steps=<k>`,
+    `env.sh wait <candidate>` first); log `issue_done issue=<n> verdict=<v> minutes=<m> model_steps=<k>`,
     `m` and `k` the `elapsed_min` and `model_steps` of `suite.sh budget <claim time>`.
 
 A failure between steps 5 and 8 that is not an environment failure → finish with the

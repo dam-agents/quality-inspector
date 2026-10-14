@@ -8,9 +8,10 @@
 #   env.sh init | up <build> | reset | status | down    → the profile
 #                                            (`up` first checks min_free_disk_gi and keeps its
 #                                            result in work/env/UP for `wait`)
-#   env.sh wait [<seconds>]      block until the `up` started in the background ends (default 540 s,
-#                                under the harness's 10-minute tool limit): exit 0 it succeeded,
-#                                3 it still runs (call again), 1 it failed or died
+#   env.sh wait <build> [<seconds>]  block until this session's background `up <build>` ends
+#                                (default 540 s, under the harness's 10-minute tool limit): exit 0
+#                                it succeeded, 3 it still runs (call again), 1 it failed, died, or
+#                                no such install was started
 #   env.sh between <from> <to>   read-only: the profile's `bin/versions --between` — a JSON
 #                                array of builds between the two, oldest first; exit 2 when
 #                                the profile does not implement it (no array), 1 when it
@@ -58,7 +59,7 @@ cmd_lock() {
   fi
   printf '%s %s %s\n' "$owner" "$(now)" "$ME" > "$ENVD/LOCK.tmp" && mv -f "$ENVD/LOCK.tmp" "$ENVD/LOCK"
 }
-up_running() { local st b ts x; [ -f "$UPF" ] && read -r st b ts x < "$UPF" && [ "$st" = running ] && kill -0 "$x" 2>/dev/null; }
+up_running() { local st b ts x _; [ -f "$UPF" ] && read -r st b ts x _ < "$UPF" && [ "$st" = running ] && kill -0 "$x" 2>/dev/null; }
 cmd_unlock() {
   local owner="${1:?owner}" held ts sess
   [ -f "$ENVD/LOCK" ] || return 0
@@ -103,21 +104,25 @@ disk_gate() {
   exit 1
 }
 
-# up <build>, its result kept for `wait`: `running <build> <ISO> <pid>`, then `done <build> <ISO> <exit>`.
+# up <build>, its result kept for `wait`: `running <build> <ISO> <pid> <session>`, then
+# `done <build> <ISO> <exit> <session>` — so a wait never reads an earlier run's result.
 cmd_up() {
   local rc
   mkdir -p "$ENVD"
-  printf 'running %s %s %s\n' "$1" "$(now)" "$$" > "$UPF"
+  printf 'running %s %s %s %s\n' "$1" "$(now)" "$$" "${ME:--}" > "$UPF"
   ( disk_gate && delegate up "$1" ); rc=$?
-  printf 'done %s %s %s\n' "$1" "$(now)" "$rc" > "$UPF"
+  printf 'done %s %s %s %s\n' "$1" "$(now)" "$rc" "${ME:--}" > "$UPF"
   return "$rc"
 }
-cmd_wait() { # [<seconds>]
-  local max="${1:-540}" end st b ts x
+cmd_wait() { # <build> [<seconds>]
+  local want="$1" max="${2:-540}" end st b ts x who
   case "$max" in (''|*[!0-9]*) max=540;; esac
   end=$(( $(date -u +%s) + max ))
   while :; do
-    { [ -f "$UPF" ] && read -r st b ts x < "$UPF"; } || { echo "env: no install was started" >&2; return 1; }
+    st=""; [ -f "$UPF" ] && read -r st b ts x who < "$UPF"
+    if [ -z "$st" ] || [ "$b" != "$want" ] || { [ -n "$ME" ] && [ "${who:--}" != "$ME" ]; }; then
+      echo "env: this session started no install of $want — env.sh up $want first" >&2; return 1
+    fi
     case "$st" in
       (done) [ "$x" = 0 ] && { echo "env: $b is up ($ts)" >&2; return 0; }
              echo "env: the install of $b failed (exit $x, $ts) — docs/nested-env.md → Failures" >&2; return 1;;
@@ -135,6 +140,6 @@ case "${1:-}" in
   unlock) cmd_unlock "${2:-}" ;;
   init|reset|status|down) delegate "$1" ;;
   up)     [ -n "${2:-}" ] || { echo "usage: $0 up <build>" >&2; exit 2; }; cmd_up "$2" ;;
-  wait)   cmd_wait "${2:-}" ;;
-  *) echo "usage: $0 lock <owner>|unlock <owner>|init|up <build>|wait [<seconds>]|reset|status|down|between <from> <to>" >&2; exit 2 ;;
+  wait)   [ -n "${2:-}" ] || { echo "usage: $0 wait <build> [<seconds>]" >&2; exit 2; }; cmd_wait "$2" "${3:-}" ;;
+  *) echo "usage: $0 lock <owner>|unlock <owner>|init|up <build>|wait <build> [<seconds>]|reset|status|down|between <from> <to>" >&2; exit 2 ;;
 esac

@@ -40,7 +40,7 @@ as the operator's "test #N" ([on-demand.md](on-demand.md)), with these changes:
   first once the lock is taken — the issue, the candidate and baseline builds, and "up to
   `max_wallclock_min_per_issue` minutes"; the second the report.
 - **Stay in the turn until the report is sent**: a Slack turn ends when you stop. Every
-  wait for an install is `env.sh wait` again while it exits 3 ([issue-qa.md](issue-qa.md)).
+  wait for an install is `env.sh wait <build>` again while it exits 3 ([issue-qa.md](issue-qa.md)).
 - **The report:** the issue verdict, the ACs that are not `verified` with their verdicts
   (none → "N of N verified"), the evidence link, and the first `failed` AC's `AC-<k>`
   screenshot as the reply's `attachment`. Never a credential, a log, the operator

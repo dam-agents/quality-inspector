@@ -20,7 +20,7 @@ that prefix for a run that did not finish.
 
 Written through `scripts/log.sh` (`logev <level> <event> <msg>`), one JSON line
 `{ts, run, job, level, event, msg}`, secrets masked before writing. Set `LOG_JOB` to the
-run type (`issues`, `regression`, `security`, `audit`, `session`).
+run type (`issues`, `regression`, `security`, `audit`, `slack`, `session`).
 
 | Event | Writer | `msg` grammar (parsed) |
 | --- | --- | --- |

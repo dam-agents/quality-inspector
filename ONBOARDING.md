@@ -268,7 +268,7 @@ The agent is useless until the product comes up, so this is a gate:
 CAND=$(bash "$HOME/scripts/preflight.sh" issues | jq -r '.candidate // empty')
 bash "$HOME/scripts/env.sh" lock operator
 bash "$HOME/scripts/env.sh" up "$CAND"   # as a background task (docs/nested-env.md → Shape)
-bash "$HOME/scripts/env.sh" wait && bash "$HOME/scripts/suite.sh" run smoke-onboarding --tag smoke   # again while wait exits 3
+bash "$HOME/scripts/env.sh" wait "$CAND" && bash "$HOME/scripts/suite.sh" run smoke-onboarding --tag smoke   # again while wait exits 3
 bash "$HOME/scripts/env.sh" unlock operator
 ```
 

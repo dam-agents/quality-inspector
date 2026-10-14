@@ -16,9 +16,9 @@ file is the why and the recovery path; how one product is installed is the profi
   idle; once it does not, the next run takes the lock at once and the pre-flight hands the
   holder's `in_progress` row over as a `takeover`. No runtime answer, or a lock without a
   session → age decides: past `lock_ttl_min` it is the next holder's.
-- **Every `env.sh up` runs as a harness background task**, then `env.sh wait` — with the
-  tool's timeout at its 10-minute maximum, so one call waits 9 minutes — until it exits 0
-  (up) or 1 (failed, an environment failure); 3 = still installing, call it again. The turn
+- **Every `env.sh up <build>` runs as a harness background task**, then `env.sh wait <build>`
+  — with the tool's timeout at its 10-minute maximum, so one call waits 9 minutes — until it
+  exits 0 (up) or 1 (failed, an environment failure); 3 = still installing, call it again. The turn
   never ends while an install runs. The engine runs the product below the agent's own CPU
   priority, and an `up` of the build that already answers with the same values returns at
   once — after a VM restart too ([engines/helm-k3s/README.md](../engines/helm-k3s/README.md)).

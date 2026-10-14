@@ -30,7 +30,7 @@ scheduled ([persistence.md](persistence.md) → **Scheduled or direct session**)
   Coverage), propose one scenario per uncovered page and nav item; proposals only — no
   test is written without a yes.
 - **"reset the environment"** — `env.sh lock operator`, `env.sh reset`, optionally `up
-  <version>` and `wait` ([nested-env.md](nested-env.md) → Shape), `env.sh unlock operator`.
+  <version>` and `wait <version>` ([nested-env.md](nested-env.md) → Shape), `env.sh unlock operator`.
 - **"run the regression now"** — the regression run procedure with the current candidate,
   ignoring "already tested".
 - **"run the security checks"** — [security.md](security.md) → **The run** with the current candidate, ignoring "already tested".
