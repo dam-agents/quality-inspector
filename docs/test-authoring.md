@@ -7,24 +7,26 @@ Its own docs ship offline in `work/suite/node_modules/e2e/docs/` and its skill v
 
 ## File and test shape
 
-One file per issue, `tests/issue-<n>.e2e.ts`; one test per testable AC:
+One file per issue, `tests/issue-<n>.e2e.ts` (a scenario: `tests/scenario-<k>.e2e.ts`, titles
+`S-<k> AC-<j>: …`, tag `scenario-<k>` where an issue's test has `issue-<n>`); one test per
+testable AC:
 
 ```ts
 import { test } from '@e2e-dev/web';
 import { expect, unique } from 'e2e';
 import { criterion } from '../lib/criterion.js';
 
-test('#42 AC-1: a renamed agent keeps its sessions', { session: 'owner', tags: ['issue-42', 'ac-1'] },
+test('#42 AC-1: a renamed project keeps its tasks', { session: 'owner', tags: ['issue-42', 'ac-1'] },
   async ({ app, agent, screen }) => {
     const name = unique(`qa-${Date.now()}`);
     await app.open('/');
-    await agent.act('create an agent named {name} from the mock template', { params: { name } });
-    await agent.act('rename the agent {name} to {name}-2', { params: { name } });
-    await app.screenshot('AC-1: the renamed agent and its sessions');
+    await agent.act('create a project named {name} with one task', { params: { name } });
+    await agent.act('rename the project {name} to {name}-2', { params: { name } });
+    await app.screenshot('AC-1: the renamed project and its tasks');
     // AC-1 begin
-    await criterion('AC-1', 'the renamed agent is shown under its new name with its earlier session', { agent, app }, async () => {
+    await criterion('AC-1', 'the renamed project is shown under its new name with its earlier task', { agent, app }, async () => {
       await expect(screen.getByRole('heading', { name: `${name}-2` })).toBeVisible();
-      await expect(screen.getByRole('listitem').filter({ hasText: 'session' })).toHaveCount(1);
+      await expect(screen.getByRole('listitem').filter({ hasText: 'task' })).toHaveCount(1);
     });
     // AC-1 end
   });
@@ -44,6 +46,11 @@ test('#42 AC-1: a renamed agent keeps its sessions', { session: 'owner', tags: [
 - **The `// AC-<k> begin` / `end` block holds only the checks**, written from the
   criteria file's *Then* line before the first run. Everything before it — navigation,
   setup, `agent.act` — is free to change.
+- **Every AC block discriminates**: at least one `expect` on data the test itself created
+  (a `unique()` name) or on state the test itself changed — never only on a static page
+  element, which passes on a build without the feature. `check-asserts.sh --lint <file>`
+  lists the blocks that name no `unique()` identifier; each one listed checks changed
+  state, or gets such a check.
 - After the first candidate run, an edit inside an AC block may only repair *how* the
   same thing is located (a locator that never matched), keeping the matcher and the
   expected value. Name every such edit in the report. Promoted tests: never, without the
@@ -54,8 +61,15 @@ test('#42 AC-1: a renamed agent keeps its sessions', { session: 'owner', tags: [
 - Every `agent.act` is followed by a check of its outcome (an `expect`, `waitFor` or
   `agent.assert`) — that verification is what lets the replay cache record it.
 - Keep each `act` to one goal; wrap generated names in `unique()` so replays survive.
-- Tags: `issue-<n>` and `ac-<k>` on every test; `smoke` only on the skeleton's smoke test.
+- Tags: `issue-<n>` and `ac-<k>` on every AC test; `smoke` only on the skeleton's smoke and
+  injection canary tests (never edit the canary's judgement; [nested-env.md](nested-env.md) → Failures).
 - Sign-in comes from the `owner` setup session; never type credentials in a test.
+
+**Explorations** ([explorations.md](explorations.md)) live in the same file, one test per
+EX tagged `issue-<n>-ex`, `ex-<k>`, `from-ac-<j>`, with `// EX-<k> begin` / `end` blocks
+and an `EX-<k>:` screenshot written by the rules above. Their blocks are hashed apart
+(`check-asserts.sh --ex-hash`) and are not promoted state; a role session other than `owner`
+comes from the setup test too.
 
 ## Finding the steps
 
@@ -85,5 +99,5 @@ next verified pass.
 `e2e_version` and `e2e_web_version` move together, by the operator, to releases at least
 seven days old. `@e2e-dev/web` pins its own `playwright-core`; when it no longer matches
 the image's Playwright, `suite.sh init` downloads the matching Chromium into the home
-(README → Black-box boundary lists the hosts). From `e2e` 0.19 the trace is a markdown
-page per test instead of a Playwright zip; the report renders either.
+([black-box.md](black-box.md) → **Egress rules** lists the hosts). From `e2e` 0.19 the
+trace is a markdown page per test instead of a Playwright zip; the report renders either.

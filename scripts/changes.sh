@@ -2,8 +2,11 @@
 # changes.sh — what landed between two product builds, told by the issues alone: every
 # issue of the target closed as completed between the two builds' publish times (from the
 # profile's bin/build-time), with its
-# title, labels and spec text (the "Done when" section). No PR, commit or code is read
-# (docs/black-box.md). Read-only. Rationale: docs/change-awareness.md.
+# title, labels, spec text (the "Done when" section) and who stands behind it: the author's
+# association, the close reason and who closed it (the per-issue GET; the listing omits
+# closed_by) — the supersede rule of docs/triage.md. No PR, commit or code is read
+# (docs/black-box.md): only GET …/issues and GET …/issues/<n>. Read-only.
+# Rationale: docs/change-awareness.md.
 #
 #   changes.sh <from-build> <to-build>   -> one JSON object on stdout
 #
@@ -47,8 +50,16 @@ while IFS= read -r it; do
   [ -n "$it" ] || continue
   title="$(jq -r .title <<<"$it")"; body="$(jq -r '.body // ""' <<<"$it")"
   spec="$(issue_spec_text "$title" "$body" | tail -n +2 | head -c 800)"
-  issues="$(jq -c --argjson i "$it" --arg s "$spec" '. + [{number:$i.number, title:$i.title,
-     labels:[$i.labels[]?.name], closed_at:$i.closed_at, spec:$s}]' <<<"$issues")"
+  # closed_by: null when the lookup fails — may_supersede then needs a maintainer author.
+  closer="$(gh api ${HA[@]+"${HA[@]}"} "repos/$RP/issues/$(jq -r .number <<<"$it")" 2>/dev/null | jq -r '.closed_by.login // ""' 2>/dev/null)"
+  # may_supersede: docs/triage.md → Retiring a superseded test (the one home of the rule).
+  issues="$(jq -c --argjson i "$it" --arg s "$spec" --arg c "$closer" '
+     ($i.author_association // null) as $a | (if $c == "" then null else $c end) as $cb
+     | . + [{number:$i.number, title:$i.title, labels:[$i.labels[]?.name], closed_at:$i.closed_at,
+        author:($i.user.login // null), author_association:$a, state_reason:$i.state_reason, closed_by:$cb,
+        may_supersede:(($a == "OWNER" or $a == "MEMBER" or $a == "COLLABORATOR")
+          or ($i.state_reason == "completed" and $cb != null and $cb != ($i.user.login // null))),
+        spec:$s}]' <<<"$issues")"
 done < <(jq -c --arg f "$from_utc" --arg t "$to_utc" '
   map(select(.pull_request == null and .state_reason == "completed" and .closed_at > $f and .closed_at <= $t))
   | sort_by(.closed_at) | .[]' <<<"$all")

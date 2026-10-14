@@ -7,12 +7,181 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 2.3.0 — 2026-10-14
+## 2.14.0 — 2026-10-14
 
 **Upgrade:**
 Nothing — the `qi-profile-creator` skill (`skills/`) is for product teams writing a
 profile, and the helm-k3s engine's `bin/check` runs only when a profile is checked;
 neither runs on a deployed instance.
+
+## 2.13.0 — 2026-10-14
+
+**Upgrade:**
+1. Add `- profile_source_path: <path>` to `work/CONFIG.md` unless present: the skill
+   source's path when the profile's source is `target_repo` (for DAM: source
+   `dam-agents/dam`, path `qa`), else empty.
+2. **operator-only:** run the commands `bash "$HOME/scripts/egress-rules.sh"` prints (add
+   `--source <owner>/<repo>` per other GitHub skill source), skipping the rules the agent
+   already has, then delete the target rules it no longer prints — among them the
+   `…/contents/<path>*` allow of 2.2.0 ([docs/black-box.md](docs/black-box.md) → **Egress
+   rules**). The target's GitHub hosts become deny-by-default: forks, other-case spellings
+   of the target and other repositories were readable.
+3. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:` — the
+   probes now also cover the target in the other case and a dot segment out of the
+   profile's directory, and check that directory is readable and symlink-free. A `fail`
+   on `…/contents/<path>/..` is the platform's gateway: its `fix:` empties
+   `profile_source_path` and drops the profile allows; report the gateway.
+
+## 2.12.0 — 2026-10-14
+
+**Upgrade:**
+1. Seed `work/SCENARIOS.md` and `work/scenarios/` as in ONBOARDING.md Step 2b (only what
+   is missing).
+2. Create the schedule `quality-inspector-scenarios-weekly` from its `kit.yaml` entry,
+   **disabled**, unless it exists (ONBOARDING.md Step 5).
+3. Offer `scenario_discovery: propose` (weekly judged scenario proposals) or `run` (also
+   tested, a few hundred thousand tokens per scenario), and `scenario_channel` for their
+   Slack digest — off when unanswered ([docs/scenarios.md](docs/scenarios.md)).
+4. **operator-only:** to take scenario requests from Slack, connect a channel to the agent
+   on the platform. The policy hook treats its turns as non-direct by itself.
+5. Run `bash "$HOME/scripts/verify-onboarding.sh"` and apply every `fix:`.
+
+## 2.11.0 — 2026-10-14
+
+**Upgrade:**
+1. **operator-only:** run the commands `bash "$HOME/scripts/egress-rules.sh" --kit`
+   prints, skipping the rules the agent already has ([docs/black-box.md](docs/black-box.md)
+   → **Egress rules**): the kit's denies (GraphQL, code search, `/repositories/*`, gists,
+   the code hosts) and `GET` denies for the target's issue timelines and events — the
+   earlier method-`*` ones lost to the `GET` issues allow.
+2. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:` — the
+   probes now also cover GraphQL, code search, a repository by number, the target's web
+   archive and the code hosts, and report a `404` as unproven instead of refused.
+
+## 2.10.0 — 2026-10-14
+
+**Upgrade:**
+1. Offer the operator the new `work/CONFIG.md` keys at their defaults, adding only the
+   ones the file lacks (`grep -q '^- <key>:' work/CONFIG.md` first):
+   `max_wallclock_min_per_issue: 150`, `max_model_steps_per_issue: 400` (per-issue
+   budgets, [docs/nested-env.md](docs/nested-env.md) → **Budgets**) and
+   `min_free_disk_gi: 10` (`env.sh up` refuses below it). Keep `lock_ttl_min` above the
+   wall-clock budget.
+2. Unless an event of the last 14 days already has `"event":"ledger_start"`
+   (`grep -l '"event":"ledger_start"' work/logs/events-*.jsonl`), log one:
+   `. "$HOME/scripts/log.sh"; logev info ledger_start "external-write ledger begins"` —
+   the audit's `ledger_reconcile` does not judge comments older than it.
+3. Run `bash "$HOME/scripts/verify-onboarding.sh" --config` and apply every `fix:`.
+
+## 2.9.0 — 2026-10-14
+
+**Upgrade:**
+1. Run `bash "$HOME/scripts/verify-onboarding.sh" --config` — it now knows
+   `confirm_regressions` and `bisect_max_steps`; apply every `fix:`.
+2. Offer once per key not yet in `work/CONFIG.md`, never enable unasked (missing = off):
+   `- confirm_regressions: enabled` re-runs an unexplained regression on the previous
+   build before reporting it — one extra install (15–25 min) on a night with one, none
+   otherwise; `- bisect_max_steps: <n>` (needs the former) narrows a confirmed regression
+   over the builds in between — up to n more installs, 15–25 min each
+   ([docs/triage.md](docs/triage.md) → **Order of work**).
+3. **operator-only**, optional: the profile's maintainers may add `interfaces` (`cli`,
+   `openapi`) to its `profile.json`, and `bin/versions --between` to a profile with its
+   own `bin/versions` ([docs/profile-contract.md](docs/profile-contract.md)); the
+   interface snapshots then start on their own. Nothing else to run.
+
+## 2.8.0 — 2026-10-14
+
+**Upgrade:**
+1. `mkdir -p "$HOME/work/security"`; `touch "$HOME/work/SECURITY.log"`.
+2. Missing schedule `quality-inspector-security-weekly` → create it from its `kit.yaml` entry
+   verbatim (cron, `sessionMode: fresh`, precheck, task), **disabled**. Offer once to enable
+   it: frozen security checks of each new candidate, findings in a private artifact only
+   ([docs/security.md](docs/security.md)). Footprint: one product reset + install per new
+   candidate (time, no tokens), the script half without model calls, the e2e half and the
+   report ~50–150k tokens — under 1M a month.
+3. Offer once: `security_checks` (default `enabled`; `disabled` idles the security pre-flight)
+   and `security_failed_logins` (default `10`). A yes writes the key; no answer writes nothing.
+4. Re-run `bash "$HOME/scripts/suite.sh" init` (adds `tests/security.e2e.ts`). Older UI maps
+   lack `api_requests`; the security pre-flight treats them as missing, so the run rebuilds them.
+5. **operator-only:** full coverage needs the profile's `VIEWER`/`OUTSIDER` accounts,
+   `security.entity` and optionally `suite/lib/security-api.ts`
+   ([docs/profile-contract.md](docs/profile-contract.md)); without them those checks skip with the reason.
+6. Run `bash "$HOME/scripts/verify-onboarding.sh"` and apply every `fix:`.
+
+## 2.7.0 — 2026-10-14
+
+**Upgrade:**
+1. Run `bash "$HOME/scripts/suite.sh" init` — it adds `work/suite/tests/canary.e2e.ts`
+   (missing files only; existing tests are untouched).
+2. Unless `work/suite/e2e.config.ts` already contains `dataNotInstructions`, copy that
+   constant and the `agents:` line from `scripts/suite-skeleton/e2e.config.ts` into it
+   (`init` never overwrites an existing config).
+
+## 2.6.0 — 2026-10-14
+
+**Upgrade:**
+1. `work/COVERAGE.md` missing → create it with the `COVERAGE.md` block of
+   [ONBOARDING.md](ONBOARDING.md) Step 2b (header only; the next regression run fills it).
+2. Offer `auto_promote: verified` — the issues run promotes tests whose every criterion
+   was verified red-green into the nightly regression without the operator's "promote"
+   (missing key = `disabled`; [docs/regression.md](docs/regression.md) → Tiers).
+3. Run `bash "$HOME/scripts/verify-onboarding.sh"` and apply every `fix:`.
+
+## 2.5.0 — 2026-10-14
+
+**Upgrade:**
+1. Offer the explorations layer ([docs/explorations.md](docs/explorations.md)): scenarios
+   derived from each AC (negative paths, persistence, roles…), run on the candidate only and
+   reported under "Beyond the criteria", never in a verdict. It is on by default; when
+   `work/CONFIG.md` lacks `explorations` or `max_explorations_per_ac`, add the key with the
+   operator's choice (defaults `enabled`, `3`). Cost per issue: at most 3 × its testable ACs
+   extra tests and one extra candidate run (no install, video for failures only) — roughly
+   +30–60 % of the issue's first-run tokens; nothing nightly (explorations are never
+   replayed). Per month: that × the issues tested.
+2. Run `bash "$HOME/scripts/suite.sh" init` (it copies missing skeleton files only). Then,
+   when `work/suite/e2e.config.ts` has no `member` credential, replace its `credentials`
+   with the four-role block of `scripts/suite-skeleton/e2e.config.ts`; when
+   `work/suite/tests/auth.setup.e2e.ts` has no `ROLES`, adopt the skeleton's role loop,
+   keeping the file's own sign-in steps and the `owner` session name.
+3. **operator-only, optional:** ask the profile's maintainers for `MEMBER` / `VIEWER` /
+   `OUTSIDER` accounts ([docs/profile-contract.md](docs/profile-contract.md)); without them
+   `roles-isolation` explorations are `blocked`.
+4. Run `bash "$HOME/scripts/verify-onboarding.sh" --config` and apply every `fix:`.
+
+## 2.4.0 — 2026-10-14
+
+**Upgrade:**
+1. `mkdir -p "$HOME/work/perf"` — the test-duration history of `scripts/perf-trend.mjs`.
+2. Nothing else: UI maps recorded before 2.4.0 carry no page signals, so the first diff
+   against one reports none ([docs/change-awareness.md](docs/change-awareness.md)); re-run
+   `bash "$HOME/scripts/verify-onboarding.sh"` to confirm.
+
+## 2.3.0 — 2026-10-14
+
+**Upgrade:**
+1. Run `bash "$HOME/scripts/hooks/install.sh"` — merges the policy hook and its deny list
+   into `$HOME/.claude/settings.json`, keeping every other key; re-running changes nothing.
+   It applies from the next session.
+2. Schedule `quality-inspector-audit-weekly`: when its precheck is empty, set it to
+   `bash "$HOME/scripts/precheck.sh" audit` (its `kit.yaml` entry) with the platform's
+   schedule tools; leave its enabled state alone.
+3. **operator-only:** if the product ships npm packages the suite installs, ask the
+   profile's maintainers to list their scopes under `boundary.packages`
+   ([docs/profile-contract.md](docs/profile-contract.md)).
+4. Run `bash "$HOME/scripts/verify-onboarding.sh"` and apply every `fix:` until
+   `policy_hook` is `ok`.
+
+## 2.2.1 — 2026-10-14
+
+**Upgrade:**
+1. **operator-only:** replace the egress allow `DELETE api.github.com /repos/<T>/issues/*/labels/*`
+   with the retest label only, `…/labels/<RL>` (README → Black-box boundary); skip when it
+   is already narrowed.
+2. Mask the runs written before this version (idempotent):
+   `for d in "$HOME"/work/suite/.e2e/runs/*/; do node "$HOME/scripts/lib/secrets.mjs" mask "$HOME/work/env/credentials.env" "$d"; done`
+   — the audit's `secrets_in_runs` confirms it.
+3. Nothing else: markers now count only in the agent's own comments; if the GitHub
+   account changed since the first comment, expect at most one repeated comment per issue.
 
 ## 2.2.0 — 2026-10-13
 

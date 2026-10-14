@@ -9,9 +9,18 @@ QA_HEADER='| issue | ac_hash | candidate | baseline | verdict | status | updated
 SUITE_HEADER='| test | issue | tier | assert_hash | promoted_utc |'
 HEALS_HEADER='| utc | test | ac | build | old_hash | new_hash | basis |'
 FLAKY_HEADER='| utc | test | ac | build | runs | passes |'
+COVERAGE_HEADER='| page | title | tests | covered |'   # written by scripts/coverage.mjs --md
+SCENARIOS_HEADER='| id | source | requester | thread | spec_hash | build | verdict | status | updated_utc |'
 
 # Data rows of a markdown table file (everything after the header + separator).
 table_rows() { grep '^|' "$1" 2>/dev/null | tail -n +3; }
+
+# Scenario runs that took the environment today (UTC): the `scenario_run` events, which
+# `max_scenarios_per_day` caps (docs/scenarios.md).
+scenario_runs_today() {
+  jq -r 'select(.event == "scenario_run") | .msg' "$WORK/logs/events-$(date -u +%Y-%m-%d).jsonl" 2>/dev/null \
+    | wc -l | tr -d ' '
+}
 
 # Cell <n> (1-based) of a table row, trimmed.
 cell() { printf '%s\n' "$1" | awk -F'|' -v n="$(( $2 + 1 ))" '{gsub(/^[ \t]+|[ \t]+$/, "", $n); print $n}'; }

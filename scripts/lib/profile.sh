@@ -53,14 +53,13 @@ profile_run() { # <bin> [args…]
       "$exe" "$@" )
 }
 
-# The black-box probes: one "gh <api-path>" or "url <url>" per line, each of which must be
-# refused (docs/black-box.md). The provider's own list, then the profile's additions.
-boundary_targets() { # <owner/repo>
-  local r="$1" dir p
-  printf '%s\n' "gh repos/$r/contents/" "gh repos/$r/pulls?per_page=1" "gh repos/$r/commits?per_page=1" \
-    "gh repos/$r/git/refs/heads" "gh repos/$r/issues/1/timeline" "gh repos/$r/issues/1/events" \
-    "url https://raw.githubusercontent.com/$r/HEAD/README.md" "url https://codeload.github.com/$r/tar.gz/HEAD"
-  dir="$(profile_dir)" || return 0
-  jq -r '.boundary.github_paths[]? // empty' "$dir/profile.json" | while read -r p; do printf 'gh repos/%s/%s\n' "$r" "${p#/}"; done
-  jq -r '.boundary.urls[]? // empty' "$dir/profile.json" | sed "s|{repo}|$r|g; s|^|url |"
+# The e2e roles a credentials.env provides (docs/profile-contract.md → The `bin/` contract):
+# each non-empty E2E_USER_<ROLE>_USERNAME, with `export` and one layer of quotes allowed. A
+# sorted JSON array of lowercase names — never a value; `[]` when the file is missing.
+provided_roles() { # <credentials.env>
+  [ -f "$1" ] || { echo '[]'; return; }
+  awk '/^(export[ \t]+)?E2E_USER_[A-Z0-9_]+_USERNAME=/ {
+    k = $0; sub(/^export[ \t]+/, "", k); v = substr(k, index(k, "=") + 1); sub(/=.*/, "", k)
+    gsub(/^["\047]|["\047][ \t]*$/, "", v); if (v == "") next
+    sub(/^E2E_USER_/, "", k); sub(/_USERNAME$/, "", k); print tolower(k) }' "$1" | jq -R . | jq -sc 'unique'
 }

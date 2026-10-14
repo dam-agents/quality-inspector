@@ -28,7 +28,18 @@ library for evidence, the skill catalog for profiles, sub-agents for independent
   the last release and on the candidate, and reports (docs/issue-qa.md).
 - **Regression run** (nightly, off by default) — replays the tests the operator promoted
   against each new candidate; recorded steps replay without model calls, the LLM steps in
-  only where the UI changed (docs/regression.md).
+  only where the UI changed; it also maps which pages no promoted test reaches (docs/regression.md).
+- **Security run** (weekly, off by default) — frozen black-box checks of each new candidate:
+  access without or with the wrong session, stored XSS, headers, leaks, the deployment;
+  findings go to a private artifact only, never to an issue (docs/security.md).
+- **Scenarios** — in a connected Slack channel anyone can ask "test that …" or write the
+  steps and the expected outcome; the agent freezes it, has an independent judge sub-agent
+  check the scenario, tests it on the newest build (and on the last release when it fails,
+  to tell a regression from an old defect), lets the judge check the evidence, and answers
+  in the thread with a video report. "save S-<k>" queues a passing scenario for the
+  operator's "promote all pending". A weekly discovery run (off by default) proposes
+  scenarios of its own from uncovered pages and completed issues, and can test them too
+  (docs/scenarios.md, docs/judge.md).
 - **Weekly audit** (off by default) — health, the black-box boundary probes, assertion
   drift, cache efficiency (docs/audit.md).
 - Scripts only detect, and the profile only sets up the nested product; every judgment and every
@@ -42,19 +53,24 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
 1. **Find it under Starter kits** and open its setup page.
 2. **Grant the GitHub connection** (required) — reads the target's issues; with issue
    comments enabled it also posts verdicts and removes the retest label, so the account
-   needs issue write access on the target. Use a dedicated bot account.
+   needs issue write access on the target. Use a dedicated bot account, and where the
+   connection allows it (a GitHub App installation, a fine-grained token) only Issues on
+   the target — no Contents, Pull requests or Actions. The egress, not the token, keeps
+   forks and mirrors out of reach: a public target's are readable by anyone.
 3. **Create the agent on the vm backend** when the profile requires root (most nested
    products do). The kit asks for 8 CPU, 16 Gi and 80 Gi; the profile's README says what
    its product needs.
 4. **Assign the product profile**: add its skill source (Skills → Sources) and assign the
    profile skill to the agent — for DAM, repository `https://github.com/dam-agents/dam`
-   with path `qa`, skill `qi-profile-dam`. Onboarding checks it. A product without a
-   profile gets one from its team with the
-   [`qi-profile-creator`](skills/qi-profile-creator/SKILL.md) skill.
+   with path `qa`, skill `qi-profile-dam` (in the target repository, so onboarding sets
+   `profile_source_path: qa`). Onboarding checks it. A product without a profile gets one
+   from its team with the [`qi-profile-creator`](skills/qi-profile-creator/SKILL.md) skill.
 5. **Make sure agent steps can reach Anthropic** through the gateway with an injected
    credential (the agent's provider connection). Onboarding checks it.
-6. **Apply the egress rules** below, then answer the onboarding dialog. Schedules are
-   held until onboarding completes, which includes a smoke test of the nested product.
+6. **Apply the egress rules** (Black-box boundary below), then answer the onboarding
+   dialog. Schedules are held until onboarding completes, which includes a smoke test of
+   the nested product.
+7. *Optional:* **connect a Slack channel** to the agent for scenario requests.
 
 Not in a catalog yet? Add one entry to the catalog repository's `catalog.yaml`:
 
@@ -73,38 +89,26 @@ Create a vm-backend agent by hand, grant the GitHub connection, then send it:
 ## Black-box boundary
 
 The agent must not be able to read the target's source. Its rules say so
-([docs/black-box.md](docs/black-box.md)); the egress rules make it true. Apply them with
-the CLI (`T` = the target, e.g. `acme/widgets`; `AGENT` = this agent's name):
-
-```bash
-# The issues API — patterns end in * because the matched path includes the query string.
-dam network create "$AGENT" --host api.github.com --method GET    --path "/repos/$T/issues*"                 --yes
-dam network create "$AGENT" --host api.github.com --method POST   --path "/repos/$T/issues/*/comments*"      --yes
-dam network create "$AGENT" --host api.github.com --method DELETE --path "/repos/$T/issues/*/labels/*"       --yes
-# Longer than the allow above, so they win: timeline and events expose linked commits.
-dam network create "$AGENT" --host api.github.com --path "/repos/$T/issues/*/timeline*" --verdict deny --yes
-dam network create "$AGENT" --host api.github.com --path "/repos/$T/issues/*/events*"   --verdict deny --yes
-dam network create "$AGENT" --host api.github.com --path "/repos/$T/*" --verdict deny --yes
-# Source downloads: the tarball endpoint redirects to codeload, so deny the target there
-# by path — a host-wide codeload deny would also break skill installs (the profile).
-dam network create "$AGENT" --host codeload.github.com --path "/$T/*" --verdict deny --yes
-dam network create "$AGENT" --host raw.githubusercontent.com --verdict deny --yes
-dam network create "$AGENT" --host github.com --path "/$T*" --verdict deny --yes
-# Only when the profile lives in the target repository: its directory, nothing else
-# (longer than the deny above). P = the source path, e.g. qa.
-dam network create "$AGENT" --host api.github.com --method GET --path "/repos/$T/contents/$P*" --yes
-```
-
-The kit already seeds the rules every deployment shares (`registry.npmjs.org`,
-`api.anthropic.com`, a deny on `raw.githubusercontent.com`). Add `cdn.playwright.dev` only
-if `e2e`'s Playwright ever differs from the image's, then **every entry of the profile's
-`egress`** in its `profile.json` — the hosts its product needs to come up.
-
-Rules are matched by method first, then the longest path pattern, against the path
-**with its query string**; a connection grant may already allow the GitHub API host as a
-whole — **the deny rules are only proven by the probes**:
+([docs/black-box.md](docs/black-box.md)); the egress rules make it true. The kit seeds
+the ones every deployment shares: denies for GraphQL, code search and every code host
+the agent never needs (raw.githubusercontent.com, GitLab, Bitbucket, …). The target's
+rules depend on the instance, so onboarding prints them — `bash scripts/egress-rules.sh`
+— as `dam network create` commands, with the profile's `egress`; set `AGENT` to the
+agent's name and run them (`--kit` adds the kit's rules for an agent created by hand or
+from a kit before 2.11.0). They make the target's GitHub hosts deny-by-default, so a
+skill from another GitHub repository needs `--source <owner>/<repo>`; a profile inside the
+target gets only its directory (`profile_source_path`). A rule counts only once a probe
+proves it:
 `verify-onboarding.sh --live` and the weekly audit request each forbidden surface and
 fail when one answers. Approve no held request on the deny side.
+
+Inside the VM, a Claude Code `PreToolUse` hook and a `permissions.deny` list, merged into
+`~/.claude/settings.json` at onboarding, refuse the same surfaces before a tool call runs
+(a repository by number, gists, a search that does not name the target and the other code
+hosts excepted: only the egress rules hold those) — plus `git clean`, container
+filesystems, writes outside `work/`, commits or definition edits from a scheduled run or a
+Slack turn, and any GitHub write from a Slack turn
+([docs/black-box.md](docs/black-box.md) → Enforcement layers).
 
 ## What a report looks like
 
@@ -139,14 +143,22 @@ configuration.
 | `profile` | chosen and installed | The product profile skill, e.g. `qi-profile-dam`. |
 | `profile.<key>` | asked or defaulted, per the profile | The profile's own settings ([docs/profile-contract.md](docs/profile-contract.md)). |
 | `target_repo` | asked | Repository whose issues are tested. `QI_TARGET_REPO` overrides. |
+| `profile_source_path` | asked when the profile lives in `target_repo` | Its skill source's path there (DAM: `qa`) — the one directory the egress opens. |
 | `issue_comments` | asked, default `disabled` | Opt-in: post verdicts on the issue. |
 | `spec_feedback` | asked, default `disabled` | Opt-in: suggest an observable "Done when" on issues with nothing testable. |
+| `scenario_discovery`, `scenario_channel` | asked, default `disabled` / empty | Opt-in: weekly scenario proposals (`propose`), also tested (`run`); the Slack conversation for their digest. |
+| `max_scenarios_per_run`, `max_scenarios_per_day` | defaults (`3`, `10`) | Proposals per discovery run; scenario runs a day. |
+| `auto_promote` | default `disabled` | `verified`: tests whose every criterion was verified join the nightly regression without the operator's "promote". |
 | `marker_prefix` | default `quality-inspector` | Dedup marker; **immutable once a comment exists**. |
 | `qa_label`, `retest_label` | defaults | The gates (`qa:ready`, `qa:retest`). |
 | `candidate_channel`, `baseline_channel` | the profile's defaults | What is tested against what (`none` turns red-green off). |
 | `artifact_reports`, `include_comments`, `max_issues_per_run`, `lock_ttl_min`, `display_name` | defaults | Reporting and pacing. |
 | `e2e_version`, `e2e_web_version`, `e2e_model` | defaults | Test framework pins and the model for agent steps. |
+| `confirm_regressions`, `bisect_max_steps` | defaults (off) | Opt-in: confirm a regression on the previous build, then narrow it over the builds in between — extra installs. |
 | `audit_report`, `log_level`, `media_retention_days` | defaults | Audit, diagnostics, local evidence retention. |
+| `explorations`, `max_explorations_per_ac` | defaults (`enabled`, `3`) | Agent-designed checks beyond the criteria, reported apart from the verdict ([docs/explorations.md](docs/explorations.md)). |
+| `security_checks`, `security_failed_logins` | defaults (`enabled`, `10`) | The security run ([docs/security.md](docs/security.md)); its schedule ships off. |
+| `max_wallclock_min_per_issue`, `max_model_steps_per_issue`, `min_free_disk_gi` | defaults | Per-issue budgets and the free disk an install needs. |
 
 ## Runtime requirements
 
@@ -158,11 +170,14 @@ configuration.
   target's issues, plus issues write when comments are enabled.
 - **External surfaces:** artifacts in the platform's artifact library (private by
   default); with `issue_comments: enabled`, **public comments** on the target's issues,
-  and removal of the retest label.
+  and removal of the retest label; optionally a Slack channel bound to the agent (replies
+  in request threads; with `scenario_channel`, one weekly digest post).
 - **Cost:** idle hours wake no model. One issue costs three installs of the product (time,
   no tokens) plus authoring — expect a few hundred thousand tokens for the first
-  run of an issue; replays of promoted tests are mostly free, except `agent.assert`
-  checks, which always call the model.
+  run of an issue (explorations, on by default, add roughly 30–60 %); replays of promoted
+  tests are mostly free, except `agent.assert` checks, which always call the model. A
+  scenario costs about what an issue does; discovery adds tens of thousands of tokens a
+  week (`propose`), or that plus one scenario per proposal (`run`).
 
 ## Persistence
 

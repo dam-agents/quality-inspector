@@ -27,7 +27,34 @@ await expect(screen.getByRole('tab', { name: 'API keys' })).toBeVisible();
 // AC-1 end
 T
 printf "await app.open('/');\n" > "$SANDBOX/issue-2.e2e.ts"
-i="$(node "$SCRIPTS/impact.mjs" "$SANDBOX/diff.json" "$SANDBOX/issue-1.e2e.ts" "$SANDBOX/issue-2.e2e.ts")"
+i="$(node "$SCRIPTS/impact.mjs" "$SANDBOX/diff.json" "$SANDBOX/issue-1.e2e.ts" "$SANDBOX/issue-2.e2e.ts" "$SANDBOX/scenario-*.e2e.ts")"
+assert "an unexpanded glob is skipped" '(.impacted | length) + (.clear | length) == 2' "$i"
 assert "renamed tab hits the AC block" '.impacted[0].hits | map(select(.inAcBlock and (.change | test("Access tokens")))) | length == 1' "$i"
 assert "untouched test is clear" '.clear | length == 1' "$i"
+
+# Page signals: an old map without them is tolerated, and only what is new is reported.
+assert "no signals in old-format maps" '.console_errors_new == [] and .failed_requests_new == [] and .slower_pages == []' "$d"
+mkdir -p "$SANDBOX/m1" "$SANDBOX/m2"
+cat > "$SANDBOX/m1/inventory.json" <<'J'
+{"routes":{"/":{"headings":["Home"],"shot":"shots/root.png","console_errors":["TypeError: x is undefined"],
+  "failed_requests":[{"method":"GET","path":"/api/health","status":404}],"timing":{"load_ms":800,"samples":1}},
+ "/settings":{"headings":["Settings"],"shot":"shots/settings.png","console_errors":[],"failed_requests":[],"timing":{"load_ms":900,"samples":1}},
+ "/usage":{"headings":["Usage"],"shot":"shots/usage.png","console_errors":[],"failed_requests":[],"timing":{"load_ms":300,"samples":1}}}}
+J
+cat > "$SANDBOX/m2/inventory.json" <<'J'
+{"routes":{"/":{"headings":["Home"],"shot":"shots/root.png","console_errors":["TypeError: x is undefined"],
+  "failed_requests":[{"method":"GET","path":"/api/health","status":404}],"timing":{"load_ms":1500,"samples":1}},
+ "/settings":{"headings":["Settings"],"shot":"shots/settings.png","console_errors":["Error: <script>boom</script> N"],
+  "failed_requests":[{"method":"POST","path":"/api/keys/:id","status":500}],"timing":{"load_ms":2950,"samples":1}},
+ "/usage":{"headings":["Usage"],"shot":"shots/usage.png","console_errors":[],"failed_requests":[],"timing":{"load_ms":900,"samples":1}}}}
+J
+s="$(node "$SCRIPTS/ui-diff.mjs" "$SANDBOX/m1/inventory.json" "$SANDBOX/m2/inventory.json")"
+assert "new console error on its page, the known one is not" '.console_errors_new == [{"route":"/settings","errors":["Error: <script>boom</script> N"],"shot":"'"$SANDBOX"'/m2/shots/settings.png"}]' "$s"
+assert "new failed request" '.failed_requests_new | length == 1 and .[0].route == "/settings" and .[0].requests == [{"method":"POST","path":"/api/keys/:id","status":500}]' "$s"
+assert "slower page needs factor and floor (/ under 2x, /usage under +1000 ms)" '.slower_pages == [{"route":"/settings","old_load_ms":900,"new_load_ms":2950,"factor":3.3}]' "$s"
+assert "--perf-factor raises the bar" '.slower_pages == [] and .unchanged == true' "$(node "$SCRIPTS/ui-diff.mjs" --perf-factor 4 "$SANDBOX/m1/inventory.json" "$SANDBOX/m2/inventory.json")"
+assert "identical maps: no signals" '.console_errors_new == [] and .failed_requests_new == [] and .slower_pages == []' "$(node "$SCRIPTS/ui-diff.mjs" "$SANDBOX/m2/inventory.json" "$SANDBOX/m2/inventory.json")"
+assert "old map without signals vs a new one: none reported" '.console_errors_new == [] and .slower_pages == []' "$(node "$SCRIPTS/ui-diff.mjs" "$SANDBOX/old.json" "$SANDBOX/m2/inventory.json")"
+m="$(node "$SCRIPTS/ui-diff.mjs" "$SANDBOX/m1/inventory.json" "$SANDBOX/m2/inventory.json" --md)"
+case "$m" in *'**New console errors:**'*'`/settings`: Error: <script>boom</script> N'*'**New failed requests:**'*'POST /api/keys/:id → 500'*'**Slower pages**'*'900 ms → 2950 ms'*) ;; *) echo "  --md lacks the signals: $m"; FAILED=1;; esac
 exit $FAILED

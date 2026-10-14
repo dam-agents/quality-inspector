@@ -51,11 +51,15 @@ warn() { WARNS=$((WARNS+1)); printf 'warn %s — %s\n' "$1" "$2"; }
 . "$SCRIPT_DIR/lib/config.sh" || { echo "cannot source lib/config.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/state.sh" || { echo "cannot source lib/state.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/profile.sh" || { echo "cannot source lib/profile.sh" >&2; exit 1; }
+. "$SCRIPT_DIR/lib/boundary.sh" || { echo "cannot source lib/boundary.sh" >&2; exit 1; }
 
-SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-benchmark-monthly quality-inspector-audit-weekly"
+SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-benchmark-monthly quality-inspector-security-weekly quality-inspector-audit-weekly quality-inspector-scenarios-weekly"
 KNOWN_KEYS="profile target_repo display_name qa_label retest_label marker_prefix candidate_channel
 baseline_channel issue_comments artifact_reports include_comments max_issues_per_run lock_ttl_min
-e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback"
+e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback profile_source_path
+explorations max_explorations_per_ac auto_promote security_checks security_failed_logins
+confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi
+scenario_discovery scenario_channel max_scenarios_per_run max_scenarios_per_day"
 
 if [ "$STRUCTURE" = 1 ]; then
   # ------------------------------------------------------------- definition
@@ -67,6 +71,8 @@ if [ "$STRUCTURE" = 1 ]; then
   else
     fail definition_repo "\$HOME is not a git checkout" "re-run ONBOARDING.md Step 1"
   fi
+  ph="$(bash "$SCRIPT_DIR/hooks/install.sh" --check 2>&1)" && ok policy_hook "$ph" \
+    || fail policy_hook "$ph" "bash \"\$HOME/scripts/hooks/install.sh\" (ONBOARDING.md Step 2e), then start a new session"
   [ "$(grep -v '^[[:space:]]*#' "$HOME_DIR/.gitignore" 2>/dev/null | grep -v '^[[:space:]]*$' | head -1)" = '/*' ] \
     && ok gitignore_allowlist "first rule is /*" \
     || fail gitignore_allowlist ".gitignore is not an allowlist" "restore .gitignore from origin/main"
@@ -100,13 +106,21 @@ if [ "$STRUCTURE" = 1 ]; then
   [ -z "$bad" ] && ok qa_rows "row format" || fail qa_rows "malformed rows: $bad" "fix the rows to the format in docs/issue-qa.md → State"
   [ "$(grep '^|' "$WORK/SUITE.md" 2>/dev/null | head -1)" = "$SUITE_HEADER" ] \
     && ok suite_table "header intact" || fail suite_table "work/SUITE.md missing or header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
-  bad="$(table_rows "$WORK/SUITE.md" | awk -F'|' 'NF!=7 || $4 !~ /^ *(exploratory|regression|retired|quarantined) *$/' | head -3)"
+  bad="$(table_rows "$WORK/SUITE.md" | awk -F'|' 'NF!=7 || $4 !~ /^ *(exploratory|promotable|regression|retired|quarantined) *$/' | head -3)"
   [ -z "$bad" ] && ok suite_rows "row format" || fail suite_rows "malformed rows: $bad" "fix the rows to the format in docs/regression.md → Tiers"
   [ "$(grep '^|' "$WORK/HEALS.md" 2>/dev/null | head -1)" = "$HEALS_HEADER" ] \
     && ok heals_log "header intact" || fail heals_log "work/HEALS.md missing or header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
   [ "$(grep '^|' "$WORK/FLAKY.md" 2>/dev/null | head -1)" = "$FLAKY_HEADER" ] \
     && ok flaky_log "header intact" || fail flaky_log "work/FLAKY.md missing or header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
+  [ "$(grep '^|' "$WORK/COVERAGE.md" 2>/dev/null | head -1)" = "$COVERAGE_HEADER" ] \
+    && ok coverage_table "header intact" || fail coverage_table "work/COVERAGE.md missing or header changed" "re-seed per ONBOARDING.md Step 2b"
+  [ "$(grep '^|' "$WORK/SCENARIOS.md" 2>/dev/null | head -1)" = "$SCENARIOS_HEADER" ] && [ -d "$WORK/scenarios" ] \
+    && ok scenarios_table "header intact" || fail scenarios_table "work/SCENARIOS.md or work/scenarios/ missing, or the header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
+  bad="$(table_rows "$WORK/SCENARIOS.md" | awk -F'|' 'NF!=11 || $2 !~ /^ *S-[0-9]+ *$/ || $3 !~ /^ *(slack|operator|discovery) *$/ || $8 !~ /^ *(passed|failed|regression|needs-review|blocked|flaky|not-testable|-) *$/ || $9 !~ /^ *(proposed|queued|in_progress|report_pending|reported|rejected) *$/' | head -3)"
+  [ -z "$bad" ] && ok scenarios_rows "row format" || fail scenarios_rows "malformed rows (a scenario is never verified): $bad" "fix the rows to the format in docs/scenarios.md → State"
   [ -f "$WORK/LESSONS.md" ] && ok lessons "present" || fail lessons "work/LESSONS.md missing" "ONBOARDING.md Step 2b"
+  # perf-trend.mjs creates it on first use; missing is only worth a note.
+  [ -d "$WORK/perf" ] && ok perf_dir "present" || warn perf_dir "work/perf missing — mkdir -p work/perf (ONBOARDING.md Step 2b)"
   if [ -f "$WORK/env/credentials.env" ]; then
     perm="$(stat -c %a "$WORK/env/credentials.env" 2>/dev/null || stat -f %Lp "$WORK/env/credentials.env" 2>/dev/null)"
     [ "$perm" = 600 ] && ok env_credentials "mode 600" || fail env_credentials "mode $perm" "chmod 600 work/env/credentials.env"
@@ -127,14 +141,32 @@ if [ -f "$CONFIG" ]; then
   t="$(cfg target_repo)"
   printf '%s' "$t" | grep -qE '^([A-Za-z0-9.-]+/)?[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' \
     && ok cfg:target_repo "set" || fail cfg:target_repo "missing or not [host/]owner/repo" "ask the operator (ONBOARDING.md Step 3)"
+  v="$(_bb_profile_path)"
+  if [ -z "$v" ]; then ok cfg:profile_source_path "empty — the profile lives outside target_repo"
+  elif _bb_profile_path_ok "$v"; then ok cfg:profile_source_path "$v"
+  else fail cfg:profile_source_path "'$v' is not a plain directory path" "set the skill source's path in target_repo (no * % ?, no . or .. segment), or leave it empty"; fi
   enum() { local v; v="$(cfg "$1")"; [ -z "$v" ] && { ok "cfg:$1" "default"; return; }
     case " $2 " in (*" $v "*) ok "cfg:$1" "$v";; (*) fail "cfg:$1" "'$v' is not one of: $2" "set a documented value (CLAUDE.md → Runtime configuration)";; esac; }
   enum issue_comments "enabled disabled"; enum artifact_reports "enabled disabled"
   enum include_comments "enabled disabled"; enum audit_report "enabled disabled"; enum log_level "info debug"
-  enum spec_feedback "enabled disabled"
-  for k in max_issues_per_run lock_ttl_min media_retention_days; do
+  enum spec_feedback "enabled disabled"; enum explorations "enabled disabled"; enum auto_promote "disabled verified"
+  enum security_checks "enabled disabled"; enum confirm_regressions "enabled disabled"
+  enum scenario_discovery "disabled propose run"
+  v="$(cfg scenario_channel)"
+  if [ -z "$v" ]; then ok cfg:scenario_channel "empty — proposals stay in the chat UI"
+  elif printf '%s' "$v" | grep -qE '^[CDG][A-Z0-9]{6,}$'; then ok cfg:scenario_channel "$v"
+  else fail cfg:scenario_channel "'$v' is not a Slack conversation id" "set the C…/G…/D… id of a conversation this agent is bound to, or leave it empty"; fi
+  for k in max_issues_per_run lock_ttl_min media_retention_days max_explorations_per_ac security_failed_logins bisect_max_steps \
+           max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi max_scenarios_per_run max_scenarios_per_day; do
     v="$(cfg "$k")"; case "$v" in (''|*[!0-9]*) [ -z "$v" ] && ok "cfg:$k" "default" || fail "cfg:$k" "'$v' is not a number" "set a positive integer";; (*) ok "cfg:$k" "$v";; esac
   done
+  case "$(cfg bisect_max_steps)" in (''|0|*[!0-9]*) ;; (*) [ "$(cfg confirm_regressions)" = enabled ] \
+    || warn cfg:bisect_max_steps "set, but bisection runs only with confirm_regressions: enabled (docs/triage.md)";; esac
+  # A live run must never look stale: the lock outlives the wall-clock budget (docs/nested-env.md → Budgets).
+  ttl="$(cfg lock_ttl_min)"; case "$ttl" in (''|*[!0-9]*) ttl=180;; esac
+  wall="$(cfg max_wallclock_min_per_issue)"; case "$wall" in (''|*[!0-9]*) wall=150;; esac
+  [ "$ttl" -gt "$wall" ] && ok cfg:lock_vs_budget "lock_ttl_min $ttl > max_wallclock_min_per_issue $wall" \
+    || fail cfg:lock_vs_budget "lock_ttl_min $ttl is not above max_wallclock_min_per_issue $wall" "raise lock_ttl_min or lower the budget"
   # ---------------------------------------------------------------- profile
   if pd="$(profile_dir)"; then
     ok profile "$(profile_field '.product') at $pd"
@@ -169,16 +201,13 @@ if [ "$LIVE" = 1 ]; then
   [ -n "$login" ] && ok github_identity "acting as $login" || fail github_identity "gh api user failed" "grant the GitHub connection to this agent (README → Setup)"
   timeout 20 gh api ${HA[@]+"${HA[@]}"} "repos/$RP/issues?per_page=1" >/dev/null 2>&1 \
     && ok issues_read "target issues readable" || fail issues_read "cannot list target issues" "check target_repo and the connection's repository access"
-  while read -r kind target; do
-    if [ "$kind" = gh ]; then timeout 20 gh api ${HA[@]+"${HA[@]}"} "$target" >/dev/null 2>&1; r=$?
-    else code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$target" 2>/dev/null)"
-      case "$code" in (2??) r=0;; (000) r=124;; (*) r=1;; esac; fi
-    case $r in
-      (0)   fail "boundary:${target%%\?*}" "source surface reachable" "the operator adds the deny rule (README → Black-box boundary)";;
-      (124) warn "boundary:${target%%\?*}" "request held for approval — make it an explicit deny so nobody approves it by accident";;
-      (*)   ok "boundary:${target%%\?*}" "refused";;
+  while read -r status id detail; do
+    case "$status" in
+      (fail) fail "$id" "${detail%% — *}" "$(boundary_fix "$detail")";;
+      (ok)   ok "$id" "$detail";;
+      (*)    warn "$id" "$detail";;
     esac
-  done < <(boundary_targets "$RP")
+  done < <(boundary_probe "$T")
   cv="$(profile_run versions 2>&1)" && printf '%s' "$cv" | jq -e '.candidate' >/dev/null 2>&1 \
     && ok builds "$cv" || fail builds "$cv" "fix the profile's bin/versions or its egress (profile README)"
   code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 https://api.anthropic.com/v1/models \
@@ -207,7 +236,7 @@ if [ "$LIVE" = 1 ]; then
   st="$(bash "$SCRIPT_DIR/env.sh" status 2>/dev/null)"
   printf '%s' "$st" | jq -e '.running and (.ui_http | test("^[23]"))' >/dev/null 2>&1 \
     && ok product_env "$(printf '%s' "$st" | jq -r .build)" || warn product_env "not up: $st (docs/nested-env.md)"
-  for m in issues regression; do
+  for m in issues regression discovery; do
     out="$(bash "$SCRIPT_DIR/preflight.sh" "$m" 2>/dev/null)"
     if printf '%s' "$out" | jq -e 'type == "object"' >/dev/null 2>&1; then
       err="$(printf '%s' "$out" | jq -r '.error // empty')"
@@ -215,7 +244,7 @@ if [ "$LIVE" = 1 ]; then
     else
       fail "preflight:$m" "no JSON" "bash -x scripts/preflight.sh $m and fix"
     fi
-    s=$(date +%s); bash "$SCRIPT_DIR/precheck.sh" "$m" >/dev/null 2>&1; rc=$?; d=$(( $(date +%s) - s ))
+    s=$(date +%s); QI_PRECHECK_PROBE=1 bash "$SCRIPT_DIR/precheck.sh" "$m" >/dev/null 2>&1; rc=$?; d=$(( $(date +%s) - s ))
     case "$rc" in (0|1) [ "$d" -lt 90 ] && ok "precheck:$m" "exit $rc in ${d}s" || fail "precheck:$m" "took ${d}s" "make the $m pre-flight faster than 2 minutes";;
       (*) fail "precheck:$m" "exit $rc" "fix scripts/precheck.sh / preflight.sh $m";; esac
   done

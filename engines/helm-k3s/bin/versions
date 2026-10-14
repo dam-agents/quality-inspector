@@ -2,7 +2,10 @@
 # bin/versions — candidate and baseline builds (chart tags) for the instance's channels.
 # A channel is a tag regex plus an order (semver | numeric-suffix | time); the candidate
 # is the newest tag of the candidate channel, the baseline the newest of the baseline
-# channel — or its second newest when both channels are the same. Read-only.
+# channel — or its second newest when both channels are the same. Read-only: tag listings only.
+#   versions                      -> {"candidate": <tag>, "baseline": <tag>|null}
+#   versions --between <from> <to> -> JSON array of the tags of one channel published strictly
+#                                     between the two, oldest first (bisection, docs/triage.md)
 set -u
 export LC_ALL=C
 . "$(dirname "$0")/../lib/common.sh"
@@ -14,12 +17,20 @@ BC="${QI_BASELINE_CHANNEL:-$(jq -r '.default_baseline // "none"' <<<"$CFG")}"
 jq -e --arg c "$CC" '.channels[$c]' <<<"$CFG" >/dev/null || { echo "unknown candidate channel '$CC'" >&2; exit 1; }
 [ "$BC" = none ] || jq -e --arg c "$BC" '.channels[$c]' <<<"$CFG" >/dev/null || { echo "unknown baseline channel '$BC'" >&2; exit 1; }
 read -r HOST REPO < <(ref_parts "$CHART")
+FROM=""; TO=""
+if [ "${1:-}" = --between ]; then
+  FROM="${2:-}"; TO="${3:-}"
+  [ -n "$FROM" ] && [ -n "$TO" ] || { echo "usage: versions --between <from> <to>" >&2; exit 1; }
+fi
 
 # Enough tags: quay pages newest-first until both channels have their builds; /v2 lists all.
-need() { jq -r --arg c "$CC" --arg b "$BC" --slurp -R '
+need() {
+  if [ -n "$FROM" ]; then awk -v f="$FROM" -v t="$TO" '$1==f{a=1} $1==t{b=1} END{print (a&&b) ? "true" : "false"}'; return; fi
+  jq -r --arg c "$CC" --arg b "$BC" --slurp -R '
   split("\n") | map(select(length>0) | split(" ") | {name:.[0], ts:(.[1]|tonumber)}) as $t
   | def n($ch): if $ch == "none" then 0 else ($t | map(select(.name | test($CFG.channels[$ch].tag))) | length) end;
-  (n($c) >= 1) and ($b == "none" or n($b) >= (if $b == $c then 2 else 1 end))' --argjson CFG "$CFG"; }
+  (n($c) >= 1) and ($b == "none" or n($b) >= (if $b == $c then 2 else 1 end))' --argjson CFG "$CFG"
+}
 TAGS=""
 if [ "$API" = quay ]; then
   for p in $(seq 1 "$(jq -r '.max_pages // 30' <<<"$CFG")"); do
@@ -33,7 +44,7 @@ else
   TAGS="$(tags_oci "$HOST" "$REPO")" || { echo "OCI tag listing failed for $HOST/$REPO" >&2; exit 1; }
 fi
 
-printf '%s\n' "$TAGS" | jq -R --slurp -c --arg c "$CC" --arg b "$BC" --argjson CFG "$CFG" '
+printf '%s\n' "$TAGS" | jq -R --slurp -c --arg c "$CC" --arg b "$BC" --arg f "$FROM" --arg to "$TO" --argjson CFG "$CFG" '
   split("\n") | map(select(length>0) | split(" ") | {name:.[0], ts:(.[1]|tonumber)}) as $t
   | def ordered($ch): $CFG.channels[$ch] as $d
       | $t | map(select(.name | test($d.tag)))
@@ -41,7 +52,19 @@ printf '%s\n' "$TAGS" | jq -R --slurp -c --arg c "$CC" --arg b "$BC" --argjson C
         elif $d.order == "numeric-suffix" then sort_by(.name | capture("(?<n>[0-9]+)$").n | tonumber)
         else sort_by(.ts) end
       | reverse | map(.name);
+  def pos($o; $x): $o | to_entries | map(select(.value == $x)) | .[0].key;
+  if $f != "" then
+    # The channel both builds belong to, the candidate channel first.
+    ([$c] + ($CFG.channels | keys) | map(select(. as $ch | ($f | test($CFG.channels[$ch].tag)) and ($to | test($CFG.channels[$ch].tag)))) | .[0]) as $ch
+    | if $ch == null then error("\($f) and \($to) are not builds of one channel") else . end
+    | (ordered($ch) | reverse) as $o | pos($o; $f) as $i | pos($o; $to) as $j
+    | if $i == null then error("\($f) is not in the registry listing")
+      elif $j == null then error("\($to) is not in the registry listing")
+      elif $i >= $j then error("\($f) is not older than \($to)")
+      else $o[$i + 1:$j] end
+  else
   ordered($c) as $cand
   | {candidate: ($cand[0] // null),
      baseline: (if $b == "none" then null elif $b == $c then ($cand[1] // null) else (ordered($b)[0] // null) end)}
-  | if .candidate == null then error("no build in channel \($c)") else . end'
+  | if .candidate == null then error("no build in channel \($c)") else . end
+  end'

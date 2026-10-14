@@ -100,6 +100,24 @@ else
     fail "kit.yaml declares no 'seed:' — without one the platform creates an agent with no definition"
   fi
 
+  # The egress preset and the connections write host-wide allows (path "*") before the
+  # kit's rules; a kit deny on the same tuple fails the apply, which deletes the agent.
+  # A deny that names a path ("/*" for a whole host) never collides and outranks "*".
+  # A key counts on the item's "- " line too, quoted or not, before a trailing comment;
+  # scripts/egress-rules.sh reads the kit the same way (scripts/tests/test_egress_rules.sh).
+  if grep -qE '^egressRules:' kit.yaml; then
+    bad_denies="$(sed -n '/^egressRules:/,/^[a-z]/p' kit.yaml | awk '
+      function val(s) { sub(/^[^:]*:[[:space:]]*/, "", s); sub(/[[:space:]]+#.*$/, "", s); gsub(/["\047]/, "", s); sub(/[[:space:]]+$/, "", s); return s }
+      /^  - / { if (deny && !path) print host; host = ""; deny = 0; path = 0 }
+      /^(  - |    )host:/ { host = val($0) }
+      /^(  - |    )verdict:/ { deny = (val($0) == "deny") }
+      /^(  - |    )pathPattern:/ { pp = val($0); path = (pp != "*" && pp != "") }
+      END { if (deny && !path) print host }')"
+    [ -z "$bad_denies" ] \
+      && pass "kit.yaml egress denies each name a path" \
+      || fail "kit.yaml egress denies without a path collide with the preset's and connections' allows and fail the apply — give each a pathPattern (\"/*\" for the whole host): $(echo $bad_denies)"
+  fi
+
   # id, the sentinel and the schedule prefix all name the same agent; a mismatch means
   # ONBOARDING creates a second copy of every schedule the kit already made.
   kit_id="$(grep -m1 -E '^id:' kit.yaml | sed -e 's/^id:[[:space:]]*//' -e 's/[[:space:]]*$//')"
@@ -196,6 +214,32 @@ if [ -d scripts ]; then
     [ -e "$s" ] || continue
     if bash -n "$s" 2>/dev/null; then pass "bash -n: $s"; else fail "syntax error: $s (bash -n)"; fi
   done
+fi
+
+# --------------------------------------------------------------- policy hook ----
+# The harness half of the black-box boundary (docs/black-box.md → Enforcement layers).
+# Every rule id in the hook's header table needs a deny fixture, and the fixtures must
+# hold — a change that drops or weakens a denial fails here and in the offline suite.
+HOOK=scripts/hooks/policy.sh FIX=scripts/tests/policy-fixtures.jsonl
+if [ ! -f "$HOOK" ]; then
+  fail "missing $HOOK (the PreToolUse policy hook)"
+else
+  { [ -x "$HOOK" ] || [ "$(git ls-files -s "$HOOK" 2>/dev/null | cut -c1-6)" = 100755 ]; } \
+    && pass "$HOOK is executable" || fail "$HOOK is not executable (chmod +x, and commit the mode)"
+  bash -n "$HOOK" 2>/dev/null && pass "bash -n: $HOOK" || fail "syntax error: $HOOK (bash -n)"
+  [ -f scripts/hooks/install.sh ] && bash -n scripts/hooks/install.sh 2>/dev/null \
+    && pass "scripts/hooks/install.sh present" || fail "scripts/hooks/install.sh missing or broken"
+  rules="$(sed -n '/^#   rule  /,/^#$/p' "$HOOK" | sed -nE 's/^#   ([a-z][a-z-]+)  .*/\1/p' | grep -vx rule)"
+  [ -n "$rules" ] || fail "$HOOK has no rule table in its header"
+  for r in $rules; do
+    jq -e --arg r "$r" 'select(.expect == "deny" and .rule == $r)' "$FIX" 2>/dev/null | grep -q . \
+      && pass "policy rule $r has a deny fixture" || fail "policy rule $r has no deny fixture in $FIX"
+  done
+  if [ -f scripts/tests/test_policy_hook.sh ] && bash scripts/tests/test_policy_hook.sh >/dev/null 2>&1; then
+    pass "policy fixtures hold (scripts/tests/test_policy_hook.sh)"
+  else
+    fail "policy fixtures fail — run bash scripts/tests/test_policy_hook.sh"
+  fi
 fi
 
 # ------------------------------------------------------ config reader parity ----

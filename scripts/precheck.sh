@@ -34,7 +34,22 @@ MAX_CONTEXT=8192
 
 allow() { [ -n "${1:-}" ] && printf '%s\n' "$1"; exit 0; }
 
+# Every exit that lets the turn run — a crash included — marks the session as scheduled
+# for the policy hook (docs/persistence.md → Scheduled or direct session). A decline wakes
+# no model and writes nothing; QI_PRECHECK_PROBE=1 (a timed health check) neither.
+mark_scheduled() {
+  [ "${QI_PRECHECK_PROBE:-0}" = 1 ] && return 0
+  local d="${WORK_DIR:-$HOME_DIR/work}/env"
+  mkdir -p "$d" 2>/dev/null && printf 'scheduled %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    "${PLATFORM_SCHEDULE_ID:--}" > "$d/RUN_MODE" 2>/dev/null || true
+}
+trap 'rc=$?; [ "$rc" = 1 ] || mark_scheduled' EXIT
+
 [ -n "$MODE" ] || allow "precheck: no mode given — run the pre-flight yourself."
+
+# The audit always runs and its task runs the pre-flight itself (its probes take most of
+# the two minutes); the Precheck is there only for the marker.
+[ "$MODE" = audit ] && allow ""
 
 # A missing or unrunnable pre-flight degrades to a slower run, never a skipped one:
 # the same fallback the agent-side contract states for non-JSON output.
