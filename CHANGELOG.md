@@ -7,6 +7,13 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.3.0 — 2026-10-14
+
+**Upgrade:**
+Nothing — the `qi-profile-creator` skill (`skills/`) is for product teams writing a
+profile, and the helm-k3s engine's `bin/check` runs only when a profile is checked;
+neither runs on a deployed instance.
+
 ## 2.2.0 — 2026-10-13
 
 **Upgrade:**

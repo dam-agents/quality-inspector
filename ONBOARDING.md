@@ -73,8 +73,8 @@ Leak check: `git status --porcelain` **must be clean**. Anything under `work/`, 
 The operator assigns the profile on the platform; you never install it yourself.
 
 1. Find it: a directory under `$HOME/.agents/skills/` holding a `profile.json`. None →
-   checklist item 1 is not done; ask the operator to assign it and wait. More than one →
-   ask which.
+   checklist item 1 is not done; ask the operator to assign it and wait (a product with
+   no profile yet: README → Setup). More than one → ask which.
 2. It answers the contract: `jq -r .schema <dir>/profile.json` prints `qi-profile/v1`,
    and `env`, `versions`, `build-time` resolve — its own `bin/` or its engine's
    (`profile_bin` in `scripts/lib/profile.sh`; `verify-onboarding.sh --config` reports it).

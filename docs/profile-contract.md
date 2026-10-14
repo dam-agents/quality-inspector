@@ -44,7 +44,16 @@ describes its product as data in `"engine_config"`. A profile that ships its own
 
 A new engine is a new directory with `bin/env`, `bin/versions`, `bin/build-time` and a
 README of its configuration; it receives the profile's `engine_config` (placeholders its
-own business) as `QI_ENGINE_CONFIG`, and never product facts of its own.
+own business) as `QI_ENGINE_CONFIG`, and never product facts of its own. An optional
+`bin/check` validates that configuration offline (`FAIL <problem>` / `WARN <note>` lines,
+exit 1 on any `FAIL`); only the profile checker below calls it.
+
+## Writing a profile
+
+The product team writes it with the
+[`qi-profile-creator`](../skills/qi-profile-creator/SKILL.md) skill: discovery and a brief
+they confirm, the files from templates, and `scripts/check-profile.mjs`, which checks a
+profile against this contract (`--live` also lists its builds).
 
 ## `profile.json`
 

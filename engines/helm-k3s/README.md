@@ -46,6 +46,13 @@ held in that key. In `values` only: `{{user:<name>.username|password}}`,
 `{{secret:<name>}}`, `{{app_port}}` — filled at `up` from `credentials.env`; the rendered
 values (`$QI_ENV_DIR/values.json`) are mode 600 and never printed.
 
+## Check
+
+`bin/check` validates `engine_config` offline, for the profile checker: the keys above,
+the channels and their defaults, the owner account, each prerequisite's fields, `app_port`
+against the profile's `app.url`, and every placeholder rendered with throw-away
+credentials — once with the config defaults, once with every overlay switched on.
+
 ## Diagnosis (read-only)
 
 `k3s kubectl get pods -A`, `k3s kubectl -n <ns> describe pod <p>`, `k3s kubectl -n <ns>

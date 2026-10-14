@@ -1,0 +1,14 @@
+{
+  "schema": "qi-profile/v1",
+  "product": "<fill: the product's name as users know it>",
+  "app": { "url": "http://localhost:<fill: UI port>" },
+  "issues": { "provider": "github" },
+  "boundary": { "github_paths": ["actions/runs?per_page=1", "releases?per_page=1"], "urls": [] },
+  "egress": [
+    { "host": "<fill: the registry the builds come from>", "method": "GET", "why": "tag listings and image pulls" }
+  ],
+  "requires": { "root": true, "commands": ["curl", "jq", "<fill: the runtime bin/env uses, e.g. k3s>"], "memory_gi": 8 },
+  "config": {
+    "image_ref": { "default": "<fill: registry/repository the builds come from>", "about": "image repository the builds come from" }
+  }
+}

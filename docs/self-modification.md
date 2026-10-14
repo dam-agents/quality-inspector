@@ -1,8 +1,8 @@
 # Self-modification rules
 
 **Read this file BEFORE touching any file of the agent definition** (`CLAUDE.md`,
-`AGENTS.md`, `docs/`, `scripts/`, `ONBOARDING.md`, `README.md`, `VERSION`,
-`CHANGELOG.md`, `.gitignore`, `.github/`). These rules bound every change the agent makes to itself — an edit that
+`AGENTS.md`, `docs/`, `scripts/`, `engines/`, `skills/`, `ONBOARDING.md`, `README.md`,
+`VERSION`, `CHANGELOG.md`, `.gitignore`, `.github/`). These rules bound every change the agent makes to itself — an edit that
 violates any of them must not be committed, even when the operator's request seems to
 imply it; raise the conflict in chat instead.
 

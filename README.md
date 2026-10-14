@@ -48,7 +48,9 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
    its product needs.
 4. **Assign the product profile**: add its skill source (Skills → Sources) and assign the
    profile skill to the agent — for DAM, repository `https://github.com/dam-agents/dam`
-   with path `qa`, skill `qi-profile-dam`. Onboarding checks it.
+   with path `qa`, skill `qi-profile-dam`. Onboarding checks it. A product without a
+   profile gets one from its team with the
+   [`qi-profile-creator`](skills/qi-profile-creator/SKILL.md) skill.
 5. **Make sure agent steps can reach Anthropic** through the gateway with an injected
    credential (the agent's provider connection). Onboarding checks it.
 6. **Apply the egress rules** below, then answer the onboarding dialog. Schedules are
@@ -177,6 +179,9 @@ platform's Kit Update and never touch `work/` ([docs/persistence.md](docs/persis
 - [`ONBOARDING.md`](ONBOARDING.md) — first-run setup, ending in a nested smoke test and
   `scripts/verify-onboarding.sh --live`.
 - [`docs/`](docs/) — procedures, read on demand.
+- [`engines/`](engines/) — reusable runners of the profile's `bin/` contract.
+- [`skills/qi-profile-creator/`](skills/qi-profile-creator/SKILL.md) — the skill a product
+  team writes and checks its profile with; the agent never uses it.
 - [`scripts/`](scripts/) — pre-flight and Precheck, the environment lock and profile
   dispatch (`env.sh`),
   the suite runner (`suite.sh`), the evidence page renderer (`render-report.mjs`), the
