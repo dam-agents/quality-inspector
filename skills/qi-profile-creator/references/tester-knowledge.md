@@ -34,8 +34,10 @@ Keep the template's order; drop a section that has nothing to say.
   onto screens.
 - **Where things are** — the main areas and how a user reaches them, by navigation label.
   Names only, no layout: positions change with every redesign, labels rarely do.
-- **Test accounts** — `owner` and any further account: its role and what it may not do.
-  Never a username or password; tests read them from the credentials.
+- **Test accounts** — `owner` and each further role (`member`, `viewer`, `outsider`, the
+  contract's names): what it may do and what it may not. Explorations and the security
+  run judge access against these sentences. Never a username or password; tests read
+  them from the credentials.
 - **What the nested install cannot do** — the section that decides verdicts. One bullet
   per limit: the limit, then the verdict in the core's words:
   - `testable: no — external dependency` for an outside service with no stand-in;

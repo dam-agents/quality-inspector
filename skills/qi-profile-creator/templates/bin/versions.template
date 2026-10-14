@@ -2,6 +2,10 @@
 # bin/versions — the candidate and baseline builds for the instance's channels
 # (quality-inspector docs/profile-contract.md → The bin/ contract). Read-only.
 #
+#   versions                        -> {"candidate": <build>, "baseline": <build>|null}
+#   versions --between <from> <to>  -> JSON array of the builds of one channel published
+#                                      strictly between the two, oldest first (bisection)
+#
 # Builds are the tags of one OCI repository, listed over /v2 with an anonymous token.
 # A channel is an anchored tag regex plus an order: semver | numeric-suffix. The baseline
 # is the newest build of the baseline channel — or the one before the candidate when both
@@ -20,9 +24,15 @@ channel() {
     *) return 1 ;;
   esac
 }
+CHANNELS="main release"    # TODO(profile): every channel name that channel() knows
 DEFAULT_CANDIDATE=main     # TODO(profile): the channel an instance with an empty candidate_channel gets
 DEFAULT_BASELINE=release   # TODO(profile): the same for baseline_channel ("none" = no red-green)
 
+FROM=""; TO=""
+if [ "${1:-}" = --between ]; then
+  FROM="${2:-}"; TO="${3:-}"
+  [ -n "$FROM" ] && [ -n "$TO" ] || { echo "usage: versions --between <from> <to>" >&2; exit 1; }
+fi
 [ -n "$REF" ] || { echo "no image repository configured" >&2; exit 1; }
 HOST="${REF%%/*}"; REPO="${REF#*/}"
 [ "$HOST" = docker.io ] && HOST=registry-1.docker.io
@@ -58,15 +68,37 @@ channel "$CC" >/dev/null || { echo "unknown candidate channel '$CC'" >&2; exit 1
 [ "$BC" = none ] || channel "$BC" >/dev/null || { echo "unknown baseline channel '$BC'" >&2; exit 1; }
 TAGS="$(list_tags)" || { echo "tag listing failed for $HOST/$REPO (egress, or a private registry)" >&2; exit 1; }
 
-newest() { # <channel> [<skip>] → that channel's newest tag (or the one <skip> places older)
+ordered() { # <channel> → that channel's builds as a JSON array, newest first
   local rx order
   read -r rx order < <(channel "$1")
-  printf '%s\n' "$TAGS" | jq -R --slurp -r --arg rx "$rx" --arg o "$order" --argjson skip "${2:-0}" '
+  printf '%s\n' "$TAGS" | jq -R --slurp -c --arg rx "$rx" --arg o "$order" '
     split("\n") | map(select(length > 0 and test($rx)))
     | if $o == "semver" then sort_by(ltrimstr("v") | split("-")[0] | split(".") | map(tonumber? // 0))
       else sort_by(capture("(?<n>[0-9]+)$").n | tonumber) end
-    | reverse | .[$skip] // empty'
+    | reverse'
 }
+newest() { # <channel> [<skip>] → that channel's newest tag (or the one <skip> places older)
+  ordered "$1" | jq -r --argjson skip "${2:-0}" '.[$skip] // empty'
+}
+
+if [ -n "$FROM" ]; then
+  # The channel both builds belong to, the candidate channel first.
+  CH=""
+  for c in "$CC" $CHANNELS; do
+    rx="$(channel "$c")" || continue
+    jq -ne --arg rx "${rx% *}" --arg f "$FROM" --arg t "$TO" '($f | test($rx)) and ($t | test($rx))' >/dev/null \
+      && { CH="$c"; break; }
+  done
+  [ -n "$CH" ] || { echo "$FROM and $TO are not builds of one channel" >&2; exit 1; }
+  ordered "$CH" | jq -c --arg f "$FROM" --arg t "$TO" '
+    reverse | (to_entries | map(select(.value == $f)) | .[0].key) as $i
+    | (to_entries | map(select(.value == $t)) | .[0].key) as $j
+    | if $i == null then error("\($f) is not in the registry listing")
+      elif $j == null then error("\($t) is not in the registry listing")
+      elif $i >= $j then error("\($f) is not older than \($t)")
+      else .[$i + 1:$j] end'
+  exit
+fi
 
 CAND="$(newest "$CC")"
 [ -n "$CAND" ] || { echo "no build in channel $CC" >&2; exit 1; }

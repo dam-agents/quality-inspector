@@ -52,8 +52,9 @@ exit 1 on any `FAIL`); only the profile checker below calls it.
 
 The product team writes it with the
 [`qi-profile-creator`](../skills/qi-profile-creator/SKILL.md) skill: discovery and a brief
-they confirm, the files from templates, and `scripts/check-profile.mjs`, which checks a
-profile against this contract (`--live` also lists its builds).
+they confirm, the files from templates, and
+`skills/qi-profile-creator/scripts/check-profile.mjs`, which checks a profile against
+this contract (`--live` also lists its builds).
 
 ## `profile.json`
 

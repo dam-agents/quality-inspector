@@ -110,8 +110,9 @@ that remain.
   `default` and one `about` sentence; `"ask": true` only for a value onboarding cannot
   default. What every instance shares stays literal in `engine_config` or the scripts.
 - **`suite/`** only for files tests need that the core does not ship (upload fixtures, a
-  helper). The core's suite skeleton wins on every path it already has, so never put
-  tests, the sign-in setup or `e2e.config.ts` there.
+  helper, the security run's `lib/security-api.ts` — brief row 18). The core's suite
+  skeleton wins on every path it already has, so never put tests, the sign-in setup or
+  `e2e.config.ts` there.
 - **Channels** are named in the README (operators choose them), build names in
   `SKILL.md` (testers read them in reports).
 
@@ -122,10 +123,10 @@ node scripts/check-profile.mjs --core "$QI_CORE" <profile-dir>
 ```
 
 It checks the contract (manifest, commands, SKILL.md frontmatter, leftover template
-markers, literal secrets, black-box hints) and runs the engine's own offline check. Fix
-every `FAIL`; judge every `WARN` — fix it or tell the person why it stays. Then the
-read-only live check, which lists builds from the real registry (needs the network and
-`curl`, `jq`, `node`):
+markers, literal secrets, black-box hints, plain files only — no symlink or submodule)
+and runs the engine's own offline check. Fix every `FAIL`; judge every `WARN` — fix it
+or tell the person why it stays. Then the read-only live check, which lists builds from
+the real registry (needs the network and `curl`, `jq`, `node`):
 
 ```bash
 node scripts/check-profile.mjs --core "$QI_CORE" --live <profile-dir>

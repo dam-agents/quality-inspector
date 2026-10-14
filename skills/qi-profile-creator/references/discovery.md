@@ -19,16 +19,18 @@ confirmed before writing files.
 | 4 | Build channels: names, tag pattern, ordering, which is the default candidate and baseline | `channels`, the defaults, README → Channels |
 | 5 | Prerequisites a fresh cluster or host needs (CRDs, operators, a database, ingress) | `prerequisites`, or `bin/env up` |
 | 6 | How a fresh install gets a signed-in-able **owner** account without a person | values with `{{user:owner.…}}`, or `bin/env up` |
-| 7 | Further accounts the criteria need (a second user, a non-admin) | more `credentials.users` / `E2E_USER_<NAME>_*` |
+| 7 | Further accounts, by the contract's role names: `member`, `viewer`, `outsider` (The owner account, below) | more `credentials.users` / `E2E_USER_<ROLE>_*` |
 | 8 | First-run screens (terms, a setup wizard, a tour) and how to skip them | values, or a `SKILL.md` note |
 | 9 | Where product data lives — what `reset` must wipe | the engine (release + PVCs), or `bin/env reset` |
 | 10 | Every outside service the product calls, and whether a stand-in exists | `SKILL.md` → cannot do; an optional `config` key |
 | 11 | Every host `up` and `versions` download from | `egress` |
-| 12 | Extra surfaces that would expose the implementation | `boundary` |
+| 12 | Extra surfaces that would expose the implementation; the product's npm scopes or package names | `boundary`, `boundary.packages` |
 | 13 | Root, commands, memory a fresh install with two builds' images needs | `requires` |
 | 14 | Settings an operator may change, and which have no safe default | `config` (`ask`) |
 | 15 | Main UI areas and the terms users see | `SKILL.md` |
-| 16 | A published CLI or API, and how a user gets a token for it | `SKILL.md` → CLI and API |
+| 16 | A published CLI or API (the command, the path of its OpenAPI JSON), its npm package, and how a user gets a token for it | `interfaces`, `boundary.packages`, `SKILL.md` → CLI and API |
+| 17 | The main object a user creates, with a name and a description (a project, a document); the namespace its pods run in when no engine names one | `security.entity`, `security.namespace` |
+| 18 | API calls the security run cannot make through the UI: create that object, mint and use an API key | `suite/lib/security-api.ts` (its exports: the core's `docs/security.md`) |
 
 ## Where to look
 
@@ -56,6 +58,9 @@ confirmed before writing files.
 - **Order**: `semver` for releases; `numeric-suffix` for a counter at the tag's end;
   `time` (helm-k3s, quay.io only) for commit-hash tags. Hash tags elsewhere need their
   publish time — own `bin/versions` (references/custom-bin.md).
+- **Bisection** (optional, `bin/versions --between` in `docs/profile-contract.md` → The
+  bin/ contract) needs nothing more: helm-k3s and the `versions` template answer it from
+  the same sorted listing. An own script without it exits 2.
 - **Confirm against the registry**, not the CI file: list the tags (quay.io's
   `/api/v1/repository/<repo>/tag/`, `/v2/<repo>/tags/list` with an anonymous token,
   `crane ls`, `oras repo tags`, `skopeo list-tags`) and check that each anchored regex
@@ -79,9 +84,11 @@ profile); `bin/env up` must leave that account able to sign in. Best first:
    owner with the generated credentials, and the brief flags it as brittle across
    resets.
 
-A product that offers SSO only needs option 2. A second account the criteria need
-(sharing, permissions) is one more user with the same mechanism; without one, `SKILL.md`
-says ACs about other users are `testable: no — single user`.
+A product that offers SSO only needs option 2. Each further account takes a role name
+of the contract (`docs/profile-contract.md` → The bin/ contract: `member`, `viewer`,
+`outsider`) — explorations and the security run find accounts by those names only — and
+is one more user with the same mechanism. Without them, `SKILL.md` says ACs about other
+users are `testable: no — single user`.
 
 ## Outside services
 
@@ -107,9 +114,8 @@ builds must come from a registry.
 
 ## Boundary
 
-The core already denies and probes, for the github provider: the target's contents,
-pulls, commits, git refs, issue timeline and events, `raw.githubusercontent.com`,
-`codeload.github.com` and `github.com/<target>`. Add what would otherwise expose the
+The core already denies and probes its own list for the provider (its
+`docs/black-box.md` → Enforcement layers). Add what would otherwise expose the
 implementation for this product:
 
 - `github_paths` — repository API paths, probed as `repos/<target>/<path>`: CI runs and
@@ -118,6 +124,9 @@ implementation for this product:
 - `urls` — sites that describe the internals: architecture or design docs, a component
   catalogue built from the code, hosted source maps. `{repo}` stands for the target. Each
   needs an explicit deny from the operator — the README lists them.
+- `packages` — the product's npm scopes or package names (`@acme`, `acme-cli`): the
+  agent refuses to read their files under any `node_modules/`, for example a published
+  CLI the suite installs. Without the list nothing is refused there.
 
 ## Config keys
 

@@ -78,15 +78,29 @@ dir = resolve(dir);
 if (!existsSync(dir) || !statSync(dir).isDirectory()) { fail(`no such profile directory: ${dir}`); finish(); }
 const name = basename(dir);
 const files = [];
+const rel = (f) => relative(dir, f);
+// A profile is fetched by directory: plain files only, so a symlink or a submodule fails.
+const odd = new Set();
+const notPlain = (p, what) => { if (!odd.has(p)) { odd.add(p); fail(`${p}: ${what} — a profile fetched by directory holds plain files only`); } };
 const walk = (d) => {
   for (const e of readdirSync(d, { withFileTypes: true })) {
-    if (e.name === '.git' || e.name === 'node_modules') continue;
     const p = join(d, e.name);
-    if (e.isDirectory()) walk(p); else if (e.isFile()) files.push(p);
+    if (e.name === '.git') { if (d !== dir) notPlain(rel(d), 'a git submodule'); continue; }
+    if (e.name === 'node_modules') continue;
+    if (e.isSymbolicLink()) notPlain(rel(p), 'a symlink');
+    else if (e.isDirectory()) walk(p);
+    else if (e.isFile()) files.push(p);
   }
 };
 walk(dir);
-const rel = (f) => relative(dir, f);
+// What git tracks there, too: an uninitialised submodule is an empty directory on disk.
+const tracked = spawnSync('git', ['-C', dir, 'ls-files', '-s', '--', '.'], { encoding: 'utf8' });
+if (tracked.status === 0) {
+  for (const line of tracked.stdout.split('\n')) {
+    const t = line.match(/^(120000|160000) \S+ \d+\t(.+)$/);
+    if (t) notPlain(t[2], t[1] === '160000' ? 'a git submodule' : 'a symlink');
+  }
+}
 
 // ------------------------------------------------------------- profile.json ----
 const manifestText = read(join(dir, 'profile.json'));
@@ -98,7 +112,7 @@ else {
 if (m !== null && !obj(m)) { fail('profile.json: not an object'); m = null; }
 
 if (m) {
-  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'config'];
+  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'security', 'interfaces', 'config'];
   for (const k of Object.keys(m)) if (!TOP.includes(k)) warn(`profile.json: unknown key '${k}' — the core ignores it`);
   m.schema === 'qi-profile/v1' ? pass('schema qi-profile/v1') : fail(`schema '${m.schema ?? ''}' is not qi-profile/v1`);
   str(m.product) ? pass(`product: ${m.product}`) : fail('product: missing');
@@ -154,7 +168,13 @@ if (m) {
       else if (gp.some((p) => /^\/?repos\//.test(p))) fail('boundary.github_paths: paths are relative to repos/<target>/ — drop the repos/ prefix');
       const urls = m.boundary.urls ?? [];
       if (!Array.isArray(urls) || urls.some((u) => !/^https?:\/\/\S+$/.test(String(u)))) fail('boundary.urls: must be a list of full URLs');
-      if (Array.isArray(gp) && Array.isArray(urls)) pass(`boundary: ${gp.length} repository path(s), ${urls.length} URL(s) probed`);
+      const pk = m.boundary.packages ?? [];
+      if (!Array.isArray(pk) || pk.some((p) => !str(p) || /[\s\\]|^[./]|node_modules/.test(p))) {
+        fail('boundary.packages: must be a list of npm scopes or package names (@acme, acme-cli)');
+      }
+      if (Array.isArray(gp) && Array.isArray(urls) && Array.isArray(pk)) {
+        pass(`boundary: ${gp.length} repository path(s), ${urls.length} URL(s) probed, ${pk.length} package(s) refused under node_modules/`);
+      }
     }
   } else warn('boundary: none — the core\'s own probes only');
 
@@ -184,6 +204,27 @@ if (m) {
     if (r.commands !== undefined && (!Array.isArray(r.commands) || r.commands.some((c) => !str(c) || /\s/.test(c)))) fail('requires.commands: must be a list of command names');
     if (r.memory_gi !== undefined && !(typeof r.memory_gi === 'number' && r.memory_gi > 0)) fail('requires.memory_gi: must be a positive number');
     if (fails === before) pass(`requires: root ${r.root === true}, commands ${(r.commands ?? []).join(' ') || '-'}, memory ${r.memory_gi ?? '-'} GiB`);
+  }
+
+  // security and interfaces: optional; without them the core skips what needs them.
+  if (m.security === undefined) warn('security: none — the security run skips its entity checks');
+  else if (!obj(m.security)) fail('security: not an object');
+  else {
+    const s = m.security;
+    const before = fails;
+    if (s.entity !== undefined && !str(s.entity)) fail('security.entity: must be the noun of the main object a user creates');
+    if (s.namespace !== undefined && !/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(String(s.namespace))) fail(`security.namespace '${s.namespace}' is not a Kubernetes name`);
+    if (fails === before) pass(`security: entity ${s.entity ?? '-'}, namespace ${s.namespace ?? '-'}`);
+  }
+  if (m.interfaces !== undefined) {
+    const it = m.interfaces;
+    const before = fails;
+    if (!obj(it)) fail('interfaces: not an object');
+    else {
+      if (it.cli !== undefined && !str(it.cli)) fail('interfaces.cli: must be the published CLI\'s command');
+      if (it.openapi !== undefined && !/^\/\S*$/.test(String(it.openapi))) fail('interfaces.openapi: must be a path under app.url (/…)');
+      if (fails === before) pass(`interfaces: cli ${it.cli ?? '-'}, openapi ${it.openapi ?? '-'}`);
+    }
   }
 
   // config

@@ -24,7 +24,8 @@ parts and leave the product's part as `TODO(profile)`.
 
 - The template lists tags of one OCI repository over `/v2` with an anonymous token
   (ghcr.io, Docker Hub, quay.io, most registries) and sorts each channel by `semver` or
-  `numeric-suffix`. Fill in the channel table and the repository.
+  `numeric-suffix`; `--between` answers from the same sorted listing. Fill in the channel
+  table, its list of names and the repository.
 - Builds come from where they are published — a registry, a package index — never from
   the target repository's GitHub API, which the agent's egress denies.
 - `build-time` reads the image's `org.opencontainers.image.created` annotation or its
