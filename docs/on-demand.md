@@ -15,6 +15,8 @@ scheduled ([persistence.md](persistence.md) → **Scheduled or direct session**)
   `assert_hash` from `bash "$HOME/scripts/check-asserts.sh" --hash <file>`,
   `promoted_utc` now ([regression.md](regression.md) → Tiers). Re-promoting a drifted
   file is the same command and needs the same yes.
+- **"promote #N --with-explorations"** — not available in this version: explorations are
+  never replayed nightly ([explorations.md](explorations.md)); say so, then "promote #N".
 - **"demote #N"** — tier back to `exploratory`, `promoted_utc` `-`.
 - **"accept the review of #N"** / **"reject …"** — a `needs-review` item from a regression
   run: accept = apply the repair, re-hash, log in `work/HEALS.md` with basis

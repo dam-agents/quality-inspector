@@ -13,6 +13,9 @@
 #                                 Extra args go to `e2e run`; a confirmation re-run adds
 #                                 `--repeat-each 3 --no-cache`, and by_test[].stability reads it
 #   suite.sh summary <label>      re-print the summary of an earlier run
+#   suite.sh roles                the e2e identities the profile provided, as a JSON array
+#                                 of role names (`["owner","member"]`) — names only, never a
+#                                 value (docs/explorations.md → Identities)
 #
 # The base URL is fixed to the nested platform; any APP_URL that is not localhost
 # is refused (CLAUDE.md → Hard invariants: nested target only). After every run the
@@ -148,6 +151,16 @@ cmd_run() {
   masked_summary "$SUITE/$out/report.json" "$label"
 }
 
+# A role is provided when credentials.env sets a non-empty E2E_USER_<ROLE>_USERNAME.
+cmd_roles() {
+  local f="$WORK/env/credentials.env"
+  [ -f "$f" ] || die "work/env/credentials.env missing — run: bash \"\$HOME/scripts/env.sh\" init"
+  awk '/^(export[ \t]+)?E2E_USER_[A-Z0-9_]+_USERNAME=/ {
+    k = $0; sub(/^export[ \t]+/, "", k); v = substr(k, index(k, "=") + 1); sub(/=.*/, "", k)
+    gsub(/^["\047]|["\047][ \t]*$/, "", v); if (v == "") next
+    sub(/^E2E_USER_/, "", k); sub(/_USERNAME$/, "", k); print tolower(k) }' "$f" | jq -R . | jq -sc 'unique'
+}
+
 # The summary on stdout is masked too; fails when either half of the pipe failed.
 masked_summary() { summarize "$1" "$2" | unsecret; [ "${PIPESTATUS[0]}${PIPESTATUS[1]}" = 00 ]; }
 cmd_summary() { local f="$SUITE/.e2e/runs/${1:?label}/report.json"; [ -f "$f" ] || die "no report for $1"; masked_summary "$f" "$1"; }
@@ -156,5 +169,6 @@ case "${1:-}" in
   init)    cmd_init ;;
   run)     shift; cmd_run "$@" ;;
   summary) cmd_summary "${2:-}" ;;
-  *) echo "usage: $0 init | run <label> [--evidence full|failures] [--strict] [e2e run args…] | summary <label>" >&2; exit 2 ;;
+  roles)   cmd_roles ;;
+  *) echo "usage: $0 init | run <label> [--evidence full|failures] [--strict] [e2e run args…] | summary <label> | roles" >&2; exit 2 ;;
 esac

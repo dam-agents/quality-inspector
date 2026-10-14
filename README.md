@@ -151,6 +151,7 @@ configuration.
 | `artifact_reports`, `include_comments`, `max_issues_per_run`, `lock_ttl_min`, `display_name` | defaults | Reporting and pacing. |
 | `e2e_version`, `e2e_web_version`, `e2e_model` | defaults | Test framework pins and the model for agent steps. |
 | `audit_report`, `log_level`, `media_retention_days` | defaults | Audit, diagnostics, local evidence retention. |
+| `explorations`, `max_explorations_per_ac` | defaults (`enabled`, `3`) | Agent-designed scenarios beyond the criteria, reported apart from the verdict ([docs/explorations.md](docs/explorations.md)). |
 
 ## Runtime requirements
 
@@ -165,8 +166,8 @@ configuration.
   and removal of the retest label.
 - **Cost:** idle hours wake no model. One issue costs three installs of the product (time,
   no tokens) plus authoring — expect a few hundred thousand tokens for the first
-  run of an issue; replays of promoted tests are mostly free, except `agent.assert`
-  checks, which always call the model.
+  run of an issue (explorations, on by default, add roughly 30–60 %); replays of promoted
+  tests are mostly free, except `agent.assert` checks, which always call the model.
 
 ## Persistence
 

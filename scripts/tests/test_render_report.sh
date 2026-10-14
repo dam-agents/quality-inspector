@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# render-report.mjs: every tested AC gets its video and captioned screenshot; the setup test never appears.
+# render-report.mjs: every tested AC gets its video and captioned screenshot; the setup test never appears;
+# explorations render apart from the verdict, and a verdicts file without them renders as before.
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 R="$SANDBOX/runs"
@@ -34,6 +35,38 @@ case "$h" in *'Rename &lt;b&gt;'*) ;; *) echo "  title not escaped"; FAILED=1;; 
 case "$h" in *ASSERTION_FAILED*) ;; *) echo "  baseline error missing"; FAILED=1;; esac
 [ "$(ls "$SANDBOX/out/media" | wc -l | tr -d ' ')" = 4 ] || { echo "  expected exactly the two AC-1 videos and screenshots (setup test must not be published)"; FAILED=1; }
 grep -q '| AC-1 | renamed | passed | failed | verified |' "$SANDBOX/out/comment.md" || { echo "  comment row missing"; FAILED=1; }
+# Backward compatibility: no "explorations" field → no section, no comment line, no new output keys.
+assert "no exploration keys without explorations" 'has("explorations") | not' "$out"
+case "$h" in *'Beyond the criteria'*) echo "  explorations section rendered without explorations"; FAILED=1;; esac
+grep -q 'beyond the criteria' "$SANDBOX/out/comment.md" && { echo "  explorations comment line without explorations"; FAILED=1; }
+
+# Explorations: their own run, tagged issue-<n>-ex + ex-<k>; candidate only, never in the verdict.
+d="$R/expl/artifacts/web/ex1/default/attempt-0"
+mkdir -p "$d/video" "$d/screenshots"
+printf 'webm' > "$d/video/video.webm"; printf 'png' > "$d/screenshots/001-EX-1.png"
+cat > "$R/expl/report.json" <<'J'
+{"run":{"results":[
+ {"titlePath":["#42 EX-1: a viewer cannot rename"],"tags":["issue-42-ex","ex-1","from-ac-1"],"status":"failed","attempts":[{"durationMs":700,
+  "error":{"code":"ASSERTION_FAILED","message":"rename offered to viewer"},
+  "artifacts":[{"id":"e:0","kind":"screenshot","path":"web/ex1/default/attempt-0/screenshots/001-EX-1.png","producer":{"kind":"step","stepId":"y:1"}},
+               {"id":"e:1","kind":"video","path":"web/ex1/default/attempt-0/video/video.webm","producer":{"kind":"attempt"}}],
+  "steps":[{"id":"y:1","api":"app.screenshot","label":"EX-1: the agent page as the viewer","status":"passed","durationMs":20,"artifacts":["e:0"]}]}]},
+ {"titlePath":["#42 EX-2: rename survives reload"],"tags":["issue-42-ex","ex-2","from-ac-1"],"status":"passed","attempts":[{"durationMs":500,"artifacts":[],"steps":[]}]}]}}
+J
+jq '. + {explorations_run: "expl", ex_hash: "e0e0e0e0e0e0", explorations: [
+  {id:"EX-1", from_ac:"AC-1", heuristic:"roles-isolation", given:"a viewer", when:"opens the agent", expected:"no rename <action>", surface:"ui", verdict:"observation", severity:"major", note:"confirmed 3/3"},
+  {id:"EX-2", from_ac:"AC-1", heuristic:"persistence", given:"a renamed agent", when:"reload", expected:"new name stays", surface:"ui", verdict:"observed-ok", severity:null}]}' \
+  "$SANDBOX/v.json" > "$SANDBOX/vx.json"
+out="$(QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/vx.json" "$SANDBOX/outx")"
+assert "explorations counted apart from the ACs" '.videos == 2 and .screenshots == 2 and .explorations == 2 and .observations == 1 and .exploration_videos == 1' "$out"
+hx="$(cat "$SANDBOX/outx/index.html")"
+case "$hx" in *'Beyond the criteria'*'Not part of the verdict'*) ;; *) echo "  explorations section or its label missing"; FAILED=1;; esac
+case "$hx" in *'rename offered to viewer'*'EX-1: the agent page as the viewer'*) ;; *) echo "  EX evidence missing"; FAILED=1;; esac
+case "$hx" in *'no rename &lt;action&gt;'*) ;; *) echo "  EX expected not escaped"; FAILED=1;; esac
+case "$hx" in *'<h1>#42 — Rename &lt;b&gt;</h1><span class="badge ok">Verified</span>'*) ;; *) echo "  an observation changed the issue verdict"; FAILED=1;; esac
+[ "$(ls "$SANDBOX/outx/media" | wc -l | tr -d ' ')" = 6 ] || { echo "  expected the AC media plus EX-1's video and screenshot"; FAILED=1; }
+grep -qx '2 explorations beyond the criteria: 1 observations (see evidence)' "$SANDBOX/outx/comment.md" || { echo "  explorations comment line missing"; FAILED=1; }
+[ "$(grep -c 'EX-' "$SANDBOX/outx/comment.md")" = 0 ] || { echo "  the comment must not list explorations"; FAILED=1; }
 
 # Regression mode: signals no test covers are listed under "What changed", escaped, with the new map's screenshot.
 printf 'png' > "$SANDBOX/settings.png"

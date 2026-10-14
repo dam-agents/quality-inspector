@@ -55,7 +55,8 @@ warn() { WARNS=$((WARNS+1)); printf 'warn %s — %s\n' "$1" "$2"; }
 SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-benchmark-monthly quality-inspector-audit-weekly"
 KNOWN_KEYS="profile target_repo display_name qa_label retest_label marker_prefix candidate_channel
 baseline_channel issue_comments artifact_reports include_comments max_issues_per_run lock_ttl_min
-e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback"
+e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback
+explorations max_explorations_per_ac"
 
 if [ "$STRUCTURE" = 1 ]; then
   # ------------------------------------------------------------- definition
@@ -135,8 +136,8 @@ if [ -f "$CONFIG" ]; then
     case " $2 " in (*" $v "*) ok "cfg:$1" "$v";; (*) fail "cfg:$1" "'$v' is not one of: $2" "set a documented value (CLAUDE.md → Runtime configuration)";; esac; }
   enum issue_comments "enabled disabled"; enum artifact_reports "enabled disabled"
   enum include_comments "enabled disabled"; enum audit_report "enabled disabled"; enum log_level "info debug"
-  enum spec_feedback "enabled disabled"
-  for k in max_issues_per_run lock_ttl_min media_retention_days; do
+  enum spec_feedback "enabled disabled"; enum explorations "enabled disabled"
+  for k in max_issues_per_run lock_ttl_min media_retention_days max_explorations_per_ac; do
     v="$(cfg "$k")"; case "$v" in (''|*[!0-9]*) [ -z "$v" ] && ok "cfg:$k" "default" || fail "cfg:$k" "'$v' is not a number" "set a positive integer";; (*) ok "cfg:$k" "$v";; esac
   done
   # ---------------------------------------------------------------- profile

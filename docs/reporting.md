@@ -39,7 +39,9 @@ Your judgment, the renderer's only input besides the runs:
 ```
 
 `given` / `when` / `then` are copied from the criteria file verbatim; `baseline_run` is
-`null` when no baseline ran. Never: credentials, internal state, the operator conversation.
+`null` when no baseline ran. Explorations add their own keys, never touching `acs` or
+`verdict` ([explorations.md](explorations.md) → **Reporting**). Never: credentials,
+internal state, the operator conversation.
 
 ## The report — `work/issues/<n>/report-<ac_hash>-<candidate>/`
 
@@ -53,10 +55,11 @@ Your judgment, the renderer's only input besides the runs:
 - `media/` — the copied videos, screenshots and traces it links to.
 - `comment.md` — the short issue comment, with the literal `EVIDENCE_LINK` to replace.
 
-It reads only tests tagged `issue-<n>` and `ac-<k>`, so the sign-in setup test is never
-in the evidence. Videos are not redacted by `e2e`; that is why no test but the setup one
-ever types a credential. Text artefacts are: `scripts/suite.sh` replaces every
-`work/env/credentials.env` secret with `***` in the run dir and its summary.
+It reads only tests tagged `issue-<n>` and `ac-<k>` (explorations: `issue-<n>-ex` and
+`ex-<k>`), so the sign-in setup test is never in the evidence. Videos are not redacted by
+`e2e`; that is why no test but the setup one ever types a credential. Text artefacts are:
+`scripts/suite.sh` replaces every `work/env/credentials.env` secret with `***` in the run
+dir and its summary.
 
 ## Delivery
 

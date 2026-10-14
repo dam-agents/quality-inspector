@@ -31,7 +31,8 @@ run — say so, never treat it as clean).
    the window, the impact per test, and your one-line expectation per impacted test.
 4. Drifted tests (`assert_drift`) are **not run** — list them for the operator.
 5. Replay: `suite.sh run regression-<candidate> --evidence failures --tag issue-<a> --tag issue-<b> …`.
-   `criterion()` judges a check whose control moved instead of failing it.
+   `criterion()` judges a check whose control moved instead of failing it. Explorations
+   (`issue-<n>-ex`) are never replayed in this version ([explorations.md](explorations.md)).
 6. **Triage** every result that is not plain `unchanged` per [triage.md](triage.md):
    re-run without cache, look, check the context, decide, heal or retire where the rules
    allow. Re-run every healed file strictly.

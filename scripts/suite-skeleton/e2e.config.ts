@@ -20,10 +20,12 @@ export default {
   workers: 1,
   cache: 'read-write',
   agents: { default: { model } },
-  credentials: {
-    owner: {
-      username: process.env.E2E_USER_OWNER_USERNAME ?? '',
-      password: process.env.E2E_USER_OWNER_PASSWORD ?? '',
-    },
-  },
+  // The role convention (docs/profile-contract.md → The `bin/` contract): owner is always
+  // provided; member, viewer and outsider are empty unless the profile writes them.
+  credentials: Object.fromEntries(
+    ['owner', 'member', 'viewer', 'outsider'].map((role) => [role, {
+      username: process.env[`E2E_USER_${role.toUpperCase()}_USERNAME`] ?? '',
+      password: process.env[`E2E_USER_${role.toUpperCase()}_PASSWORD`] ?? '',
+    }]),
+  ),
 } satisfies E2EConfig;

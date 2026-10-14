@@ -54,8 +54,14 @@ test('#42 AC-1: a renamed agent keeps its sessions', { session: 'owner', tags: [
 - Every `agent.act` is followed by a check of its outcome (an `expect`, `waitFor` or
   `agent.assert`) — that verification is what lets the replay cache record it.
 - Keep each `act` to one goal; wrap generated names in `unique()` so replays survive.
-- Tags: `issue-<n>` and `ac-<k>` on every test; `smoke` only on the skeleton's smoke test.
+- Tags: `issue-<n>` and `ac-<k>` on every AC test; `smoke` only on the skeleton's smoke test.
 - Sign-in comes from the `owner` setup session; never type credentials in a test.
+
+**Explorations** ([explorations.md](explorations.md)) live in the same file, one test per
+EX tagged `issue-<n>-ex`, `ex-<k>`, `from-ac-<j>`, with `// EX-<k> begin` / `end` blocks
+and an `EX-<k>:` screenshot written by the rules above. Their blocks are hashed apart
+(`check-asserts.sh --ex-hash`) and are not promoted state; a role session other than `owner`
+comes from the setup test too.
 
 ## Finding the steps
 

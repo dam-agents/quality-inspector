@@ -25,7 +25,9 @@ when `audit_report: disabled` (still append the log line).
    - Sample up to three reports of the week: criteria file predates the test file; no
      `verified` without a baseline failure; every tested AC has a candidate video and its
      `AC-<k>` screenshot; AC blocks contain checks only; no internal identifiers or
-     credentials in the text, the screenshots or the first and last frames you look at.
+     credentials in the text, the screenshots or the first and last frames you look at;
+     the explorations file predates the test file and the report states its observations
+     count ([explorations.md](explorations.md)).
    - Benchmark: the newest line of `work/benchmark/history.jsonl` — its age, accuracy and
      `false_verified` (above 0 is a red line until a later run is clean); a benchmark
      never run, or older than two months with cases defined, is a warn.
@@ -39,7 +41,8 @@ when `audit_report: disabled` (still append the log line).
      the operator has not answered, `retired` tests.
    - Trends: verdict distribution (100 % one verdict is suspicious), `inconclusive`
      share (a non-discriminating suite), replay cache `handed_off + missed` share from
-     `REGRESSION.log`, environment failures per week, and one line of `needs-review`
+     `REGRESSION.log`, environment failures per week, observations per week by severity
+     (the week's `verdicts-*.json` → `explorations`), and one line of `needs-review`
      signal items per week from `stats.signals_by_week` (a rising line while every test
      passes is drift the suite does not see).
 3. Report to the chat UI, traffic-light:

@@ -7,6 +7,27 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.5.0 — 2026-10-14
+
+**Upgrade:**
+1. Offer the explorations layer ([docs/explorations.md](docs/explorations.md)): scenarios
+   derived from each AC (negative paths, persistence, roles…), run on the candidate only and
+   reported under "Beyond the criteria", never in a verdict. It is on by default; when
+   `work/CONFIG.md` lacks `explorations` or `max_explorations_per_ac`, add the key with the
+   operator's choice (defaults `enabled`, `3`). Cost per issue: at most 3 × its testable ACs
+   extra tests and one extra candidate run (no install, video for failures only) — roughly
+   +30–60 % of the issue's first-run tokens; nothing nightly (explorations are never
+   replayed). Per month: that × the issues tested.
+2. Run `bash "$HOME/scripts/suite.sh" init` (it copies missing skeleton files only). Then,
+   when `work/suite/e2e.config.ts` has no `member` credential, replace its `credentials`
+   with the four-role block of `scripts/suite-skeleton/e2e.config.ts`; when
+   `work/suite/tests/auth.setup.e2e.ts` has no `ROLES`, adopt the skeleton's role loop,
+   keeping the file's own sign-in steps and the `owner` session name.
+3. **operator-only, optional:** ask the profile's maintainers for `MEMBER` / `VIEWER` /
+   `OUTSIDER` accounts ([docs/profile-contract.md](docs/profile-contract.md)); without them
+   `roles-isolation` explorations are `blocked`.
+4. Run `bash "$HOME/scripts/verify-onboarding.sh" --config` and apply every `fix:`.
+
 ## 2.4.0 — 2026-10-14
 
 **Upgrade:**

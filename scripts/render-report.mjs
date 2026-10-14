@@ -8,9 +8,10 @@
 // verdicts.json is written by the agent (the judgment); every run label in it names a
 // directory under work/suite/.e2e/runs/ (the evidence). With "mode": "regression" it is one
 // page for a whole regression run: no baseline column, the change context on top, and a
-// triage category per criterion (docs/triage.md). Nothing else is read, except the
-// previous build's screenshots an AC names as "before_shot" and the new map's screenshots
-// a context.signals item names as "shot".
+// triage category per criterion (docs/triage.md). With "explorations" (docs/explorations.md)
+// it adds a "Beyond the criteria" section from the explorations_run, outside the verdict.
+// Nothing else is read, except the previous build's screenshots an AC names as "before_shot"
+// and the new map's screenshots a context.signals item names as "shot".
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
@@ -52,12 +53,13 @@ function copyMedia(run, rel, acId) {
   return `media/${name}`;
 }
 
-// The evidence of one AC on one side: the last attempt of the test tagged issue-<n> + ac-<k>.
-function evidence(run, ac) {
+// The evidence of one AC on one side: the last attempt of the test tagged issue-<n> + ac-<k>
+// (an exploration: issue-<n>-ex + ex-<k>).
+function evidence(run, ac, suffix = '') {
   if (!run) return { state: 'not-run' };
   if (run.missing) return { state: 'missing', label: run.label };
   const tag = ac.id.toLowerCase();
-  const res = run.results.find((r) => (r.tags ?? []).includes(`issue-${ac.issue ?? v.issue}`) && (r.tags ?? []).includes(tag));
+  const res = run.results.find((r) => (r.tags ?? []).includes(`issue-${ac.issue ?? v.issue}${suffix}`) && (r.tags ?? []).includes(tag));
   if (!res) return { state: 'no-test', label: run.label };
   const att = res.attempts?.at(-1) ?? {};
   const arts = att.artifacts ?? [];
@@ -101,17 +103,20 @@ function readText(p) { try { return p ? readFileSync(p, 'utf8').slice(0, 20000) 
 
 const key = (ac) => `${ac.issue ?? v.issue}-${ac.id}`;
 const regression = v.mode === 'regression';
-const runs = { candidate: loadRun(v.candidate_run), baseline: loadRun(v.baseline_run) };
+const runs = { candidate: loadRun(v.candidate_run), baseline: loadRun(v.baseline_run), explore: loadRun(v.explorations_run) };
 if (runs.candidate) runs.candidate.side = 'candidate';
 if (runs.baseline) runs.baseline.side = 'baseline';
+if (runs.explore) runs.explore.side = 'explore';
 
 const VERDICT = {
   verified: ['Verified', 'ok'], failed: ['Failed', 'bad'], partial: ['Partial', 'warn'],
   inconclusive: ['Inconclusive', 'warn'], blocked: ['Blocked', 'muted'], 'not-testable': ['Not testable', 'muted'],
   unchanged: ['Unchanged', 'ok'], relearned: ['UI changed · steps re-learned', 'ok'], healed: ['UI changed · check repaired', 'warn'],
   superseded: ['Superseded by a change', 'muted'], regression: ['Regression', 'bad'], 'needs-review': ['Needs review', 'warn'],
-  flaky: ['Flaky', 'warn'],
+  flaky: ['Flaky', 'warn'], 'observed-ok': ['Observed OK', 'ok'], observation: ['Observation', 'warn'],
 };
+const SEVERITY = { info: 'muted', minor: 'warn', major: 'bad' };
+const sevBadge = (x) => (x ? `<span class="badge ${SEVERITY[x] ?? 'muted'}">${esc(x)}</span>` : '');
 const badge = (x) => { const [t, c] = VERDICT[x] ?? [x, 'muted']; return `<span class="badge ${c}">${esc(t)}</span>`; };
 const stateBadge = (s) => {
   const map = { passed: 'ok', flaky: 'warn', failed: 'bad', 'timed-out': 'bad', interrupted: 'muted', skipped: 'muted' };
@@ -150,6 +155,23 @@ const acs = (v.acs ?? []).map((ac) => {
   }
   return { ...ac, before, cand: ac.testable === false ? null : evidence(runs.candidate, ac), base: ac.testable === false || regression ? null : evidence(runs.baseline, ac) };
 });
+
+// Explorations: candidate only, never part of the verdict (docs/explorations.md).
+const exps = (v.explorations ?? []).map((ex) => ({ ...ex, cand: evidence(runs.explore, ex, '-ex') }));
+const observations = exps.filter((ex) => ex.verdict === 'observation').length;
+const exHtml = !exps.length ? '' : `
+<section id="beyond-the-criteria">
+<h2>Beyond the criteria</h2>
+<p class="dim"><b>Not part of the verdict.</b> Scenarios the agent derived from the criteria (negative paths, persistence, roles…) and ran on the candidate only. An <b>observation</b> is something worth a look; it never changes a criterion's verdict.${v.ex_hash ? ` · checks <code>ex=${esc(v.ex_hash)}</code>` : ''}</p>
+<table><thead><tr><th>EX</th><th>From</th><th>Heuristic</th><th>Candidate</th><th>Result</th></tr></thead><tbody>${exps.map((ex) => `<tr><td><a href="#${esc(slug(key(ex)))}">${esc(ex.id)}</a></td><td>${esc(ex.from_ac)}</td><td>${esc(ex.heuristic)}</td><td>${stateBadge(ex.cand?.state ?? 'not-run')}</td><td>${badge(ex.verdict)} ${sevBadge(ex.severity)}</td></tr>`).join('')}</tbody></table>
+${exps.map((ex) => `
+<article class="ac" id="${esc(slug(key(ex)))}">
+  <header><h3>${esc(ex.id)} <span class="dim">from ${esc(ex.from_ac)} · ${esc(ex.heuristic)}${ex.surface ? ` · ${esc(ex.surface)}` : ''}</span></h3><span>${badge(ex.verdict)} ${sevBadge(ex.severity)}</span></header>
+  <blockquote>${ex.given ? `<b>Given</b> ${esc(ex.given)}<br>` : ''}${ex.when ? `<b>When</b> ${esc(ex.when)}<br>` : ''}${ex.expected ? `<b>Expected</b> ${esc(ex.expected)}` : ''}</blockquote>
+  ${ex.note ? `<p class="note">${esc(ex.note)}</p>` : ''}
+  <div class="sides">${sideHtml(`Candidate ${v.candidate ?? ''}`, ex.cand)}</div>
+</article>`).join('')}
+</section>`;
 
 const ctx = v.context ?? null;
 // Signals no test covers (docs/triage.md): each a needs-review item, with the new map's
@@ -197,7 +219,7 @@ const html = `<!doctype html>
 :root{--bg:#fff;--fg:#1d1f23;--dim:#6b7078;--card:#f6f7f9;--line:#e3e5e8;--ok:#127a3a;--okbg:#e3f5e9;--bad:#b42318;--badbg:#fdecea;--warn:#8a5a00;--warnbg:#fff4d6;--muted:#555b63;--mutedbg:#eceef1;--link:#1a5fb4}
 @media (prefers-color-scheme:dark){:root{--bg:#15171a;--fg:#e8eaed;--dim:#9aa0a6;--card:#1e2125;--line:#2e3238;--ok:#6fd58f;--okbg:#173322;--bad:#ff8a80;--badbg:#3a1d1b;--warn:#f5c26b;--warnbg:#3a2f14;--muted:#b0b5bb;--mutedbg:#2a2e33;--link:#8ab4f8}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
-main{max-width:1180px;margin:0 auto;padding:24px 16px 64px}h1{font-size:24px;margin:0 0 4px}h3{margin:0;font-size:17px}h4{margin:0 0 8px;font-size:14px;display:flex;gap:8px;align-items:center}
+main{max-width:1180px;margin:0 auto;padding:24px 16px 64px}h1{font-size:24px;margin:0 0 4px}h2{font-size:20px;margin:32px 0 4px}h3{margin:0;font-size:17px}h4{margin:0 0 8px;font-size:14px;display:flex;gap:8px;align-items:center}
 a{color:var(--link)}.dim{color:var(--dim)}.meta{color:var(--dim);margin:0 0 20px}
 .badge,.state{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;white-space:nowrap}
 .ok{color:var(--ok);background:var(--okbg)}.bad{color:var(--bad);background:var(--badbg)}.warn{color:var(--warn);background:var(--warnbg)}.muted{color:var(--muted);background:var(--mutedbg)}
@@ -224,6 +246,7 @@ ${regression ? `<div class="hero"><h1>Regression run — ${esc(v.candidate)}</h1
 <p class="dim">Each criterion was tested on the candidate build and on the baseline release. <b>Verified</b> means it fails on the baseline and passes on the candidate. Watch the videos and screenshots to check the result yourself.</p>
 <table><thead><tr><th>AC</th><th>Criterion</th><th>Candidate</th><th>Baseline</th><th>Verdict</th></tr></thead><tbody>${summaryRows}</tbody></table>`}
 ${acHtml}
+${exHtml}
 ${(v.notes ?? []).length ? `<h3>Notes</h3><ul>${v.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
 <footer>${esc(v.display_name ?? 'Quality Inspector')} · black-box test of the published chart in a nested cluster · e2e ${esc(runs.candidate?.version ?? '')}</footer>
 </main></body></html>
@@ -238,7 +261,9 @@ const comment = [
   '| --- | --- | --- | --- | --- |',
   ...acs.map((ac) => `| ${ac.id} | ${String(ac.name).replace(/\|/g, '\\|')} | ${ac.cand?.state ?? 'not run'} | ${ac.base?.state ?? 'not run'} | ${ac.verdict} |`),
   '',
+  ...(exps.length ? [`${exps.length} explorations beyond the criteria: ${observations} observations (see evidence)`, ''] : []),
   'Evidence (videos, screenshots, step traces): EVIDENCE_LINK',
 ].join('\n');
 writeFileSync(join(outDir, 'comment.md'), `${comment}\n`);
-console.log(JSON.stringify({ out: outDir, acs: acs.length, videos: acs.flatMap((a) => [a.cand?.video, a.base?.video]).filter(Boolean).length, screenshots: acs.flatMap((a) => [...(a.cand?.shots ?? []), ...(a.base?.shots ?? [])]).length }));
+console.log(JSON.stringify({ out: outDir, acs: acs.length, videos: acs.flatMap((a) => [a.cand?.video, a.base?.video]).filter(Boolean).length, screenshots: acs.flatMap((a) => [...(a.cand?.shots ?? []), ...(a.base?.shots ?? [])]).length,
+  ...(exps.length ? { explorations: exps.length, observations, exploration_videos: exps.filter((e) => e.cand?.video).length } : {}) }));

@@ -111,9 +111,12 @@ Every executable runs with cwd `$HOME/work`, and with:
 **Acting commands** (only the agent calls them, under the environment lock):
 
 - `bin/env init` — idempotent: create `$QI_ENV_DIR` and **`$QI_ENV_DIR/credentials.env`**
-  (mode 600) with `E2E_USER_OWNER_USERNAME` and `E2E_USER_OWNER_PASSWORD` — the account
-  the suite signs in as — plus any further `E2E_USER_<NAME>_*` pairs the product needs.
-  Never prints a secret.
+  (mode 600) with `E2E_USER_<ROLE>_USERNAME` / `_PASSWORD` pairs. `OWNER` is required —
+  the account the suite signs in as; optional roles: `MEMBER` (an ordinary user of the
+  owner's tenant), `VIEWER` (read-only there), `OUTSIDER` (another tenant or
+  organization). Every role written signs in after each `up`; `SKILL.md` says what each
+  may do. Further `E2E_USER_<NAME>_*` pairs the product needs are allowed. Never prints a
+  secret.
 - `bin/env up <build>` — bring the product up at exactly that build, reachable at
   `app.url`; idempotent; exit 0 only when the UI answers. A forward-only upgrade is fine.
 - `bin/env reset` — wipe product data so the next `up` starts clean (fresh users, no
@@ -127,8 +130,8 @@ verdict ([issue-qa.md](issue-qa.md)). Diagnostics go to stderr; secrets never.
 ## `SKILL.md` — what a tester should know
 
 Read at the AC freeze and when writing tests. It holds **user-facing** knowledge only:
-the product's vocabulary, its main areas and how a user reaches them, the test account
-and what it can do, what the nested environment cannot do (no outbound network, no email,
+the product's vocabulary, its main areas and how a user reaches them, each test
+account's role and what it may do, what the nested environment cannot do (no outbound network, no email,
 a mock instead of a real model…), and the sentences that tell a tester an AC is
 `testable: no` for that reason. Never implementation detail — a profile that describes
 the code breaks the black box as surely as reading it.

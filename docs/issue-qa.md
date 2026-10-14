@@ -19,8 +19,8 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
 - `verdict`: `verified` | `failed` | `partial` | `inconclusive` | `blocked` |
   `not-testable` | `-` (while in progress). Meanings: [reporting.md](reporting.md).
 - Rewrite a row with an atomic `tmp + mv` of the whole file; never two rows per issue.
-- Per-issue files live in `work/issues/<n>/`: `criteria-<ac_hash>.md` (frozen, never
-  edited), `verdicts-<ac_hash>-<candidate>.json` (your judgment),
+- Per-issue files live in `work/issues/<n>/`: `criteria-<ac_hash>.md` and
+  `explorations-<ac_hash>.md` (frozen, never edited), `verdicts-<ac_hash>-<candidate>.json` (your judgment),
   `report-<ac_hash>-<candidate>/` (the rendered evidence page), `artifact.id`.
 
 ## Procedure
@@ -37,7 +37,8 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
 3. **Freeze the ACs** → [acceptance-criteria.md](acceptance-criteria.md). Output
    `work/issues/<n>/criteria-<ac_hash>.md`. Written **before** you look at the product;
    when it already exists (a takeover or a retest of the same text), reuse it unchanged.
-   No testable AC → verdict `not-testable`, go to step 8.
+   Then, unless `explorations: disabled`, the explorations file, same discipline
+   ([explorations.md](explorations.md)). No testable AC → verdict `not-testable`, go to step 8.
 4. **Candidate environment.** `bash "$HOME/scripts/env.sh" up <candidate>`, then
    `bash "$HOME/scripts/suite.sh" run smoke-<candidate> --tag smoke`. Either failing is
    an **environment failure** ([nested-env.md](nested-env.md) → Failures): restore the
@@ -46,7 +47,8 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
 5. **Author** `work/suite/tests/issue-<n>.e2e.ts` per [test-authoring.md](test-authoring.md):
    one test per testable AC, AC blocks written from the criteria file, steps found by
    exploring the candidate. Iterate until every test *reaches* its AC block on the
-   candidate. Refresh the row.
+   candidate. One test per EX too, tagged `issue-<n>-ex`
+   ([explorations.md](explorations.md) → **Tests**). Refresh the row.
 6. **Red-green**, both runs with full evidence (video, screenshots, steps for every test):
    - `env.sh reset`, `env.sh up <baseline>`,
      `suite.sh run issue-<n>-baseline --evidence full --strict --tag issue-<n>`.
@@ -55,13 +57,16 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    `--strict` keeps `criterion()` from judging: red-green needs checks that discriminate.
    - `baseline` is `null` (`baseline_channel: none`) → skip the baseline run; no AC can
      then be `verified`, only `inconclusive` or `failed`.
+   - Explorations, on the same candidate install, never on the baseline:
+     `suite.sh run issue-<n>-explorations --evidence failures --strict --tag issue-<n>-ex`.
    Refresh the row after each install.
 7. **Confirm every failure** before judging it: re-run each failing AC on the build where
    it failed with `--strict --repeat-each 3 --no-cache` ([triage.md](triage.md) → Order of
    work, step 1). A `flaky` AC gets the verdict `flaky`, never `failed` or `verified`.
    **Judge each AC** from the two summaries, the failing steps and the screenshots, per
    [reporting.md](reporting.md) → Verdicts: a step the test could not perform is
-   `blocked`, an assertion that ran and was false is `failed`. Write
+   `blocked`, an assertion that ran and was false is `failed`. Judge each EX per
+   [explorations.md](explorations.md) → **Run and judge** — never into an AC verdict. Write
    `verdicts-<ac_hash>-<candidate>.json` ([reporting.md](reporting.md) → Verdicts file).
 8. **Report.** Render it — `node "$HOME/scripts/render-report.mjs" <verdicts.json>
    work/issues/<n>/report-<ac_hash>-<candidate>` — open its `index.html` and check
@@ -82,7 +87,8 @@ leave the row `in_progress` at run end.
 
 - Every `issues_due` entry ended `reported`, `report_pending` (delivery failed, logged),
   or restored with an `issue_abort` event.
-- `criteria-<ac_hash>.md` predates the first test file edit of this run.
+- `criteria-<ac_hash>.md` and `explorations-<ac_hash>.md` predate the first test file edit of this run.
+- No observation changed an AC or issue verdict.
 - No AC is `verified` without a baseline failure and a candidate pass.
 - Every tested AC in the rendered report has a candidate video and at least one screenshot.
 - A comment skipped as already posted was skipped for a marker in the agent's own comment.

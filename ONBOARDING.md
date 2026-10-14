@@ -199,6 +199,8 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - e2e_model: claude-sonnet-5
 - audit_report: enabled
 - log_level: info
+- explorations: enabled
+- max_explorations_per_ac: 3
 
 - profile.chart_ref: oci://quay.io/dam-agents/charts/platform
 - profile.mock_image:
