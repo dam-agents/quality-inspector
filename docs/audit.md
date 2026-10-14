@@ -39,7 +39,9 @@ when `audit_report: disabled` (still append the log line).
      the operator has not answered, `retired` tests.
    - Trends: verdict distribution (100 % one verdict is suspicious), `inconclusive`
      share (a non-discriminating suite), replay cache `handed_off + missed` share from
-     `REGRESSION.log`, environment failures per week.
+     `REGRESSION.log`, environment failures per week, and one line of `needs-review`
+     signal items per week from `stats.signals_by_week` (a rising line while every test
+     passes is drift the suite does not see).
 3. Report to the chat UI, traffic-light:
 
 ```

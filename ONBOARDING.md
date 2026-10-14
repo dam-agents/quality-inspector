@@ -88,7 +88,7 @@ The operator assigns the profile on the platform; you never install it yourself.
 Create only what is missing; never overwrite an existing state file.
 
 ```bash
-mkdir -p /home/agent/work/issues /home/agent/work/logs /home/agent/work/inventory /home/agent/work/regression /home/agent/work/benchmark
+mkdir -p /home/agent/work/issues /home/agent/work/logs /home/agent/work/inventory /home/agent/work/regression /home/agent/work/benchmark /home/agent/work/perf
 cd /home/agent/work
 [ -f QA.md ] || cat > QA.md <<'EOF'
 # QA state — one row per issue (docs/issue-qa.md → State)

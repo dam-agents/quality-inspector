@@ -16,11 +16,14 @@ sources, never from code or pull requests ([black-box.md](black-box.md)).
    work/inventory/<build>` signs in and walks the nested product read-only: every page
    reachable through links, navigation items and tabs, with its headings, nav items,
    buttons, tabs, fields and links (repeated data rows and cards excluded), an
-   accessibility snapshot and a screenshot. `node "$HOME/scripts/ui-diff.mjs" <old> <new>`
+   accessibility snapshot, a screenshot, and the page's **signals** — console errors,
+   failed same-origin requests, load timing. `node "$HOME/scripts/ui-diff.mjs" <old> <new>`
    turns two maps into pages added/removed and controls renamed, moved, removed or added —
    including a **likely rename** when one control left and one arrived in exactly the same
-   places with unlike text. Two maps of one build diff to nothing; anything it reports is a
-   real change.
+   places with unlike text — and the signals new on this build (`console_errors_new`,
+   `failed_requests_new`, `slower_pages`: load above `--perf-factor`, default 2×, and
+   +1000 ms; triage: [triage.md](triage.md) → **Signals no test covers**). Two maps of one
+   build diff to nothing; anything it reports is a real change.
 
 ## Building the context
 

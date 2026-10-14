@@ -284,10 +284,21 @@ mode_audit() {
   stats="$(table_rows "$WORK/QA.md" | awk -F'|' -v since="$week_ago" '{u=$8; v=$6; gsub(/[ \t]/,"",u); gsub(/[ \t]/,"",v)} u>=since {print v}' \
            | jq -R . | jq -sc 'group_by(.) | map({key:.[0], value:length}) | from_entries')"
   [ -n "$stats" ] || stats='{}'
+  # needs-review signal items (context.signals, docs/triage.md) per week starting Monday
+  # UTC, newest eight weeks, from the regression verdicts files; an unreadable file is skipped.
+  local f sigweeks
+  sigweeks="$(for f in "$WORK"/regression/*/verdicts.json; do [ -f "$f" ] && jq -c '
+      select(.mode == "regression" and (.generated_utc | type) == "string")
+      | ((.generated_utc | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) / 86400 | floor) as $d
+      | {week: (($d - (($d + 3) % 7)) * 86400 | todate | .[0:10]),
+         n: ([(.context.signals // {})[]? | arrays | .[] | select((.verdict // "needs-review") == "needs-review")] | length)}' "$f" 2>/dev/null; done \
+    | jq -sc 'group_by(.week) | map({key: .[0].week, value: (map(.n) | add)}) | .[-8:] | from_entries' 2>/dev/null)"
+  [ -n "$sigweeks" ] || sigweeks='{}'
   stats="$(jq -nc --argjson v "$stats" --arg runs "$(count_lines '' "$WORK/ISSUES.log")" \
     --arg reg "$(count_lines 'ran candidate=' "$WORK/REGRESSION.log")" \
-    --arg heals "$(count_lines '^| 20' "$WORK/HEALS.md")" \
-    '{verdicts_7d:$v, issues_preflights_total:($runs|tonumber), regression_runs_total:($reg|tonumber), heals_total:($heals|tonumber)}')"
+    --arg heals "$(count_lines '^| 20' "$WORK/HEALS.md")" --argjson sw "$sigweeks" \
+    '{verdicts_7d:$v, issues_preflights_total:($runs|tonumber), regression_runs_total:($reg|tonumber), heals_total:($heals|tonumber),
+      signals_by_week:$sw}')"
 
   runlog AUDIT_PREFLIGHT "checks=$(printf '%s' "$CHECKS" | jq length)"
   jq -nc --argjson c "$CHECKS" --argjson f "$failures" --argjson s "$stats" --argjson logs "$(logs_json)" \

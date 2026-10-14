@@ -82,6 +82,21 @@ its cause is fixed — usually a wait for state the test assumed, or nested-plat
 instability recorded in `work/LESSONS.md`. A flaky result is never a regression and
 never a pass.
 
+## Signals no test covers
+
+Each of these is a `needs-review` item in the report's `context.signals`
+([regression.md](regression.md) step 7) even when every test passed — never a
+`regression` on its own. Each item keeps the script's fields and adds
+`verdict: "needs-review"` and one `explanation` sentence:
+
+- **A new console error or failed request on a page** (`ui-diff.mjs`
+  `console_errors_new`, `failed_requests_new`): the error text and the page's screenshot
+  from the new map (`shot`) are the evidence.
+- **A slower page or test** (`ui-diff.mjs` `slower_pages`, `scripts/perf-trend.mjs`
+  `slow_tests`): the explanation names both numbers.
+
+A signal on the page of a failing test is also evidence in that test's triage.
+
 ## Retiring a superseded test
 
 Only with a quoted sentence from the completed issue that contradicts the criterion.

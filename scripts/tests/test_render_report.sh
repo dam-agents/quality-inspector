@@ -34,4 +34,19 @@ case "$h" in *'Rename &lt;b&gt;'*) ;; *) echo "  title not escaped"; FAILED=1;; 
 case "$h" in *ASSERTION_FAILED*) ;; *) echo "  baseline error missing"; FAILED=1;; esac
 [ "$(ls "$SANDBOX/out/media" | wc -l | tr -d ' ')" = 4 ] || { echo "  expected exactly the two AC-1 videos and screenshots (setup test must not be published)"; FAILED=1; }
 grep -q '| AC-1 | renamed | passed | failed | verified |' "$SANDBOX/out/comment.md" || { echo "  comment row missing"; FAILED=1; }
+
+# Regression mode: signals no test covers are listed under "What changed", escaped, with the new map's screenshot.
+printf 'png' > "$SANDBOX/settings.png"
+cat > "$SANDBOX/r.json" <<J
+{"mode":"regression","candidate":"c2","candidate_run":"cand","verdict":"needs-review","acs":[],
+ "context":{"previous":"c1","issues":[],"ui_diff":"No UI change between the two builds.","signals":{
+  "console_errors_new":[{"route":"/settings","errors":["Error: <img onerror=x>"],"shot":"$SANDBOX/settings.png","verdict":"needs-review","explanation":"absent on c1"}],
+  "failed_requests_new":[{"route":"/settings","requests":[{"method":"POST","path":"/api/keys/:id","status":500}],"verdict":"needs-review"}],
+  "slower_pages":[],"slow_tests":[{"title":"#1 AC-1: slow","latest_ms":9000,"median_ms":4000,"verdict":"needs-review","explanation":"took 9000 ms, 2.3x its median of 4000 ms"}]}}}
+J
+QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/r.json" "$SANDBOX/rout" >/dev/null
+h="$(cat "$SANDBOX/rout/index.html")"
+case "$h" in *'Signals no test covers'*'Error: &lt;img onerror=x&gt;'*'media/signal-1-settings.png'*'POST /api/keys/:id → 500'*'took 9000 ms'*) ;; *) echo "  signals list missing or unescaped"; FAILED=1;; esac
+case "$h" in *'<img onerror'*) echo "  signal text not escaped"; FAILED=1;; esac
+[ -f "$SANDBOX/rout/media/signal-1-settings.png" ] || { echo "  signal screenshot not copied"; FAILED=1; }
 exit $FAILED

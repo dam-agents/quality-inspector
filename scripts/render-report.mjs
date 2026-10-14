@@ -9,7 +9,8 @@
 // directory under work/suite/.e2e/runs/ (the evidence). With "mode": "regression" it is one
 // page for a whole regression run: no baseline column, the change context on top, and a
 // triage category per criterion (docs/triage.md). Nothing else is read, except the
-// previous build's screenshots an AC names as "before_shot".
+// previous build's screenshots an AC names as "before_shot" and the new map's screenshots
+// a context.signals item names as "shot".
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
@@ -151,10 +152,28 @@ const acs = (v.acs ?? []).map((ac) => {
 });
 
 const ctx = v.context ?? null;
+// Signals no test covers (docs/triage.md): each a needs-review item, with the new map's
+// screenshot of the page when one is named.
+let sigN = 0;
+function signalShot(p) {
+  if (!p || !existsSync(p)) return '';
+  const to = `media/signal-${++sigN}-${basename(p).replace(/[^A-Za-z0-9._-]/g, '_')}`;
+  copyFileSync(p, join(outDir, to));
+  return `<figure class="sigshot"><a href="${esc(to)}" target="_blank"><img loading="lazy" src="${esc(to)}" alt="the page on this build"></a></figure>`;
+}
+const sg = ctx?.signals ?? {};
+const why = (x) => (x.explanation ? `<br><span class="dim">${esc(x.explanation)}</span>` : '');
+const signalItems = [
+  ...(sg.console_errors_new ?? []).map((x) => `<li>${badge(x.verdict ?? 'needs-review')} <code>${esc(x.route)}</code> — new console error${(x.errors ?? []).length > 1 ? 's' : ''}<pre>${esc((x.errors ?? []).join('\n'))}</pre>${why(x)}${signalShot(x.shot)}</li>`),
+  ...(sg.failed_requests_new ?? []).map((x) => `<li>${badge(x.verdict ?? 'needs-review')} <code>${esc(x.route)}</code> — new failed request${(x.requests ?? []).length > 1 ? 's' : ''}<pre>${esc((x.requests ?? []).map((q) => `${q.method} ${q.path} → ${q.status}${q.error ? ` (${q.error})` : ''}`).join('\n'))}</pre>${why(x)}${signalShot(x.shot)}</li>`),
+  ...(sg.slower_pages ?? []).map((x) => `<li>${badge(x.verdict ?? 'needs-review')} <code>${esc(x.route)}</code> — page load ${esc(ms(x.old_load_ms))} → ${esc(ms(x.new_load_ms))}${why(x)}</li>`),
+  ...(sg.slow_tests ?? []).map((x) => `<li>${badge(x.verdict ?? 'needs-review')} ${esc(x.title)} — ${esc(ms(x.median_ms))} → ${esc(ms(x.latest_ms))}${why(x)}</li>`),
+];
 const contextHtml = !ctx ? '' : `
 <section class="ac"><header><h3>What changed since ${esc(ctx.previous ?? 'the last run')}</h3></header>
 ${(ctx.issues ?? []).length ? `<p><b>Completed issues in the window</b> (${esc(ctx.window ?? '')})</p><ul>${ctx.issues.map((i) => `<li>#${esc(i.number)} — ${esc(i.title)}</li>`).join('')}</ul>` : '<p class="dim">No completed issues in the window.</p>'}
 ${ctx.ui_diff ? `<p><b>UI map difference</b></p><pre>${esc(ctx.ui_diff)}</pre>` : ''}
+${signalItems.length ? `<p><b>Signals no test covers</b> — console errors, failed requests and slowdowns that are new on this build</p><ul class="signals">${signalItems.join('')}</ul>` : ''}
 </section>`;
 
 const acHtml = acs.map((ac) => `
@@ -194,7 +213,7 @@ figure{margin:0}img{width:100%;border-radius:6px;border:1px solid var(--line);di
 pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;max-height:420px;overflow:auto}
 pre.error{color:var(--bad)}details{margin:6px 0}summary{cursor:pointer;color:var(--dim)}
 .steps{margin:6px 0;padding-left:22px;font-size:13px}.steps li.failed{color:var(--bad)}.steps code{font-size:12px}
-.note{font-style:italic;color:var(--dim)}footer{color:var(--dim);font-size:13px;margin-top:32px}
+.note{font-style:italic;color:var(--dim)}.signals li{margin:0 0 12px}.sigshot{max-width:320px;margin-top:6px}footer{color:var(--dim);font-size:13px;margin-top:32px}
 </style></head><body><main>
 ${regression ? `<div class="hero"><h1>Regression run — ${esc(v.candidate)}</h1>${badge(v.verdict)}</div>
 <p class="meta">previous build <code>${esc(ctx?.previous ?? '–')}</code> · ${esc(v.generated_utc ?? '')}</p>

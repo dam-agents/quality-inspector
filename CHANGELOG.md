@@ -7,6 +7,14 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.4.0 — 2026-10-14
+
+**Upgrade:**
+1. `mkdir -p "$HOME/work/perf"` — the test-duration history of `scripts/perf-trend.mjs`.
+2. Nothing else: UI maps recorded before 2.4.0 carry no page signals, so the first diff
+   against one reports none ([docs/change-awareness.md](docs/change-awareness.md)); re-run
+   `bash "$HOME/scripts/verify-onboarding.sh"` to confirm.
+
 ## 2.3.0 — 2026-10-14
 
 **Upgrade:**

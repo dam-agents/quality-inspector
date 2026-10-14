@@ -39,13 +39,16 @@ run — say so, never treat it as clean).
    — one entry per criterion that was not `unchanged`, each with `issue`, `id`, `name`,
    `then`, `verdict` (the category), `explanation`, `because_issue` when an issue explains
    it, `heal` `{from, to}` for a repair, and `before_shot` (the previous map's screenshot
-   of the page). Add `context` `{previous, window, issues[{number,title}], ui_diff}` (the
-   diff's `--md` text). Render it with `scripts/render-report.mjs` into
+   of the page). Add `context` `{previous, window, issues[{number,title}], ui_diff, signals}`
+   (`ui_diff`: the diff's `--md` text; `signals`: `{console_errors_new, failed_requests_new,
+   slower_pages, slow_tests}` — the diff's lists plus `slow_tests` from
+   `node "$HOME/scripts/perf-trend.mjs" regression-<candidate>`, each item made a
+   `needs-review` entry per [triage.md](triage.md) → **Signals no test covers**). Render it with `scripts/render-report.mjs` into
    `work/regression/<candidate>/report/` and publish as in
    [reporting.md](reporting.md) → Delivery (artifact only, its reference in
    `work/regression/<candidate>/artifact.id`; regression runs never comment).
    The run's top verdict is `regression` if any criterion is, else `needs-review` if any
-   is, else `healed`, `relearned` or `unchanged`.
+   criterion or signal is, else `healed`, `relearned` or `unchanged`.
 8. Append `<ISO> ran candidate=<c> unchanged=<n> relearned=<n> healed=<n> needs_review=<n> superseded=<n> flaky=<n> regression=<n> blocked=<n> drift=<n>`
    to `work/REGRESSION.log` — the pre-flight keys "already tested" and
    `previous_candidate` on `ran candidate=`.

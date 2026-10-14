@@ -109,6 +109,8 @@ if [ "$STRUCTURE" = 1 ]; then
   [ "$(grep '^|' "$WORK/FLAKY.md" 2>/dev/null | head -1)" = "$FLAKY_HEADER" ] \
     && ok flaky_log "header intact" || fail flaky_log "work/FLAKY.md missing or header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
   [ -f "$WORK/LESSONS.md" ] && ok lessons "present" || fail lessons "work/LESSONS.md missing" "ONBOARDING.md Step 2b"
+  # perf-trend.mjs creates it on first use; missing is only worth a note.
+  [ -d "$WORK/perf" ] && ok perf_dir "present" || warn perf_dir "work/perf missing — mkdir -p work/perf (ONBOARDING.md Step 2b)"
   if [ -f "$WORK/env/credentials.env" ]; then
     perm="$(stat -c %a "$WORK/env/credentials.env" 2>/dev/null || stat -f %Lp "$WORK/env/credentials.env" 2>/dev/null)"
     [ "$perm" = 600 ] && ok env_credentials "mode 600" || fail env_credentials "mode $perm" "chmod 600 work/env/credentials.env"
