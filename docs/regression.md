@@ -70,3 +70,4 @@ run — say so, never treat it as clean), and `confirm_regressions` / `bisect_ma
    `previous_candidate` on `ran candidate=`.
 9. `env.sh unlock regression`. Summary in the chat UI: regressions first, each with its
    evidence link; then what needs review; then one line of what was absorbed.
+10. The catalog ([catalog.md](catalog.md) → **Build and publish**).

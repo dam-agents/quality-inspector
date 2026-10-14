@@ -123,6 +123,15 @@ exact screen the criterion is checked on — the step list, the assertion error 
 failed, and the trace. A reader can confirm a `verified` verdict by watching the feature
 fail on the release and work on the candidate. Media add a few MB per criterion.
 
+## The test catalog
+
+One more artifact shows the whole suite: every criterion, exploration and scenario test with
+its Given/When/Then, steps, tier, verdict history per build, heals, flakiness and the still of
+the screen it checks — filterable, sortable and groupable by tier, origin, verdict, area, page,
+label or the operator's own collections, with a gallery, a coverage map of the UI, a
+build-by-test heatmap and the promotion funnel. It holds test-related content only, so the
+operator may share it ([docs/catalog.md](docs/catalog.md)).
+
 ## When the UI changes
 
 Promoted tests replay nightly against each new build, and a redesign must not fail them.
@@ -156,6 +165,7 @@ configuration.
 | `marker_prefix` | default `quality-inspector` | Dedup marker; **immutable once a comment exists**. |
 | `qa_label`, `retest_label` | defaults | The gates (`qa:ready`, `qa:retest`). |
 | `candidate_channel`, `baseline_channel` | the profile's defaults | What is tested against what (`none` turns red-green off). |
+| `test_catalog` | default `enabled` | One page to browse, describe, filter, group and categorize every test, published as an artifact after a run that changes it ([docs/catalog.md](docs/catalog.md)). |
 | `artifact_reports`, `include_comments`, `max_issues_per_run`, `lock_ttl_min`, `display_name` | defaults | Reporting and pacing. |
 | `e2e_version`, `e2e_web_version`, `e2e_model` | defaults | Test framework pins and the model for agent steps. |
 | `confirm_regressions`, `bisect_max_steps` | defaults (off) | Opt-in: confirm a regression on the previous build, then narrow it over the builds in between — extra installs. |
@@ -210,6 +220,7 @@ loses it. Definition updates arrive as the platform's Kit Update and never touch
 - [`scripts/`](scripts/) — pre-flight and Precheck, the environment lock and profile
   dispatch (`env.sh`),
   the suite runner (`suite.sh`), the evidence page renderer (`render-report.mjs`), the
-  work backup (`work-backup.sh`), the assertion guard, verification, offline tests.
+  work backup (`work-backup.sh`), the test catalog (`catalog.mjs`, `catalog/viewer.html`), the
+  assertion guard, verification, offline tests.
 - [`VERSION`](VERSION) + [`CHANGELOG.md`](CHANGELOG.md) — semver and upgrade steps.
 - [`LICENSE`](LICENSE) — Apache-2.0.

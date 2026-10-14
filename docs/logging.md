@@ -74,7 +74,7 @@ never holds a space (`%20`), and `intent` and its outcome share `surface`, `issu
 | `comment` | `<ac_hash>@<candidate>` (the marker's `ac`, `build`) | `target_repo` |
 | `spec_comment` | `<ac_hash>` | `target_repo` |
 | `label` | the label name | `target_repo` |
-| `artifact` | `<ac_hash>@<candidate>`; regression: `issue=-`, `regression@<candidate>` | `artifact:<id>`, `artifact:new` before a first create |
+| `artifact` | `<ac_hash>@<candidate>`; regression: `issue=-`, `regression@<candidate>`; the test catalog: `issue=-`, `catalog@<hash>` | `artifact:<id>`, `artifact:new` before a first create |
 | `definition_issue` | 12-hex sha256 of the `failures[]` signature; `issue=-` | `<definition repo>`, `#<n>` appended on `done` |
 | `slack` | a scenario's answer `S-<k>:<spec_hash>`, a digest `digest@<candidate>`; `issue=-` | the conversation id |
 | `backup` | the pushed tree's sha, 12 hex; `issue=-`; written by `scripts/work-backup.sh` | `work_repo` |

@@ -32,6 +32,10 @@ test('#42 AC-1: a renamed project keeps its tasks', { session: 'owner', tags: ['
   });
 ```
 
+- **Open each file with a doc comment** — `/** @qi-summary <one sentence: what the file proves,
+  in the issue's or request's words> @qi-area <the top-level navigation section it exercises> */`
+  — the test catalog's description ([catalog.md](catalog.md)). It is outside every AC block, so
+  rewording it never drifts a promoted test.
 - **Right before each AC block, `app.screenshot('AC-<k>: <what the Then line looks at>')`.**
   It is the still a reader checks the verdict against; the report captions it with that
   label. `agent.assert` adds its own screenshot. Never screenshot inside the setup test.

@@ -59,7 +59,7 @@ baseline_channel issue_comments artifact_reports include_comments max_issues_per
 e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback profile_source_path
 explorations max_explorations_per_ac auto_promote security_checks security_failed_logins
 confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi
-scenario_discovery scenario_channel max_scenarios_per_run max_scenarios_per_day work_repo"
+scenario_discovery scenario_channel max_scenarios_per_run max_scenarios_per_day work_repo test_catalog"
 
 if [ "$STRUCTURE" = 1 ]; then
   # ------------------------------------------------------------- definition
@@ -119,6 +119,8 @@ if [ "$STRUCTURE" = 1 ]; then
   bad="$(table_rows "$WORK/SCENARIOS.md" | awk -F'|' 'NF!=11 || $2 !~ /^ *S-[0-9]+ *$/ || $3 !~ /^ *(slack|operator|discovery) *$/ || $8 !~ /^ *(passed|failed|regression|needs-review|blocked|flaky|not-testable|-) *$/ || $9 !~ /^ *(proposed|queued|in_progress|report_pending|reported|rejected) *$/' | head -3)"
   [ -z "$bad" ] && ok scenarios_rows "row format" || fail scenarios_rows "malformed rows (a scenario is never verified): $bad" "fix the rows to the format in docs/scenarios.md → State"
   [ -f "$WORK/LESSONS.md" ] && ok lessons "present" || fail lessons "work/LESSONS.md missing" "ONBOARDING.md Step 2b"
+  [ "$(grep '^|' "$WORK/CATALOG.md" 2>/dev/null | head -1)" = "$CATALOG_HEADER" ] \
+    && ok catalog_collections "header intact" || fail catalog_collections "work/CATALOG.md missing or header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
   # perf-trend.mjs creates it on first use; missing is only worth a note.
   [ -d "$WORK/perf" ] && ok perf_dir "present" || warn perf_dir "work/perf missing — mkdir -p work/perf (ONBOARDING.md Step 2b)"
   if [ -f "$WORK/env/credentials.env" ]; then
@@ -158,7 +160,7 @@ if [ -f "$CONFIG" ]; then
   enum include_comments "enabled disabled"; enum audit_report "enabled disabled"; enum log_level "info debug"
   enum spec_feedback "enabled disabled"; enum explorations "enabled disabled"; enum auto_promote "disabled verified"
   enum security_checks "enabled disabled"; enum confirm_regressions "enabled disabled"
-  enum scenario_discovery "disabled propose run"
+  enum scenario_discovery "disabled propose run"; enum test_catalog "enabled disabled"
   v="$(cfg scenario_channel)"
   if [ -z "$v" ]; then ok cfg:scenario_channel "empty — proposals stay in the chat UI"
   elif printf '%s' "$v" | grep -qE '^[CDG][A-Z0-9]{6,}$'; then ok cfg:scenario_channel "$v"

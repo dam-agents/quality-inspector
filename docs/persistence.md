@@ -39,8 +39,8 @@ connection can push to, never the target or a fork of it — and restores it on 
   (by mtime, `logs/` aside) → no git at all.
 - **What travels:** all of `work/` except `env/` (credentials, locks, the run marker),
   `suite/node_modules`, `suite/.e2e/runs`, `.cache`, transient files (`*.lock`, `*.tmp`, …),
-  evidence media (videos, images, trace zips — they live in the artifacts) and any file over
-  20 MiB (logged).
+  the rebuilt catalog page, evidence media (videos, images, trace zips — they live in the
+  artifacts; the catalog's small thumbnails do travel) and any file over 20 MiB (logged).
 - **Refused** (logged as an error, nothing pushed): the repository is not private, is the
   target or a fork of it, or its metadata cannot be read; the snapshot holds a credential value
   of `work/env/credentials.env` or a token (`secrets.mjs scan-all`); the snapshot deletes

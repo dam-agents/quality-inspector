@@ -156,6 +156,12 @@ EOF
 [ -f LESSONS.md ] || cat > LESSONS.md <<'EOF'
 # Operational lessons — verified environment facts only, each with its evidence.
 EOF
+[ -f CATALOG.md ] || cat > CATALOG.md <<'EOF'
+# Catalog collections — set by the operator in the direct session (docs/catalog.md)
+
+| collection | members |
+| --- | --- |
+EOF
 ```
 
 **2c — the harness entry pointer:**
@@ -238,6 +244,7 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - baseline_channel:
 - issue_comments: disabled
 - artifact_reports: enabled
+- test_catalog: enabled
 - include_comments: disabled
 - spec_feedback: disabled
 - auto_promote: disabled

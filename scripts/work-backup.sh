@@ -37,9 +37,12 @@ BRANCH=main
 HEAD_FILE="$WORK/env/backup-head"   # "<sha> <work_repo>" this instance pushed last; env/ never travels
 NAME="quality-inspector"; EMAIL="quality-inspector@agents.local"
 # Never carried: credentials and pod-local state (env/), installs, raw runs, caches,
-# transient files, and evidence media (it lives in the artifacts; a git history keeps it forever).
+# transient files, the rebuilt catalog page, and evidence media (it lives in the artifacts; a
+# git history keeps it forever) — except the catalog's small thumbnails, which nothing rebuilds.
 PRUNE_DIRS="env suite/node_modules suite/.e2e/runs .cache"
 SKIP_NAMES='.nfs* *.lock *.tmp *.tmp.* *.qi-tmp.* *.qi-mask *.webm *.mp4 *.mov *.png *.jpg *.jpeg *.gif *.webp *.zip'
+SKIP_PATHS='./catalog/index.html'
+KEEP_PATHS='./catalog/thumbs/*.jpg'
 # A snapshot that deletes one of these, or more than half of the backed-up files, comes from an
 # unhydrated work/ (restore first). Any other deletion is mirrored: the history keeps it.
 PROTECTED="CONFIG.md VERSION QA.md SUITE.md SCENARIOS.md HEALS.md FLAKY.md LESSONS.md"
@@ -66,7 +69,8 @@ find_set() { # <find tests…> — files of the set that also match the tests
   local prune=() skip=() d n
   for d in $PRUNE_DIRS; do prune+=(-path "./$d" -o); done
   for n in $SKIP_NAMES; do skip+=(-name "$n" -o); done
-  ( cd "$WORK" && find . \( "${prune[@]}" -false \) -prune -o -type f ! \( "${skip[@]}" -false \) "$@" -print ) \
+  for n in $SKIP_PATHS; do skip+=(-path "$n" -o); done
+  ( cd "$WORK" && find . \( "${prune[@]}" -false \) -prune -o -type f \( -path "$KEEP_PATHS" -o ! \( "${skip[@]}" -false \) \) "$@" -print ) \
     | sed 's|^\./||' | LC_ALL=C sort
 }
 file_list() {
