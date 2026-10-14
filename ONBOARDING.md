@@ -206,7 +206,8 @@ file to the operator.
 
 When the operator says this target already has comments from a previous quality-inspector: list the
 issues with `qa_label`, read their comments, and for each `<!-- <marker_prefix> issue=… ac=…
-build=… -->` (newest per issue) write one row — `ac_hash` and `candidate` from the marker,
+build=… -->` (newest per issue, own comments only — [docs/reporting.md](docs/reporting.md) →
+**Delivery**; a login the operator names as the previous instance's counts too) write one row — `ac_hash` and `candidate` from the marker,
 `baseline` from the `-data` copy or `-`, the verdict from the `-data` copy, `status:
 reported`, `updated_utc` = **the comment's `created_at`**. No marker → no row. The suite,
 the criteria files and the replay cache are not reconstructable.

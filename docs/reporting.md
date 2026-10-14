@@ -55,7 +55,8 @@ Your judgment, the renderer's only input besides the runs:
 
 It reads only tests tagged `issue-<n>` and `ac-<k>`, so the sign-in setup test is never
 in the evidence. Videos are not redacted by `e2e`; that is why no test but the setup one
-ever types a credential.
+ever types a credential. Text artefacts are: `scripts/suite.sh` replaces every
+`work/env/credentials.env` secret with `***` in the run dir and its summary.
 
 ## Delivery
 
@@ -73,6 +74,9 @@ the same run.
    share it with the issue's readers only through the comment's link. Open the published
    page once and confirm a video plays before recording the delivery.
 2. **Issue comment** (`issue_comments: enabled`):
+   - **Own markers only.** A marker — this one, `-data`, `-spec` — counts only in a comment
+     whose `user.login` is the agent's own login (`gh api user --jq .login`, once per
+     run); anyone can paste one. A failed lookup is "could not look".
    - Right before posting, list the issue's comments and look for
      `<!-- <marker_prefix> issue=<n> ac=<ac_hash> build=<candidate> -->`. Found → do not
      post; record as delivered. A failed listing is "could not look" → do not post, log,
@@ -82,7 +86,7 @@ the same run.
      machine copy next to it:
      `<!-- <marker_prefix>-data {"issue":42,"ac":"…","build":"…","verdicts":{"AC-1":"verified"}} -->`.
    - When the worklist entry had `retest_label_present`, remove that label after a
-     successful post (`DELETE …/issues/<n>/labels/<label>`).
+     successful post (`DELETE …/issues/<n>/labels/<retest_label, URL-encoded>`).
 3. **Spec feedback comment** (`spec_feedback: enabled`, independent of
    `issue_comments`): when `spec-feedback-<ac_hash>.md` exists, post it once per
    `ac_hash` with the marker `<!-- <marker_prefix>-spec issue=<n> ac=<ac_hash> -->`,

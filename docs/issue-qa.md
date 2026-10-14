@@ -85,5 +85,6 @@ leave the row `in_progress` at run end.
 - `criteria-<ac_hash>.md` predates the first test file edit of this run.
 - No AC is `verified` without a baseline failure and a candidate pass.
 - Every tested AC in the rendered report has a candidate video and at least one screenshot.
+- A comment skipped as already posted was skipped for a marker in the agent's own comment.
 - The environment lock is released; no `/tmp/quality-inspector-*` left behind.
 - One line appended to `work/ISSUES.log`: `<ISO> ran issues=<n,…> verdicts=<v,…>`.

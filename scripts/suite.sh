@@ -15,7 +15,9 @@
 #   suite.sh summary <label>      re-print the summary of an earlier run
 #
 # The base URL is fixed to the nested platform; any APP_URL that is not localhost
-# is refused (CLAUDE.md → Hard invariants: nested target only).
+# is refused (CLAUDE.md → Hard invariants: nested target only). After every run the
+# credential values of work/env/credentials.env are masked in the run dir's text files
+# and in every summary (lib/secrets.mjs; the audit's secrets_in_runs proves it).
 
 set -u
 export LC_ALL=C
@@ -35,6 +37,8 @@ E2E_MODEL="$(cfg e2e_model)"; E2E_MODEL="${E2E_MODEL:-claude-sonnet-5}"
 APP_URL="${APP_URL:-$(profile_field '.app.url')}"
 
 die() { echo "suite: $*" >&2; logev error suite_failed "$*"; exit 1; }
+CRED="$WORK/env/credentials.env"
+unsecret() { node "$SCRIPT_DIR/lib/secrets.mjs" filter "$CRED"; }  # stdin -> stdout, masked
 
 cmd_init() {
   mkdir -p "$SUITE"
@@ -117,11 +121,11 @@ cmd_run() {
     (*) die "refusing APP_URL=$APP_URL — only the nested platform on localhost is a test target";;
   esac
   [ -d "$SUITE/node_modules/e2e" ] || die "suite not initialized — run: bash \"\$HOME/scripts/suite.sh\" init"
-  [ -f "$WORK/env/credentials.env" ] || die "work/env/credentials.env missing — run: bash \"\$HOME/scripts/env.sh\" init"
+  [ -f "$CRED" ] || die "work/env/credentials.env missing — run: bash \"\$HOME/scripts/env.sh\" init"
   local out=".e2e/runs/$label"
   (
     cd "$SUITE" || exit 1
-    set -a; . "$WORK/env/credentials.env"; set +a
+    set -a; . "$CRED"; set +a
     export APP_URL E2E_MODEL E2E_TELEMETRY_DISABLED=1 NODE_USE_ENV_PROXY=1 QI_STRICT="$strict"
     # Model calls leave through the gateway, which injects the provider credential.
     export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-injected-by-gateway}"
@@ -132,15 +136,21 @@ cmd_run() {
   )
   local rc=$?
   if [ ! -f "$SUITE/$out/report.json" ]; then
-    local e; e="$(tail -20 "/tmp/quality-inspector-run-$label.log" 2>/dev/null)"; rm -f "/tmp/quality-inspector-run-$label.log"
+    local e; e="$(tail -20 "/tmp/quality-inspector-run-$label.log" 2>/dev/null | unsecret)"; rm -f "/tmp/quality-inspector-run-$label.log"
+    [ -d "$SUITE/$out" ] && node "$SCRIPT_DIR/lib/secrets.mjs" mask "$CRED" "$SUITE/$out"
     die "e2e produced no report (exit $rc): $e"
   fi
   mv -f "/tmp/quality-inspector-run-$label.log" "$SUITE/$out/run.log" 2>/dev/null || true
+  # run.log and report.json carry agent-step params — the setup test's password among them.
+  node "$SCRIPT_DIR/lib/secrets.mjs" mask "$CRED" "$SUITE/$out" \
+    || die "masking credentials in $out failed — publish nothing from it (audit: secrets_in_runs)"
   logev info suite_run "$label exit=$rc"
-  summarize "$SUITE/$out/report.json" "$label"
+  masked_summary "$SUITE/$out/report.json" "$label"
 }
 
-cmd_summary() { local f="$SUITE/.e2e/runs/${1:?label}/report.json"; [ -f "$f" ] || die "no report for $1"; summarize "$f" "$1"; }
+# The summary on stdout is masked too; fails when either half of the pipe failed.
+masked_summary() { summarize "$1" "$2" | unsecret; [ "${PIPESTATUS[0]}${PIPESTATUS[1]}" = 00 ]; }
+cmd_summary() { local f="$SUITE/.e2e/runs/${1:?label}/report.json"; [ -f "$f" ] || die "no report for $1"; masked_summary "$f" "$1"; }
 
 case "${1:-}" in
   init)    cmd_init ;;

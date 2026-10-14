@@ -7,6 +7,18 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.2.1 — 2026-10-14
+
+**Upgrade:**
+1. **operator-only:** replace the egress allow `DELETE api.github.com /repos/<T>/issues/*/labels/*`
+   with the retest label only, `…/labels/<RL>` (README → Black-box boundary); skip when it
+   is already narrowed.
+2. Mask the runs written before this version (idempotent):
+   `for d in "$HOME"/work/suite/.e2e/runs/*/; do node "$HOME/scripts/lib/secrets.mjs" mask "$HOME/work/env/credentials.env" "$d"; done`
+   — the audit's `secrets_in_runs` confirms it.
+3. Nothing else: markers now count only in the agent's own comments; if the GitHub
+   account changed since the first comment, expect at most one repeated comment per issue.
+
 ## 2.2.0 — 2026-10-13
 
 **Upgrade:**

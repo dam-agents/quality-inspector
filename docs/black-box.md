@@ -40,7 +40,7 @@ Black-box boundary has the commands). The core's own needs:
 
 | Host | Allowed | Denied |
 | --- | --- | --- |
-| `api.github.com` | `GET /repos/<T>/issues*`; `POST …/issues/*/comments*`; `DELETE …/issues/*/labels/*` | `…/issues/*/timeline*`, `…/issues/*/events*` (longer, so they win), every other path under `/repos/<T>/` |
+| `api.github.com` | `GET /repos/<T>/issues*`; `POST …/issues/*/comments*`; `DELETE …/issues/*/labels/<retest_label>` — that label only, URL-encoded (`qa%3Aretest`), no trailing `*` | `…/issues/*/timeline*`, `…/issues/*/events*` (longer, so they win), every other path under `/repos/<T>/` |
 | `api.github.com` (profile in the target repo) | `GET /repos/<T>/contents/<profile dir>*` — the profile only; longer than the deny, so it wins | — |
 | `codeload.github.com` | skill and definition downloads of other repositories | `/<T>/*` — the target's tarballs |
 | `raw.githubusercontent.com` | — | everything |

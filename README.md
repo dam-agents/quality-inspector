@@ -72,13 +72,14 @@ Create a vm-backend agent by hand, grant the GitHub connection, then send it:
 
 The agent must not be able to read the target's source. Its rules say so
 ([docs/black-box.md](docs/black-box.md)); the egress rules make it true. Apply them with
-the CLI (`T` = the target, e.g. `acme/widgets`; `AGENT` = this agent's name):
+the CLI (`T` = the target, e.g. `acme/widgets`; `AGENT` = this agent's name; `RL` = the
+URL-encoded `retest_label`, e.g. `qa%3Aretest`):
 
 ```bash
 # The issues API — patterns end in * because the matched path includes the query string.
 dam network create "$AGENT" --host api.github.com --method GET    --path "/repos/$T/issues*"                 --yes
 dam network create "$AGENT" --host api.github.com --method POST   --path "/repos/$T/issues/*/comments*"      --yes
-dam network create "$AGENT" --host api.github.com --method DELETE --path "/repos/$T/issues/*/labels/*"       --yes
+dam network create "$AGENT" --host api.github.com --method DELETE --path "/repos/$T/issues/*/labels/$RL"     --yes
 # Longer than the allow above, so they win: timeline and events expose linked commits.
 dam network create "$AGENT" --host api.github.com --path "/repos/$T/issues/*/timeline*" --verdict deny --yes
 dam network create "$AGENT" --host api.github.com --path "/repos/$T/issues/*/events*"   --verdict deny --yes

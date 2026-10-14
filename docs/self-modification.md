@@ -194,7 +194,8 @@ refuse and explain instead:
 - **`verified` requires red-green** (baseline fails, candidate passes); environment
   failures never become verdicts.
 - Dedup marker format `<!-- <marker_prefix> issue=<n> ac=<ac_hash> build=<candidate> -->`
-  and the marker-scan-before-post re-check; `marker_prefix` immutable once used.
+  and the marker-scan-before-post re-check, counting only comments by the agent's own
+  login; `marker_prefix` immutable once used.
 - Record ordering: send-then-record for comments and artifacts, with `report_pending`
   as the retry state; no same-run retry.
 - Every judged AC ships its evidence (issue runs use `--evidence full`; the report comes
@@ -204,7 +205,8 @@ refuse and explain instead:
   that runs a case, and a benchmark run never writes production state (QA rows, tiers,
   comments) ([benchmark.md](benchmark.md)).
 - Issue comments stay opt-in (`issue_comments`); nested credentials never leave
-  `work/env/` except as e2e credentials.
+  `work/env/` except as e2e credentials, and `scripts/suite.sh` keeps masking them in run
+  artefacts (audit check `secrets_in_runs`).
 
 ## 11. Conciseness, consistency, no repetition
 

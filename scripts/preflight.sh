@@ -216,6 +216,13 @@ mode_audit() {
   elif [ "$used" -ge 85 ]; then check disk warn "home volume ${used}% used"
   else check disk ok "home volume ${used}% used"; fi
   [ -d "$WORK/.git" ] && check work_not_git fail "work/.git exists" || check work_not_git ok "work/ is a plain directory"
+  # nested credentials left in raw runs (scripts/suite.sh masks them); paths only, never a value
+  local sec; sec="$(node "$SCRIPT_DIR/lib/secrets.mjs" scan "$WORK/env/credentials.env" "$WORK/suite/.e2e/runs" 2>/dev/null)"
+  if ! jq -e '.files | type == "array"' >/dev/null 2>&1 <<<"$sec"; then check secrets_in_runs warn "not measured"
+  elif [ "$(jq '.files | length' <<<"$sec")" -gt 0 ]; then
+    check secrets_in_runs fail "credential values in $(jq -r '(.files | length | tostring) + " file(s): " + (.files[:5] | join(", "))' <<<"$sec")"
+  elif [ "$(jq .unmaskable <<<"$sec")" -gt 0 ]; then check secrets_in_runs warn "$(jq .unmaskable <<<"$sec") credential value(s) under 4 characters cannot be masked"
+  else check secrets_in_runs ok "no credential value in run artefacts"; fi
   local tmpd; tmpd="$(ls -d /tmp/quality-inspector-* 2>/dev/null | wc -l | tr -d ' ')"
   [ "$tmpd" = 0 ] && check tmp_leftovers ok "none" || check tmp_leftovers warn "$tmpd leftover /tmp/quality-inspector-* entries"
 
