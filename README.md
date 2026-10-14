@@ -41,7 +41,12 @@ library for evidence, the skill catalog for profiles, sub-agents for independent
   scenarios of its own from uncovered pages and completed issues, and can test them too
   (docs/scenarios.md, docs/judge.md).
 - **Weekly audit** (off by default) — health, the black-box boundary probes, assertion
-  drift, cache efficiency (docs/audit.md).
+  drift, cache efficiency, and the week's speed and cost per issue (docs/audit.md).
+- **From Slack** (off by default) — a person in the bound channel asks "test #N" and gets
+  the report in the thread; one test at a time, `slack_tests_per_day` a day (docs/slack.md).
+  In the direct session the operator can watch exploration live in the Browser Panel
+  (`live_browser`), and the nested product can call the agent's own model by placeholder
+  instead of a mock (`lend_model`).
 - Scripts only detect, and the profile only sets up the nested product; every judgment and every
   external write is the agent's, per `docs/`. `CLAUDE.md` is the small always-loaded
   core; the definition is versioned (`VERSION` + `CHANGELOG.md`).
@@ -110,7 +115,8 @@ Inside the VM, a Claude Code `PreToolUse` hook and a `permissions.deny` list, me
 (a repository by number, gists, a search that does not name the target and the other code
 hosts excepted: only the egress rules hold those) — plus `git clean`, container
 filesystems, writes outside `work/`, commits or definition edits from a scheduled run or a
-Slack turn, and any GitHub write from a Slack turn
+Slack turn, and any GitHub write from a Slack turn except a Slack-ordered "test #N"'s
+comment and retest-label removal on that issue
 ([docs/black-box.md](docs/black-box.md) → Enforcement layers).
 
 ## What a report looks like
@@ -173,6 +179,8 @@ configuration.
 | `explorations`, `max_explorations_per_ac` | defaults (`enabled`, `3`) | Agent-designed checks beyond the criteria, reported apart from the verdict ([docs/explorations.md](docs/explorations.md)). |
 | `security_checks`, `security_failed_logins` | defaults (`enabled`, `10`) | The security run ([docs/security.md](docs/security.md)); its schedule ships off. |
 | `max_wallclock_min_per_issue`, `max_model_steps_per_issue`, `min_free_disk_gi` | defaults | Per-issue budgets and the free disk an install needs. |
+| `slack_channel`, `slack_tests_per_day` | asked (optional), default `3` | Slack test requests ([docs/slack.md](docs/slack.md)). |
+| `lend_model`, `live_browser` | offered, default `disabled` | The product calls the agent's model by placeholder; exploration in the browser the operator watches. |
 
 ## Runtime requirements
 
@@ -187,10 +195,12 @@ configuration.
 - **External surfaces:** artifacts in the platform's artifact library (private by
   default); with `issue_comments: enabled`, **public comments** on the target's issues,
   and removal of the retest label; optionally a Slack channel bound to the agent (replies
-  in request threads; with `scenario_channel`, one weekly digest post); with `work_repo`,
-  pushes of the `work/` backup to that private repository.
-- **Cost:** idle hours wake no model. One issue costs three installs of the product (time,
-  no tokens) plus authoring — expect a few hundred thousand tokens for the first
+  in request threads; with `scenario_channel`, one weekly digest post; with `slack_channel`,
+  issue tests people order there); with `work_repo`, pushes of the `work/` backup to that
+  private repository. The platform runtime's session state (`PLATFORM_RUNTIME_URL`) frees a
+  dead run's environment lock at once; without it the lock waits `lock_ttl_min`.
+- **Cost:** idle hours wake no model. One issue costs up to three installs of the product
+  (time, no tokens; an install of the build already up returns at once) plus authoring — expect a few hundred thousand tokens for the first
   run of an issue (explorations, on by default, add roughly 30–60 %); replays of promoted
   tests are mostly free, except `agent.assert` checks, which always call the model. A
   scenario costs about what an issue does; discovery adds tens of thousands of tokens a

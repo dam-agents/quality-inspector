@@ -39,6 +39,7 @@ allow() { [ -n "${1:-}" ] && printf '%s\n' "$1"; exit 0; }
 # no model and writes nothing; QI_PRECHECK_PROBE=1 (a timed health check) neither.
 mark_scheduled() {
   [ "${QI_PRECHECK_PROBE:-0}" = 1 ] && return 0
+  [ "$MODE" = slack ] && return 0
   local d="${WORK_DIR:-$HOME_DIR/work}/env"
   mkdir -p "$d" 2>/dev/null && printf 'scheduled %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     "${PLATFORM_SCHEDULE_ID:--}" > "$d/RUN_MODE" 2>/dev/null || true
@@ -46,6 +47,27 @@ mark_scheduled() {
 trap 'rc=$?; [ "$rc" = 1 ] || mark_scheduled' EXIT
 
 [ -n "$MODE" ] || allow "precheck: no mode given — run the pre-flight yourself."
+
+# `slack [<n>]` is no schedule and never declines — a person waits for the answer
+# (docs/slack.md). It prints the pre-flight's `slack` JSON. The policy hook knows a Slack
+# turn by itself; `slack <n>` adds the one issue a Slack-ordered "test #N" may deliver to:
+# when slack_channel is set, the environment is free and the day's quota is left, it writes
+# the run marker `slack <ISO> - <n> <session>` and adds `"marked": <n>` to the JSON.
+if [ "$MODE" = slack ]; then
+  out="$(bash "$PREFLIGHT" slack 2>/dev/null)"
+  printf '%s' "$out" | jq -e 'type == "object"' >/dev/null 2>&1 || allow '{"mode":"slack","error":"the pre-flight failed"}'
+  n="${2:-}"
+  [ -n "$n" ] || allow "$out"
+  case "$n" in ([1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9]|[1-9][0-9][0-9][0-9][0-9]|[1-9][0-9][0-9][0-9][0-9][0-9]) ;;
+    (*) allow "$(printf '%s' "$out" | jq -c '. + {error: "precheck slack <n>: <n> is not an issue number", marked: null}')";; esac
+  if printf '%s' "$out" | jq -e '.channel != null and .environment.busy == false and .quota_left > 0' >/dev/null 2>&1; then
+    d="${WORK_DIR:-$HOME_DIR/work}/env"; s="${CLAUDE_CODE_SESSION_ID:--}"
+    case "$s" in (*[!A-Za-z0-9_-]*) s=-;; esac
+    mkdir -p "$d" 2>/dev/null && printf 'slack %s - %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$n" "$s" > "$d/RUN_MODE" 2>/dev/null \
+      && allow "$(printf '%s' "$out" | jq -c --argjson n "$n" '. + {marked: $n}')"
+  fi
+  allow "$(printf '%s' "$out" | jq -c '. + {marked: null}')"
+fi
 
 # The audit always runs and its task runs the pre-flight itself (its probes take most of
 # the two minutes); the Precheck is there only for the marker.

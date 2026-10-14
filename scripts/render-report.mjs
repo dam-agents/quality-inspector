@@ -9,14 +9,15 @@
 // directory under work/suite/.e2e/runs/ (the evidence). With "mode": "regression" it is one
 // page for a whole regression run: no baseline column, the change context on top, and a
 // triage category per criterion (docs/triage.md). With "explorations" (docs/explorations.md)
-// it adds a "Beyond the criteria" section from the explorations_run, outside the verdict.
+// it adds a "Beyond the criteria" section from the explorations_run, outside the verdict; with
+// "noticed" (docs/explorations.md → Noticed in passing) a list of what was seen, never tested.
 // With "mode": "security" it is the security run's findings, severity-sorted, with the e2e
 // evidence of findings that carry a "tag"; it writes no comment.md — security findings never
 // go to an issue (docs/security.md). With "mode": "scenario" it is one scenario
 // (docs/scenarios.md): tests tagged scenario-<k>, the judge's reading per criterion, and
 // comment.md as the channel reply. Nothing else is read, except the previous build's
-// screenshots an AC names as "before_shot" and the new map's screenshots a context.signals
-// item names as "shot".
+// screenshots an AC names as "before_shot", the new map's screenshots a context.signals
+// item names as "shot", and the screenshot a "noticed" item names as "shot".
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
@@ -223,6 +224,22 @@ ${exps.map((ex) => `
 </article>`).join('')}
 </section>`;
 
+// Noticed in passing: seen while testing, outside the criteria; never tested, never a verdict.
+const noticed = v.noticed ?? [];
+let notN = 0;
+const noticedShot = (p) => {
+  if (!p || !existsSync(p)) return '';
+  const to = `media/noticed-${++notN}-${basename(p).replace(/[^A-Za-z0-9._-]/g, '_')}`;
+  copyFileSync(p, join(outDir, to));
+  return `<figure class="sigshot"><a href="${esc(to)}" target="_blank"><img loading="lazy" src="${esc(to)}" alt="what was seen"></a></figure>`;
+};
+const noticedHtml = !noticed.length ? '' : `
+<section id="noticed">
+<h2>Noticed in passing</h2>
+<p class="dim"><b>Not tested, not part of the verdict.</b> What the agent saw outside the criteria while testing them — worth a look, nothing more.</p>
+<ul class="signals">${noticed.map((x) => `<li><code>${esc(x.where)}</code> — ${esc(x.saw)}${noticedShot(x.shot)}</li>`).join('')}</ul>
+</section>`;
+
 const ctx = v.context ?? null;
 // Signals no test covers (docs/triage.md): each a needs-review item, with the new map's
 // screenshot of the page when one is named.
@@ -286,6 +303,7 @@ ${regression ? `<div class="hero"><h1>Regression run — ${esc(v.candidate)}</h1
 <table><thead><tr><th>AC</th><th>Criterion</th><th>Candidate</th><th>Baseline</th><th>Verdict</th></tr></thead><tbody>${summaryRows}</tbody></table>`}
 ${acHtml}
 ${exHtml}
+${noticedHtml}
 ${(v.notes ?? []).length ? `<h3>Notes</h3><ul>${v.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
 <footer>${esc(v.display_name ?? 'Quality Inspector')} · black-box test of the build in a nested environment · e2e ${esc(runs.candidate?.version ?? '')}</footer>
 </main></body></html>
@@ -306,11 +324,13 @@ const comment = scenario ? [
   ...acs.map((ac) => `| ${ac.id} | ${String(ac.name).replace(/\|/g, '\\|')} | ${ac.cand?.state ?? 'not run'} | ${ac.base?.state ?? 'not run'} | ${ac.verdict} |`),
   '',
   ...(exps.length ? [`${exps.length} explorations beyond the criteria: ${observations} observations (see evidence)`, ''] : []),
+  ...(noticed.length ? [`${noticed.length} noticed in passing, not tested (see evidence)`, ''] : []),
   'Evidence (videos, screenshots, step traces): EVIDENCE_LINK',
 ].join('\n');
 writeFileSync(join(outDir, 'comment.md'), `${comment}\n`);
 console.log(JSON.stringify({ out: outDir, acs: acs.length, videos: acs.flatMap((a) => [a.cand?.video, a.base?.video]).filter(Boolean).length, screenshots: acs.flatMap((a) => [...(a.cand?.shots ?? []), ...(a.base?.shots ?? [])]).length,
-  ...(exps.length ? { explorations: exps.length, observations, exploration_videos: exps.filter((e) => e.cand?.video).length } : {}) }));
+  ...(exps.length ? { explorations: exps.length, observations, exploration_videos: exps.filter((e) => e.cand?.video).length } : {}),
+  ...(noticed.length ? { noticed: noticed.length } : {}) }));
 
 // The security run's page: one severity-sorted table; e2e findings keep their video.
 function renderSecurity() {

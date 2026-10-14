@@ -23,6 +23,13 @@ while IFS= read -r fx; do
     (stale) printf 'scheduled %s -\n' "$(iso_ago 400)" > "$WORK_DIR/env/RUN_MODE"; touch -t 202001010000 "$WORK_DIR/env/RUN_MODE";;
     (*) rm -f "$WORK_DIR/env/RUN_MODE";;
   esac
+  # `marker`: the run marker `precheck.sh slack <n>` writes; `qa`: the status of #12's work/QA.md row.
+  rm -f "$WORK_DIR/QA.md"
+  mk="$(jq -r '.marker // ""' <<<"$fx")"
+  [ -n "$mk" ] && printf '%s\n' "$mk" | sed -e "s|@NOW@|$(date -u +%Y-%m-%dT%H:%M:%SZ)|" -e "s|@OLD@|$(iso_ago 400)|" > "$WORK_DIR/env/RUN_MODE"
+  qa="$(jq -r '.qa // ""' <<<"$fx")"
+  [ -n "$qa" ] && printf '| issue | ac_hash | candidate | baseline | verdict | status | updated_utc |\n| --- | --- | --- | --- | --- | --- | --- |\n| 12 | abc | c1 | b1 | verified | %s | %s |\n' \
+    "$qa" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$WORK_DIR/QA.md"
   # A channel turn's transcript holds the platform's Slack frame in a prompt; a direct one does
   # not. `quoted`: a direct session whose tool results, progress, compaction summary and own
   # messages quote the frame (a Read of docs/persistence.md). `garbled`: a frame line that

@@ -233,7 +233,8 @@ refuse and explain instead:
   `scripts/tests/test_work_backup.sh`).
 - Scenario verdicts never claim `verified`; every scenario's criteria and verdicts pass the
   independent judge; a channel turn is never a direct session for the policy hook
-  ([scenarios.md](scenarios.md)).
+  ([scenarios.md](scenarios.md)), and it writes to GitHub only a Slack-ordered "test #N"'s
+  comment and retest-label removal on that issue ([slack.md](slack.md)).
 - Security findings reach only a private artifact and the operator's chat — never an issue
   comment or other public surface; their oracles stay frozen in [security.md](security.md),
   and source maps are probed by status only.

@@ -56,8 +56,8 @@ Your judgment, the renderer's only input besides the runs:
 ```
 
 `given` / `when` / `then` are copied from the criteria file verbatim; `baseline_run` is
-`null` when no baseline ran. Explorations add their own keys, never touching `acs` or
-`verdict` ([explorations.md](explorations.md) → **Reporting**). Never: credentials,
+`null` when no baseline ran. Explorations and `noticed` add their own keys, never touching
+`acs` or `verdict` ([explorations.md](explorations.md) → **Reporting**, **Noticed in passing**). Never: credentials,
 internal state, the operator conversation.
 
 ## The report — `work/issues/<n>/report-<ac_hash>-<candidate>/`

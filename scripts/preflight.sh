@@ -12,7 +12,7 @@
 #   .nothing_to_do == true  -> the agent ends the run immediately.
 #   otherwise               -> the agent processes the arrays per CLAUDE.md + docs/.
 #
-# Modes: issues (default) | regression | discovery | audit | benchmark | security.
+# Modes: issues (default) | regression | discovery | audit | benchmark | security | slack.
 # Requires: bash, jq, gh, curl, sed/grep/awk, GNU date (Linux pod).
 
 set -u
@@ -34,6 +34,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/state.sh" || { echo "cannot source lib/state.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/profile.sh" || { echo "cannot source lib/profile.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/boundary.sh" || { echo "cannot source lib/boundary.sh" >&2; exit 1; }
+. "$SCRIPT_DIR/lib/lock.sh" || { echo "cannot source lib/lock.sh" >&2; exit 1; }
 
 iso2epoch() { date -d "$1" +%s 2>/dev/null \
               || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
@@ -84,14 +85,16 @@ retention_sweep() {
   return 0
 }
 
-# The nested environment serves one run at a time (scripts/env.sh lock). A live
-# holder makes this occurrence idle; a lock past the TTL is the holder's to take over.
+# The nested environment serves one run at a time (scripts/env.sh lock, lib/lock.sh). A
+# holder whose session runs (or, liveness unknown, younger than the TTL) makes this
+# occurrence idle; a dead or stale one is the next run's to take over. ENV_LOCK keeps the
+# state for the issue scan: with no live holder, an in_progress row is an orphan.
+ENV_LOCK=free
 env_busy_out() {
-  local held ts
-  [ -f "$WORK/env/LOCK" ] || return 0
-  read -r held ts < "$WORK/env/LOCK" 2>/dev/null || return 0
-  [ $(( (NOW_EPOCH - $(iso2epoch "$ts")) / 60 )) -ge "$LOCK_TTL_MIN" ] && return 0
-  log "nested environment busy (held by $held since $ts) — next occurrence"
+  local held ts sess
+  read -r ENV_LOCK held ts sess <<<"$(lock_state "$WORK/env/LOCK" "$LOCK_TTL_MIN")"
+  case "$ENV_LOCK" in (live|held) ;; (*) return 0;; esac
+  log "nested environment busy (held by $held since $ts$([ "$ENV_LOCK" = live ] && printf ', its session is running')) — next occurrence"
   runlog "$1" "busy holder=$held"
   jq -nc --arg mode "$MODE" --argjson logs "$(logs_json)" '{mode:$mode, nothing_to_do:true, logs:$logs}'
   exit 0
@@ -128,7 +131,7 @@ mode_issues() {
 
   local scan due reports deferred tmp="/tmp/quality-inspector-listing.$$"
   printf '%s' "$listing" > "$tmp"
-  scan="$(QI_RETEST_LABEL="$RETEST_LABEL" QI_MAX_ISSUES="$MAX_ISSUES" QI_LOCK_TTL_MIN="$LOCK_TTL_MIN" QI_NOW_EPOCH="$NOW_EPOCH" \
+  scan="$(QI_RETEST_LABEL="$RETEST_LABEL" QI_MAX_ISSUES="$MAX_ISSUES" QI_LOCK_TTL_MIN="$LOCK_TTL_MIN" QI_NOW_EPOCH="$NOW_EPOCH" QI_ENV_LOCK="$ENV_LOCK" \
           node "$SCRIPT_DIR/lib/scan-issues.mjs" "$tmp" "$WORK/QA.md" "$WORK/logs" 2>/dev/null)"
   rm -f "$tmp"
   [ -n "$scan" ] || fail_out "the issue scan failed (node scripts/lib/scan-issues.mjs)"
@@ -148,9 +151,10 @@ mode_issues() {
 }
 
 # Scenarios this run takes over (docs/scenarios.md → Waiting scenarios): frozen and
-# waiting for the environment, abandoned in_progress past the TTL, or finished with an
-# undelivered report. Oldest first. A full daily cap holds back the runs (not the
-# deliveries), so a waiting queue does not wake a model every hour for nothing.
+# waiting for the environment, in_progress with no run holding the environment (ENV_LOCK
+# free or dead) or past the TTL, or finished with an undelivered report. Oldest first. A
+# full daily cap holds back the runs (not the deliveries), so a waiting queue does not wake
+# a model every hour for nothing.
 SCEN_CAP="$(cfg max_scenarios_per_day)"; case "$SCEN_CAP" in (''|*[!0-9]*) SCEN_CAP=10;; esac
 scenarios_due() {
   local row id st upd kind full=0
@@ -161,7 +165,8 @@ scenarios_due() {
     case "$st" in
       (queued) [ "$full" = 0 ] && kind=queued ;;
       (report_pending) kind=report ;;
-      (in_progress) [ "$full" = 0 ] && [ $(( (NOW_EPOCH - $(iso2epoch "$upd")) / 60 )) -ge "$LOCK_TTL_MIN" ] && kind=takeover ;;
+      (in_progress) [ "$full" = 0 ] && { case "$ENV_LOCK" in (free|dead) true;; (*) false;; esac \
+          || [ $(( (NOW_EPOCH - $(iso2epoch "$upd")) / 60 )) -ge "$LOCK_TTL_MIN" ]; } && kind=takeover ;;
     esac
     [ -n "$kind" ] && printf '%s\t%s\t%s\n' "$upd" "$id" "$kind"
   done | sort | jq -R 'split("\t") | {id: .[1], kind: .[2]}' | jq -sc .
@@ -428,12 +433,26 @@ mode_audit() {
          n: ([(.context.signals // {})[]? | arrays | .[] | select((.verdict // "needs-review") == "needs-review")] | length)}' "$f" 2>/dev/null; done \
     | jq -sc 'group_by(.week) | map({key: .[0].week, value: (map(.n) | add)}) | .[-8:] | from_entries' 2>/dev/null)"
   [ -n "$sigweeks" ] || sigweeks='{}'
+  # speed and cost of the week: per finished issue its minutes and model steps (issue_done),
+  # per install its seconds (env_up) — medians and totals (docs/logging.md).
+  local cost
+  cost="$(cat "$WORK"/logs/events-*.jsonl 2>/dev/null | jq -sc --arg since "$week_ago" '
+      def med: sort | if length == 0 then null else .[(length - 1) / 2 | floor] end;
+      def num($k): capture("(^| )" + $k + "=(?<v>[0-9]+)") | .v | tonumber;
+      [.[] | select(.ts >= $since)] as $w
+      | [$w[] | select(.event == "issue_done") | .msg] as $d
+      | [$d[] | num("minutes")] as $m | [$d[] | num("model_steps")] as $k
+      | [$w[] | select(.event == "env_up") | .msg | num("took_s")] as $u
+      | {issues_done: ($d | length), minutes_p50: ($m | med), minutes_total: ($m | add // 0),
+         model_steps_p50: ($k | med), model_steps_total: ($k | add // 0),
+         installs: ($u | length), install_s_p50: ($u | med)}' 2>/dev/null)"
+  [ -n "$cost" ] || cost=null
   stats="$(jq -nc --argjson v "$stats" --arg runs "$(count_lines '' "$WORK/ISSUES.log")" \
     --arg reg "$(count_lines 'ran candidate=' "$WORK/REGRESSION.log")" \
     --arg heals "$(count_lines '^| 20' "$WORK/HEALS.md")" --argjson sw "$sigweeks" \
-    --argjson cov "$cov" --argjson sc "$sstats" \
+    --argjson cov "$cov" --argjson sc "$sstats" --argjson cost "$cost" \
     '{verdicts_7d:$v, scenarios_7d:$sc, issues_preflights_total:($runs|tonumber), regression_runs_total:($reg|tonumber), heals_total:($heals|tonumber),
-      signals_by_week:$sw, coverage:$cov}')"
+      signals_by_week:$sw, coverage:$cov, cost_7d:$cost}')"
 
   runlog AUDIT_PREFLIGHT "checks=$(printf '%s' "$CHECKS" | jq length)"
   jq -nc --argjson c "$CHECKS" --argjson f "$failures" --argjson s "$stats" --argjson logs "$(logs_json)" \
@@ -515,7 +534,26 @@ mode_security() {
       inventory:(if $inv=="" then null else $inv end), roles:$roles, deployment_checks:$dep, logs:$logs}'
 }
 
+# ============================================================= SLACK MODE ====
+# What a Slack turn needs before it answers (docs/slack.md): who holds the environment and
+# how many Slack tests already started today (UTC) against slack_tests_per_day. Never idle.
+mode_slack() {
+  local held ts sess today n max ch
+  read -r ENV_LOCK held ts sess <<<"$(lock_state "$WORK/env/LOCK" "$LOCK_TTL_MIN")"
+  today="$(date -u +%Y-%m-%d)"
+  n="$(cat "$WORK/logs/events-$today.jsonl" 2>/dev/null | jq -s '[.[] | select(.event == "slack_test")] | length' 2>/dev/null)"
+  max="$(cfg slack_tests_per_day)"; case "$max" in (''|*[!0-9]*) max=3;; esac
+  ch="$(cfg slack_channel)"
+  [ -n "$ch" ] || log "slack_channel is not set — Slack orders nothing"
+  jq -nc --arg ch "$ch" --arg st "$ENV_LOCK" --arg h "$held" --arg s "$ts" --argjson n "${n:-0}" --argjson max "$max" --argjson logs "$(logs_json)" \
+    '{mode:"slack", nothing_to_do:false, channel:(if $ch == "" then null else $ch end),
+      environment:{state:$st, holder:(if $h == "-" then null else $h end), since:(if $s == "-" then null else $s end),
+                   busy:($st == "live" or $st == "held")},
+      tests_today:$n, max_tests_per_day:$max, quota_left:([$max - $n, 0] | max), logs:$logs}'
+}
+
 case "$MODE" in
+  slack)      mode_slack ;;
   benchmark)  mode_benchmark ;;
   security)   mode_security ;;
   issues)     mode_issues ;;

@@ -8,7 +8,7 @@ agent or check its version, or asks for a change to the agent definition itself.
 | Path | Kind | Holds |
 | --- | --- | --- |
 | `/home/agent` (outer) | git repo, remote `origin` (the kit's seed) | Definition: `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `docs/`, `scripts/`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `LICENSE`, `engines/`, `skills/`. |
-| `/home/agent/work` | **plain data directory** (no `.git`), backed up to `work_repo` when set | Config, `QA.md`, `SUITE.md`, `SCENARIOS.md`, `LESSONS.md`, `issues/`, `scenarios/`, `suite/` (tests, replay cache, `node_modules`), `env/` (values, credentials, lock), logs. |
+| `/home/agent/work` | **plain data directory** (no `.git`), backed up to `work_repo` when set | Config, `QA.md`, `SUITE.md`, `SCENARIOS.md`, `LESSONS.md`, `issues/`, `scenarios/`, `suite/` (tests, replay cache, `node_modules`), `env/` (values, credentials, lock, the last install's result), logs. |
 | `work_repo` (`work/CONFIG.md`) | private git remote | The durable, versioned backup of `work/` — **Backup & restore** below. |
 | `$HOME/.agents/skills/<profile>` | the product profile skill | Reinstalled from its source; never edited here. |
 | the profile's own paths (its README) | the nested product's state and tools | Rebuildable by `scripts/env.sh` through the profile. |
@@ -123,7 +123,9 @@ instance the same shape as a fresh one.
 
 Only a schedule runs a Precheck before the agent wakes. Every `scripts/precheck.sh` exit
 that lets the turn run writes `work/env/RUN_MODE` = `scheduled <ISO> <schedule id>`; a
-decline writes nothing, nor does a timed health check (`QI_PRECHECK_PROBE=1`). The policy
+decline writes nothing, nor does a timed health check (`QI_PRECHECK_PROBE=1`). A
+Slack-ordered "test #N" writes `slack <ISO> - <n> <session>` through `precheck.sh slack <n>`
+([slack.md](slack.md)). The policy
 hook ([black-box.md](black-box.md) → **Enforcement layers**) reads a marker younger than
 `lock_ttl_min` — by its timestamp or its mtime, whichever is newer — as a **scheduled
 run**: `git commit`/`push`, `gh pr create`/`merge`, a `gh api` write outside the
@@ -138,8 +140,10 @@ a **direct session**.
 - A **channel turn** counts the same: a session whose transcript holds the platform's Slack
   frame (`<how-to-respond>`) in a prompt is never direct, whoever sent the message — a session
   continued from the UI included; a definition change needs a fresh direct session. The frame
-  in a tool's output (this file, an issue body) does not count. A channel turn also writes
-  nothing to GitHub (rule `channel-write`).
+  in a tool's output (this file, an issue body) does not count. A channel turn writes to GitHub
+  only the delivery of a Slack-ordered "test #N": its issue comment and its retest-label
+  removal, on that one issue, while the `slack` marker names it and its `work/QA.md` row is
+  `report_pending` (rule `channel-write`; [slack.md](slack.md)). Every other write is refused.
 
 ## Evolving the agent definition (outer repo)
 

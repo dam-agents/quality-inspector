@@ -66,7 +66,7 @@ start_k3s() {
   [ -n "${HTTPS_PROXY:-${https_proxy:-}}" ] && export CONTAINERD_HTTPS_PROXY="${HTTPS_PROXY:-$https_proxy}" CONTAINERD_NO_PROXY="$np"
   [ -n "${HTTP_PROXY:-${http_proxy:-}}" ] && export CONTAINERD_HTTP_PROXY="${HTTP_PROXY:-$http_proxy}"
   say "starting k3s"
-  (umask 022; k3s server >/var/log/k3s.log 2>&1 &)
+  (umask 022; low k3s server >/var/log/k3s.log 2>&1 &)
   local i; for i in $(seq 1 60); do k3s_running && break; sleep 5; done
   k3s_running || die "k3s did not become ready in 5 minutes (see /var/log/k3s.log)"
   kc wait --for=condition=Ready node --all --timeout=180s >/dev/null || die "node not Ready"
@@ -117,7 +117,7 @@ prerequisites() {
           say "installing $name"
           local sets=(); while IFS= read -r kv; do [ -n "$kv" ] && sets+=(--set "$kv"); done \
             < <(jq -r '.set // {} | to_entries[] | "\(.key)=\(.value)"' <<<"$step")
-          helm install "$name" "$(jq -r .chart <<<"$step")" --repo "$(jq -r .repo <<<"$step")" \
+          low helm install "$name" "$(jq -r .chart <<<"$step")" --repo "$(jq -r .repo <<<"$step")" \
             -n "$(jq -r .namespace <<<"$step")" --create-namespace --version "$(jq -r .version <<<"$step")" \
             --wait --timeout 10m ${sets[@]+"${sets[@]}"} >/dev/null || die "$name: helm install failed"
         fi ;;
@@ -135,34 +135,45 @@ prerequisites() {
   done < <(jq -c '.prerequisites // [] | .[]' <<<"$CFG")
 }
 
+# The UI answers with a 2xx/3xx within <tries> × 10 s.
+ui_answers() { # <tries>
+  local i code; for i in $(seq 1 "$1"); do
+    code="$(curl -s -o /dev/null -w '%{http_code}' --noproxy '*' --max-time 10 "$(app_url)" 2>/dev/null)"
+    case "$code" in (2??|3??) return 0;; esac; [ "$i" = "$1" ] || sleep 10
+  done
+  return 1
+}
+
 cmd_up() {
-  local tag="${1:?tag}" tmp chartdir
+  local tag="${1:?tag}" tmp chartdir vhash
   [ -f "$CRED" ] || cmd_init
-  ensure_helm
+  ( umask 077; node "$ENGINE_DIR/lib/render.mjs" values "$CRED" <<<"$CFG" > "$ENVD/values.json" ) || die "values rendering failed"
+  vhash="$( (sha256sum || shasum -a 256) < "$ENVD/values.json" 2>/dev/null | cut -c1-12)"
   start_k3s
+  # Already this build with these values (a takeover, the next run on the same candidate, a
+  # restarted VM whose cluster comes back from disk): nothing to install once the UI answers.
+  if [ "$(jq -r '"\(.build // "")@\(.values // "")"' "$ENVD/STATE.json" 2>/dev/null)" = "$tag@$vhash" ] && ui_answers 30; then
+    say "$RELEASE $tag is already up at $(app_url)"; return 0
+  fi
+  ensure_helm
   traefik_port
   prerequisites
   tmp="/tmp/quality-inspector-chart-$tag"; rm -rf "$tmp"; mkdir -p "$tmp"
-  helm pull "$CHART" --version "$tag" --untar --untardir "$tmp" >/dev/null 2>&1 || { rm -rf "$tmp"; die "helm pull $tag failed"; }
+  low helm pull "$CHART" --version "$tag" --untar --untardir "$tmp" >/dev/null 2>&1 || { rm -rf "$tmp"; die "helm pull $tag failed"; }
   chartdir="$(find "$tmp" -mindepth 1 -maxdepth 1 -type d | head -1)"
   # Helm never upgrades a chart's crds/ on an existing release — apply them first.
   if [ "$(cfgv .apply_chart_crds)" = true ] && [ -d "$chartdir/crds" ]; then
     kc apply --server-side --force-conflicts -f "$chartdir/crds/" >/dev/null || { rm -rf "$tmp"; die "CRD apply failed"; }
   fi
-  ( umask 077; node "$ENGINE_DIR/lib/render.mjs" values "$CRED" <<<"$CFG" > "$ENVD/values.json" ) \
-    || { rm -rf "$tmp"; die "values rendering failed"; }
   say "installing $RELEASE at $tag"
-  helm upgrade --install "$RELEASE" "$chartdir" -n "$NS" --create-namespace -f "$ENVD/values.json" \
+  rm -f "$ENVD/STATE.json"   # recorded again only once this build answers: a failed upgrade is never "up"
+  low helm upgrade --install "$RELEASE" "$chartdir" -n "$NS" --create-namespace -f "$ENVD/values.json" \
       --timeout 20m --wait >/dev/null 2>"$tmp/helm.err" \
     || { local e; e="$(tail -5 "$tmp/helm.err")"; rm -rf "$tmp"; die "helm upgrade to $tag failed: $e"; }
   rm -rf "$tmp"
   kc -n "$NS" wait --for=condition=Available deployment --all --timeout=600s >/dev/null || die "deployments not Available"
-  local i code; for i in $(seq 1 60); do
-    code="$(curl -s -o /dev/null -w '%{http_code}' --noproxy '*' --max-time 10 "$(app_url)" 2>/dev/null)"
-    case "$code" in (2??|3??) break;; esac; sleep 10
-  done
-  case "$code" in (2??|3??) ;; (*) die "app not reachable at $(app_url) (last HTTP $code)";; esac
-  printf '{"build":"%s","installed_utc":"%s"}\n' "$tag" "$(now)" > "$ENVD/STATE.json"
+  ui_answers 60 || die "app not reachable at $(app_url) after 10 minutes"
+  printf '{"build":"%s","values":"%s","installed_utc":"%s"}\n' "$tag" "$vhash" "$(now)" > "$ENVD/STATE.json"
   say "$RELEASE $tag is up at $(app_url)"
 }
 

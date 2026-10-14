@@ -10,9 +10,20 @@ file is the why and the recovery path; how one product is installed is the profi
 - **Inside the VM only.** The product answers at the profile's `app.url` on `localhost`;
   `suite.sh`, `e2e-mcp.sh` and `ui-inventory.mjs` refuse any other base URL, and no
   procedure ever drives the platform this agent itself runs on.
-- **One user of the environment at a time** — `env.sh lock <owner>` / `unlock <owner>`;
-  the pre-flight treats a live lock as an idle occurrence, and a lock past `lock_ttl_min`
-  is the next holder's to take over.
+- **One user of the environment at a time** — `env.sh lock <owner>` / `unlock <owner>`
+  (`scripts/lib/lock.sh`). The lock names its holder's session: while the platform runtime
+  says that session runs a turn, the lock holds and the pre-flight treats the occurrence as
+  idle; once it does not, the next run takes the lock at once and the pre-flight hands the
+  holder's `in_progress` row over as a `takeover`. No runtime answer, or a lock without a
+  session → age decides: past `lock_ttl_min` it is the next holder's.
+- **Every `env.sh up <build>` runs as a harness background task**, then `env.sh wait <build>`
+  — with the tool's timeout at its 10-minute maximum, so one call waits 9 minutes — until it
+  exits 0 (up) or 1 (failed, an environment failure); 3 = still installing, call it again. The turn
+  never ends while an install runs. The engine runs the product below the agent's own CPU
+  priority, and an `up` of the build that already answers with the same values returns at
+  once — after a VM restart too ([engines/helm-k3s/README.md](../engines/helm-k3s/README.md)).
+- **What a run leaves stays until the next reset**: a failed AC's data is there to look
+  at ("show the environment") until a run resets for its baseline.
 - **Credentials are the profile's** — `env.sh init` makes it write
   `work/env/credentials.env` (mode 600). Tests reach them only as `e2e` credentials.
 - **Builds move forward only.** To run an older build (the baseline) after a newer one,
@@ -34,7 +45,8 @@ One issue may hold the environment for at most `max_wallclock_min_per_issue` min
 `max_model_steps_per_issue` model-backed steps. `suite.sh budget <claim time>` measures
 both deterministically: minutes since the claim, and the `agent.act` / `agent.assert`
 steps of every suite run written since then, replays from the cache excluded — the only
-cost proxy a script can count (your own exploring turns are not in it). When `exceeded`
+cost proxy a script can count (your own exploring turns are not in it, nor the product's
+own model calls under `lend_model: enabled`). When `exceeded`
 is non-empty: stop testing, judge what already ran, mark every remaining AC `blocked` with
 the note `budget exceeded`, log `issue_budget_exceeded` per budget
 ([logging.md](logging.md)), and finish from step 8 of [issue-qa.md](issue-qa.md) — the

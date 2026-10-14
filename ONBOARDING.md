@@ -213,19 +213,25 @@ with an existing file → keep its values, ask only for missing keys. Ask, valid
 4. **`spec_feedback`** — ask, default `disabled`: when an issue has nothing testable, the
    agent comments a suggested observable "Done when" on it (public, as the connection's
    account).
-5. **The profile's keys** — every `config` entry of its `profile.json`, written as
+5. **`slack_channel`** — optional, off unless the operator says yes: `describe_channel` for
+   `slack`; when it lists a chat, offer test requests there ([docs/slack.md](docs/slack.md))
+   and record its id. Not connected → skip; a channel can be bound later.
+6. **The profile's keys** — every `config` entry of its `profile.json`, written as
    `- profile.<key>: <value>`: ask those marked `"ask": true` (its `about` text is the
    question), default the rest. Tick item 6.
-6. **Channels** — `candidate_channel` / `baseline_channel` empty = the profile's defaults;
+7. **Channels** — `candidate_channel` / `baseline_channel` empty = the profile's defaults;
    offer `baseline_channel: none` only if the operator wants no red-green.
-7. **Scenarios** ([docs/scenarios.md](docs/scenarios.md)) — say that a Slack channel the
+8. **Scenarios** ([docs/scenarios.md](docs/scenarios.md)) — say that a Slack channel the
    operator connects to this agent (optional, on the platform) takes scenario requests
    from anyone in it, up to `max_scenarios_per_day` runs a day. Ask `scenario_discovery`,
    default `disabled`: `propose` drafts up to `max_scenarios_per_run` judged proposals a
    week (tens of thousands of tokens), `run` also tests them (a few hundred thousand per
    scenario). With discovery on and a channel connected, ask `scenario_channel` (its
    `C…` id; empty keeps the digest in chat).
-8. Everything else — defaults; show them and change only what the operator asks for.
+9. Everything else — defaults; show them and change only what the operator asks for. Offer
+   `lend_model: enabled` when the profile's `SKILL.md` names criteria only a real model makes
+   testable (tokens per product AI step), and `live_browser` when `/etc/AGENTS.md` names the
+   shared browser's CDP endpoint.
 
 Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s keys):
 
@@ -269,6 +275,10 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - scenario_channel:
 - max_scenarios_per_run: 3
 - max_scenarios_per_day: 10
+- lend_model: disabled
+- live_browser: disabled
+- slack_channel:
+- slack_tests_per_day: 3
 
 - profile.chart_ref: oci://quay.io/dam-agents/charts/platform
 - profile.mock_image:
@@ -311,7 +321,8 @@ The agent is useless until the product comes up, so this is a gate:
 ```bash
 CAND=$(bash "$HOME/scripts/preflight.sh" issues | jq -r '.candidate // empty')
 bash "$HOME/scripts/env.sh" lock operator
-bash "$HOME/scripts/env.sh" up "$CAND" && bash "$HOME/scripts/suite.sh" run smoke-onboarding --tag smoke
+bash "$HOME/scripts/env.sh" up "$CAND"   # as a background task (docs/nested-env.md → Shape)
+bash "$HOME/scripts/env.sh" wait "$CAND" && bash "$HOME/scripts/suite.sh" run smoke-onboarding --tag smoke   # again while wait exits 3
 bash "$HOME/scripts/env.sh" unlock operator
 ```
 

@@ -4,7 +4,8 @@
 // env: QI_ENGINE_CONFIG (the profile's engine_config), QI_PROFILE_CONFIG (its config,
 // defaults resolved), QI_PROFILE_DIR (optional: app.url is compared with app_port).
 // Prints "FAIL <problem>" / "WARN <note>" lines; exit 1 on any FAIL. No network: the
-// placeholders are filled by render.mjs with throw-away credentials.
+// placeholders are filled by render.mjs with throw-away credentials. An overlay's `when` is
+// a profile config key or "@model" (on while the agent lends its model, QI_MODEL_KEY).
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -40,16 +41,20 @@ for (const k of Object.keys(raw)) if (!KNOWN.includes(k)) warn(`unknown key '${k
 const overlays = raw.overlays ?? [];
 if (!Array.isArray(overlays)) fail('overlays must be a list');
 const ovl = Array.isArray(overlays) ? overlays : [];
+const MODEL = '@model';
 for (const o of ovl) {
-  if (!obj(o) || !str(o.when)) { fail('every overlay needs `when` (a profile config key) and `values`'); continue; }
-  if (!(o.when in pcfg)) fail(`overlay when '${o.when}' is not a profile config key`);
+  if (!obj(o) || !str(o.when)) { fail('every overlay needs `when` (a profile config key or "@model") and `values`'); continue; }
+  if (o.when !== MODEL && !(o.when in pcfg)) fail(`overlay when '${o.when}' is not a profile config key or "@model"`);
   if (!obj(o.values)) fail(`overlay '${o.when}' has no values object`);
 }
-const base = render('config', raw, { QI_PROFILE_CONFIG: JSON.stringify(pcfg) });
+// The defaults render lends no model; the "every overlay on" render lends a throw-away one.
+const NO_MODEL = { QI_MODEL_KEY: '', QI_MODEL_KIND: '', QI_MODEL_BASE_URL: '' };
+const LENT = { QI_MODEL_KEY: 'check:model', QI_MODEL_KIND: 'api-key', QI_MODEL_BASE_URL: '' };
+const base = render('config', raw, { QI_PROFILE_CONFIG: JSON.stringify(pcfg), ...NO_MODEL });
 if (base.err) fail(`placeholders: ${base.err}`);
 const on = { ...pcfg };
-for (const o of ovl) if (obj(o) && str(o.when) && !on[o.when]) on[o.when] = 'registry.invalid/check:on';
-const all = ovl.length ? render('config', raw, { QI_PROFILE_CONFIG: JSON.stringify(on) }) : base;
+for (const o of ovl) if (obj(o) && str(o.when) && o.when !== MODEL && !on[o.when]) on[o.when] = 'registry.invalid/check:on';
+const all = ovl.length ? render('config', raw, { QI_PROFILE_CONFIG: JSON.stringify(on), ...LENT }) : base;
 if (all.err && !base.err) fail(`placeholders with every overlay on: ${all.err}`);
 const cfg = base.out ?? raw;
 const { values: _v, ...outside } = cfg;
@@ -136,10 +141,10 @@ try {
     ...Object.keys(users).flatMap((u) => [`E2E_USER_${u.toUpperCase()}_USERNAME=check-${u}`, `E2E_USER_${u.toUpperCase()}_PASSWORD=check`]),
     ...(Array.isArray(secrets) ? secrets : []).map((s) => `QI_SECRET_${String(s).toUpperCase()}=check`),
   ].join('\n') + '\n', { mode: 0o600 });
-  const runs = ovl.length ? [['', base.out], [' with every overlay on', all.out]] : [['', base.out]];
-  for (const [label, c] of runs) {
+  const runs = ovl.length ? [['', base.out, NO_MODEL], [' with every overlay on', all.out, LENT]] : [['', base.out, NO_MODEL]];
+  for (const [label, c, model] of runs) {
     if (!c || !obj(c.values)) continue;
-    const v = render('values', c, {}, [cred]);
+    const v = render('values', c, model, [cred]);
     if (v.err) { fail(`values${label}: ${v.err}`); continue; }
     const left = JSON.stringify(v.out).match(/\{\{[^}]*\}\}/g);
     if (left) fail(`values${label}: unknown placeholder ${[...new Set(left)].join(', ')}`);

@@ -33,13 +33,16 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
 2. **Re-check at action time.** `gh api repos/$T/issues/<n>` (host flag per CLAUDE.md
    when `T` names one). The issue must still carry `qa_label` (or `retest_label`). Gone →
    restore the previous row, unlock, log `issue_abort`, next entry. Recompute nothing by
-   hand: the pre-flight's `ac_hash` is authoritative for this run.
+   hand: the pre-flight's `ac_hash` is authoritative for this run. Then start
+   `bash "$HOME/scripts/env.sh" up <candidate>` as a harness background task and go on —
+   it does not look at the product, so the freeze below stays blind.
 3. **Freeze the ACs** → [acceptance-criteria.md](acceptance-criteria.md). Output
    `work/issues/<n>/criteria-<ac_hash>.md`. Written **before** you look at the product;
    when it already exists (a takeover or a retest of the same text), reuse it unchanged.
    Then, unless `explorations: disabled`, the explorations file, same discipline
    ([explorations.md](explorations.md)). No testable AC → verdict `not-testable`, go to step 8.
-4. **Candidate environment.** `bash "$HOME/scripts/env.sh" up <candidate>`, then
+4. **Candidate environment.** `bash "$HOME/scripts/env.sh" wait <candidate>` — again while it exits 3
+   ([nested-env.md](nested-env.md) → Shape) — then
    `bash "$HOME/scripts/suite.sh" run smoke-<candidate> --tag smoke`. Either failing is
    an **environment failure** ([nested-env.md](nested-env.md) → Failures): restore the
    previous row, unlock, log `issue_abort reason=environment`, end the run's issue work —
@@ -50,7 +53,9 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    candidate. One test per EX too, tagged `issue-<n>-ex` ([explorations.md](explorations.md)
    → **Tests**). Then `bash "$HOME/scripts/check-asserts.sh" --lint <file>`: give every AC in
    `no_unique_ref` a discriminating check ([test-authoring.md](test-authoring.md)), and
-   retag every EX in `ex_with_issue_tag`. Refresh the row.
+   retag every EX in `ex_with_issue_tag`. Something broken you see outside the ACs is one
+   `noticed` item ([explorations.md](explorations.md) → **Noticed in passing**) — never
+   chased. Refresh the row.
 6. **Red-green**, both runs with full evidence (video, screenshots, steps for every test):
    - `env.sh reset`, `env.sh up <baseline>`,
      `suite.sh run issue-<n>-baseline --evidence full --strict --tag issue-<n>`.
@@ -83,7 +88,9 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    Tiers); `auto_promote: verified` writes a qualifying file as `regression` instead. A
    retest of a promoted file never demotes it and never rewrites its hash. Name every
    `promotable` (or auto-promoted) file in the run's chat summary.
-10. **Release.** `env.sh unlock issues`; log `issue_done issue=<n> verdict=<v>`.
+10. **Release.** `env.sh unlock issues` (it refuses while the background install runs:
+    `env.sh wait <candidate>` first); log `issue_done issue=<n> verdict=<v> minutes=<m> model_steps=<k>`,
+    `m` and `k` the `elapsed_min` and `model_steps` of `suite.sh budget <claim time>`.
 
 A failure between steps 5 and 8 that is not an environment failure → finish with the
 evidence you have: the ACs you could not judge are `blocked` with the reason. Never
@@ -99,7 +106,7 @@ work the same way ([nested-env.md](nested-env.md) → **Budgets**).
 - Every send of this run has its `intent` and `done`/`failed` ledger lines
   ([logging.md](logging.md) → **Ledger of external writes**).
 - `criteria-<ac_hash>.md` and `explorations-<ac_hash>.md` predate the first test file edit of this run.
-- No observation changed an AC or issue verdict.
+- No observation or `noticed` item changed an AC or issue verdict.
 - No AC is `verified` without a candidate pass and a baseline failure or
   `baseline_blocked_reason: absent`.
 - Every `promotable` row written qualifies; no file was newly promoted unless

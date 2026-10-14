@@ -81,6 +81,16 @@ Explore the running candidate with `npx e2e mcp` (registered for this harness at
 onboarding): open a session, look at the screen, use its `locate` tool to turn a
 `screen.*` locator into test code. Explore only what the criterion needs.
 
+## Watching live
+
+With `live_browser` set to the CDP endpoint of the platform's shared browser on this VM
+(`http://127.0.0.1:<port>`; `/etc/AGENTS.md` names it), `npx e2e mcp` and every
+`--evidence failures` run (smoke, authoring iterations) attach to that browser, so the
+operator watches you explore in the Browser Panel. Only in a direct session, only while it
+answers (`scripts/lib/config.sh` → `live_cdp`); scheduled and Slack turns, a session whose
+transcript the shell cannot find (`CLAUDE_CODE_SESSION_ID`), and every `--evidence full` run
+stay headless, so evidence never depends on it.
+
 ## CLI and API criteria
 
 Same file, same AC blocks; there is no browser video for these, so print the command

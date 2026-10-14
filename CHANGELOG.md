@@ -7,6 +7,33 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.18.0 — 2026-10-14
+
+**Upgrade:**
+1. Nothing to migrate for the environment lock: `work/env/LOCK` lines written before this
+   version (no session) are still read, by age ([docs/nested-env.md](docs/nested-env.md) → Shape).
+   k3s takes its low priority at its next start (a VM restart).
+2. Offer, once, the new off-by-default features — the step is the offer; a yes writes the
+   key ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**):
+   - `slack_channel: <chat id>` — people in that Slack chat order "test #N" and get the
+     report in the thread ([docs/slack.md](docs/slack.md)). It needs the Slack channel
+     connected to the agent (2.12.0); `describe_channel` for `slack` names the id.
+     `slack_tests_per_day: 3` caps it.
+   - `lend_model: enabled` — the nested product calls this agent's model by placeholder
+     instead of a mock; tokens per product AI step, and only once the profile uses
+     `QI_MODEL_*` or a `when: "@model"` overlay ([docs/profile-contract.md](docs/profile-contract.md)).
+   - `live_browser: <CDP endpoint>` — when `/etc/AGENTS.md` names the shared browser's: the
+     operator watches exploration in the Browser Panel, in a direct session whose
+     transcript the shell finds. It needs `work/suite/e2e.config.ts` to carry the
+     skeleton's `E2E_CDP_ENDPOINT` lines — without them, copy those two changes from
+     `scripts/suite-skeleton/e2e.config.ts` (`diff` shows them).
+3. Nothing to install for the policy hook: its rule `channel-write` now lets a Slack-ordered
+   "test #N" post its issue comment and remove its retest label on that one issue; every
+   other GitHub write in a Slack turn stays refused. It applies with the hook, from the next
+   session ([docs/slack.md](docs/slack.md)).
+4. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:` — its new
+   `lock_liveness` line says whether a dead run's lock is freed at once or after `lock_ttl_min`.
+
 ## 2.17.0 — 2026-10-14
 
 **Upgrade:**

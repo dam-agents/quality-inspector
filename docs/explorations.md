@@ -113,3 +113,14 @@ Read the trace before writing an `observation`, as for a `failed` AC. Confirm a 
 renders them after the ACs as "Beyond the criteria", labelled not part of the verdict,
 candidate side only, and adds one line to `comment.md`:
 `N explorations beyond the criteria: M observations (see evidence)`.
+
+## Noticed in passing
+
+What you happen to see outside the ACs while exploring, authoring or reading a run's
+screenshots — an error page, a console error on screen, a broken layout, a wrong count — is
+one `noticed` item in `verdicts-<ac_hash>-<candidate>.json`:
+`"noticed": [{"where": "<page or step>", "saw": "<what a user sees>", "shot": "<screenshot path>" | null}]`.
+It costs nothing extra: no test, no re-run, no chase, no verdict. `render-report.mjs` lists
+it as "Noticed in passing — not tested" and adds one count line to `comment.md`. Something
+that looks like a security weakness is never a `noticed` item: it goes to the operator's
+chat only ([security.md](security.md)).

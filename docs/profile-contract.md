@@ -119,6 +119,7 @@ Every executable runs with cwd `$HOME/work`, and with:
 | `QI_PROFILE_CONFIG` | one JSON object: every `profile.json` config key, resolved (instance value, else default) |
 | `QI_CANDIDATE_CHANNEL`, `QI_BASELINE_CHANNEL` | the instance's channels |
 | `QI_PROFILE_DIR`, `QI_ENGINE_CONFIG` | the profile's directory, and its `engine_config` (JSON) for an engine |
+| `QI_MODEL_KEY`, `QI_MODEL_KIND`, `QI_MODEL_BASE_URL` | with `lend_model: enabled`, the agent's own model connection lent to the product: its placeholder `platform:conn:<id>` — never a key; the gateway swaps it for the key on the way out —, the credential kind (`api-key`, `oauth`, `auth-token`, `bedrock`, `unknown`) and the base URL or empty. All empty when not lent: the product keeps its mock |
 
 **Read-only commands** (the pre-flight calls them inside the Precheck's two minutes):
 
@@ -158,7 +159,7 @@ Read at the AC freeze and when writing tests. It holds **user-facing** knowledge
 the product's vocabulary, its main areas and how a user reaches them, each test
 account's role and what it may do, what the nested environment cannot do (no outbound network, no email,
 a mock instead of a real model…), and the sentences that tell a tester an AC is
-`testable: no` for that reason. Never implementation detail — a profile that describes
+`testable: no` for that reason — and which of them a lent model (`lend_model`) makes testable. Never implementation detail — a profile that describes
 the code breaks the black box as surely as reading it.
 
 ## Choosing and changing the profile

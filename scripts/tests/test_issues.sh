@@ -27,7 +27,10 @@ h14="$(text_hash "$(issue_spec_text "Pending" "b")")"
   echo "| 14 | $h14 | c | b | failed | report_pending | $(iso_ago 60) |"
 } >> "$WORK_DIR/QA.md"
 
+# A lock past the TTL with no session to ask (lib/lock.sh → stale): rows are judged by age.
+mkdir -p "$WORK_DIR/env"; echo "regression $(iso_ago 400)" > "$WORK_DIR/env/LOCK"
 out="$(bash "$SCRIPTS/preflight.sh" issues)"
+rm -f "$WORK_DIR/env/LOCK"
 assert "valid object, work to do" '.mode=="issues" and .nothing_to_do==false' "$out"
 assert "candidate is newest main tag" '.candidate=="0.0.0-main.bbb2222"' "$out"
 assert "baseline is newest release" '.baseline=="0.2.19"' "$out"
@@ -49,6 +52,11 @@ assert "changed text is due" '.issues_due[] | select(.issue==11) | .kind=="ac_ch
 assert "fresh lock skipped" '[.issues_due[].issue] | index(12) == null' "$out"
 assert "stale silent lock taken over" '.issues_due[] | select(.issue==13) | .kind=="takeover" and .takeover==true' "$out"
 assert "pending report only redelivered" '.reports_due == [{"issue":14}] and ([.issues_due[].issue] | index(14) == null)' "$out"
+
+# No run holds the environment: an in_progress row is an orphan, taken over at once.
+out="$(bash "$SCRIPTS/preflight.sh" issues)"
+assert "orphaned fresh row taken over" '.issues_due[] | select(.issue==12) | .kind=="takeover" and .takeover==true' "$out"
+assert "the orphan is named in the logs" '.logs | map(select(test("#12: in progress, but no run holds the environment"))) | length == 1' "$out"
 
 # the Done-when section alone defines the hash: editing other prose changes nothing
 a="$(text_hash "$(issue_spec_text t "x

@@ -6,7 +6,10 @@
 //                                      folds every overlay whose `when` key is set into `values`.
 //   render.mjs values <credentials>    stdin: the resolved config. Prints the Helm values (JSON)
 //                                      with {{user:NAME.username|password}}, {{secret:name}} and
-//                                      {{app_port}} filled from the credentials file.
+//                                      {{app_port}} filled from the credentials file, and
+//                                      {{model:key|kind|base_url}}, {{proxy:https|http|no}},
+//                                      {{gateway_ca}} from the environment.
+// An overlay whose `when` is "@model" applies while the agent lends its model (QI_MODEL_KEY).
 import { readFileSync } from 'node:fs';
 
 const input = JSON.parse(readFileSync(0, 'utf8'));
@@ -32,19 +35,29 @@ if (mode === 'config') {
     .replace(/\{\{config_tag:([a-z0-9_]+)\}\}/g, (_, k) => split(ref(k))[1]);
   const { overlays = [], ...rest } = input;
   let out = walk(rest, fill);
+  const on = (w) => (w === '@model' ? !!process.env.QI_MODEL_KEY : String(cfg[w] ?? '') !== '');
   for (const o of overlays) {
     if (!o.when) fail('an overlay needs `when`');
-    if (String(cfg[o.when] ?? '') !== '') out = { ...out, values: merge(out.values ?? {}, walk(o.values ?? {}, fill)) };
+    if (on(o.when)) out = { ...out, values: merge(out.values ?? {}, walk(o.values ?? {}, fill)) };
   }
   console.log(JSON.stringify(out));
 } else if (mode === 'values') {
   const env = Object.fromEntries(readFileSync(process.argv[3], 'utf8').split('\n')
     .map((l) => l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean).map((m) => [m[1], m[2]]));
   const get = (k) => { if (!(k in env)) fail(`credentials have no ${k}`); return env[k]; };
+  const e = process.env;
+  // Pods reach the outside only through the gateway; cluster-internal traffic never does.
+  const proxy = { https: e.HTTPS_PROXY ?? e.https_proxy ?? '', http: e.HTTP_PROXY ?? e.http_proxy ?? '',
+    no: [e.NO_PROXY ?? e.no_proxy, 'localhost,127.0.0.1,::1,10.42.0.0/16,10.43.0.0/16,.svc,.cluster.local'].filter(Boolean).join(',') };
+  // The CA the gateway presents, as PEM — the file the VM's own Node or OpenSSL trust names.
+  const ca = () => { for (const f of [e.NODE_EXTRA_CA_CERTS, e.SSL_CERT_FILE]) { try { if (f) return readFileSync(f, 'utf8'); } catch {} } return ''; };
   const fill = (s) => s
     .replace(/\{\{user:([A-Za-z0-9_]+)\.(username|password)\}\}/g, (_, u, f) => get(`E2E_USER_${u.toUpperCase()}_${f.toUpperCase()}`))
     .replace(/\{\{secret:([a-z0-9_]+)\}\}/g, (_, k) => get(`QI_SECRET_${k.toUpperCase()}`))
-    .replace(/\{\{app_port\}\}/g, String(input.app_port ?? ''));
+    .replace(/\{\{app_port\}\}/g, String(input.app_port ?? ''))
+    .replace(/\{\{model:(key|kind|base_url)\}\}/g, (_, k) => e[`QI_MODEL_${k.toUpperCase()}`] ?? '')
+    .replace(/\{\{proxy:(https|http|no)\}\}/g, (_, k) => proxy[k])
+    .replace(/\{\{gateway_ca\}\}/g, () => ca());
   console.log(JSON.stringify(walk(input.values ?? {}, fill)));
 } else {
   fail('usage: render.mjs config | values <credentials.env>');

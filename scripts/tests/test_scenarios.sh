@@ -30,6 +30,8 @@ out="$(bash "$SCRIPTS/scenarios.sh" admit)"
 assert "cap reached, environment busy" '.runs_today == 2 and .admit == false and .env.busy == true and .env.holder == "issues"' "$out"
 echo "issues $(iso_ago 400)" > "$WORK_DIR/env/LOCK"
 assert "a stale lock is not busy" '.env.busy == false' "$(bash "$SCRIPTS/scenarios.sh" admit)"
+echo "issues $(iso_ago 5) sess-a" > "$WORK_DIR/env/LOCK"
+assert "a lock line with a session is read too" '.env.busy == true and .env.holder == "issues" and (.env.since | test("^[0-9-]+T[0-9:]+Z$"))' "$(bash "$SCRIPTS/scenarios.sh" admit)"
 rm -f "$WORK_DIR/env/LOCK"
 
 # the issues run takes over waiting scenarios, oldest first
@@ -44,9 +46,15 @@ rm -f "$WORK_DIR/env/LOCK"
   echo "| S-6 | slack | U0123ABCD | C0123ABCD/1.6 | pqr | c | failed | reported | $(iso_ago 60) |"
 } > "$WORK_DIR/SCENARIOS.md"
 sed -i.bak 's/^- max_scenarios_per_day: 2$/- max_scenarios_per_day: 10/' "$WORK_DIR/CONFIG.md"
+# A lock past the TTL with no session to ask (lib/lock.sh → stale): in_progress rows by age.
+echo "regression $(iso_ago 400)" > "$WORK_DIR/env/LOCK"
 out="$(bash "$SCRIPTS/preflight.sh" issues)"
+rm -f "$WORK_DIR/env/LOCK"
 assert "waiting scenarios make work" '.nothing_to_do == false and .issues_due == []' "$out"
 assert "queued, stale and undelivered, oldest first" '.scenarios_due == [{"id":"S-4","kind":"takeover"},{"id":"S-5","kind":"report"},{"id":"S-1","kind":"queued"}]' "$out"
+# No run holds the environment: a fresh in_progress row is an orphan, taken over at once.
+out="$(bash "$SCRIPTS/preflight.sh" issues)"
+assert "an orphaned fresh scenario is taken over" '.scenarios_due[-1] == {"id":"S-3","kind":"takeover"}' "$out"
 grep -q 'scenarios=3' "$WORK_DIR/ISSUES.log" || { echo "  ISSUES.log has no scenarios count"; FAILED=1; }
 sed -i.bak 's/^- max_scenarios_per_day: 10$/- max_scenarios_per_day: 2/' "$WORK_DIR/CONFIG.md"
 out="$(bash "$SCRIPTS/preflight.sh" issues)"

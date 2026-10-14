@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # render-report.mjs: every tested AC gets its video and captioned screenshot; the setup test never appears;
 # explorations render apart from the verdict, and a verdicts file without them renders as before;
-# a baseline blocked reason and a regression's build interval are shown; a scenario's evidence is
-# found by its own tag and carries the judge's reading, and a verified scenario is refused.
+# noticed-in-passing items are listed outside the verdict; a baseline blocked reason and a
+# regression's build interval are shown; a scenario's evidence is found by its own tag and
+# carries the judge's reading, and a verified scenario is refused.
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 R="$SANDBOX/runs"
@@ -70,6 +71,19 @@ case "$hx" in *'<h1>#42 — Rename &lt;b&gt;</h1><span class="badge ok">Verified
 [ "$(ls "$SANDBOX/outx/media" | wc -l | tr -d ' ')" = 6 ] || { echo "  expected the AC media plus EX-1's video and screenshot"; FAILED=1; }
 grep -qx '2 explorations beyond the criteria: 1 observations (see evidence)' "$SANDBOX/outx/comment.md" || { echo "  explorations comment line missing"; FAILED=1; }
 [ "$(grep -c 'EX-' "$SANDBOX/outx/comment.md")" = 0 ] || { echo "  the comment must not list explorations"; FAILED=1; }
+
+# Noticed in passing: listed with its screenshot, escaped, counted once in the comment, never in the verdict.
+printf 'png' > "$SANDBOX/noticed.png"
+jq --arg shot "$SANDBOX/noticed.png" '. + {noticed: [{where: "/settings", saw: "a 500 <error> page after saving", shot: $shot}, {where: "the agent list", saw: "the count is off by one", shot: null}]}' \
+  "$SANDBOX/v.json" > "$SANDBOX/vn.json"
+out="$(QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/vn.json" "$SANDBOX/outn")"
+assert "noticed counted apart" '.noticed == 2 and .videos == 2' "$out"
+hn="$(cat "$SANDBOX/outn/index.html")"
+case "$hn" in *'Noticed in passing'*'Not tested, not part of the verdict'*'a 500 &lt;error&gt; page'*'media/noticed-1-noticed.png'*) ;; *) echo "  noticed section, label, escaping or screenshot missing"; FAILED=1;; esac
+case "$hn" in *'<span class="badge ok">Verified</span>'*) ;; *) echo "  a noticed item changed the issue verdict"; FAILED=1;; esac
+grep -qx '2 noticed in passing, not tested (see evidence)' "$SANDBOX/outn/comment.md" || { echo "  noticed comment line missing"; FAILED=1; }
+grep -q '500' "$SANDBOX/outn/comment.md" && { echo "  the comment must not list what was noticed"; FAILED=1; }
+case "$h" in *'Noticed in passing'*) echo "  noticed section rendered without noticed items"; FAILED=1;; esac
 
 # Regression mode: signals no test covers are listed under "What changed", escaped, with the new map's screenshot.
 printf 'png' > "$SANDBOX/settings.png"

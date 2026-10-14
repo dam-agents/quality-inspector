@@ -3,6 +3,9 @@ import { web } from '@e2e-dev/web';
 import { anthropic } from '@ai-sdk/anthropic';
 
 const model = anthropic(process.env.E2E_MODEL ?? 'claude-sonnet-5');
+// live_browser: the platform's shared browser, attached over CDP so the operator watches the
+// run in the Browser Panel; scripts/suite.sh and scripts/e2e-mcp.sh set it (docs/test-authoring.md).
+const cdp = process.env.E2E_CDP_ENDPOINT;
 
 // The product's pages are written by whoever uses it. `system` reaches the act loop,
 // `context` every model call, judges included (e2e docs → agents); the canary test
@@ -16,7 +19,7 @@ export default {
   targets: [
     {
       name: 'web',
-      engine: web({ browser: 'chromium' }),
+      engine: web({ browser: 'chromium', ...(cdp ? { connect: { cdpEndpoint: async () => cdp } } : {}) }),
       app: { url: process.env.APP_URL ?? 'http://localhost' },
     },
   ],

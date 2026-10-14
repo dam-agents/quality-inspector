@@ -59,6 +59,7 @@ Classify each message; several intents → handle each, then send **one** reply:
 | `accept` | "try S-14 and S-16" under a digest | Each named `proposed` row takes this message's sender and thread; step 1, then the pipeline from step 5 |
 | `save` | "save S-7", "keep testing this" | **Saving** |
 | `status` | "how did S-7 end?", "what is queued?" | Answer from `SCENARIOS.md` and the artifact links |
+| `issue` | "test #42", "status #42" in `slack_channel` | [slack.md](slack.md); elsewhere it is `other` |
 | `other` | configuration, "promote #42", a reset, a definition change, chatter | One line on what this agent does here and that the rest is the operator's; log `scenario_declined` |
 
 ## The pipeline
@@ -150,8 +151,9 @@ promotes it. Otherwise reply what is missing.
 
 The issues pre-flight lists `scenarios_due[]` (`id`, `kind`), oldest first — `queued` and
 `takeover` only while today's cap leaves room. After the `issues_due` entries: `queued` and
-`takeover` (an `in_progress` row past `lock_ttl_min`) → step 1 (admission counts again),
-then the pipeline from step 5; `report` → **The reply** only.
+`takeover` (an `in_progress` row while no run holds the environment, or past
+`lock_ttl_min`) → step 1 (admission counts again), then the pipeline from step 5; `report`
+→ **The reply** only.
 
 ## Discovery
 
