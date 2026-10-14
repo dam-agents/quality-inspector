@@ -11,7 +11,7 @@ _bb_api_prefix() { case "$1" in (github.com|*.ghe.com) echo "";; (*) echo /api/v
 _bb_timeout() { if command -v timeout >/dev/null 2>&1; then timeout "$@"; else shift; "$@"; fi; }
 _bb_lower() { printf '%s' "$1" | tr 'A-Z' 'a-z'; }
 # The target's owner and name in the other case: GitHub resolves them case-insensitively,
-# the platform's path match (SQL LIKE) does not.
+# and only a gateway with case-blind GitHub denies (dam-agents/dam#4909) refuses each form.
 _bb_swapcase() { printf '%s' "$1" | tr 'a-zA-Z' 'A-Za-z'; }
 # profile_source_path, without leading or trailing slashes; empty = the profile lives
 # outside the target repository.
@@ -53,9 +53,12 @@ deny GET $api $p/repos/$r/issues/*/events*
 deny GET $api $p/repos/$r/issues/events*
 EOF
   # The platform fetches a skill by directory when the archive is denied and this path
-  # is not: `contents/<path>?ref=…`, then everything below `<path>/`.
-  [ -n "$pp" ] && _bb_profile_path_ok "$pp" && printf 'allow GET %s %s\nallow GET %s %s\n' \
-    "$api" "$p/repos/$r/contents/$pp/*" "$api" "$p/repos/$r/contents/$pp?*"
+  # is not: `contents/<path>?ref=…`, then everything below `<path>/`. Its scan of a
+  # private source reads the head from the default branch's ref (repository metadata,
+  # then one SHA), never from the head commit, whose diff shows files outside the path.
+  [ -n "$pp" ] && _bb_profile_path_ok "$pp" && printf 'allow GET %s %s\n' \
+    "$api" "$p/repos/$r/contents/$pp/*" "$api" "$p/repos/$r/contents/$pp?*" \
+    "$api" "$p/repos/$r" "$api" "$p/repos/$r/git/refs/heads/*"
   if read -r dh dr < <(_bb_definition) && [ "$dh" = "$h" ] && [ "$(_bb_lower "$dr")" != "$(_bb_lower "$r")" ]; then
     printf 'allow * %s %s\nallow * %s %s\nallow * %s %s\n' "$api" "$p/repos/$dr/*" "$h" "/$dr/*" "$h" "/$dr.git/*"
   fi
@@ -90,6 +93,7 @@ boundary_targets() { # <target>
   h="$(_bb_host "$1")"; r="$(_bb_repo "$1")"; R="$(_bb_swapcase "$r")"; pp="$(_bb_profile_path)"
   printf '%s\n' "gh repos/$r/contents/" "gh repos/$R/contents/" "gh repos/$r/pulls?per_page=1" \
     "gh repos/$r/commits?per_page=1" "gh repos/$r/git/refs/heads" "gh repos/$r/issues/{issue}/timeline" \
+    "gh repos/$r/issues/{issue}/TIMELINE" \
     "gh repos/$r/issues/{issue}/events" "gh repos/$r/issues/events?per_page=1" \
     "gh search/code?q=repo:$r+a&per_page=1" "gh repositories/{id}/contents/" "gql graphql" \
     "url https://$h/$r/archive/HEAD.tar.gz" "url https://$h/$R/archive/HEAD.tar.gz" \
@@ -125,7 +129,8 @@ boundary_probe() { # <target>
     case "$code" in (''|000) case "$rc" in (124|28) code=held;; (*) code=000;; esac;; esac
     label="boundary:${target%%\?*}"
     case "$code:$target" in
-      (2??:*/..|2??:*%2e%2e) echo "fail $label source surface reachable (HTTP $code): the gateway matches the path before it resolves dot segments, so the profile allows open the whole repository — empty profile_source_path, delete the profile allows, and report the gateway to the platform";;
+      (2??:*/..|2??:*%2e%2e) echo "fail $label source surface reachable (HTTP $code): the gateway does not deny dot segments (dam-agents/dam#4909), so the profile allows open the whole repository — empty profile_source_path, delete the profile allows, and report the gateway to the platform";;
+      (2??:*/TIMELINE) echo "fail $label source surface reachable (HTTP $code): the gateway matches a GitHub deny only in exact case — report the gateway to the platform (dam-agents/dam#4909)";;
       (2??:*|3??:*) echo "fail $label source surface reachable (HTTP $code)";;
       (403:*|000:*) echo "ok $label refused";;
       (held:*)  echo "warn $label request held for approval — make it an explicit deny so nobody approves it by accident";;

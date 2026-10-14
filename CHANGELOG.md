@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 2.15.0 — 2026-10-14
+## 2.16.0 — 2026-10-14
 
 **Upgrade:**
 1. Run `bash "$HOME/scripts/hooks/install.sh"` — it adds the Stop backup hook, a no-op until
@@ -21,6 +21,30 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    `bash "$HOME/scripts/egress-rules.sh"` prints; then write the key and run
    `bash "$HOME/scripts/work-backup.sh" persist` and `… check` in the direct session.
 3. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:`.
+
+## 2.15.0 — 2026-10-14
+
+**Upgrade:**
+1. **operator-only, with `profile_source_path` set:** first make sure the platform carries
+   dam-agents/dam#4909 (README → Runtime requirements) — before it, the profile allow
+   opens the repository through `<path>/..`. Then run the commands
+   `bash "$HOME/scripts/egress-rules.sh"` prints, skipping the rules the agent already
+   has: the new `GET /repos/<T>` and `GET /repos/<T>/git/refs/heads/*` allows, which the
+   platform's scan of a private source needs ([docs/black-box.md](docs/black-box.md) →
+   **Egress rules**).
+2. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:`. Its new
+   probe `boundary:…/issues/<n>/TIMELINE` fails or warns on every agent until the platform
+   carries dam-agents/dam#4909.
+
+## 2.14.2 — 2026-10-14
+
+**Upgrade:**
+Nothing — only the offline suite's runner changed.
+
+## 2.14.1 — 2026-10-14
+
+**Upgrade:**
+Nothing — engine scripts are read per run.
 
 ## 2.14.0 — 2026-10-14
 
