@@ -118,7 +118,8 @@ The agent's job ends at "PR opened". Use fresh descriptive branch names; runtime
 never goes to this repo.
 
 The definition repository may sit on a different GitHub host than the target: the PR
-call takes the host from `origin`, plain `git fetch`/`push` need nothing extra. It is
+call takes the host from `origin`; plain `git fetch`/`push` need only the allows
+`egress-rules.sh` prints for this repository when it shares the target's host. It is
 REST on purpose — `gh pr create` speaks GraphQL, which the egress denies
 ([black-box.md](black-box.md) → **Egress rules**); the path sits in a variable because the
 policy hook reads `repos/<variable>/…` as the target's.

@@ -55,14 +55,15 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
    comments enabled it also posts verdicts and removes the retest label, so the account
    needs issue write access on the target. Use a dedicated bot account, and where the
    connection allows it (a GitHub App installation, a fine-grained token) only Issues on
-   the target — no Contents, Pull requests or Actions — so a fork or mirror of the source
-   stays out of reach too.
+   the target — no Contents, Pull requests or Actions. The egress, not the token, keeps
+   forks and mirrors out of reach: a public target's are readable by anyone.
 3. **Create the agent on the vm backend** when the profile requires root (most nested
    products do). The kit asks for 8 CPU, 16 Gi and 80 Gi; the profile's README says what
    its product needs.
 4. **Assign the product profile**: add its skill source (Skills → Sources) and assign the
    profile skill to the agent — for DAM, repository `https://github.com/dam-agents/dam`
-   with path `qa`, skill `qi-profile-dam`. Onboarding checks it.
+   with path `qa`, skill `qi-profile-dam` (in the target repository, so onboarding sets
+   `profile_source_path: qa`). Onboarding checks it.
 5. **Make sure agent steps can reach Anthropic** through the gateway with an injected
    credential (the agent's provider connection). Onboarding checks it.
 6. **Apply the egress rules** (Black-box boundary below), then answer the onboarding
@@ -93,7 +94,10 @@ the agent never needs (raw.githubusercontent.com, GitLab, Bitbucket, …). The t
 rules depend on the instance, so onboarding prints them — `bash scripts/egress-rules.sh`
 — as `dam network create` commands, with the profile's `egress`; set `AGENT` to the
 agent's name and run them (`--kit` adds the kit's rules for an agent created by hand or
-from a kit before 2.11.0). A rule counts only once a probe proves it:
+from a kit before 2.11.0). They make the target's GitHub hosts deny-by-default, so a
+skill from another GitHub repository needs `--source <owner>/<repo>`; a profile inside the
+target gets only its directory (`profile_source_path`). A rule counts only once a probe
+proves it:
 `verify-onboarding.sh --live` and the weekly audit request each forbidden surface and
 fail when one answers. Approve no held request on the deny side.
 
@@ -138,6 +142,7 @@ configuration.
 | `profile` | chosen and installed | The product profile skill, e.g. `qi-profile-dam`. |
 | `profile.<key>` | asked or defaulted, per the profile | The profile's own settings ([docs/profile-contract.md](docs/profile-contract.md)). |
 | `target_repo` | asked | Repository whose issues are tested. `QI_TARGET_REPO` overrides. |
+| `profile_source_path` | asked when the profile lives in `target_repo` | Its skill source's path there (DAM: `qa`) — the one directory the egress opens. |
 | `issue_comments` | asked, default `disabled` | Opt-in: post verdicts on the issue. |
 | `spec_feedback` | asked, default `disabled` | Opt-in: suggest an observable "Done when" on issues with nothing testable. |
 | `scenario_discovery`, `scenario_channel` | asked, default `disabled` / empty | Opt-in: weekly scenario proposals (`propose`), also tested (`run`); the Slack conversation for their digest. |

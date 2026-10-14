@@ -56,7 +56,7 @@ warn() { WARNS=$((WARNS+1)); printf 'warn %s — %s\n' "$1" "$2"; }
 SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-benchmark-monthly quality-inspector-security-weekly quality-inspector-audit-weekly quality-inspector-scenarios-weekly"
 KNOWN_KEYS="profile target_repo display_name qa_label retest_label marker_prefix candidate_channel
 baseline_channel issue_comments artifact_reports include_comments max_issues_per_run lock_ttl_min
-e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback
+e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback profile_source_path
 explorations max_explorations_per_ac auto_promote security_checks security_failed_logins
 confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi
 scenario_discovery scenario_channel max_scenarios_per_run max_scenarios_per_day"
@@ -141,6 +141,10 @@ if [ -f "$CONFIG" ]; then
   t="$(cfg target_repo)"
   printf '%s' "$t" | grep -qE '^([A-Za-z0-9.-]+/)?[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' \
     && ok cfg:target_repo "set" || fail cfg:target_repo "missing or not [host/]owner/repo" "ask the operator (ONBOARDING.md Step 3)"
+  v="$(_bb_profile_path)"
+  if [ -z "$v" ]; then ok cfg:profile_source_path "empty — the profile lives outside target_repo"
+  elif _bb_profile_path_ok "$v"; then ok cfg:profile_source_path "$v"
+  else fail cfg:profile_source_path "'$v' is not a plain directory path" "set the skill source's path in target_repo (no * % ?, no . or .. segment), or leave it empty"; fi
   enum() { local v; v="$(cfg "$1")"; [ -z "$v" ] && { ok "cfg:$1" "default"; return; }
     case " $2 " in (*" $v "*) ok "cfg:$1" "$v";; (*) fail "cfg:$1" "'$v' is not one of: $2" "set a documented value (CLAUDE.md → Runtime configuration)";; esac; }
   enum issue_comments "enabled disabled"; enum artifact_reports "enabled disabled"
@@ -199,7 +203,7 @@ if [ "$LIVE" = 1 ]; then
     && ok issues_read "target issues readable" || fail issues_read "cannot list target issues" "check target_repo and the connection's repository access"
   while read -r status id detail; do
     case "$status" in
-      (fail) fail "$id" "$detail" "the operator adds the deny rule (bash scripts/egress-rules.sh)";;
+      (fail) fail "$id" "${detail%% — *}" "$(boundary_fix "$detail")";;
       (ok)   ok "$id" "$detail";;
       (*)    warn "$id" "$detail";;
     esac
