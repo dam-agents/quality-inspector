@@ -98,9 +98,11 @@ from a kit before 2.11.0). A rule counts only once a probe proves it:
 fail when one answers. Approve no held request on the deny side.
 
 Inside the VM, a Claude Code `PreToolUse` hook and a `permissions.deny` list, merged into
-`~/.claude/settings.json` at onboarding, refuse the same surfaces before a tool call runs —
-plus `git clean`, container filesystems, writes outside `work/`, and commits or definition
-edits from a scheduled run or a Slack turn ([docs/black-box.md](docs/black-box.md) → Enforcement layers).
+`~/.claude/settings.json` at onboarding, refuse the same surfaces before a tool call runs
+(a repository by number, gists, a search that does not name the target and the other code
+hosts excepted: only the egress rules hold those) — plus `git clean`, container
+filesystems, writes outside `work/`, and commits or definition edits from a scheduled run
+or a Slack turn ([docs/black-box.md](docs/black-box.md) → Enforcement layers).
 
 ## What a report looks like
 

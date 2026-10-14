@@ -40,8 +40,8 @@
 #   run-mode         Write Edit …          work/env/RUN_MODE (only the Precheck writes it)
 #   scheduled-def    Write Edit … (sched.) definition files and work/CONFIG.md
 #   scheduled-git    Bash (scheduled)      git commit, git push, gh pr create|merge, and a `gh api` write
-#                                          (-X POST|PUT|PATCH|DELETE or a field) on no issues path — so a
-#                                          pull request opened over REST too
+#                                          (a method other than GET, or a field or --input) whose endpoint
+#                                          is not under the target's issues — so a pull request over REST too
 #   policy-tamper    Bash (scheduled)      any command naming RUN_MODE, scripts/hooks/ or .claude/settings
 #
 # Every denial logs one `policy_denied` event (scripts/log.sh): `tool=<name> rule=<id>`
@@ -228,6 +228,49 @@ RE_MAP='[a-z0-9_*-]\.map([[:space:]"'"'"'?#;|&)]|$)'
 FETCHES=0
 unq() { U="${1#[\"\']}"; U="${U%[\"\']}"; }
 
+# Advance j past the word that closes a quote w[j] opens (j, w and n are the caller's):
+# the words are split at blanks, so a quoted value can span several.
+skip_quoted() {
+  local d="${w[$j]//[^\"]/}" q='"'
+  [ $(( ${#d} % 2 )) = 1 ] || { d="${w[$j]//[^\']/}"; q="'"; }
+  [ $(( ${#d} % 2 )) = 1 ] || return 0
+  while [ $((j+1)) -lt "$n" ]; do
+    j=$((j+1)); d="${w[$j]//[^$q]/}"; [ $(( ${#d} % 2 )) = 1 ] && return 0
+  done
+}
+# `gh api` from word <k> on (check_simple's w and n): GH_EP = the endpoint, the first word
+# that is neither a flag nor a flag's value. True when the call writes: a method other than
+# GET or HEAD, or a field or --input without a method.
+gh_api_write() { # <k>
+  local j="$1" m="" f=0
+  GH_EP=""
+  while [ "$j" -lt "$n" ]; do
+    unq "${w[$j]}"
+    case "$U" in
+      (-X|--method) j=$((j+1)); unq "${w[$j]:-}"; m="$U";;
+      (-X?*) m="${U#-X}";;
+      (--method=*) m="${U#--method=}";;
+      (-f|-F|--field|--raw-field|--input) f=1; j=$((j+1)); skip_quoted;;
+      (-[fF]?*|--field=*|--raw-field=*|--input=*) f=1; skip_quoted;;
+      (-H|--header|--hostname|-q|--jq|-t|--template|-p|--preview|--cache) j=$((j+1)); skip_quoted;;
+      (-*) skip_quoted;;
+      (*) [ -n "$GH_EP" ] || GH_EP="$U"; skip_quoted;;
+    esac
+    j=$((j+1))
+  done
+  case "$m" in (GET|HEAD) return 1;; ('') [ "$f" = 1 ];; (*) return 0;; esac
+}
+# An endpoint under the target's issues: repos/<T>/issues…, with or without a leading /,
+# /api/v3 or scheme and host; an owner/repo given as a variable counts as <T>.
+RE_ISSUES_EP='^/?(api/v3/)?repos/([^/]+)/([^/?#]+)/issues([/?#]|$)'
+RE_ISSUES_EP_VAR='^/?(api/v3/)?repos/(\$[A-Za-z_][A-Za-z0-9_]*|\$\{[^}/]+\})/issues([/?#]|$)'
+issues_endpoint() { # <endpoint>
+  local e="$1"
+  case "$e" in (http://*|https://*) e="${e#*://}"; e="/${e#*/}";; esac
+  [[ "$e" =~ $RE_ISSUES_EP_VAR ]] && return 0
+  [[ "$e" =~ $RE_ISSUES_EP ]] && repo_is_target "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
+}
+
 check_simple() { # <one simple command>
   local -a w; local i=0 n cmd sub x rest=" "
   read -r -a w <<<"$1" || true
@@ -267,8 +310,8 @@ check_simple() { # <one simple command>
           case "$rest" in (*" graphql "*|*" /graphql "*) deny gh-graphql "$API_HOST/graphql" "GraphQL is off limits; use the issues REST endpoints";; esac
           check_repo_paths "$rest"
           if [ -n "$T" ]; then case "$rest" in (*search/code*"$T"*|*search/commits*"$T"*) deny gh-search "$API_HOST/search" "searching the target's code or commits is off limits";; esac; fi
-          case "$rest" in (*" -X GET "*|*" --method GET "*) ;; (*" -X "*|*" --method "*|*" -f "*|*" -F "*|*" --field "*|*" --raw-field "*|*" --input "*)
-            case "$rest" in (*/issues*) ;; (*) scheduled && deny scheduled-git "" "a scheduled run writes only the target's issue comments and labels";; esac;; esac;;
+          gh_api_write "$((i+1))" && ! issues_endpoint "$GH_EP" && scheduled \
+            && deny scheduled-git "" "a scheduled run writes only the target's issue comments and labels";;
         (pr) case "$rest" in (" pr create "*|" pr merge "*) scheduled && deny scheduled-git "" "a scheduled run never opens or merges a PR";; esac;;
       esac
       case "$sub" in (pr|repo|release|run|workflow|browse|gist|search|cache|attestation|codespace|ruleset|project)

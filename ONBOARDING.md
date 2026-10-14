@@ -37,7 +37,8 @@ operator-only steps, and tick each with `complete_onboarding_step` as it is sett
 2. *Backend* — the agent runs on the backend and size the profile's README asks for
    (vm backend when it requires root).
 3. *Target repository* — the `target_repo` whose issues are tested.
-4. *Egress rules* — run the commands `scripts/egress-rules.sh` prints (Step 3 shows them).
+4. *Egress rules* — run the commands `scripts/egress-rules.sh` prints (Step 3 shows them,
+   with `--kit` on the by-hand path).
 5. *Issue comments* — enable or keep disabled.
 6. *Profile settings* — a value for every profile key it marks `ask`.
 7. *Model credential* — confirm agent steps reach Anthropic through the gateway.

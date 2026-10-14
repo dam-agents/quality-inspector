@@ -150,8 +150,8 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
 **Upgrade:**
 1. **operator-only:** replace the egress allow `DELETE api.github.com /repos/<T>/issues/*/labels/*`
-   with the retest label only, `…/labels/<RL>` (README → Black-box boundary); skip when it
-   is already narrowed.
+   with the retest label only, `…/labels/<RL>` (`bash "$HOME/scripts/egress-rules.sh"`
+   prints it); skip when it is already narrowed.
 2. Mask the runs written before this version (idempotent):
    `for d in "$HOME"/work/suite/.e2e/runs/*/; do node "$HOME/scripts/lib/secrets.mjs" mask "$HOME/work/env/credentials.env" "$d"; done`
    — the audit's `secrets_in_runs` confirms it.
@@ -172,8 +172,8 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 ## 2.1.1 — 2026-10-13
 
 **Upgrade:**
-1. **operator-only:** replace the egress rules with README → Black-box boundary: issue
-   patterns end in `*` (the matched path includes the query string), explicit denies for
+1. **operator-only:** replace the egress rules with the ones
+   `bash "$HOME/scripts/egress-rules.sh"` prints: issue patterns end in `*` (the matched path includes the query string), explicit denies for
    `…/issues/*/timeline*` and `…/issues/*/events*`, and codeload denied for the target's
    path only (a host-wide codeload deny breaks skill installs).
 2. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` — the boundary probes now also
