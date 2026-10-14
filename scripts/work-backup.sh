@@ -34,7 +34,7 @@ LOCAL="${QI_WORK_BACKUP_LOCAL:-/dev/shm/qi-work-backup}"   # tmpfs: the pod's on
 LOCK="$LOCAL.lock"; AGAIN="$LOCAL.again"; STAMP="$LOCAL.stamp"; VERIFIED="$LOCAL.verified"
 LOCK_TTL_MIN=10; RETRIES=3; MAX_FILE_KB=20480
 BRANCH=main
-HEAD_FILE="$WORK/env/backup-head"   # the commit this instance pushed last; env/ never travels
+HEAD_FILE="$WORK/env/backup-head"   # "<sha> <work_repo>" this instance pushed last; env/ never travels
 NAME="quality-inspector"; EMAIL="quality-inspector@agents.local"
 # Never carried: credentials and pod-local state (env/), installs, raw runs, caches,
 # transient files, and evidence media (it lives in the artifacts; a git history keeps it forever).
@@ -74,14 +74,20 @@ file_list() {
   find_set ! -size +"${MAX_FILE_KB}"k
 }
 
-# Anything in the set (or a directory of it) newer than the last completed persist. logs/
-# does not count: the persist's own events land there, and they travel with the next change.
+# Anything in the set (or a directory of it) newer than the last completed persist to this
+# work_repo. logs/ does not count: the persist's own events land there, and they travel with the
+# next change.
 changed_since_stamp() {
-  [ -f "$STAMP" ] || return 0
+  [ "$(cat "$STAMP" 2>/dev/null)" = "$REF" ] || return 0
   local prune=() d
   for d in $PRUNE_DIRS logs; do prune+=(-path "./$d" -o); done
   [ -n "$( cd "$WORK" && find . \( "${prune[@]}" -false \) -prune -o -newer "$STAMP" -print 2>/dev/null | head -1)" ]
 }
+
+# The last pushed commit, only when it was pushed to this work_repo; then the record of a push.
+known_head() { local sha ref; read -r sha ref < "$HEAD_FILE" 2>/dev/null; [ "$ref" = "$REF" ] && printf '%s' "$sha"; }
+record_head() { mkdir -p "$WORK/env" && printf '%s %s\n' "$1" "$REF" > "$HEAD_FILE.tmp" && mv -f "$HEAD_FILE.tmp" "$HEAD_FILE"; }
+stamp_done() { mv -f "$1" "$STAMP"; }   # the stamp's mtime stays the persist's start
 
 # ---------------------------------------------------------------- the guards
 # The destination: private, not the target, not a fork of it. A positive answer is cached a
@@ -176,14 +182,14 @@ persist() {
 
 do_persist() {
   local attempt=0 gone hits tree known tip foreign sha n stamp_new="$LOCAL.stamp.new"
-  : > "$stamp_new"
+  printf '%s\n' "$REF" > "$stamp_new"
   while [ "$attempt" -lt "$RETRIES" ]; do
     attempt=$((attempt + 1)); touch "$LOCK"
     seed_clone || { logev warn work_backup "clone of $REF failed (attempt $attempt)"; continue; }
     sync_in || { logev warn work_backup "snapshot copy failed (attempt $attempt)"; continue; }
     [ -s "$LOCAL.oversize" ] && logev warn work_backup "left out, over ${MAX_FILE_KB} KiB: $(sed 's/^oversize: //' "$LOCAL.oversize" | head -5 | paste -sd, -)"
     git_l add -A >/dev/null 2>&1 || { logev warn work_backup "git add failed (attempt $attempt)"; continue; }
-    if git_l diff --cached --quiet 2>/dev/null; then mv -f "$stamp_new" "$STAMP"; return 0; fi
+    if git_l diff --cached --quiet 2>/dev/null; then stamp_done "$stamp_new"; return 0; fi
     if [ "$OPT" != --allow-delete ]; then
       # shellcheck disable=SC2086 # PROTECTED is a path list by design
       gone="$(git_l diff --cached --diff-filter=D --name-only -- $PROTECTED 2>/dev/null | head -5 | paste -sd' ' -)"
@@ -205,7 +211,7 @@ do_persist() {
     # Onto the remote tip: the snapshot is the tree, the remote's history its parent.
     if git_l fetch -q origin "$BRANCH" 2>/dev/null; then
       tip="$(git_l rev-parse FETCH_HEAD)"
-      known="$(cat "$HEAD_FILE" 2>/dev/null)"
+      known="$(known_head)"
       if [ -n "$known" ] && [ "$tip" != "$known" ] && ! git_l cat-file -e "$known^{commit}" 2>/dev/null; then
         logev error work_backup "the commit this instance pushed last is gone from $REF@$BRANCH — its history was rewritten"
       elif [ -n "$known" ] && [ "$tip" != "$known" ]; then
@@ -214,7 +220,7 @@ do_persist() {
       fi
       git_l reset -q --soft "$tip"
       if git_l diff --cached --quiet 2>/dev/null; then
-        printf '%s\n' "$tip" > "$HEAD_FILE.tmp" && mv -f "$HEAD_FILE.tmp" "$HEAD_FILE"; mv -f "$stamp_new" "$STAMP"; return 0
+        record_head "$tip"; stamp_done "$stamp_new"; return 0
       fi
     fi
     n="$(git_l diff --cached --name-only | wc -l | tr -d ' ')"
@@ -223,8 +229,7 @@ do_persist() {
     logev info external_write "surface=backup action=intent issue=- key=$tree target=$REF"
     if git_l push -q origin "HEAD:$BRANCH" 2>/dev/null; then
       logev info external_write "surface=backup action=done issue=- key=$tree target=$REF"
-      mkdir -p "$WORK/env" && printf '%s\n' "$sha" > "$HEAD_FILE.tmp" && mv -f "$HEAD_FILE.tmp" "$HEAD_FILE"
-      mv -f "$stamp_new" "$STAMP"
+      record_head "$sha"; stamp_done "$stamp_new"
       logev info work_backup "pushed ${sha:0:12} to $REF ($n file(s) changed, attempt $attempt)"; return 0
     fi
     logev error external_write "surface=backup action=failed issue=- key=$tree target=$REF"
@@ -263,7 +268,7 @@ restore() {
   if [ "$bad" -gt 0 ]; then
     say "restore incomplete: $bad of $n files differ from $REF"; logev error work_backup "restore incomplete: $bad of $n files differ"; return 1
   fi
-  mkdir -p "$WORK/env" && git_l rev-parse HEAD > "$WORK/env/backup-head"
+  record_head "$(git_l rev-parse HEAD)"
   say "restored $n files from $REF@$(git_l rev-parse --short HEAD) ($(git_l log -1 --format=%cI))"
   foreign="$(git_l log --format='%h %an %cI' | grep -v " $NAME " | head -5)"
   [ -n "$foreign" ] && say "commits not made by this script (inspect before trusting them): $(printf '%s' "$foreign" | paste -sd';' -)"
@@ -271,7 +276,7 @@ restore() {
                table_rows "$WORK/SCENARIOS.md" | awk -F'|' '$9 ~ /report_pending/ {gsub(/ /,"",$2); printf "%s ", $2}'; } )"
   [ -n "$pending" ] && say "report_pending without their media (never backed up) — re-test before delivery: ${pending% }"
   logev info work_backup "restored $n files from $REF"
-  touch "$STAMP"
+  printf '%s\n' "$REF" > "$STAMP"
   return 0
 }
 table_rows() { grep '^|' "$1" 2>/dev/null | tail -n +3; }

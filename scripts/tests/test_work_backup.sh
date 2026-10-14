@@ -50,7 +50,7 @@ for never in env/credentials.env suite/node_modules/e2e/index.js suite/.e2e/runs
              issues/7/report-abc-1/media/AC-1.png .cache/retention-x issues/7/huge.json; do
   printf '%s\n' "$f" | grep -qx "$never" && { echo "  must never travel: $never"; FAILED=1; }
 done
-assert_eq "backup-head records the push" "$(git --git-dir="$REMOTE" rev-parse main)" "$(cat "$WORK_DIR/env/backup-head")"
+assert_eq "backup-head records the push" "$(git --git-dir="$REMOTE" rev-parse main) acme/widgets-qa" "$(cat "$WORK_DIR/env/backup-head")"
 assert "ledger pair" 'map(.msg) | (map(select(test("^surface=backup action=intent issue=- key=[0-9a-f]{12} target=acme/widgets-qa$"))) | length) == 1
                       and (map(select(test("action=done"))) | length) == 1' "$(events external_write)"
 assert "oversize file named" 'map(.msg) | any(test("left out.*huge.json"))' "$(events work_backup)"
@@ -119,6 +119,17 @@ assert_eq "pushed on top of the foreign commit" $((base + 4)) "$(commits)"
 assert "foreign commit logged" 'map(select(.level == "error")) | any(.msg | test("foreign commits on acme/widgets-qa@main.*alice"))' "$(events work_backup)"
 assert_eq "foreign edit reverted" "$(cat "$WORK_DIR/LESSONS.md")" "$(git --git-dir="$REMOTE" show main:LESSONS.md)"
 
+# Another work_repo: the first persist there is no rewritten history, and it does not wait
+# for a new change.
+OTHER="$SANDBOX/other.git"; git init -q --bare "$OTHER"
+echo '{"private":true,"fork":false}' > "$STUB_DIR/repo-acme_widgets-qa2.json"
+sed -i.bak 's|^- work_repo: .*|- work_repo: acme/widgets-qa2|' "$WORK_DIR/CONFIG.md" && rm -f "$WORK_DIR/CONFIG.md.bak"
+touch -t 202001010000 "$WORK_DIR/CONFIG.md"
+QI_WORK_BACKUP_REMOTE="$OTHER" bash "$WB" persist >/dev/null
+assert_eq "the new work_repo gets the full state at once" 1 "$(git --git-dir="$OTHER" rev-list --count main 2>/dev/null || echo 0)"
+assert "no false rewrite alarm" 'map(select(.msg | test("history was rewritten"))) | length == 0' "$(events work_backup)"
+sed -i.bak 's|^- work_repo: .*|- work_repo: acme/widgets-qa|' "$WORK_DIR/CONFIG.md" && rm -f "$WORK_DIR/CONFIG.md.bak"
+
 c="$(bash "$WB" check)"
 assert "check after a push" '.configured and .problem == null and (.last_push_utc | test("Z$")) and .unbacked == 0' "$c"
 
@@ -131,7 +142,7 @@ case "$out" in (*"re-test before delivery: #7"*) ;; (*) echo "  pending report n
 case "$out" in (*"commits not made by this script"*alice*) ;; (*) echo "  foreign commit not named: $out"; FAILED=1;; esac
 cmp -s "$WORK_DIR/suite/tests/issue-9.e2e.ts" "$FRESH/suite/tests/issue-9.e2e.ts" || { echo "  restored test differs"; FAILED=1; }
 [ -e "$FRESH/env/credentials.env" ] && { echo "  credentials restored"; FAILED=1; }
-assert_eq "restore records the head" "$(git --git-dir="$REMOTE" rev-parse main)" "$(cat "$FRESH/env/backup-head")"
+assert_eq "restore records the head" "$(git --git-dir="$REMOTE" rev-parse main) acme/widgets-qa" "$(cat "$FRESH/env/backup-head")"
 WORK_DIR="$FRESH" bash "$WB" restore >/dev/null; assert_eq "restore refuses over state" 1 "$?"
 EMPTY="$SANDBOX/empty.git"; git init -q --bare "$EMPTY"; E="$SANDBOX/e"; mkdir -p "$E"
 printf -- '- work_repo: acme/widgets-qa\n' > "$E/CONFIG.md"
