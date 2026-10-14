@@ -148,7 +148,11 @@ harness, an external service — rather than fixing it at its source:
   JSON and its decisions must match observable reality.
 - **Run the offline test suite** (`bash scripts/tests/run.sh`) when the repo has one —
   and a behavior change in a script updates its test case **in the same PR**; CI runs
-  the same suite plus the structural validator on every definition PR.
+  the same suite plus the structural validator on every definition PR. Files run in
+  parallel (`QI_TEST_JOBS`, `1` = serial); one suite per host at a time — a second run
+  waits and names the holder. On macOS `run.sh` runs in a CI-like container through
+  `scripts/tests/docker.sh` (Docker or Rancher Desktop), on the host only when no engine
+  answers or with `QI_TEST_DOCKER=0`.
 - Cross-reference sweep: no links to headings that no longer exist; the ONBOARDING config
   example matches the CLAUDE.md key list; README's tables match both.
 - `VERSION` was bumped exactly once, is valid semver, and equals the newest
