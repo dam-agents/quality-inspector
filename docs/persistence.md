@@ -88,8 +88,10 @@ run**: `git commit`/`push`, `gh pr create`/`merge`, edits of definition files an
 - It fails open only when a scheduled turn ran without its Precheck — every `kit.yaml`
   schedule carries one for that reason.
 - A **channel turn** counts the same: a session whose transcript holds the platform's Slack
-  frame (`<how-to-respond>`) is never direct, whoever sent the message — a session continued
-  from the UI included; a definition change needs a fresh direct session.
+  frame (`<how-to-respond>`) in a prompt is never direct, whoever sent the message — a session
+  continued from the UI included; a definition change needs a fresh direct session. The frame
+  in a tool's output (this file, an issue body) does not count. A channel turn also writes
+  nothing to GitHub (rule `channel-write`).
 
 ## Evolving the agent definition (outer repo)
 

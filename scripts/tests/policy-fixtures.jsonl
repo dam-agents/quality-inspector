@@ -72,6 +72,15 @@
 {"name":"commit, channel turn","mode":"channel","expect":"deny","rule":"scheduled-git","tool":"Bash","input":{"command":"git -C /home/agent commit -m 'fix: x'"}}
 {"name":"settings merge, channel turn","mode":"channel","expect":"deny","rule":"policy-tamper","tool":"Bash","input":{"command":"bash \"$HOME/scripts/hooks/install.sh\""}}
 {"name":"scenario write, channel turn","mode":"channel","expect":"allow","tool":"Write","input":{"file_path":"@WORK@/scenarios/S-1/request.md"}}
+{"name":"issue comment over REST, channel turn","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/12/comments -f body='ship it'"}}
+{"name":"gh issue comment, channel turn","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh issue comment 12 --body 'ship it'"}}
+{"name":"gh pr review, channel turn","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh pr review 3 --approve"}}
+{"name":"issue read, channel turn","mode":"channel","expect":"allow","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/12"}}
+{"name":"issue comment, scheduled","mode":"scheduled","expect":"allow","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/12/comments -f body=verdict"}}
+{"name":"definition edit, frame only quoted","mode":"quoted","expect":"allow","tool":"Edit","input":{"file_path":"@DEF@/CLAUDE.md"}}
+{"name":"config edit, frame only quoted","mode":"quoted","expect":"allow","tool":"Write","input":{"file_path":"@WORK@/CONFIG.md"}}
+{"name":"commit, frame only quoted","mode":"quoted","expect":"allow","tool":"Bash","input":{"command":"git -C /home/agent commit -m 'fix: x'"}}
+{"name":"config edit, unparsable frame line","mode":"garbled","expect":"deny","rule":"scheduled-def","tool":"Write","input":{"file_path":"@WORK@/CONFIG.md"}}
 {"name":"webfetch raw","expect":"deny","rule":"raw-host","tool":"WebFetch","input":{"url":"https://raw.githubusercontent.com/acme/widgets/main/src/app.ts","prompt":"x"}}
 {"name":"webfetch repo page","expect":"deny","rule":"repo-web","tool":"WebFetch","input":{"url":"https://github.com/acme/widgets/blob/main/src/app.ts","prompt":"x"}}
 {"name":"websearch repo","expect":"deny","rule":"repo-web","tool":"WebSearch","input":{"query":"site:github.com/acme/widgets session store"}}

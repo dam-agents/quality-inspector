@@ -2,7 +2,7 @@
 # render-report.mjs: every tested AC gets its video and captioned screenshot; the setup test never appears;
 # explorations render apart from the verdict, and a verdicts file without them renders as before;
 # a baseline blocked reason and a regression's build interval are shown; a scenario's evidence is
-# found by its own tag and carries the judge's reading.
+# found by its own tag and carries the judge's reading, and a verified scenario is refused.
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 R="$SANDBOX/runs"
@@ -112,4 +112,10 @@ h="$(cat "$SANDBOX/s-out/index.html")"
 case "$h" in *'S-7 — Export the usage table'*) ;; *) echo "  scenario title missing"; FAILED=1;; esac
 case "$h" in *'agrees (product-defect)'*) ;; *) echo "  judge reading missing"; FAILED=1;; esac
 grep -q '^• AC-1 csv downloads — regression$' "$SANDBOX/s-out/comment.md" || { echo "  scenario reply line missing"; FAILED=1; }
+
+# A scenario is never verified: refused before anything is written, the earlier report kept.
+jq '.verdict = "passed" | .acs[0].verdict = "verified"' "$SANDBOX/s.json" > "$SANDBOX/s-ver.json"
+QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/s-ver.json" "$SANDBOX/s-out" >/dev/null 2>&1
+assert_eq "a verified scenario AC is refused" 2 "$?"
+[ -f "$SANDBOX/s-out/index.html" ] || { echo "  the refused render removed the earlier report"; FAILED=1; }
 exit $FAILED
