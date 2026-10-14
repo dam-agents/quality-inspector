@@ -58,6 +58,16 @@ check "$P" | grep -q '^FAIL  boundary.packages' || { echo "  boundary.packages t
 P="$(helm_profile api)"; edit "$P" '.interfaces = {"openapi":"api/openapi.json"}'
 check "$P" | grep -q '^FAIL  interfaces.openapi' || { echo "  an openapi path outside app.url must fail"; FAILED=1; }
 
+# Egress entries as scripts/egress-rules.sh reads them: verdict, method *, pathPattern.
+P="$(helm_profile egress)"
+edit "$P" '.egress += [{"host":"github.com","method":"*","verdict":"allow","pathPattern":"/acme/tools/releases/*","why":"a tool"}]'
+out="$(check "$P")"
+assert_eq "egress: method *, verdict and pathPattern pass" "" "$(grep '^FAIL  egress' <<<"$out")"
+P="$(helm_profile egressbad)"; edit "$P" '.egress += [{"host":"x.example","verdict":"maybe","pathPattern":"tools/*","why":"x"}]'
+out="$(check "$P")"
+grep -q "^FAIL  egress\[2\] (x.example): verdict 'maybe'" <<<"$out" || { echo "  an unknown egress verdict must fail"; FAILED=1; }
+grep -q '^FAIL  egress\[2\] (x.example): pathPattern must be' <<<"$out" || { echo "  a relative pathPattern must fail"; FAILED=1; }
+
 P="$(helm_profile url)"; edit "$P" '.app.url = "https://acme.example.com"'
 check "$P" | grep -q '^FAIL  app.url' || { echo "  a non-local app.url must fail"; FAILED=1; }
 

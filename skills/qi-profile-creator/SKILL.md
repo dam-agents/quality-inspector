@@ -65,7 +65,9 @@ Phases in order. Write no profile files before the person approves the Phase 1 b
 3. **Find the product and the profile's home.** Default: the current repository, profile
    at `qa/qi-profile-<product-slug>/` — the directory name is the skill name. Ask when the
    working directory is not the product's repository, or when the profile belongs
-   elsewhere (a product the team does not own → a separate profiles repository).
+   elsewhere (a product the team does not own → a separate profiles repository). Inside
+   the target repository the agent fetches only that directory: plain directory names in
+   its path, no symlink or submodule in it (`docs/profile-contract.md` → Where it lives).
 4. **An existing profile → update mode.** Read all of it, run the checker (Phase 4) to see
    where it stands, and change only what was asked. Keep `config` key names stable: an
    instance's `work/CONFIG.md` holds `profile.<key>` bullets, and a renamed key is unknown
@@ -150,9 +152,11 @@ agent's onboarding smoke test is their first real run — say so.
    → Black-box boundary instead of restating them:
    - add a skill source — this repository, `path` = the profile's parent directory — and
      assign the profile skill to the agent;
-   - when the profile lives in the **target** repository, the egress allow
-     `GET api.github.com /repos/<target>/contents/<path>*`;
-   - every `egress` entry of `profile.json`, and a deny for every `boundary.urls` entry;
+   - the egress rules that `scripts/egress-rules.sh` prints (`docs/black-box.md` → Egress
+     rules): in the **target** repository, with that `path` as `profile_source_path` in
+     `work/CONFIG.md`; in a separate profiles repository, with
+     `--source <owner>/<repo>`. They include every `egress` entry of `profile.json`;
+   - a deny for every `boundary.urls` entry;
    - the `profile.<key>` values onboarding will ask for.
 3. Say in three lines what the QA agent will treat as untestable (the "cannot do" list),
    so the first `not-testable` verdicts surprise nobody.

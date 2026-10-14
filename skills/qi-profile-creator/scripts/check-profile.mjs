@@ -187,8 +187,13 @@ if (m) {
     for (const [i, e] of m.egress.entries()) {
       const id = `egress[${i}]`;
       if (!obj(e) || !str(e.host) || /[/:\s]/.test(e.host)) { fail(`${id}: host must be a bare host name (no scheme, port or path)`); ok = false; continue; }
-      if (e.method !== undefined && !['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(e.method)) { fail(`${id} (${e.host}): method '${e.method}'`); ok = false; }
-      if (e.path !== undefined && !String(e.path).startsWith('/')) { fail(`${id} (${e.host}): path must start with /`); ok = false; }
+      // The keys scripts/egress-rules.sh reads: verdict, method, host, pathPattern (or path), why.
+      if (e.method !== undefined && !['*', 'GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(e.method)) { fail(`${id} (${e.host}): method '${e.method}' is not * or an HTTP method`); ok = false; }
+      if (e.verdict !== undefined && !['allow', 'deny'].includes(e.verdict)) { fail(`${id} (${e.host}): verdict '${e.verdict}' is not allow or deny`); ok = false; }
+      for (const k of ['path', 'pathPattern']) {
+        if (e[k] !== undefined && !(e[k] === '*' || String(e[k]).startsWith('/'))) { fail(`${id} (${e.host}): ${k} must be * or start with /`); ok = false; }
+      }
+      if (e.path !== undefined && e.pathPattern !== undefined) warn(`${id} (${e.host}): both path and pathPattern — pathPattern wins`);
       if (!str(e.why)) warn(`${id} (${e.host}): no why — the operator applies it without knowing what it is for`);
     }
     if (ok) pass(`egress: ${m.egress.length} host rule(s)`);
