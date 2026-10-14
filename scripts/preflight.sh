@@ -33,6 +33,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/config.sh" || { echo "cannot source lib/config.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/state.sh" || { echo "cannot source lib/state.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/profile.sh" || { echo "cannot source lib/profile.sh" >&2; exit 1; }
+. "$SCRIPT_DIR/lib/boundary.sh" || { echo "cannot source lib/boundary.sh" >&2; exit 1; }
 
 iso2epoch() { date -d "$1" +%s 2>/dev/null \
               || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
@@ -188,8 +189,6 @@ check() { CHECKS="$(printf '%s' "$CHECKS" | jq -c --arg id "$1" --arg s "$2" --a
 
 # 0 = the request succeeded (reachable), 1 = refused/failed, 2 = held (timed out).
 probe_gh() { timeout 20 gh api ${GH_HOST_ARGS[@]+"${GH_HOST_ARGS[@]}"} "$1" >/dev/null 2>&1; case $? in (0) return 0;; (124) return 2;; (*) return 1;; esac; }
-probe_url() { local c; c="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$1" 2>/dev/null)"
-  case "$c" in (2??) return 0;; (000) return 2;; (*) return 1;; esac; }
 
 epoch2iso() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$1" +%Y-%m-%dT%H:%M:%SZ; }
 # "<used %> <free GiB>" of the home volume; nothing when df cannot tell.
@@ -254,15 +253,11 @@ mode_audit() {
     if probe_gh "repos/$REPO_PATH/issues?per_page=1"; then check issues_read ok "issues endpoint reachable"
     else check issues_read fail "cannot list issues of the target repository"; fi
     # black-box boundary: each of these must be refused (docs/black-box.md)
-    local kind target r
-    while read -r kind target; do
-      if [ "$kind" = gh ]; then probe_gh "$target"; else probe_url "$target"; fi; r=$?
-      case $r in
-        (0) check "boundary:${target%%\?*}" fail "source surface is reachable — add the deny rule (README → Black-box boundary)";;
-        (2) check "boundary:${target%%\?*}" warn "request was held, not denied — make the rule an explicit deny";;
-        (*) check "boundary:${target%%\?*}" ok "refused";;
-      esac
-    done < <(boundary_targets "$REPO_PATH")
+    local status id detail
+    while read -r status id detail; do
+      [ "$status" = fail ] && detail="$detail — add the deny rule (bash scripts/egress-rules.sh)"
+      check "$id" "$status" "$detail"
+    done < <(boundary_probe "$TARGET")
   else
     check config_target fail "target_repo not configured"
   fi

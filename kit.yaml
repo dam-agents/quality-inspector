@@ -84,13 +84,73 @@ schedules:
       Weekly self-audit. Run `bash "$HOME/scripts/preflight.sh" audit`, then follow
       CLAUDE.md → "Audit run": read docs/audit.md and report.
 
-# Rules every deployment shares; the target-specific ones are the operator's (README →
-# Black-box boundary), because the target repository is an instance value.
+# Rules every deployment shares; the target-specific ones are the operator's
+# (`bash scripts/egress-rules.sh` prints them), because the target is an instance value.
+# The `trusted` preset and the GitHub connection allow github.com, api.github.com,
+# codeload, raw, gitlab.com and codeberg.org host-wide (method and path "*") before these
+# rules are written, and a kit rule that contradicts a rule already there fails the
+# apply. So every deny names a path — "/*" for a whole host — which also outranks their
+# "*" (docs/black-box.md → Egress rules).
+egressPreset: trusted
 egressRules:
   - host: registry.npmjs.org
     method: GET
   - host: api.anthropic.com
+  # Read any repository's code, whatever the target.
+  - host: api.github.com
+    pathPattern: "/graphql*"
+    verdict: deny
+  - host: api.github.com
+    pathPattern: "/search/code*"
+    verdict: deny
+  - host: api.github.com
+    pathPattern: "/search/commits*"
+    verdict: deny
+  - host: api.github.com
+    pathPattern: "/repositories/*"
+    verdict: deny
+  - host: api.github.com
+    pathPattern: "/gists*"
+    verdict: deny
+  # Code hosts this agent never needs.
   - host: raw.githubusercontent.com
+    pathPattern: "/*"
+    verdict: deny
+  - host: gist.githubusercontent.com
+    pathPattern: "/*"
+    verdict: deny
+  - host: gist.github.com
+    pathPattern: "/*"
+    verdict: deny
+  - host: gitlab.com
+    pathPattern: "/*"
+    verdict: deny
+  - host: "*.gitlab.com"
+    pathPattern: "/*"
+    verdict: deny
+  - host: bitbucket.org
+    pathPattern: "/*"
+    verdict: deny
+  - host: "*.bitbucket.org"
+    pathPattern: "/*"
+    verdict: deny
+  - host: codeberg.org
+    pathPattern: "/*"
+    verdict: deny
+  - host: gitea.com
+    pathPattern: "/*"
+    verdict: deny
+  - host: dev.azure.com
+    pathPattern: "/*"
+    verdict: deny
+  - host: "*.visualstudio.com"
+    pathPattern: "/*"
+    verdict: deny
+  - host: sourcegraph.com
+    pathPattern: "/*"
+    verdict: deny
+  - host: git.sr.ht
+    pathPattern: "/*"
     verdict: deny
 
 resources:

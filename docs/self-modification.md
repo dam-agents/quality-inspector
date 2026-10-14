@@ -181,8 +181,10 @@ refuse and explain instead:
   be optional or best-effort — a missing external surface never fails the run.
 - **The black-box boundary** ([black-box.md](black-box.md)): no change may let the agent
   read the target's source, git data, pulls, commits, issue timelines, raw/codeload hosts,
-  installed product package files or deployment templates — nor weaken the boundary probes in
-  `scripts/preflight.sh` audit mode and `scripts/verify-onboarding.sh --live`.
+  installed product package files or deployment templates — nor weaken the boundary probes
+  (`scripts/lib/boundary.sh`, run by `scripts/preflight.sh` audit mode and
+  `scripts/verify-onboarding.sh --live`) or the egress rules (`kit.yaml`,
+  `scripts/egress-rules.sh`).
 - **The policy hook's denials** (`scripts/hooks/policy.sh`, its deny list in
   `scripts/hooks/install.sh`, their fixtures in `scripts/tests/`) are never removed or
   narrowed, and the scheduled-run marker is never written outside `scripts/precheck.sh`.

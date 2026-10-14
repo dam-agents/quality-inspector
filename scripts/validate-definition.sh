@@ -100,6 +100,24 @@ else
     fail "kit.yaml declares no 'seed:' — without one the platform creates an agent with no definition"
   fi
 
+  # The egress preset and the connections write host-wide allows (path "*") before the
+  # kit's rules; a kit deny on the same tuple fails the apply, which deletes the agent.
+  # A deny that names a path ("/*" for a whole host) never collides and outranks "*".
+  # A key counts on the item's "- " line too, quoted or not, before a trailing comment;
+  # scripts/egress-rules.sh reads the kit the same way (scripts/tests/test_egress_rules.sh).
+  if grep -qE '^egressRules:' kit.yaml; then
+    bad_denies="$(sed -n '/^egressRules:/,/^[a-z]/p' kit.yaml | awk '
+      function val(s) { sub(/^[^:]*:[[:space:]]*/, "", s); sub(/[[:space:]]+#.*$/, "", s); gsub(/["\047]/, "", s); sub(/[[:space:]]+$/, "", s); return s }
+      /^  - / { if (deny && !path) print host; host = ""; deny = 0; path = 0 }
+      /^(  - |    )host:/ { host = val($0) }
+      /^(  - |    )verdict:/ { deny = (val($0) == "deny") }
+      /^(  - |    )pathPattern:/ { pp = val($0); path = (pp != "*" && pp != "") }
+      END { if (deny && !path) print host }')"
+    [ -z "$bad_denies" ] \
+      && pass "kit.yaml egress denies each name a path" \
+      || fail "kit.yaml egress denies without a path collide with the preset's and connections' allows and fail the apply — give each a pathPattern (\"/*\" for the whole host): $(echo $bad_denies)"
+  fi
+
   # id, the sentinel and the schedule prefix all name the same agent; a mismatch means
   # ONBOARDING creates a second copy of every schedule the kit already made.
   kit_id="$(grep -m1 -E '^id:' kit.yaml | sed -e 's/^id:[[:space:]]*//' -e 's/[[:space:]]*$//')"
