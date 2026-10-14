@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 2.12.0 — 2026-10-14
+## 2.15.0 — 2026-10-14
 
 **Upgrade:**
 1. Nothing to migrate for the environment lock: `work/env/LOCK` lines written before this
@@ -16,19 +16,62 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 2. Offer, once, the new off-by-default features — the step is the offer; a yes writes the
    key ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**):
    - `slack_channel: <chat id>` — people in that Slack chat order "test #N" and get the
-     report in the thread ([docs/slack.md](docs/slack.md)). **operator-only** first: bind a
-     Slack channel in the agent's settings; then `describe_channel` for `slack` names the
-     id. `slack_tests_per_day: 3` caps it.
+     report in the thread ([docs/slack.md](docs/slack.md)). It needs the Slack channel
+     connected to the agent (2.12.0); `describe_channel` for `slack` names the id.
+     `slack_tests_per_day: 3` caps it.
    - `lend_model: enabled` — the nested product calls this agent's model by placeholder
      instead of a mock; tokens per product AI step, and only once the profile uses
      `QI_MODEL_*` or a `when: "@model"` overlay ([docs/profile-contract.md](docs/profile-contract.md)).
    - `live_browser: <CDP endpoint>` — when `/etc/AGENTS.md` names the shared browser's: the
-     operator watches exploration in the Browser Panel. It needs `work/suite/e2e.config.ts`
-     to carry the skeleton's `E2E_CDP_ENDPOINT` lines — without them, copy those two changes
-     from `scripts/suite-skeleton/e2e.config.ts` (`diff` shows them).
-3. **operator-only, new agents only:** `kit.yaml` now offers a Slack channel binding.
+     operator watches exploration in the Browser Panel, in a direct session whose
+     transcript the shell finds. It needs `work/suite/e2e.config.ts` to carry the
+     skeleton's `E2E_CDP_ENDPOINT` lines — without them, copy those two changes from
+     `scripts/suite-skeleton/e2e.config.ts` (`diff` shows them).
+3. Nothing to install for the policy hook: its rule `channel-write` now lets a Slack-ordered
+   "test #N" post its issue comment and remove its retest label on that one issue; every
+   other GitHub write in a Slack turn stays refused. It applies with the hook, from the next
+   session ([docs/slack.md](docs/slack.md)).
 4. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:` — its new
    `lock_liveness` line says whether a dead run's lock is freed at once or after `lock_ttl_min`.
+
+## 2.14.0 — 2026-10-14
+
+**Upgrade:**
+Nothing — the `qi-profile-creator` skill (`skills/`) is for product teams writing a
+profile, and the helm-k3s engine's `bin/check` runs only when a profile is checked;
+neither runs on a deployed instance.
+
+## 2.13.0 — 2026-10-14
+
+**Upgrade:**
+1. Add `- profile_source_path: <path>` to `work/CONFIG.md` unless present: the skill
+   source's path when the profile's source is `target_repo` (for DAM: source
+   `dam-agents/dam`, path `qa`), else empty.
+2. **operator-only:** run the commands `bash "$HOME/scripts/egress-rules.sh"` prints (add
+   `--source <owner>/<repo>` per other GitHub skill source), skipping the rules the agent
+   already has, then delete the target rules it no longer prints — among them the
+   `…/contents/<path>*` allow of 2.2.0 ([docs/black-box.md](docs/black-box.md) → **Egress
+   rules**). The target's GitHub hosts become deny-by-default: forks, other-case spellings
+   of the target and other repositories were readable.
+3. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:` — the
+   probes now also cover the target in the other case and a dot segment out of the
+   profile's directory, and check that directory is readable and symlink-free. A `fail`
+   on `…/contents/<path>/..` is the platform's gateway: its `fix:` empties
+   `profile_source_path` and drops the profile allows; report the gateway.
+
+## 2.12.0 — 2026-10-14
+
+**Upgrade:**
+1. Seed `work/SCENARIOS.md` and `work/scenarios/` as in ONBOARDING.md Step 2b (only what
+   is missing).
+2. Create the schedule `quality-inspector-scenarios-weekly` from its `kit.yaml` entry,
+   **disabled**, unless it exists (ONBOARDING.md Step 5).
+3. Offer `scenario_discovery: propose` (weekly judged scenario proposals) or `run` (also
+   tested, a few hundred thousand tokens per scenario), and `scenario_channel` for their
+   Slack digest — off when unanswered ([docs/scenarios.md](docs/scenarios.md)).
+4. **operator-only:** to take scenario requests from Slack, connect a channel to the agent
+   on the platform. The policy hook treats its turns as non-direct by itself.
+5. Run `bash "$HOME/scripts/verify-onboarding.sh"` and apply every `fix:`.
 
 ## 2.11.0 — 2026-10-14
 

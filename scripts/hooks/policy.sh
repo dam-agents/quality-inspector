@@ -12,9 +12,11 @@
 # <T> = target_repo (QI_TARGET_REPO wins); a parameter expansion in its place ($T, ${T},
 # $OWNER/$REPO) counts as <T> in gh-api-path, gh-search, gh-cli, codeload and repo-web, a
 # command substitution $(…) does not (docs/persistence.md opens the definition PR with
-# one). "scheduled" = a fresh work/env/RUN_MODE
-# (docs/persistence.md → Scheduled or direct session). Every rule id below has a deny
-# fixture in scripts/tests/policy-fixtures.jsonl; the validator fails without one.
+# one). "scheduled" = a fresh work/env/RUN_MODE, or a channel turn — a session whose
+# transcript holds the platform's Slack frame `<how-to-respond>` in a prompt, not in a
+# tool's output (lib/channel.sh; docs/persistence.md → Scheduled or direct session). Every
+# rule id below has a deny fixture in scripts/tests/policy-fixtures.jsonl; the validator
+# fails without one.
 #
 #   rule             tools                 denies
 #   gh-api-path      Bash                  a GitHub API path under /repos/<T>/ other than issues, issues/<n>,
@@ -46,6 +48,14 @@
 #                                          (a method other than GET, or a field or --input) whose endpoint
 #                                          is not under the target's issues — so a pull request over REST too
 #   policy-tamper    Bash (scheduled)      any command naming RUN_MODE, scripts/hooks/ or .claude/settings
+#   channel-write    Bash (channel turn)   any `gh api` write, issues paths included, and `gh issue|pr`
+#                                          comment|create|edit|close|merge|review|… — except the
+#                                          delivery of a Slack-ordered "test #N" (docs/slack.md): a POST
+#                                          to repos/<T>/issues/<n>/comments or a DELETE of
+#                                          repos/<T>/issues/<n>/labels/<retest_label>, <T> and <n> written
+#                                          out, while RUN_MODE is a fresh `slack <ISO> - <n> <session>`
+#                                          (precheck.sh slack <n>; <session> this one, or -) and the
+#                                          work/QA.md row of <n> is report_pending
 #
 # Every denial logs one `policy_denied` event (scripts/log.sh): `tool=<name> rule=<id>`
 # plus `at=<host/path or file>` — never a full command or a query string.
@@ -76,13 +86,15 @@ VARS="$(jq -r '
   "TOOL=\(.tool_name | s) SESSION=\(.session_id | s) CWD=\(.cwd | s)",
   "CMD=\(.tool_input.command | s) FPATH=\((.tool_input.file_path // .tool_input.notebook_path) | s)",
   "GPATH=\(.tool_input.path | s) GPAT=\(.tool_input.pattern | s) GGLOB=\(.tool_input.glob | s)",
-  "URL=\(.tool_input.url | s) QUERY=\(((.tool_input.query // "") + " " + ((.tool_input.allowed_domains // []) | join(" "))) | s)"' 2>/dev/null)" \
+  "URL=\(.tool_input.url | s) QUERY=\(((.tool_input.query // "") + " " + ((.tool_input.allowed_domains // []) | join(" "))) | s)",
+  "TRANSCRIPT=\(.transcript_path | s)"' 2>/dev/null)" \
   || deny bad-input "" "the tool call could not be parsed"
 eval "$VARS"
 [ -n "$CWD" ] || CWD="$PWD"
 
 . "$SCRIPT_DIR/lib/config.sh" 2>/dev/null || deny bad-install "" "scripts/lib/config.sh is missing"
 . "$SCRIPT_DIR/lib/profile.sh" 2>/dev/null || deny bad-install "" "scripts/lib/profile.sh is missing"
+. "$SCRIPT_DIR/lib/channel.sh" 2>/dev/null || deny bad-install "" "scripts/lib/channel.sh is missing"
 
 # ------------------------------------------------------------------ context ----
 # Host, owner and repository names compare case-insensitively (nocasematch is switched on
@@ -102,11 +114,33 @@ load_profile() { # lazily: only a rule that needs the profile's boundary reads i
 }
 
 iso2epoch() { date -u -d "$1" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
+CHAN=""
+channel_turn() { # lib/channel.sh → transcript_is_channel, once per call
+  [ -n "$CHAN" ] && { [ "$CHAN" = 1 ]; return; }
+  CHAN=0
+  transcript_is_channel "$TRANSCRIPT" && CHAN=1
+  [ "$CHAN" = 1 ]
+}
+# slack_test_issue <n>: the issue a Slack-ordered "test #N" delivers to — RUN_MODE is
+# `slack <ISO> <schedule> <n> <session>` written within lock_ttl_min, its session this one
+# (or - when the shell had none), and work/QA.md's row of <n> is report_pending.
+slack_test_issue() {
+  local f="$WORK/env/RUN_MODE" kind="" iso="" sid="" num="" sess="" ttl
+  read -r kind iso sid num sess _ < "$f" 2>/dev/null
+  [ "$kind" = slack ] && [ -n "$num" ] && [ "$num" = "$1" ] || return 1
+  case "$sess" in (''|-) ;; (*) [ "$sess" = "$SESSION" ] || return 1;; esac
+  ttl="$(cfg lock_ttl_min)"; case "$ttl" in (''|*[!0-9]*) ttl=180;; esac
+  [ $(( $(date -u +%s) - $(iso2epoch "${iso:-x}") )) -lt $(( ttl * 60 )) ] || return 1
+  awk -F'|' -v n="$1" '{i=$2; s=$7; gsub(/[ \t]/, "", i); gsub(/[ \t]/, "", s)} i == n && s == "report_pending" {f=1} END {exit !f}' \
+    "$WORK/QA.md" 2>/dev/null
+}
 SCHED=""
-scheduled() { # a RUN_MODE written (content time) or touched (mtime) within lock_ttl_min
+scheduled() { # a RUN_MODE written (content time) or touched (mtime) within lock_ttl_min, or a
+  # channel turn (above)
   [ -n "$SCHED" ] && { [ "$SCHED" = 1 ]; return; }
   SCHED=0
   local f="$WORK/env/RUN_MODE" ttl now t1 t2 kind iso
+  channel_turn && { SCHED=1; return 0; }
   [ -e "$f" ] || return 1
   ttl="$(cfg lock_ttl_min)"; case "$ttl" in (''|*[!0-9]*) ttl=180;; esac
   now="$(date -u +%s)"
@@ -251,11 +285,11 @@ skip_quoted() {
   done
 }
 # `gh api` from word <k> on (check_simple's w and n): GH_EP = the endpoint, the first word
-# that is neither a flag nor a flag's value. True when the call writes: a method other than
-# GET or HEAD, or a field or --input without a method.
+# that is neither a flag nor a flag's value; GH_M = the method (a field or --input without
+# one is POST). True when the call writes: a method other than GET or HEAD.
 gh_api_write() { # <k>
   local j="$1" m="" f=0
-  GH_EP=""
+  GH_EP=""; GH_M=GET
   while [ "$j" -lt "$n" ]; do
     unq "${w[$j]}"
     case "$U" in
@@ -270,7 +304,27 @@ gh_api_write() { # <k>
     esac
     j=$((j+1))
   done
-  case "$m" in (GET|HEAD) return 1;; ('') [ "$f" = 1 ];; (*) return 0;; esac
+  [ -z "$m" ] && [ "$f" = 1 ] && m=POST
+  GH_M="$(printf '%s' "${m:-GET}" | tr '[:lower:]' '[:upper:]')"
+  case "$GH_M" in (GET|HEAD) return 1;; (*) return 0;; esac
+}
+# The delivery a Slack-ordered "test #N" may make in a channel turn (docs/slack.md): a POST to
+# repos/<T>/issues/<n>/comments, or a DELETE of repos/<T>/issues/<n>/labels/<retest_label>
+# (URL-encoded or not) — <T> and <n> written out, never a variable — for slack_test_issue <n>.
+RE_SLACK_EP='^/?(api/v3/)?repos/([^/$]+)/([^/?#$]+)/issues/([0-9]+)/(comments|labels/([^/?#$]+))$'
+slack_test_write() { # <endpoint> <method>
+  local e="$1" own rp n what lab rl
+  case "$e" in (http://*|https://*) e="${e#*://}"; e="/${e#*/}";; esac
+  [[ "$e" =~ $RE_SLACK_EP ]] || return 1
+  own="${BASH_REMATCH[2]}"; rp="${BASH_REMATCH[3]}"; n="${BASH_REMATCH[4]}"; what="${BASH_REMATCH[5]}"; lab="${BASH_REMATCH[6]}"
+  [ -n "$T" ] && [[ "$own/$rp" == "$T" ]] || return 1
+  case "$what" in
+    (comments) [ "$2" = POST ] || return 1;;
+    (*) [ "$2" = DELETE ] || return 1
+        rl="$(cfg retest_label)"; rl="${rl:-qa:retest}"
+        [[ "$lab" == "$rl" || "$lab" == "$(jq -rn --arg l "$rl" '$l | @uri')" ]] || return 1;;
+  esac
+  slack_test_issue "$n"
 }
 # An endpoint under the target's issues: repos/<T>/issues…, with or without a leading /,
 # /api/v3 or scheme and host; an owner/repo given as a variable counts as <T>.
@@ -341,10 +395,17 @@ check_simple() { # <one simple command>
           check_repo_paths "$rest"
           if [ -n "$T" ]; then case "$rest" in (*search/code*"$T"*|*search/commits*"$T"*) deny gh-search "$API_HOST/search" "searching the target's code or commits is off limits";; esac; fi
           case "$rest" in (*search/code*\$[A-Za-z_{]*|*search/commits*\$[A-Za-z_{]*) deny gh-search "$API_HOST/search" "searching the target's code or commits is off limits";; esac
-          gh_api_write "$((i+1))" && ! issues_endpoint "$GH_EP" && scheduled \
-            && deny scheduled-git "" "a scheduled run writes only the target's issue comments and labels";;
+          if gh_api_write "$((i+1))"; then
+            channel_turn && { slack_test_write "$GH_EP" "$GH_M" || deny channel-write "" \
+              "a channel turn writes to GitHub only a Slack-ordered test's comment and retest label on its issue (docs/slack.md)"; }
+            issues_endpoint "$GH_EP" || { scheduled \
+              && deny scheduled-git "" "a scheduled run writes only the target's issue comments and labels"; }
+          fi;;
         (pr) case "$rest" in (" pr create "*|" pr merge "*) scheduled && deny scheduled-git "" "a scheduled run never opens or merges a PR";; esac;;
       esac
+      case "$sub" in (issue|pr)
+        case "${rest# "$sub" }" in (comment\ *|create\ *|edit\ *|close\ *|reopen\ *|delete\ *|lock\ *|unlock\ *|transfer\ *|pin\ *|unpin\ *|develop\ *|merge\ *|review\ *|ready\ *)
+          channel_turn && deny channel-write "" "a channel turn writes to GitHub only through gh api, and only a Slack-ordered test's delivery (docs/slack.md)";; esac;; esac
       case "$sub" in (pr|repo|release|run|workflow|browse|gist|search|cache|attestation|codespace|ruleset|project)
         if [ -n "$T" ]; then case "$rest" in (*"$T"*) deny gh-cli "$GH_HOST/$T" "only the target's issues may be read";; esac; fi
         gh_repo_var "$i" && deny gh-cli "$GH_HOST/<variable>" "only the target's issues may be read";; esac;;

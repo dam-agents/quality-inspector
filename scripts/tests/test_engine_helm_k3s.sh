@@ -87,4 +87,29 @@ assert_eq "the same build and values: already up" 0 "$(up '{"img":"x","mock":""}
 grep -q 'already up' "$SANDBOX/uperr" || { echo "  fast path not taken: $(cat "$SANDBOX/uperr")"; FAILED=1; }
 assert_eq "other values: installs again" 1 "$(up '{"img":"y","mock":""}')"
 [ -f "$E/STATE.json" ] && { echo "  the old build stayed recorded through a failed upgrade"; FAILED=1; }
+
+# bin/check: offline validation of engine_config (README → Check).
+mkdir -p "$SANDBOX/pd" && echo '{"app":{"url":"http://localhost:8080"}}' > "$SANDBOX/pd/profile.json"
+PCFG='{"img":"x","mock":""}'
+c() { QI_ENGINE_CONFIG="$1" QI_PROFILE_CONFIG="$PCFG" QI_PROFILE_DIR="$SANDBOX/pd" bash "$ENG/bin/check"; }
+out="$(c "$(cfg oci)")"; rc=$?
+assert_eq "check: a complete config passes" "0 " "$rc $(grep '^FAIL' <<<"$out")"
+c "$(cfg oci | jq -c '.default_candidate = "nightly"')" | grep -q "^FAIL default_candidate 'nightly' is not a channel" \
+  || { echo "  check: an unknown default channel must fail"; FAILED=1; }
+c "$(cfg oci | jq -c '.overlays[0].when = "nope"')" | grep -q "^FAIL overlay when 'nope' is not a profile config key" \
+  || { echo "  check: an overlay on an unknown key must fail"; FAILED=1; }
+c "$(cfg oci | jq -c '.overlays[0].values.mock.x = "{{secret:missing}}"')" | grep -q '^FAIL values with every overlay on: credentials have no QI_SECRET_MISSING' \
+  || { echo "  check: a placeholder inside an overlay must be rendered too"; FAILED=1; }
+# A "@model" overlay is valid and rendered only in the "every overlay on" pass, even when the
+# caller's own environment lends a model.
+out="$(QI_MODEL_KEY=caller c "$(cfg oci | jq -c '.overlays[1].values.llm.x = "{{secret:missing}}"')")"
+grep -q '^FAIL values with every overlay on: credentials have no QI_SECRET_MISSING' <<<"$out" \
+  || { echo "  check: a @model overlay must be rendered with every overlay on"; FAILED=1; }
+grep -q '^FAIL values: ' <<<"$out" && { echo "  check: the defaults render must lend no model"; FAILED=1; }
+c "$(cfg oci | jq -c '.app_port = 9090')" | grep -q '^FAIL app.url answers on port 8080, app_port is 9090' \
+  || { echo "  check: app_port must match app.url"; FAILED=1; }
+c "$(cfg oci | jq -c '.channels.main.order = "time"')" | grep -q "^FAIL channel 'main': order time needs registry_api quay" \
+  || { echo "  check: order time needs quay"; FAILED=1; }
+c "$(cfg oci | jq -c '.credentials.users = {}')" | grep -q '^FAIL credentials.users.owner' \
+  || { echo "  check: the owner account is required"; FAILED=1; }
 exit $FAILED

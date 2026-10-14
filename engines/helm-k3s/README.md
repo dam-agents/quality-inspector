@@ -58,6 +58,16 @@ ranges added; `{{gateway_ca}}` — the PEM of the CA the gateway presents (the f
 `NODE_EXTRA_CA_CERTS` or `SSL_CERT_FILE` names), empty when neither does. The rendered
 values (`$QI_ENV_DIR/values.json`) are mode 600 and never printed.
 
+## Check
+
+`bin/check` validates `engine_config` offline, for the profile checker: the keys above,
+the channels and their defaults, the owner account, each prerequisite's fields, `app_port`
+against the profile's `app.url`, and every placeholder rendered with throw-away
+credentials — once with the config defaults and no lent model, once with every overlay
+switched on. An overlay's `when` must be a profile config key or `"@model"`; the second
+render sets a throw-away `QI_MODEL_KEY`, so a `"@model"` overlay and its `{{model:*}}`
+placeholders are rendered too.
+
 ## Diagnosis (read-only)
 
 `k3s kubectl get pods -A`, `k3s kubectl -n <ns> describe pod <p>`, `k3s kubectl -n <ns>

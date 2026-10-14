@@ -9,7 +9,7 @@
 //                                   -> {"impacted":[{test, hits:[…]}], "clear":[…]}
 // `none` stands for a UI diff that was skipped (no map of the previous build).
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { controlRe, esc, insideAc, matchable, pageRe } from './lib/match.mjs';
 
 const args = process.argv.slice(2);
@@ -65,7 +65,8 @@ const changes = [
 
 const impacted = [];
 const clear = [];
-for (const file of files) {
+// An unexpanded glob (no scenario tests yet) is not a file.
+for (const file of files.filter((f) => existsSync(f))) {
   const src = readFileSync(file, 'utf8');
   const lines = src.split('\n');
   const hits = [];

@@ -7,8 +7,8 @@ for a change to the agent definition itself.
 
 | Path | Kind | Holds |
 | --- | --- | --- |
-| `/home/agent` (outer) | git repo, remote `origin` (the kit's seed) | Definition: `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `docs/`, `scripts/`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `LICENSE`, `engines/`. |
-| `/home/agent/work` | **plain data directory** (no `.git`), local-only | Config, `QA.md`, `SUITE.md`, `LESSONS.md`, `issues/`, `suite/` (tests, replay cache, `node_modules`), `env/` (values, credentials, lock, the last install's result), logs. |
+| `/home/agent` (outer) | git repo, remote `origin` (the kit's seed) | Definition: `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `docs/`, `scripts/`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `LICENSE`, `engines/`, `skills/`. |
+| `/home/agent/work` | **plain data directory** (no `.git`), local-only | Config, `QA.md`, `SUITE.md`, `SCENARIOS.md`, `LESSONS.md`, `issues/`, `scenarios/`, `suite/` (tests, replay cache, `node_modules`), `env/` (values, credentials, lock, the last install's result), logs. |
 | `$HOME/.agents/skills/<profile>` | the product profile skill | Reinstalled from its source; never edited here. |
 | the profile's own paths (its README) | the nested product's state and tools | Rebuildable by `scripts/env.sh` through the profile. |
 
@@ -20,7 +20,7 @@ and the home secrets are invisible to the definition repo; **never run `git clea
 **There is no remote backup.** On a lost volume: `QA.md` rows can be rebuilt from issue
 comment markers when `issue_comments` was enabled (ONBOARDING Step 4); the suite, the
 replay cache, the criteria files and the reports cannot — the next issues run re-tests
-from scratch. The nested cluster is always rebuildable.
+from scratch. The nested product is always rebuildable through the profile.
 
 ## Definition version & upgrade
 
@@ -76,8 +76,9 @@ instance the same shape as a fresh one.
 
 Only a schedule runs a Precheck before the agent wakes. Every `scripts/precheck.sh` exit
 that lets the turn run writes `work/env/RUN_MODE` = `scheduled <ISO> <schedule id>`; a
-decline writes nothing, nor does a timed health check (`QI_PRECHECK_PROBE=1`). A Slack turn
-runs `precheck.sh slack` first and is marked `slack <ISO> -` ([slack.md](slack.md)). The policy
+decline writes nothing, nor does a timed health check (`QI_PRECHECK_PROBE=1`). A
+Slack-ordered "test #N" writes `slack <ISO> - <n> <session>` through `precheck.sh slack <n>`
+([slack.md](slack.md)). The policy
 hook ([black-box.md](black-box.md) → **Enforcement layers**) reads a marker younger than
 `lock_ttl_min` — by its timestamp or its mtime, whichever is newer — as a **scheduled
 run**: `git commit`/`push`, `gh pr create`/`merge`, a `gh api` write outside the
@@ -89,6 +90,13 @@ a **direct session**.
   counts as scheduled until the marker ages out (its timestamp says since when).
 - It fails open only when a scheduled turn ran without its Precheck — every `kit.yaml`
   schedule carries one for that reason.
+- A **channel turn** counts the same: a session whose transcript holds the platform's Slack
+  frame (`<how-to-respond>`) in a prompt is never direct, whoever sent the message — a session
+  continued from the UI included; a definition change needs a fresh direct session. The frame
+  in a tool's output (this file, an issue body) does not count. A channel turn writes to GitHub
+  only the delivery of a Slack-ordered "test #N": its issue comment and its retest-label
+  removal, on that one issue, while the `slack` marker names it and its `work/QA.md` row is
+  `report_pending` (rule `channel-write`; [slack.md](slack.md)). Every other write is refused.
 
 ## Evolving the agent definition (outer repo)
 
@@ -102,7 +110,7 @@ scheduled run:
 ```bash
 git -C /home/agent fetch origin main
 git -C /home/agent checkout -b "fix/<short-slug>" origin/main
-git -C /home/agent add -- kit.yaml CLAUDE.md AGENTS.md ONBOARDING.md README.md VERSION CHANGELOG.md .gitignore LICENSE docs scripts engines
+git -C /home/agent add -- kit.yaml CLAUDE.md AGENTS.md ONBOARDING.md README.md VERSION CHANGELOG.md .gitignore LICENSE docs scripts engines skills
 git -C /home/agent commit -m "<describe the change>"
 git -C /home/agent push -u origin "fix/<short-slug>"
 o="$(git -C /home/agent remote get-url origin)"; o="${o#https://}"; o="${o%.git}"; pulls="repos/${o#*/}/pulls"
@@ -114,7 +122,8 @@ The agent's job ends at "PR opened". Use fresh descriptive branch names; runtime
 never goes to this repo.
 
 The definition repository may sit on a different GitHub host than the target: the PR
-call takes the host from `origin`, plain `git fetch`/`push` need nothing extra. It is
+call takes the host from `origin`; plain `git fetch`/`push` need only the allows
+`egress-rules.sh` prints for this repository when it shares the target's host. It is
 REST on purpose — `gh pr create` speaks GraphQL, which the egress denies
 ([black-box.md](black-box.md) → **Egress rules**); the path sits in a variable because the
 policy hook reads `repos/<variable>/…` as the target's.

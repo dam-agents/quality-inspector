@@ -7,24 +7,26 @@ Its own docs ship offline in `work/suite/node_modules/e2e/docs/` and its skill v
 
 ## File and test shape
 
-One file per issue, `tests/issue-<n>.e2e.ts`; one test per testable AC:
+One file per issue, `tests/issue-<n>.e2e.ts` (a scenario: `tests/scenario-<k>.e2e.ts`, titles
+`S-<k> AC-<j>: …`, tag `scenario-<k>` where an issue's test has `issue-<n>`); one test per
+testable AC:
 
 ```ts
 import { test } from '@e2e-dev/web';
 import { expect, unique } from 'e2e';
 import { criterion } from '../lib/criterion.js';
 
-test('#42 AC-1: a renamed agent keeps its sessions', { session: 'owner', tags: ['issue-42', 'ac-1'] },
+test('#42 AC-1: a renamed project keeps its tasks', { session: 'owner', tags: ['issue-42', 'ac-1'] },
   async ({ app, agent, screen }) => {
     const name = unique(`qa-${Date.now()}`);
     await app.open('/');
-    await agent.act('create an agent named {name} from the mock template', { params: { name } });
-    await agent.act('rename the agent {name} to {name}-2', { params: { name } });
-    await app.screenshot('AC-1: the renamed agent and its sessions');
+    await agent.act('create a project named {name} with one task', { params: { name } });
+    await agent.act('rename the project {name} to {name}-2', { params: { name } });
+    await app.screenshot('AC-1: the renamed project and its tasks');
     // AC-1 begin
-    await criterion('AC-1', 'the renamed agent is shown under its new name with its earlier session', { agent, app }, async () => {
+    await criterion('AC-1', 'the renamed project is shown under its new name with its earlier task', { agent, app }, async () => {
       await expect(screen.getByRole('heading', { name: `${name}-2` })).toBeVisible();
-      await expect(screen.getByRole('listitem').filter({ hasText: 'session' })).toHaveCount(1);
+      await expect(screen.getByRole('listitem').filter({ hasText: 'task' })).toHaveCount(1);
     });
     // AC-1 end
   });
@@ -81,8 +83,9 @@ With `live_browser` set to the CDP endpoint of the platform's shared browser on 
 (`http://127.0.0.1:<port>`; `/etc/AGENTS.md` names it), `npx e2e mcp` and every
 `--evidence failures` run (smoke, authoring iterations) attach to that browser, so the
 operator watches you explore in the Browser Panel. Only in a direct session, only while it
-answers (`scripts/lib/config.sh` → `live_cdp`); scheduled and Slack turns and every
-`--evidence full` run stay headless, so evidence never depends on it.
+answers (`scripts/lib/config.sh` → `live_cdp`); scheduled and Slack turns, a session whose
+transcript the shell cannot find (`CLAUDE_CODE_SESSION_ID`), and every `--evidence full` run
+stay headless, so evidence never depends on it.
 
 ## CLI and API criteria
 

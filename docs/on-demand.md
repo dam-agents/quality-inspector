@@ -26,9 +26,13 @@ scheduled ([persistence.md](persistence.md) → **Scheduled or direct session**)
   `operator`; reject = file it as a regression in the next report.
 - **"what changed since <build>?"** — the context of [change-awareness.md](change-awareness.md)
   for that build pair, without running tests; rewrite `work/COVERAGE.md` from the new map.
-- **"suggest scenarios for uncovered pages"** — from `coverage.mjs` ([change-awareness.md](change-awareness.md) →
-  Coverage), propose one scenario per uncovered page and nav item; proposals only — no
-  test is written without a yes.
+- **"test this scenario: …"** — [scenarios.md](scenarios.md) → The pipeline, source
+  `operator`, answered here; **"try S-<k>"** accepts a proposal the same way.
+- **"propose scenarios"** (or "suggest scenarios for uncovered pages") —
+  [scenarios.md](scenarios.md) → Discovery for the current candidate, even when explored or
+  disabled; `propose` unless the operator says run — no test is written without a yes.
+- **"promote S-<k>"** / **"demote S-<k>"** — as for `#N`, on `tests/scenario-<k>.e2e.ts`;
+  "promote all pending" includes saved scenarios.
 - **"reset the environment"** — `env.sh lock operator`, `env.sh reset`, optionally `up
   <version>` and `wait <version>` ([nested-env.md](nested-env.md) → Shape), `env.sh unlock operator`.
 - **"run the regression now"** — the regression run procedure with the current candidate,

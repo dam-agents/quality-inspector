@@ -72,7 +72,7 @@ internal state, the operator conversation.
 - `media/` — the copied videos, screenshots and traces it links to.
 - `comment.md` — the short issue comment, with the literal `EVIDENCE_LINK` to replace.
 
-It reads only tests tagged `issue-<n>` and `ac-<k>` (explorations: `issue-<n>-ex` and
+It reads only tests tagged `issue-<n>` (a scenario: `scenario-<k>`) and `ac-<k>` (explorations: `issue-<n>-ex` and
 `ex-<k>`), so the sign-in setup test is never in the evidence. Videos are not redacted by
 `e2e`; that is why no test but the setup one ever types a credential. Text artefacts are:
 `scripts/suite.sh` replaces every `work/env/credentials.env` secret with `***` in the run

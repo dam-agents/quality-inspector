@@ -74,8 +74,8 @@ Leak check: `git status --porcelain` **must be clean**. Anything under `work/`, 
 The operator assigns the profile on the platform; you never install it yourself.
 
 1. Find it: a directory under `$HOME/.agents/skills/` holding a `profile.json`. None →
-   checklist item 1 is not done; ask the operator to assign it and wait. More than one →
-   ask which.
+   checklist item 1 is not done; ask the operator to assign it and wait (a product with
+   no profile yet: README → Setup). More than one → ask which.
 2. It answers the contract: `jq -r .schema <dir>/profile.json` prints `qi-profile/v1`,
    and `env`, `versions`, `build-time` resolve — its own `bin/` or its engine's
    (`profile_bin` in `scripts/lib/profile.sh`; `verify-onboarding.sh --config` reports it).
@@ -89,7 +89,7 @@ The operator assigns the profile on the platform; you never install it yourself.
 Create only what is missing; never overwrite an existing state file.
 
 ```bash
-mkdir -p /home/agent/work/issues /home/agent/work/logs /home/agent/work/inventory /home/agent/work/regression /home/agent/work/benchmark /home/agent/work/perf /home/agent/work/security
+mkdir -p /home/agent/work/issues /home/agent/work/scenarios /home/agent/work/logs /home/agent/work/inventory /home/agent/work/regression /home/agent/work/benchmark /home/agent/work/perf /home/agent/work/security
 cd /home/agent/work
 touch SECURITY.log
 [ -f QA.md ] || cat > QA.md <<'EOF'
@@ -103,6 +103,12 @@ EOF
 
 | test | issue | tier | assert_hash | promoted_utc |
 | --- | --- | --- | --- | --- |
+EOF
+[ -f SCENARIOS.md ] || cat > SCENARIOS.md <<'EOF'
+# Scenarios — one row per scenario (docs/scenarios.md → State)
+
+| id | source | requester | thread | spec_hash | build | verdict | status | updated_utc |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 EOF
 [ -f HEALS.md ] || cat > HEALS.md <<'EOF'
 # Repaired checks — append-only, one row per heal (docs/triage.md → Healing rules)
@@ -168,7 +174,8 @@ with an existing file → keep its values, ask only for missing keys. Ask, valid
 
 1. **`profile`** — the name found in Step 2.
 2. **`target_repo`** — ask. Validate with `gh api repos/<owner>/<repo>/issues?per_page=1`
-   (host flag for a three-segment ref). Tick item 3.
+   (host flag for a three-segment ref). Tick item 3. When the profile's skill source is
+   this repository, write its path as **`profile_source_path`** (DAM: `qa`); else empty.
 3. **`issue_comments`** — ask, default `disabled`. State the consequence: comments are
    posted publicly on the target's issues as the connection's account, and the
    connection then needs write access to issues. Tick item 5.
@@ -183,7 +190,14 @@ with an existing file → keep its values, ask only for missing keys. Ask, valid
    question), default the rest. Tick item 6.
 7. **Channels** — `candidate_channel` / `baseline_channel` empty = the profile's defaults;
    offer `baseline_channel: none` only if the operator wants no red-green.
-8. Everything else — defaults; show them and change only what the operator asks for. Offer
+8. **Scenarios** ([docs/scenarios.md](docs/scenarios.md)) — say that a Slack channel the
+   operator connects to this agent (optional, on the platform) takes scenario requests
+   from anyone in it, up to `max_scenarios_per_day` runs a day. Ask `scenario_discovery`,
+   default `disabled`: `propose` drafts up to `max_scenarios_per_run` judged proposals a
+   week (tens of thousands of tokens), `run` also tests them (a few hundred thousand per
+   scenario). With discovery on and a channel connected, ask `scenario_channel` (its
+   `C…` id; empty keeps the digest in chat).
+9. Everything else — defaults; show them and change only what the operator asks for. Offer
    `lend_model: enabled` when the profile's `SKILL.md` names criteria only a real model makes
    testable (tokens per product AI step), and `live_browser` when `/etc/AGENTS.md` names the
    shared browser's CDP endpoint.
@@ -195,6 +209,7 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 
 - profile: qi-profile-dam
 - target_repo: acme/widgets
+- profile_source_path:
 - display_name: Quality Inspector
 - qa_label: qa:ready
 - retest_label: qa:retest
@@ -223,6 +238,10 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - max_explorations_per_ac: 3
 - security_checks: enabled
 - security_failed_logins: 10
+- scenario_discovery: disabled
+- scenario_channel:
+- max_scenarios_per_run: 3
+- max_scenarios_per_day: 10
 - lend_model: disabled
 - live_browser: disabled
 - slack_channel:
@@ -233,8 +252,9 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 ```
 
 Then `bash "$HOME/scripts/verify-onboarding.sh" --config`, apply every `fix:`, and show the
-file to the operator — and the output of `bash "$HOME/scripts/egress-rules.sh"`, the
-egress commands checklist item 4 asks them to run.
+file to the operator — and the output of `bash "$HOME/scripts/egress-rules.sh"` (with
+`--source <owner>/<repo>` per other GitHub skill source the operator names), the egress
+commands checklist item 4 asks them to run.
 
 ## Step 4 — Reconstruct `QA.md` (only when it has no rows and comments were used before)
 
@@ -250,7 +270,8 @@ the criteria files and the replay cache are not reconstructable.
 
 Start from `mcp__platform-outbound__list_schedules`. Expected: `quality-inspector-issues-1h`,
 `quality-inspector-regression-nightly`, `quality-inspector-benchmark-monthly`,
-`quality-inspector-security-weekly`, `quality-inspector-audit-weekly`.
+`quality-inspector-security-weekly`, `quality-inspector-scenarios-weekly`,
+`quality-inspector-audit-weekly`.
 
 - Present → leave alone, including its enabled state; every schedule but the issues one
   arrives switched off on purpose — offer to turn them on, never flip them unasked.
@@ -307,4 +328,5 @@ Then tick item 4 (the boundary probes passed) and item 2, and call
    `qa:retest` to test it again; say "promote #N" (or "promote all pending") to move
    tests into the nightly regression; "test #N" runs one now; reports land in the artifact library (and on the
    issue when comments are enabled); `marker_prefix` cannot change after the first
-   comment.
+   comment. In a connected Slack channel, "@<agent> test that …" tests a scenario and
+   "save S-<k>" queues it for "promote all pending".

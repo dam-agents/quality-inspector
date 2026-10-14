@@ -32,6 +32,14 @@ library for evidence, the skill catalog for profiles, sub-agents for independent
 - **Security run** (weekly, off by default) — frozen black-box checks of each new candidate:
   access without or with the wrong session, stored XSS, headers, leaks, the deployment;
   findings go to a private artifact only, never to an issue (docs/security.md).
+- **Scenarios** — in a connected Slack channel anyone can ask "test that …" or write the
+  steps and the expected outcome; the agent freezes it, has an independent judge sub-agent
+  check the scenario, tests it on the newest build (and on the last release when it fails,
+  to tell a regression from an old defect), lets the judge check the evidence, and answers
+  in the thread with a video report. "save S-<k>" queues a passing scenario for the
+  operator's "promote all pending". A weekly discovery run (off by default) proposes
+  scenarios of its own from uncovered pages and completed issues, and can test them too
+  (docs/scenarios.md, docs/judge.md).
 - **Weekly audit** (off by default) — health, the black-box boundary probes, assertion
   drift, cache efficiency, and the week's speed and cost per issue (docs/audit.md).
 - **From Slack** (off by default) — a person in the bound channel asks "test #N" and gets
@@ -52,19 +60,22 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
    comments enabled it also posts verdicts and removes the retest label, so the account
    needs issue write access on the target. Use a dedicated bot account, and where the
    connection allows it (a GitHub App installation, a fine-grained token) only Issues on
-   the target — no Contents, Pull requests or Actions — so a fork or mirror of the source
-   stays out of reach too.
+   the target — no Contents, Pull requests or Actions. The egress, not the token, keeps
+   forks and mirrors out of reach: a public target's are readable by anyone.
 3. **Create the agent on the vm backend** when the profile requires root (most nested
    products do). The kit asks for 8 CPU, 16 Gi and 80 Gi; the profile's README says what
    its product needs.
 4. **Assign the product profile**: add its skill source (Skills → Sources) and assign the
    profile skill to the agent — for DAM, repository `https://github.com/dam-agents/dam`
-   with path `qa`, skill `qi-profile-dam`. Onboarding checks it.
+   with path `qa`, skill `qi-profile-dam` (in the target repository, so onboarding sets
+   `profile_source_path: qa`). Onboarding checks it. A product without a profile gets one
+   from its team with the [`qi-profile-creator`](skills/qi-profile-creator/SKILL.md) skill.
 5. **Make sure agent steps can reach Anthropic** through the gateway with an injected
    credential (the agent's provider connection). Onboarding checks it.
 6. **Apply the egress rules** (Black-box boundary below), then answer the onboarding
    dialog. Schedules are held until onboarding completes, which includes a smoke test of
    the nested product.
+7. *Optional:* **connect a Slack channel** to the agent for scenario requests.
 
 Not in a catalog yet? Add one entry to the catalog repository's `catalog.yaml`:
 
@@ -89,7 +100,10 @@ the agent never needs (raw.githubusercontent.com, GitLab, Bitbucket, …). The t
 rules depend on the instance, so onboarding prints them — `bash scripts/egress-rules.sh`
 — as `dam network create` commands, with the profile's `egress`; set `AGENT` to the
 agent's name and run them (`--kit` adds the kit's rules for an agent created by hand or
-from a kit before 2.11.0). A rule counts only once a probe proves it:
+from a kit before 2.11.0). They make the target's GitHub hosts deny-by-default, so a
+skill from another GitHub repository needs `--source <owner>/<repo>`; a profile inside the
+target gets only its directory (`profile_source_path`). A rule counts only once a probe
+proves it:
 `verify-onboarding.sh --live` and the weekly audit request each forbidden surface and
 fail when one answers. Approve no held request on the deny side.
 
@@ -97,7 +111,9 @@ Inside the VM, a Claude Code `PreToolUse` hook and a `permissions.deny` list, me
 `~/.claude/settings.json` at onboarding, refuse the same surfaces before a tool call runs
 (a repository by number, gists, a search that does not name the target and the other code
 hosts excepted: only the egress rules hold those) — plus `git clean`, container
-filesystems, writes outside `work/`, and commits or definition edits from a scheduled run
+filesystems, writes outside `work/`, commits or definition edits from a scheduled run or a
+Slack turn, and any GitHub write from a Slack turn except a Slack-ordered "test #N"'s
+comment and retest-label removal on that issue
 ([docs/black-box.md](docs/black-box.md) → Enforcement layers).
 
 ## What a report looks like
@@ -133,8 +149,11 @@ configuration.
 | `profile` | chosen and installed | The product profile skill, e.g. `qi-profile-dam`. |
 | `profile.<key>` | asked or defaulted, per the profile | The profile's own settings ([docs/profile-contract.md](docs/profile-contract.md)). |
 | `target_repo` | asked | Repository whose issues are tested. `QI_TARGET_REPO` overrides. |
+| `profile_source_path` | asked when the profile lives in `target_repo` | Its skill source's path there (DAM: `qa`) — the one directory the egress opens. |
 | `issue_comments` | asked, default `disabled` | Opt-in: post verdicts on the issue. |
 | `spec_feedback` | asked, default `disabled` | Opt-in: suggest an observable "Done when" on issues with nothing testable. |
+| `scenario_discovery`, `scenario_channel` | asked, default `disabled` / empty | Opt-in: weekly scenario proposals (`propose`), also tested (`run`); the Slack conversation for their digest. |
+| `max_scenarios_per_run`, `max_scenarios_per_day` | defaults (`3`, `10`) | Proposals per discovery run; scenario runs a day. |
 | `auto_promote` | default `disabled` | `verified`: tests whose every criterion was verified join the nightly regression without the operator's "promote". |
 | `marker_prefix` | default `quality-inspector` | Dedup marker; **immutable once a comment exists**. |
 | `qa_label`, `retest_label` | defaults | The gates (`qa:ready`, `qa:retest`). |
@@ -143,7 +162,7 @@ configuration.
 | `e2e_version`, `e2e_web_version`, `e2e_model` | defaults | Test framework pins and the model for agent steps. |
 | `confirm_regressions`, `bisect_max_steps` | defaults (off) | Opt-in: confirm a regression on the previous build, then narrow it over the builds in between — extra installs. |
 | `audit_report`, `log_level`, `media_retention_days` | defaults | Audit, diagnostics, local evidence retention. |
-| `explorations`, `max_explorations_per_ac` | defaults (`enabled`, `3`) | Agent-designed scenarios beyond the criteria, reported apart from the verdict ([docs/explorations.md](docs/explorations.md)). |
+| `explorations`, `max_explorations_per_ac` | defaults (`enabled`, `3`) | Agent-designed checks beyond the criteria, reported apart from the verdict ([docs/explorations.md](docs/explorations.md)). |
 | `security_checks`, `security_failed_logins` | defaults (`enabled`, `10`) | The security run ([docs/security.md](docs/security.md)); its schedule ships off. |
 | `max_wallclock_min_per_issue`, `max_model_steps_per_issue`, `min_free_disk_gi` | defaults | Per-issue budgets and the free disk an install needs. |
 | `slack_channel`, `slack_tests_per_day` | asked (optional), default `3` | Slack test requests ([docs/slack.md](docs/slack.md)). |
@@ -159,13 +178,17 @@ configuration.
   target's issues, plus issues write when comments are enabled.
 - **External surfaces:** artifacts in the platform's artifact library (private by
   default); with `issue_comments: enabled`, **public comments** on the target's issues,
-  and removal of the retest label; with `slack_channel` set, replies in that chat's threads.
-  The platform runtime's session state (`PLATFORM_RUNTIME_URL`) frees a dead run's
-  environment lock at once; without it the lock waits `lock_ttl_min`.
+  and removal of the retest label; optionally a Slack channel bound to the agent (replies
+  in request threads; with `scenario_channel`, one weekly digest post; with `slack_channel`,
+  issue tests people order there). The platform runtime's session state
+  (`PLATFORM_RUNTIME_URL`) frees a dead run's environment lock at once; without it the lock
+  waits `lock_ttl_min`.
 - **Cost:** idle hours wake no model. One issue costs up to three installs of the product
   (time, no tokens; an install of the build already up returns at once) plus authoring — expect a few hundred thousand tokens for the first
   run of an issue (explorations, on by default, add roughly 30–60 %); replays of promoted
-  tests are mostly free, except `agent.assert` checks, which always call the model.
+  tests are mostly free, except `agent.assert` checks, which always call the model. A
+  scenario costs about what an issue does; discovery adds tens of thousands of tokens a
+  week (`propose`), or that plus one scenario per proposal (`run`).
 
 ## Persistence
 
@@ -182,6 +205,9 @@ platform's Kit Update and never touch `work/` ([docs/persistence.md](docs/persis
 - [`ONBOARDING.md`](ONBOARDING.md) — first-run setup, ending in a nested smoke test and
   `scripts/verify-onboarding.sh --live`.
 - [`docs/`](docs/) — procedures, read on demand.
+- [`engines/`](engines/) — reusable runners of the profile's `bin/` contract.
+- [`skills/qi-profile-creator/`](skills/qi-profile-creator/SKILL.md) — the skill a product
+  team writes and checks its profile with; the agent never uses it.
 - [`scripts/`](scripts/) — pre-flight and Precheck, the environment lock and profile
   dispatch (`env.sh`),
   the suite runner (`suite.sh`), the evidence page renderer (`render-report.mjs`), the

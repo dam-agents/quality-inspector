@@ -7,6 +7,9 @@
 {"name":"issue timeline","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/1/timeline"}}
 {"name":"issue events","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/1/events"}}
 {"name":"contents, profile dir included","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets/contents/qa"}}
+{"name":"contents, the profile dir as the platform asks for it","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api 'repos/acme/widgets/contents/qa?ref=HEAD'"}}
+{"name":"contents, a sibling of the profile dir","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets/contents/qa-internal/notes.md"}}
+{"name":"contents, a dot segment out of the profile dir","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets/contents/qa/../src/index.ts"}}
 {"name":"commits over curl, mixed case","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"curl -s -H 'Accept: application/json' https://api.github.com/repos/Acme/Widgets/commits"}}
 {"name":"git refs through a variable","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api \"repos/${T}/git/refs/heads\""}}
 {"name":"graphql","expect":"deny","rule":"gh-graphql","tool":"Bash","input":{"command":"gh api graphql -f query='{ viewer { login } }'"}}
@@ -88,6 +91,33 @@
 {"name":"marker removal, scheduled","mode":"scheduled","expect":"deny","rule":"policy-tamper","tool":"Bash","input":{"command":"rm -f /home/agent/work/env/RUN_MODE"}}
 {"name":"settings merge, direct","expect":"allow","tool":"Bash","input":{"command":"bash \"$HOME/scripts/hooks/install.sh\""}}
 {"name":"stale marker is direct","mode":"stale","expect":"allow","tool":"Bash","input":{"command":"git push -u origin fix/x"}}
+{"name":"definition edit, channel turn","mode":"channel","expect":"deny","rule":"scheduled-def","tool":"Edit","input":{"file_path":"@DEF@/CLAUDE.md"}}
+{"name":"config edit, channel turn","mode":"channel","expect":"deny","rule":"scheduled-def","tool":"Write","input":{"file_path":"@WORK@/CONFIG.md"}}
+{"name":"commit, channel turn","mode":"channel","expect":"deny","rule":"scheduled-git","tool":"Bash","input":{"command":"git -C /home/agent commit -m 'fix: x'"}}
+{"name":"settings merge, channel turn","mode":"channel","expect":"deny","rule":"policy-tamper","tool":"Bash","input":{"command":"bash \"$HOME/scripts/hooks/install.sh\""}}
+{"name":"scenario write, channel turn","mode":"channel","expect":"allow","tool":"Write","input":{"file_path":"@WORK@/scenarios/S-1/request.md"}}
+{"name":"issue comment over REST, scenario channel turn","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/12/comments -f body='ship it'"}}
+{"name":"Slack test comment on its issue, channel turn","mode":"channel","expect":"allow","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/12/comments -F body=@/tmp/quality-inspector-c/comment.md"},"marker":"slack @NOW@ - 12 test","qa":"report_pending"}
+{"name":"Slack test retest-label removal, channel turn","mode":"channel","expect":"allow","tool":"Bash","input":{"command":"gh api -X DELETE repos/acme/widgets/issues/12/labels/qa%3Aretest"},"marker":"slack @NOW@ - 12 test","qa":"report_pending"}
+{"name":"Slack test comment on another issue, channel turn","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/13/comments -F body=@/tmp/quality-inspector-c/comment.md"},"marker":"slack @NOW@ - 12 test","qa":"report_pending"}
+{"name":"Slack test closes its issue, channel turn","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh api -X PATCH repos/acme/widgets/issues/12 -f state=closed"},"marker":"slack @NOW@ - 12 test","qa":"report_pending"}
+{"name":"Slack test puts its retest label back, channel turn","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh api -X PUT repos/acme/widgets/issues/12/labels/qa%3Aretest"},"marker":"slack @NOW@ - 12 test","qa":"report_pending"}
+{"name":"Slack test removes another label, channel turn","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh api -X DELETE repos/acme/widgets/issues/12/labels/qa%3Aready"},"marker":"slack @NOW@ - 12 test","qa":"report_pending"}
+{"name":"Slack test comments with another method, channel turn","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh api -X DELETE repos/acme/widgets/issues/12/comments"},"marker":"slack @NOW@ - 12 test","qa":"report_pending"}
+{"name":"Slack test comment through a variable, channel turn","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh api repos/$T/issues/12/comments -F body=@/tmp/quality-inspector-c/comment.md"},"marker":"slack @NOW@ - 12 test","qa":"report_pending"}
+{"name":"Slack test comment in another repository, channel turn","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh api repos/acme/other/issues/12/comments -F body=@/tmp/quality-inspector-c/comment.md"},"marker":"slack @NOW@ - 12 test","qa":"report_pending"}
+{"name":"Slack test comment, marker of another session","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/12/comments -F body=@/tmp/quality-inspector-c/comment.md"},"marker":"slack @NOW@ - 12 other-session","qa":"report_pending"}
+{"name":"Slack test comment, marker older than lock_ttl_min","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/12/comments -F body=@/tmp/quality-inspector-c/comment.md"},"marker":"slack @OLD@ - 12 test","qa":"report_pending"}
+{"name":"Slack test comment, report already delivered","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/12/comments -F body=@/tmp/quality-inspector-c/comment.md"},"marker":"slack @NOW@ - 12 test","qa":"reported"}
+{"name":"Slack test gh issue comment, channel turn","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh issue comment 12 --body 'ship it'"},"marker":"slack @NOW@ - 12 test","qa":"report_pending"}
+{"name":"gh issue comment, channel turn","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh issue comment 12 --body 'ship it'"}}
+{"name":"gh pr review, channel turn","mode":"channel","expect":"deny","rule":"channel-write","tool":"Bash","input":{"command":"gh pr review 3 --approve"}}
+{"name":"issue read, channel turn","mode":"channel","expect":"allow","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/12"}}
+{"name":"issue comment, scheduled","mode":"scheduled","expect":"allow","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/12/comments -f body=verdict"}}
+{"name":"definition edit, frame only quoted","mode":"quoted","expect":"allow","tool":"Edit","input":{"file_path":"@DEF@/CLAUDE.md"}}
+{"name":"config edit, frame only quoted","mode":"quoted","expect":"allow","tool":"Write","input":{"file_path":"@WORK@/CONFIG.md"}}
+{"name":"commit, frame only quoted","mode":"quoted","expect":"allow","tool":"Bash","input":{"command":"git -C /home/agent commit -m 'fix: x'"}}
+{"name":"config edit, unparsable frame line","mode":"garbled","expect":"deny","rule":"scheduled-def","tool":"Write","input":{"file_path":"@WORK@/CONFIG.md"}}
 {"name":"webfetch raw","expect":"deny","rule":"raw-host","tool":"WebFetch","input":{"url":"https://raw.githubusercontent.com/acme/widgets/main/src/app.ts","prompt":"x"}}
 {"name":"webfetch repo page","expect":"deny","rule":"repo-web","tool":"WebFetch","input":{"url":"https://github.com/acme/widgets/blob/main/src/app.ts","prompt":"x"}}
 {"name":"websearch repo","expect":"deny","rule":"repo-web","tool":"WebSearch","input":{"query":"site:github.com/acme/widgets session store"}}

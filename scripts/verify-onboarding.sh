@@ -54,12 +54,13 @@ warn() { WARNS=$((WARNS+1)); printf 'warn %s — %s\n' "$1" "$2"; }
 . "$SCRIPT_DIR/lib/boundary.sh" || { echo "cannot source lib/boundary.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/lock.sh" || { echo "cannot source lib/lock.sh" >&2; exit 1; }
 
-SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-benchmark-monthly quality-inspector-security-weekly quality-inspector-audit-weekly"
+SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-benchmark-monthly quality-inspector-security-weekly quality-inspector-audit-weekly quality-inspector-scenarios-weekly"
 KNOWN_KEYS="profile target_repo display_name qa_label retest_label marker_prefix candidate_channel
 baseline_channel issue_comments artifact_reports include_comments max_issues_per_run lock_ttl_min
-e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback
+e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback profile_source_path
 explorations max_explorations_per_ac auto_promote security_checks security_failed_logins
 confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi
+scenario_discovery scenario_channel max_scenarios_per_run max_scenarios_per_day
 lend_model live_browser slack_channel slack_tests_per_day"
 
 if [ "$STRUCTURE" = 1 ]; then
@@ -115,6 +116,10 @@ if [ "$STRUCTURE" = 1 ]; then
     && ok flaky_log "header intact" || fail flaky_log "work/FLAKY.md missing or header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
   [ "$(grep '^|' "$WORK/COVERAGE.md" 2>/dev/null | head -1)" = "$COVERAGE_HEADER" ] \
     && ok coverage_table "header intact" || fail coverage_table "work/COVERAGE.md missing or header changed" "re-seed per ONBOARDING.md Step 2b"
+  [ "$(grep '^|' "$WORK/SCENARIOS.md" 2>/dev/null | head -1)" = "$SCENARIOS_HEADER" ] && [ -d "$WORK/scenarios" ] \
+    && ok scenarios_table "header intact" || fail scenarios_table "work/SCENARIOS.md or work/scenarios/ missing, or the header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
+  bad="$(table_rows "$WORK/SCENARIOS.md" | awk -F'|' 'NF!=11 || $2 !~ /^ *S-[0-9]+ *$/ || $3 !~ /^ *(slack|operator|discovery) *$/ || $8 !~ /^ *(passed|failed|regression|needs-review|blocked|flaky|not-testable|-) *$/ || $9 !~ /^ *(proposed|queued|in_progress|report_pending|reported|rejected) *$/' | head -3)"
+  [ -z "$bad" ] && ok scenarios_rows "row format" || fail scenarios_rows "malformed rows (a scenario is never verified): $bad" "fix the rows to the format in docs/scenarios.md → State"
   [ -f "$WORK/LESSONS.md" ] && ok lessons "present" || fail lessons "work/LESSONS.md missing" "ONBOARDING.md Step 2b"
   # perf-trend.mjs creates it on first use; missing is only worth a note.
   [ -d "$WORK/perf" ] && ok perf_dir "present" || warn perf_dir "work/perf missing — mkdir -p work/perf (ONBOARDING.md Step 2b)"
@@ -138,20 +143,29 @@ if [ -f "$CONFIG" ]; then
   t="$(cfg target_repo)"
   printf '%s' "$t" | grep -qE '^([A-Za-z0-9.-]+/)?[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' \
     && ok cfg:target_repo "set" || fail cfg:target_repo "missing or not [host/]owner/repo" "ask the operator (ONBOARDING.md Step 3)"
+  v="$(_bb_profile_path)"
+  if [ -z "$v" ]; then ok cfg:profile_source_path "empty — the profile lives outside target_repo"
+  elif _bb_profile_path_ok "$v"; then ok cfg:profile_source_path "$v"
+  else fail cfg:profile_source_path "'$v' is not a plain directory path" "set the skill source's path in target_repo (no * % ?, no . or .. segment), or leave it empty"; fi
   enum() { local v; v="$(cfg "$1")"; [ -z "$v" ] && { ok "cfg:$1" "default"; return; }
     case " $2 " in (*" $v "*) ok "cfg:$1" "$v";; (*) fail "cfg:$1" "'$v' is not one of: $2" "set a documented value (CLAUDE.md → Runtime configuration)";; esac; }
   enum issue_comments "enabled disabled"; enum artifact_reports "enabled disabled"
   enum include_comments "enabled disabled"; enum audit_report "enabled disabled"; enum log_level "info debug"
   enum spec_feedback "enabled disabled"; enum explorations "enabled disabled"; enum auto_promote "disabled verified"
   enum security_checks "enabled disabled"; enum confirm_regressions "enabled disabled"; enum lend_model "enabled disabled"
-  case "$(cfg slack_channel)" in ('') ok cfg:slack_channel "none — Slack orders nothing";;
+  enum scenario_discovery "disabled propose run"
+  v="$(cfg scenario_channel)"
+  if [ -z "$v" ]; then ok cfg:scenario_channel "empty — proposals stay in the chat UI"
+  elif printf '%s' "$v" | grep -qE '^[CDG][A-Z0-9]{6,}$'; then ok cfg:scenario_channel "$v"
+  else fail cfg:scenario_channel "'$v' is not a Slack conversation id" "set the C…/G…/D… id of a conversation this agent is bound to, or leave it empty"; fi
+  case "$(cfg slack_channel)" in ('') ok cfg:slack_channel "none — Slack orders no issue test";;
     (*) printf '%s' "$(cfg slack_channel)" | grep -qE '^[CGD][A-Z0-9]{6,}$' && ok cfg:slack_channel "$(cfg slack_channel)" \
           || fail cfg:slack_channel "'$(cfg slack_channel)' is not a Slack chat id" "use the id describe_channel lists, e.g. C0123ABCD (docs/slack.md)";; esac
   case "$(cfg live_browser)" in (''|disabled) ok cfg:live_browser "disabled";;
     (http://127.0.0.1:[0-9]*|http://localhost:[0-9]*) ok cfg:live_browser "$(cfg live_browser)";;
     (*) fail cfg:live_browser "'$(cfg live_browser)' is not a CDP endpoint on this VM" "http://127.0.0.1:<port> from /etc/AGENTS.md, or disabled (docs/test-authoring.md → Watching live)";; esac
   for k in max_issues_per_run lock_ttl_min media_retention_days max_explorations_per_ac security_failed_logins bisect_max_steps \
-           max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi slack_tests_per_day; do
+           max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi max_scenarios_per_run max_scenarios_per_day slack_tests_per_day; do
     v="$(cfg "$k")"; case "$v" in (''|*[!0-9]*) [ -z "$v" ] && ok "cfg:$k" "default" || fail "cfg:$k" "'$v' is not a number" "set a positive integer";; (*) ok "cfg:$k" "$v";; esac
   done
   case "$(cfg bisect_max_steps)" in (''|0|*[!0-9]*) ;; (*) [ "$(cfg confirm_regressions)" = enabled ] \
@@ -197,7 +211,7 @@ if [ "$LIVE" = 1 ]; then
     && ok issues_read "target issues readable" || fail issues_read "cannot list target issues" "check target_repo and the connection's repository access"
   while read -r status id detail; do
     case "$status" in
-      (fail) fail "$id" "$detail" "the operator adds the deny rule (bash scripts/egress-rules.sh)";;
+      (fail) fail "$id" "${detail%% — *}" "$(boundary_fix "$detail")";;
       (ok)   ok "$id" "$detail";;
       (*)    warn "$id" "$detail";;
     esac
@@ -223,7 +237,7 @@ if [ "$LIVE" = 1 ]; then
       || fail lend_model "this agent has no model connection to lend" "give it one in its settings, or set lend_model: disabled"
   fi
   case "$(cfg live_browser)" in (''|disabled) ;;
-    (*) live_cdp >/dev/null 2>&1 && ok live_browser "answers" || warn live_browser "does not answer (or a run marker is fresh) — runs stay headless";; esac
+    (*) live_cdp >/dev/null 2>&1 && ok live_browser "answers" || warn live_browser "does not answer, or this session is not shown direct (a fresh run marker, a channel turn, no transcript) — runs stay headless";; esac
   if [ "$(profile_field '.requires.root')" = true ]; then
     [ "$(id -u)" = 0 ] && ok vm_root "root" || fail vm_root "not running as root" "recreate the agent on the vm backend (README → Setup)"
   fi
@@ -243,7 +257,7 @@ if [ "$LIVE" = 1 ]; then
   st="$(bash "$SCRIPT_DIR/env.sh" status 2>/dev/null)"
   printf '%s' "$st" | jq -e '.running and (.ui_http | test("^[23]"))' >/dev/null 2>&1 \
     && ok product_env "$(printf '%s' "$st" | jq -r .build)" || warn product_env "not up: $st (docs/nested-env.md)"
-  for m in issues regression; do
+  for m in issues regression discovery; do
     out="$(bash "$SCRIPT_DIR/preflight.sh" "$m" 2>/dev/null)"
     if printf '%s' "$out" | jq -e 'type == "object"' >/dev/null 2>&1; then
       err="$(printf '%s' "$out" | jq -r '.error // empty')"

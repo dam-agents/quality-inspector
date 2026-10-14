@@ -4,7 +4,8 @@
 . "$(dirname "$0")/lib.sh"
 HOOK="$SCRIPTS/hooks/policy.sh"; DEF="$(cd "$SCRIPTS/.." && pwd)"
 export HOME="$SANDBOX/home"; mkdir -p "$HOME" "$WORK_DIR/env"
-printf -- '- target_repo: acme/widgets\n- lock_ttl_min: 180\n' > "$WORK_DIR/CONFIG.md"
+# profile_source_path opens the egress for the platform and the probe, never for a tool call.
+printf -- '- target_repo: acme/widgets\n- profile_source_path: qa\n- lock_ttl_min: 180\n' > "$WORK_DIR/CONFIG.md"
 pd="$SANDBOX/profile"; mkdir -p "$pd"; export QI_PROFILE_DIR="$pd"
 cat > "$pd/profile.json" <<'J'
 {"schema":"qi-profile/v1","product":"Stub","app":{"url":"http://localhost:8080"},
@@ -22,8 +23,30 @@ while IFS= read -r fx; do
     (stale) printf 'scheduled %s -\n' "$(iso_ago 400)" > "$WORK_DIR/env/RUN_MODE"; touch -t 202001010000 "$WORK_DIR/env/RUN_MODE";;
     (*) rm -f "$WORK_DIR/env/RUN_MODE";;
   esac
-  call="$(jq -c --arg w "$WORK_DIR" '{session_id:"test", cwd:(.input.cwd // $w), hook_event_name:"PreToolUse",
-            tool_name:.tool, tool_input:(.input | del(.cwd))}' <<<"$fx")"
+  # `marker`: the run marker `precheck.sh slack <n>` writes; `qa`: the status of #12's work/QA.md row.
+  rm -f "$WORK_DIR/QA.md"
+  mk="$(jq -r '.marker // ""' <<<"$fx")"
+  [ -n "$mk" ] && printf '%s\n' "$mk" | sed -e "s|@NOW@|$(date -u +%Y-%m-%dT%H:%M:%SZ)|" -e "s|@OLD@|$(iso_ago 400)|" > "$WORK_DIR/env/RUN_MODE"
+  qa="$(jq -r '.qa // ""' <<<"$fx")"
+  [ -n "$qa" ] && printf '| issue | ac_hash | candidate | baseline | verdict | status | updated_utc |\n| --- | --- | --- | --- | --- | --- | --- |\n| 12 | abc | c1 | b1 | verified | %s | %s |\n' \
+    "$qa" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$WORK_DIR/QA.md"
+  # A channel turn's transcript holds the platform's Slack frame in a prompt; a direct one does
+  # not. `quoted`: a direct session whose tool results, progress, compaction summary and own
+  # messages quote the frame (a Read of docs/persistence.md). `garbled`: a frame line that
+  # does not parse.
+  printf '{"type":"user","message":{"content":"promote #7"}}\n' > "$SANDBOX/transcript.jsonl"
+  case "$(jq -r '.mode // "direct"' <<<"$fx")" in
+    (channel) printf '{"type":"user","message":{"content":"<how-to-respond>\\nreply …\\n</how-to-respond>"}}\n' >> "$SANDBOX/transcript.jsonl";;
+    (quoted) jq -nc --rawfile d "$DEF/docs/persistence.md" '
+        {type:"assistant", message:{content:[{type:"text", text:"the frame <how-to-respond> marks a channel turn"},
+          {type:"tool_use", name:"Bash", input:{command:"grep -n \"<how-to-respond>\" scripts/hooks/policy.sh"}}]}},
+        {type:"user", message:{content:[{type:"tool_result", content:$d}]}, toolUseResult:{type:"text", file:{content:$d}}},
+        {type:"progress", data:{message:{content:[{type:"tool_result", content:"<how-to-respond>"}]}}},
+        {type:"user", isCompactSummary:true, message:{content:"The session read the <how-to-respond> rule."}}' >> "$SANDBOX/transcript.jsonl";;
+    (garbled) printf 'not json <how-to-respond>\n' >> "$SANDBOX/transcript.jsonl";;
+  esac
+  call="$(jq -c --arg w "$WORK_DIR" --arg t "$SANDBOX/transcript.jsonl" '{session_id:"test", cwd:(.input.cwd // $w), hook_event_name:"PreToolUse",
+            transcript_path:$t, tool_name:.tool, tool_input:(.input | del(.cwd))}' <<<"$fx")"
   err="$(printf '%s' "$call" | "$HOOK" 2>&1 >/dev/null)"; rc=$?
   case "$want:$rc" in
     (allow:0) ;;

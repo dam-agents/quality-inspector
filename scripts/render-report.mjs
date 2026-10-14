@@ -13,7 +13,9 @@
 // "noticed" (docs/explorations.md → Noticed in passing) a list of what was seen, never tested.
 // With "mode": "security" it is the security run's findings, severity-sorted, with the e2e
 // evidence of findings that carry a "tag"; it writes no comment.md — security findings never
-// go to an issue (docs/security.md). Nothing else is read, except the previous build's
+// go to an issue (docs/security.md). With "mode": "scenario" it is one scenario
+// (docs/scenarios.md): tests tagged scenario-<k>, the judge's reading per criterion, and
+// comment.md as the channel reply. Nothing else is read, except the previous build's
 // screenshots an AC names as "before_shot", the new map's screenshots a context.signals
 // item names as "shot", and the screenshot a "noticed" item names as "shot".
 
@@ -28,6 +30,12 @@ if (!verdictsPath || !outDir) {
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 const runsRoot = process.env.QI_RUNS_ROOT ?? join(work, 'suite', '.e2e', 'runs');
 const v = JSON.parse(readFileSync(verdictsPath, 'utf8'));
+// A scenario is never verified: no change is under test, so no red-green ran (CLAUDE.md →
+// Hard invariants). Refused before anything is written, so an earlier report stays.
+if (v.mode === 'scenario' && [v.verdict, ...(v.acs ?? []).map((ac) => ac.verdict)].includes('verified')) {
+  console.error('render-report: a scenario is never verified — use passed (docs/scenarios.md → The pipeline, step 9)');
+  process.exit(2);
+}
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
@@ -57,12 +65,20 @@ function copyMedia(run, rel, acId) {
   return `media/${name}`;
 }
 
-// The evidence of one AC on one side: the last attempt of the test tagged issue-<n> + ac-<k>
-// (an exploration: issue-<n>-ex + ex-<k>).
+// Whose criterion an AC is: an issue (#42, tag issue-42) or a scenario (S-7, tag scenario-7).
+function owner(ac) {
+  const s = ac.scenario ?? (ac.issue == null ? v.scenario : null);
+  if (s) return { tag: `scenario-${String(s).replace(/^S-/i, '')}`, name: String(s) };
+  const n = ac.issue ?? v.issue;
+  return { tag: `issue-${n}`, name: `#${n}` };
+}
+
+// The evidence of one AC on one side: the last attempt of the test tagged with its owner
+// + ac-<k> (an exploration: issue-<n>-ex + ex-<k>).
 function evidence(run, ac, suffix = '') {
   if (!run) return { state: 'not-run' };
   if (run.missing) return { state: 'missing', label: run.label };
-  const tags = ac.tag ? [ac.tag] : [`issue-${ac.issue ?? v.issue}${suffix}`, ac.id.toLowerCase()];
+  const tags = ac.tag ? [ac.tag] : [`${owner(ac).tag}${suffix}`, ac.id.toLowerCase()];
   const res = run.results.find((r) => tags.every((t) => (r.tags ?? []).includes(t)));
   if (!res) return { state: 'no-test', label: run.label };
   const att = res.attempts?.at(-1) ?? {};
@@ -105,8 +121,9 @@ function findTracePage(run, rel) {
 }
 function readText(p) { try { return p ? readFileSync(p, 'utf8').slice(0, 20000) : null; } catch { return null; } }
 
-const key = (ac) => (ac.tag ? `${ac.tag}-${ac.target ?? ''}` : `${ac.issue ?? v.issue}-${ac.id}`);
+const key = (ac) => (ac.tag ? `${ac.tag}-${ac.target ?? ''}` : `${owner(ac).name}-${ac.id}`);
 const regression = v.mode === 'regression';
+const scenario = v.mode === 'scenario';
 const runs = { candidate: loadRun(v.candidate_run), baseline: loadRun(v.baseline_run), explore: loadRun(v.explorations_run) };
 if (runs.candidate) runs.candidate.side = 'candidate';
 if (runs.baseline) runs.baseline.side = 'baseline';
@@ -117,7 +134,7 @@ const VERDICT = {
   inconclusive: ['Inconclusive', 'warn'], blocked: ['Blocked', 'muted'], 'not-testable': ['Not testable', 'muted'],
   unchanged: ['Unchanged', 'ok'], relearned: ['UI changed · steps re-learned', 'ok'], healed: ['UI changed · check repaired', 'warn'],
   superseded: ['Superseded by a change', 'muted'], regression: ['Regression', 'bad'], 'needs-review': ['Needs review', 'warn'],
-  flaky: ['Flaky', 'warn'], 'observed-ok': ['Observed OK', 'ok'], observation: ['Observation', 'warn'],
+  flaky: ['Flaky', 'warn'], 'observed-ok': ['Observed OK', 'ok'], observation: ['Observation', 'warn'], passed: ['Passed', 'ok'],
   critical: ['Critical', 'bad'], high: ['High', 'bad'], medium: ['Medium', 'warn'], low: ['Low', 'muted'], info: ['Info', 'muted'],
 };
 const SEVERITY = { info: 'muted', minor: 'warn', major: 'bad' };
@@ -196,7 +213,7 @@ const observations = exps.filter((ex) => ex.verdict === 'observation').length;
 const exHtml = !exps.length ? '' : `
 <section id="beyond-the-criteria">
 <h2>Beyond the criteria</h2>
-<p class="dim"><b>Not part of the verdict.</b> Scenarios the agent derived from the criteria (negative paths, persistence, roles…) and ran on the candidate only. An <b>observation</b> is something worth a look; it never changes a criterion's verdict.${v.ex_hash ? ` · checks <code>ex=${esc(v.ex_hash)}</code>` : ''}</p>
+<p class="dim"><b>Not part of the verdict.</b> Checks the agent derived from the criteria (negative paths, persistence, roles…) and ran on the candidate only. An <b>observation</b> is something worth a look; it never changes a criterion's verdict.${v.ex_hash ? ` · checks <code>ex=${esc(v.ex_hash)}</code>` : ''}</p>
 <table><thead><tr><th>EX</th><th>From</th><th>Heuristic</th><th>Candidate</th><th>Result</th></tr></thead><tbody>${exps.map((ex) => `<tr><td><a href="#${esc(slug(key(ex)))}">${esc(ex.id)}</a></td><td>${esc(ex.from_ac)}</td><td>${esc(ex.heuristic)}</td><td>${stateBadge(ex.cand?.state ?? 'not-run')}</td><td>${badge(ex.verdict)} ${sevBadge(ex.severity)}</td></tr>`).join('')}</tbody></table>
 ${exps.map((ex) => `
 <article class="ac" id="${esc(slug(key(ex)))}">
@@ -251,11 +268,12 @@ ${ctx.iface_diff ? `<p><b>CLI and API difference</b></p><pre>${esc(ctx.iface_dif
 
 const acHtml = acs.map((ac) => `
 <article class="ac" id="${esc(slug(key(ac)))}">
-  <header><h3>${regression ? `#${esc(ac.issue)} ` : ''}${esc(ac.id)} — ${esc(ac.name)}</h3>${badge(ac.verdict)}</header>
+  <header><h3>${regression ? `${esc(owner(ac).name)} ` : ''}${esc(ac.id)} — ${esc(ac.name)}</h3>${badge(ac.verdict)}</header>
   <blockquote>${ac.given ? `<b>Given</b> ${esc(ac.given)}<br>` : ''}${ac.when ? `<b>When</b> ${esc(ac.when)}<br>` : ''}${ac.then ? `<b>Then</b> ${esc(ac.then)}` : ''}</blockquote>
   ${ac.note ? `<p class="note">${esc(ac.note)}</p>` : ''}
   ${ac.explanation ? `<p><b>Why:</b> ${esc(ac.explanation)}${ac.because_issue ? ` — see #${esc(ac.because_issue)}` : ''}</p>` : ''}
   ${ac.heal ? `<p class="dim">Check repaired: <code>${esc(ac.heal.from)}</code> → <code>${esc(ac.heal.to)}</code></p>` : ''}
+  ${ac.judge ? `<p class="dim"><b>Judge:</b> ${ac.judge.agree ? 'agrees' : 'disagrees'}${ac.judge.call && ac.judge.call !== '-' ? ` (${esc(ac.judge.call)})` : ''} — ${esc(ac.judge.reason)}</p>` : ''}
   ${ac.baseline_blocked_reason ? `<p class="dim">${BLOCKED[ac.baseline_blocked_reason] ?? `Baseline stopped before the check (${esc(ac.baseline_blocked_reason)}).`}</p>` : ''}
   ${ac.regressed_between ? `<p><b>Regressed between</b> <code>${esc(ac.regressed_between.from)}</code> (passes) and <code>${esc(ac.regressed_between.to)}</code> (fails)${ac.regressed_between.builds_between == null ? '' : ac.regressed_between.builds_between ? ` · ${esc(ac.regressed_between.builds_between)} untested builds in between` : ' · adjacent builds'}</p>` : ''}
   ${ac.testable === false ? '' : `<div class="sides">${sideHtml(`${regression ? 'Build' : 'Candidate'} ${v.candidate ?? ''}`, ac.cand)}${regression
@@ -263,11 +281,11 @@ const acHtml = acs.map((ac) => `
     : sideHtml(`Baseline ${v.baseline ?? ''}`, ac.base)}</div>`}
 </article>`).join('');
 
-const summaryRows = acs.map((ac) => `<tr><td><a href="#${esc(slug(key(ac)))}">${regression ? `#${esc(ac.issue)} ` : ''}${esc(ac.id)}</a></td><td>${esc(ac.name)}</td><td>${stateBadge(ac.cand?.state ?? 'not-run')}</td>${regression ? '' : `<td>${stateBadge(ac.base?.state ?? 'not-run')}</td>`}<td>${badge(ac.verdict)}</td></tr>`).join('');
+const summaryRows = acs.map((ac) => `<tr><td><a href="#${esc(slug(key(ac)))}">${regression ? `${esc(owner(ac).name)} ` : ''}${esc(ac.id)}</a></td><td>${esc(ac.name)}</td><td>${stateBadge(ac.cand?.state ?? 'not-run')}</td>${regression ? '' : `<td>${stateBadge(ac.base?.state ?? 'not-run')}</td>`}<td>${badge(ac.verdict)}</td></tr>`).join('');
 
 const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${regression ? `Regression ${esc(v.candidate)}` : `#${esc(v.issue)} QA verdict`}</title>
+<title>${regression ? `Regression ${esc(v.candidate)}` : scenario ? `${esc(v.scenario)} scenario verdict` : `#${esc(v.issue)} QA verdict`}</title>
 <style>
 ${CSS}
 </style></head><body><main>
@@ -275,6 +293,10 @@ ${regression ? `<div class="hero"><h1>Regression run — ${esc(v.candidate)}</h1
 <p class="meta">previous build <code>${esc(ctx?.previous ?? '–')}</code> · ${esc(v.generated_utc ?? '')}</p>
 <p class="dim">Every promoted criterion was replayed on the new build. A UI that moved or was renamed is absorbed (steps re-learned) or repaired (check updated); only a criterion that no longer holds and that no completed issue explains is a <b>regression</b>.</p>
 <table><thead><tr><th>AC</th><th>Criterion</th><th>Result</th><th>Triage</th></tr></thead><tbody>${summaryRows}</tbody></table>${contextHtml}`
+: scenario ? `<div class="hero"><h1>${esc(v.scenario)} — ${esc(v.title)}</h1>${badge(v.verdict)}</div>
+<p class="meta">build <code>${esc(v.candidate ?? '–')}</code> · last release <code>${esc(v.baseline ?? '–')}</code> · scenario <code>spec=${esc(v.spec_hash)}</code> (source: ${esc(v.source ?? 'request')}) · ${esc(v.generated_utc ?? '')}</p>
+<p class="dim">Each step of the scenario was tested on the build. A failure that held on a re-run was also run on the last release: failing only on the build is a <b>regression</b>, failing on both is <b>failed</b>. An independent judge read the evidence of every criterion. Watch the videos and screenshots to check the result yourself.</p>
+<table><thead><tr><th>AC</th><th>Criterion</th><th>Build</th><th>Last release</th><th>Verdict</th></tr></thead><tbody>${summaryRows}</tbody></table>`
 : `<div class="hero"><h1>#${esc(v.issue)} — ${esc(v.title)}</h1>${badge(v.verdict)}</div>
 <p class="meta">candidate <code>${esc(v.candidate ?? '–')}</code> · baseline <code>${esc(v.baseline ?? '–')}</code> · criteria <code>ac=${esc(v.ac_hash)}</code> (source: ${esc(v.criteria_source ?? 'done-when')}) · ${esc(v.generated_utc ?? '')}</p>
 <p class="dim">Each criterion was tested on the candidate build and on the baseline release. <b>Verified</b> means it fails on the baseline and passes on the candidate. Watch the videos and screenshots to check the result yourself.</p>
@@ -283,12 +305,17 @@ ${acHtml}
 ${exHtml}
 ${noticedHtml}
 ${(v.notes ?? []).length ? `<h3>Notes</h3><ul>${v.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
-<footer>${esc(v.display_name ?? 'Quality Inspector')} · black-box test of the published chart in a nested cluster · e2e ${esc(runs.candidate?.version ?? '')}</footer>
+<footer>${esc(v.display_name ?? 'Quality Inspector')} · black-box test of the build in a nested environment · e2e ${esc(runs.candidate?.version ?? '')}</footer>
 </main></body></html>
 `;
 writeFileSync(join(outDir, 'index.html'), html);
 
-const comment = [
+// A scenario's comment.md is the channel reply's body (docs/scenarios.md → The reply).
+const comment = scenario ? [
+  `*${v.scenario} — ${v.title}*: ${(VERDICT[v.verdict] ?? [v.verdict])[0]} on \`${v.candidate ?? '–'}\``,
+  ...acs.map((ac) => `• ${ac.id} ${ac.name} — ${ac.verdict}${ac.judge && !ac.judge.agree ? ' (the judge disagrees)' : ''}${ac.note ? ` — ${ac.note}` : ''}`),
+  'Evidence (videos, screenshots, steps): EVIDENCE_LINK',
+].join('\n') : [
   `## ${v.display_name ?? 'Quality Inspector'} — #${v.issue} verdict: ${(VERDICT[v.verdict] ?? [v.verdict])[0]}`,
   `candidate \`${v.candidate ?? '–'}\` · baseline \`${v.baseline ?? '–'}\` · criteria ac=${v.ac_hash}`,
   '',
