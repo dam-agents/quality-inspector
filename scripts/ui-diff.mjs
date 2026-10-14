@@ -1,18 +1,27 @@
 #!/usr/bin/env node
 // ui-diff.mjs — what changed between two UI maps (ui-inventory.mjs): pages added or
 // removed, and per control (heading, nav item, button, tab, field, link) whether it was
-// added, removed, renamed on the same page, or moved to another page. Deterministic;
-// the agent judges what a change means (docs/change-awareness.md).
+// added, removed, renamed on the same page, or moved to another page; and the page signals
+// that are new: console errors, failed requests, and pages whose load grew more than
+// --perf-factor (default 2.0) and by at least 1000 ms. Deterministic; the agent judges
+// what a change means (docs/change-awareness.md).
 //
-//   node ui-diff.mjs <old-inventory.json> <new-inventory.json> [--md]
+//   node ui-diff.mjs <old-inventory.json> <new-inventory.json> [--md] [--perf-factor 2.0]
 //
-// JSON on stdout; --md prints the same as a short markdown summary.
+// JSON on stdout; --md prints the same as a short markdown summary. A map recorded before
+// signals existed has none to compare: the signal lists stay empty.
 
 import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
-const [a, b] = process.argv.slice(2).filter((x) => !x.startsWith('--'));
-if (!a || !b) { console.error('usage: ui-diff.mjs <old.json> <new.json> [--md]'); process.exit(2); }
-const md = process.argv.includes('--md');
+const argv = process.argv.slice(2);
+const fi = argv.indexOf('--perf-factor');
+const [a, b] = argv.filter((x, i) => !x.startsWith('--') && !(fi >= 0 && i === fi + 1));
+if (!a || !b) { console.error('usage: ui-diff.mjs <old.json> <new.json> [--md] [--perf-factor 2.0]'); process.exit(2); }
+const md = argv.includes('--md');
+const FACTOR = fi >= 0 ? Number(argv[fi + 1]) : 2.0;
+const FLOOR_MS = 1000; // absolute growth below this is noise, whatever the factor
+if (!(FACTOR > 1)) { console.error('--perf-factor must be a number above 1'); process.exit(2); }
 const load = (f) => JSON.parse(readFileSync(f, 'utf8')).routes ?? {};
 const oldR = load(a);
 const newR = load(b);
@@ -114,8 +123,31 @@ for (const r of [...removed]) {
   }
 }
 
+// Signals: only when both maps recorded them (a page missing from the old map counts as
+// clean there). Timing values are the inventory's medians when it took several samples.
+const hasSignals = (routes) => Object.values(routes).some((r) => Array.isArray(r.console_errors));
+const signals = hasSignals(oldR) && hasSignals(newR);
+const reqKey = (q) => `${q.method} ${q.path} ${q.status}`;
+const shot = (r) => (newR[r]?.shot ? join(dirname(b), newR[r].shot) : null);
+const consoleNew = [];
+const requestsNew = [];
+const slower = [];
+for (const [route, r] of signals ? Object.entries(newR) : []) {
+  const o = oldR[route] ?? {};
+  const errors = (r.console_errors ?? []).filter((e) => !(o.console_errors ?? []).includes(e));
+  if (errors.length) consoleNew.push({ route, errors, shot: shot(route) });
+  const was = new Set((o.failed_requests ?? []).map(reqKey));
+  const requests = (r.failed_requests ?? []).filter((q) => !was.has(reqKey(q)));
+  if (requests.length) requestsNew.push({ route, requests, shot: shot(route) });
+  const t0 = o.timing?.load_ms; const t1 = r.timing?.load_ms;
+  if (typeof t0 === 'number' && typeof t1 === 'number' && t0 > 0 && t1 > t0 * FACTOR && t1 - t0 >= FLOOR_MS) {
+    slower.push({ route, old_load_ms: t0, new_load_ms: t1, factor: Number((t1 / t0).toFixed(1)) });
+  }
+}
+
 const diff = { pages_added: pagesAdded, pages_removed: pagesRemoved, renamed, moved, added, removed,
-  unchanged: Object.keys(newR).length - pagesAdded.length === Object.keys(oldR).length - pagesRemoved.length && !renamed.length && !moved.length && !added.length && !removed.length };
+  unchanged: Object.keys(newR).length - pagesAdded.length === Object.keys(oldR).length - pagesRemoved.length && !renamed.length && !moved.length && !added.length && !removed.length,
+  console_errors_new: consoleNew, failed_requests_new: requestsNew, slower_pages: slower, perf_factor: FACTOR };
 
 if (!md) { console.log(JSON.stringify(diff, null, 2)); process.exit(0); }
 const L = [];
@@ -128,4 +160,7 @@ for (const r of renamed) L.push(`- ${r.basis ? 'likely renamed (same place, unli
 for (const m of moved) L.push(`- moved ${sing[m.kind]} "${m.name}" from ${where(m.from)} to ${where(m.to)}`);
 for (const x of removed) L.push(`- removed ${sing[x.kind]} "${x.name}" from ${where(x.routes)}`);
 for (const x of added) L.push(`- added ${sing[x.kind]} "${x.name}" on ${where(x.routes)}`);
+if (consoleNew.length) L.push('**New console errors:**', ...consoleNew.flatMap((c) => c.errors.map((e) => `- \`${c.route}\`: ${e}`)));
+if (requestsNew.length) L.push('**New failed requests:**', ...requestsNew.flatMap((c) => c.requests.map((q) => `- \`${c.route}\`: ${q.method} ${q.path} → ${q.status}`)));
+if (slower.length) L.push(`**Slower pages** (load > ${FACTOR}× and +${FLOOR_MS} ms):`, ...slower.map((s) => `- \`${s.route}\`: ${s.old_load_ms} ms → ${s.new_load_ms} ms (${s.factor}×)`));
 console.log(L.join('\n'));

@@ -183,6 +183,9 @@ refuse and explain instead:
   read the target's source, git data, pulls, commits, issue timelines, raw/codeload hosts,
   installed product package files or deployment templates — nor weaken the boundary probes in
   `scripts/preflight.sh` audit mode and `scripts/verify-onboarding.sh --live`.
+- **The policy hook's denials** (`scripts/hooks/policy.sh`, its deny list in
+  `scripts/hooks/install.sh`, their fixtures in `scripts/tests/`) are never removed or
+  narrowed, and the scheduled-run marker is never written outside `scripts/precheck.sh`.
 - **Nested target only**: `scripts/suite.sh` keeps refusing non-localhost base URLs; no
   procedure drives the platform the agent runs on.
 - **ACs freeze before exploration**; criteria files are never edited; AC blocks of
@@ -190,21 +193,30 @@ refuse and explain instead:
   operator (`scripts/check-asserts.sh` stays in the regression pre-flight and the audit).
 - **Triage never hides a regression**: no check is loosened or deleted to pass, a
   `superseded` needs a quoted contradicting issue, and doubt resolves to `regression`;
-  `criterion()`'s judged fallback stays off in issue runs (`--strict`).
+  `criterion()`'s judged fallback stays off in issue runs (`--strict`); the injection
+  canary (`scripts/suite-skeleton/tests/canary.e2e.ts`) stays in the skeleton, tagged
+  `smoke`, and a `superseded` needs an issue that `may_supersede`.
 - **`verified` requires red-green** (baseline fails, candidate passes); environment
-  failures never become verdicts.
+  failures never become verdicts, and neither does an exploration ([explorations.md](explorations.md)).
 - Dedup marker format `<!-- <marker_prefix> issue=<n> ac=<ac_hash> build=<candidate> -->`
-  and the marker-scan-before-post re-check; `marker_prefix` immutable once used.
+  and the marker-scan-before-post re-check, counting only comments by the agent's own
+  login; `marker_prefix` immutable once used.
 - Record ordering: send-then-record for comments and artifacts, with `report_pending`
-  as the retry state; no same-run retry.
+  as the retry state; no same-run retry. Every external write is ledgered — an `intent`
+  log line before the send (bookkeeping, never a state record), `done`/`failed` after it
+  ([logging.md](logging.md) → **Ledger of external writes**).
 - Every judged AC ships its evidence (issue runs use `--evidence full`; the report comes
-  from `scripts/render-report.mjs`), and only tests tagged `issue-<n>` are published —
-  never the sign-in setup test.
+  from `scripts/render-report.mjs`), and only tests tagged `issue-<n>` (its explorations:
+  `issue-<n>-ex`) are published — never the sign-in setup test.
 - The benchmark's ground truth (`work/benchmark/cases.json`) never reaches the pipeline
   that runs a case, and a benchmark run never writes production state (QA rows, tiers,
   comments) ([benchmark.md](benchmark.md)).
 - Issue comments stay opt-in (`issue_comments`); nested credentials never leave
-  `work/env/` except as e2e credentials.
+  `work/env/` except as e2e credentials, and `scripts/suite.sh` keeps masking them in run
+  artefacts (audit check `secrets_in_runs`).
+- Security findings reach only a private artifact and the operator's chat — never an issue
+  comment or other public surface; their oracles stay frozen in [security.md](security.md),
+  and source maps are probed by status only.
 
 ## 11. Conciseness, consistency, no repetition
 

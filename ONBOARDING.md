@@ -88,8 +88,9 @@ The operator assigns the profile on the platform; you never install it yourself.
 Create only what is missing; never overwrite an existing state file.
 
 ```bash
-mkdir -p /home/agent/work/issues /home/agent/work/logs /home/agent/work/inventory /home/agent/work/regression /home/agent/work/benchmark
+mkdir -p /home/agent/work/issues /home/agent/work/logs /home/agent/work/inventory /home/agent/work/regression /home/agent/work/benchmark /home/agent/work/perf /home/agent/work/security
 cd /home/agent/work
+touch SECURITY.log
 [ -f QA.md ] || cat > QA.md <<'EOF'
 # QA state — one row per issue (docs/issue-qa.md → State)
 
@@ -113,6 +114,12 @@ EOF
 
 | utc | test | ac | build | runs | passes |
 | --- | --- | --- | --- | --- | --- |
+EOF
+[ -f COVERAGE.md ] || cat > COVERAGE.md <<'EOF'
+# Coverage — pages of the newest UI map and the tests that reach them (docs/change-awareness.md → Coverage)
+
+| page | title | tests | covered |
+| --- | --- | --- | --- |
 EOF
 [ -f LESSONS.md ] || cat > LESSONS.md <<'EOF'
 # Operational lessons — verified environment facts only, each with its evidence.
@@ -147,6 +154,11 @@ claude mcp get e2e >/dev/null 2>&1 || claude mcp add --scope user e2e -- bash "$
 not done yet: ask the operator to apply the egress rules, then re-run this block. Write
 `- profile: <name>` into `work/CONFIG.md` first (Step 3 completes the file) — both
 scripts find the profile through it.
+
+**2e — the policy hook:** `bash "$HOME/scripts/hooks/install.sh"` merges the PreToolUse
+hook and the deny list into `$HOME/.claude/settings.json` (other keys kept; re-running
+changes nothing); it applies from the next session ([docs/black-box.md](docs/black-box.md)
+→ **Enforcement layers**).
 
 ## Step 3 — Configure (`work/CONFIG.md`, interactive)
 
@@ -186,14 +198,24 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - artifact_reports: enabled
 - include_comments: disabled
 - spec_feedback: disabled
+- auto_promote: disabled
 - media_retention_days: 14
+- confirm_regressions: disabled
+- bisect_max_steps: 0
 - max_issues_per_run: 1
 - lock_ttl_min: 180
+- max_wallclock_min_per_issue: 150
+- max_model_steps_per_issue: 400
+- min_free_disk_gi: 10
 - e2e_version: 0.17.0
 - e2e_web_version: 0.12.0
 - e2e_model: claude-sonnet-5
 - audit_report: enabled
 - log_level: info
+- explorations: enabled
+- max_explorations_per_ac: 3
+- security_checks: enabled
+- security_failed_logins: 10
 
 - profile.chart_ref: oci://quay.io/dam-agents/charts/platform
 - profile.mock_image:
@@ -206,7 +228,8 @@ file to the operator.
 
 When the operator says this target already has comments from a previous quality-inspector: list the
 issues with `qa_label`, read their comments, and for each `<!-- <marker_prefix> issue=… ac=…
-build=… -->` (newest per issue) write one row — `ac_hash` and `candidate` from the marker,
+build=… -->` (newest per issue, own comments only — [docs/reporting.md](docs/reporting.md) →
+**Delivery**; a login the operator names as the previous instance's counts too) write one row — `ac_hash` and `candidate` from the marker,
 `baseline` from the `-data` copy or `-`, the verdict from the `-data` copy, `status:
 reported`, `updated_utc` = **the comment's `created_at`**. No marker → no row. The suite,
 the criteria files and the replay cache are not reconstructable.
@@ -215,10 +238,10 @@ the criteria files and the replay cache are not reconstructable.
 
 Start from `mcp__platform-outbound__list_schedules`. Expected: `quality-inspector-issues-1h`,
 `quality-inspector-regression-nightly`, `quality-inspector-benchmark-monthly`,
-`quality-inspector-audit-weekly`.
+`quality-inspector-security-weekly`, `quality-inspector-audit-weekly`.
 
-- Present → leave alone, including its enabled state; the regression and audit schedules
-  arrive switched off on purpose — offer to turn them on, never flip them unasked.
+- Present → leave alone, including its enabled state; every schedule but the issues one
+  arrives switched off on purpose — offer to turn them on, never flip them unasked.
 - Missing → create it with the name, cron, `sessionMode: fresh`, `precheck` and task text
   of its `kit.yaml` entry, verbatim.
 - Present but unknown (another definition version) → report; never delete.
@@ -242,6 +265,7 @@ bash "$HOME/scripts/env.sh" unlock operator
   broke; a repeated proxy or pull failure usually means checklist item 4.
 - The smoke run fails in the setup test → adjust `work/suite/tests/auth.setup.e2e.ts`
   to what the nested sign-in really shows (keep its final checks), re-run.
+- The injection canary fails or is skipped → [docs/nested-env.md](docs/nested-env.md) → Failures.
 - An `agent.act` step fails with a model or provider error → checklist item 7: the
   gateway does not inject an Anthropic credential for this agent; the operator fixes the
   connection. Tick item 7 once a smoke run passes.
@@ -267,7 +291,7 @@ Then tick item 4 (the boundary probes passed) and item 2, and call
 1. The final `work/CONFIG.md`, verbatim.
 2. Schedules and which are disabled; state is local-only (README → Persistence).
 3. Day-to-day: label an issue `qa:ready` to have it tested within the hour; add
-   `qa:retest` to test it again; say "promote #N" to move its tests into the nightly
-   regression; "test #N" runs one now; reports land in the artifact library (and on the
+   `qa:retest` to test it again; say "promote #N" (or "promote all pending") to move
+   tests into the nightly regression; "test #N" runs one now; reports land in the artifact library (and on the
    issue when comments are enabled); `marker_prefix` cannot change after the first
    comment.

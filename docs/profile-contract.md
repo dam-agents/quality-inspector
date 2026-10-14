@@ -26,7 +26,7 @@ local development). The core never edits a profile; changes go to its own reposi
   bin/env         optional — the product environment (else its engine's)
   bin/versions    optional — which builds exist (else its engine's)
   bin/build-time  optional — when a build was published (else its engine's)
-  suite/          optional: files merged into work/suite on init (fixtures, helpers)
+  suite/          optional: files merged into work/suite on init (fixtures, helpers, lib/security-api.ts)
   README.md       for the people who maintain the profile
 ```
 
@@ -56,10 +56,12 @@ own business) as `QI_ENGINE_CONFIG`, and never product facts of its own.
   "issues": { "provider": "github" },
   "boundary": {
     "github_paths": ["actions/runs"],
-    "urls": ["https://docs.internal.example/architecture/"]
+    "urls": ["https://docs.internal.example/architecture/"],
+    "packages": ["@acme"]
   },
   "egress": [{ "host": "registry.example.com", "method": "GET", "why": "product images" }],
   "requires": { "root": true, "commands": ["docker"], "memory_gi": 8 },
+  "interfaces": { "cli": "widgets", "openapi": "/api/openapi.json" },
   "config": {
     "image_ref": { "default": "registry.example.com/widgets", "about": "image repository the builds come from" },
     "admin_email": { "default": "", "about": "which address the seeded admin account uses", "ask": true }
@@ -73,11 +75,20 @@ own business) as `QI_ENGINE_CONFIG`, and never product facts of its own.
   `target_repo`.
 - `boundary` — what the black-box probes must find refused **in addition** to the core's
   own list for the provider ([black-box.md](black-box.md)): repository API paths under
-  `/repos/<target>/`, and full URLs.
+  `/repos/<target>/`, and full URLs. Optional `packages` — the
+  product's npm scopes or package names; the policy hook refuses reading their files
+  under any `node_modules/` (without it, nothing is refused there).
 - `egress` — hosts the product environment needs, for README and the operator's egress
   rules. Listed, never applied by the agent.
 - `requires` — checked by `verify-onboarding.sh --live`: root (a vm-backend agent), the
   commands on `PATH`, memory.
+- `security` (optional) — `entity`: the noun of the main object a user creates, with a
+  name and a description (`"project"`); `namespace`: where its pods run, when the engine
+  names none. The security run's input and deployment checks need them ([security.md](security.md)).
+- `interfaces` — optional, both fields too: `cli`, the published CLI's command (on `PATH`
+  or installed into `work/suite`), and `openapi`, the path under `app.url` that serves the
+  API description as JSON. Their snapshots are change context
+  ([change-awareness.md](change-awareness.md)); absent → no snapshot.
 - `config` — the profile's own keys, written in `work/CONFIG.md` as
   `- profile.<key>: <value>`, each with a default and an `about` sentence; `"ask": true`
   makes onboarding ask the operator instead of defaulting. The core validates that no
@@ -102,15 +113,24 @@ Every executable runs with cwd `$HOME/work`, and with:
 
 - `bin/versions` → stdout `{"candidate": "<build>", "baseline": "<build>"|null}` for the
   channels; exit non-zero with a reason on stderr when it cannot look. Never a guess.
+- `bin/versions --between <from> <to>` — **optional** → stdout a JSON array of the builds
+  published strictly between the two (same channel), oldest first; `[]` when adjacent.
+  Not implemented → exit 2 (output that is not an array counts the same); bisection is
+  then skipped with that reason ([triage.md](triage.md) → Order of work, step 6).
 - `bin/build-time <build>` → stdout one ISO-8601 UTC timestamp, the moment the build was
   published; non-zero when unknown. The change window of [change-awareness.md](change-awareness.md).
 
 **Acting commands** (only the agent calls them, under the environment lock):
 
 - `bin/env init` — idempotent: create `$QI_ENV_DIR` and **`$QI_ENV_DIR/credentials.env`**
-  (mode 600) with `E2E_USER_OWNER_USERNAME` and `E2E_USER_OWNER_PASSWORD` — the account
-  the suite signs in as — plus any further `E2E_USER_<NAME>_*` pairs the product needs.
-  Never prints a secret.
+  (mode 600) with `E2E_USER_<ROLE>_USERNAME` / `_PASSWORD` pairs — **the role convention**.
+  `OWNER` is required — the account the suite signs in as; optional roles: `MEMBER` (an
+  ordinary user of the owner's tenant or workspace), `VIEWER` (read-only there), `OUTSIDER`
+  (another tenant or organization, with no access to the owner's data). Every role written
+  signs in after each `up`; `SKILL.md` says what each may do. Explorations
+  ([explorations.md](explorations.md)) and the security run's access checks
+  ([security.md](security.md)) use them. Further `E2E_USER_<NAME>_*` pairs the product needs
+  are allowed. Never prints a secret.
 - `bin/env up <build>` — bring the product up at exactly that build, reachable at
   `app.url`; idempotent; exit 0 only when the UI answers. A forward-only upgrade is fine.
 - `bin/env reset` — wipe product data so the next `up` starts clean (fresh users, no
@@ -124,8 +144,8 @@ verdict ([issue-qa.md](issue-qa.md)). Diagnostics go to stderr; secrets never.
 ## `SKILL.md` — what a tester should know
 
 Read at the AC freeze and when writing tests. It holds **user-facing** knowledge only:
-the product's vocabulary, its main areas and how a user reaches them, the test account
-and what it can do, what the nested environment cannot do (no outbound network, no email,
+the product's vocabulary, its main areas and how a user reaches them, each test
+account's role and what it may do, what the nested environment cannot do (no outbound network, no email,
 a mock instead of a real model…), and the sentences that tell a tester an AC is
 `testable: no` for that reason. Never implementation detail — a profile that describes
 the code breaks the black box as surely as reading it.

@@ -1,9 +1,22 @@
 #!/usr/bin/env bash
 # Offline gh stub: answers from files in $STUB_DIR; STUB_GH_FAIL=1 fails every call.
+# A single issue (…/issues/<n>) is $STUB_DIR/issue-<n>.json, else its entry of issues.json.
+# Every call is appended to $STUB_DIR/gh.calls; a comments listing reads comments-<n>.json.
 [ "${STUB_GH_FAIL:-0}" = 1 ] && { echo "stub: failure" >&2; exit 1; }
 args="$*"
+printf '%s\n' "$args" >> "$STUB_DIR/gh.calls" 2>/dev/null
+for a in "$@"; do
+  case "$a" in (*/issues/*) n="${a##*/issues/}"; case "$n" in (''|*[!0-9]*) ;; (*)
+    [ -f "$STUB_DIR/issue-$n.json" ] && { cat "$STUB_DIR/issue-$n.json"; exit 0; }
+    jq -ce --argjson n "$n" '.[] | select(.number == $n)' "$STUB_DIR/issues.json" 2>/dev/null && exit 0
+    echo "stub: issue $n not found" >&2; exit 1 ;; esac ;; esac
+done
 case "$args" in
   *" user"*|"api user"*) echo "qa-bot"; exit 0 ;;
+  *"/issues/"*"/comments"*)
+    n="$(printf '%s' "$args" | sed -n 's|.*/issues/\([0-9]*\)/comments.*|\1|p')"
+    if [ -f "$STUB_DIR/comments-$n.json" ]; then cat "$STUB_DIR/comments-$n.json"; else echo '[]'; fi
+    exit 0 ;;
   *"/issues"*) cat "$STUB_DIR/issues.json"; exit 0 ;;
 esac
 echo "stub gh: unhandled: $args" >&2; exit 1

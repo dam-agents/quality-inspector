@@ -5,28 +5,51 @@ when `audit_report: disabled` (still append the log line).
 
 1. Run `bash "$HOME/scripts/preflight.sh" audit`. Its `checks[]` are the deterministic
    half: GitHub identity, issues reachability, **the black-box boundary probes**, the
-   profile and its builds, the profile's requirements, disk, `work/` not a repo, leftovers, stale locks, assertion drift,
-   the issues pre-flight cadence, definition cleanliness and version. `failures[]` groups
-   the week's error events; `stats` counts verdicts.
+   profile and its builds, the profile's requirements, disk (use and `min_free_disk_gi`),
+   `work/` not a repo, leftovers, stale locks, the write ledger, assertion drift,
+   the issues pre-flight cadence, definition cleanliness and version, the policy hook and
+   the week's refusals (`policy_hook`, `policy_denied`), `secrets_in_runs` (a credential
+   value left in a raw run's text files; a `fail` names the paths, never the value),
+   **coverage** of the newest UI map (`warn` while pages are uncovered, never `fail`;
+   [change-awareness.md](change-awareness.md) → Coverage), and `criteria_injection` (the
+   week's criteria files holding URLs, code fences or HTML comments; the week's
+   `issue_injection_suspect` events) — a `warn` lists the issues: sample one and check its
+   instruction sentences are `testable: no`. `failures[]` groups the week's error events;
+   `stats` counts verdicts and `stats.coverage` the pages.
+   - `ledger_reconcile` ([logging.md](logging.md) → **Ledger of external writes**): for
+     the newest 20 `reported` QA rows of the week, one `GET …/issues/<n>/comments?since=`
+     each; every comment of the agent's login (`gh api user`) created this week (and after
+     the newest `ledger_start` event) that carries `<!-- <marker_prefix>` needs a `done`
+     entry with its surface and key —
+     missing → `fail` (unrecorded external write). An `intent` of the week older than
+     15 minutes with no later `done`/`failed` → `warn` (unfinished write).
 2. Add the judgment half:
-   - `mcp__platform-outbound__list_schedules`: the three `quality-inspector-*` schedules exist; their
+   - `mcp__platform-outbound__list_schedules`: every `quality-inspector-*` schedule of `kit.yaml` exists; their
      task text and precheck match `kit.yaml` (drift is a `warn` — the operator updates a
      live schedule). Save the JSON to `/tmp/quality-inspector-schedules.json` and run
      `bash "$HOME/scripts/verify-onboarding.sh" --schedules /tmp/quality-inspector-schedules.json`
      (offline structure pass); delete the file afterwards.
-   - `precheck.sh issues` and `precheck.sh regression`, timed: exit 0 or 1 within
+   - `QI_PRECHECK_PROBE=1 precheck.sh issues` and `… regression`, timed: exit 0 or 1 within
      two minutes.
    - Each `failures[]` signature: cause + fix, classified *environment* / *agent
      mistake* / *definition bug*. A reproduced environment cause → `work/LESSONS.md`. A
      definition bug → one deduplicated issue on the definition repository (search open
-     issues first) — the audit's only external write.
+     issues first) — the audit's only external write, ledgered as `definition_issue`.
    - Sample up to three reports of the week: criteria file predates the test file; no
-     `verified` without a baseline failure; every tested AC has a candidate video and its
-     `AC-<k>` screenshot; AC blocks contain checks only; no internal identifiers or
-     credentials in the text, the screenshots or the first and last frames you look at.
+     `verified` without a baseline failure or `baseline_blocked_reason: absent`; every
+     tested AC has a candidate video and its `AC-<k>` screenshot; AC blocks contain checks
+     only; no internal identifiers or credentials in the text, the screenshots or the
+     first and last frames you look at; every block `check-asserts.sh --lint` lists checks
+     state the test changed (else a warn — the AC may not discriminate), and the lint's
+     `ex_with_issue_tag` is empty (else a warn); the explorations
+     file predates the test file and the report states its observations count
+     ([explorations.md](explorations.md)).
    - Benchmark: the newest line of `work/benchmark/history.jsonl` — its age, accuracy and
      `false_verified` (above 0 is a red line until a later run is clean); a benchmark
      never run, or older than two months with cases defined, is a warn.
+   - Security: the newest `ran` line of `work/SECURITY.log` — a critical or high count above
+     0 stays a red line until a later run is clean; `security_checks` enabled with no run in
+     five weeks is a warn. Never quote a finding beyond its id.
    - Spec quality: this week's `not-testable` verdicts and `testable: no` ACs by reason,
      issues without "Done when", and how many suggested rewrites authors adopted (an
      issue that became due again by `ac_changed` after a `spec-feedback` file).
@@ -34,15 +57,18 @@ when `audit_report: disabled` (still append the log line).
      one cause dominates (the same page, the nested product right after `up`).
    - Triage health: heals this week from `work/HEALS.md` (each one's basis is a UI-map
      change or an issue — sample one), tests at three heals a month, `needs-review` items
-     the operator has not answered, `retired` tests.
+     the operator has not answered, `retired` tests, `promotable` rows waiting.
    - Trends: verdict distribution (100 % one verdict is suspicious), `inconclusive`
      share (a non-discriminating suite), replay cache `handed_off + missed` share from
-     `REGRESSION.log`, environment failures per week.
+     `REGRESSION.log`, environment failures per week, observations per week by severity
+     (the week's `verdicts-*.json` → `explorations`), and one line of `needs-review`
+     signal items per week from `stats.signals_by_week` (a rising line while every test
+     passes is drift the suite does not see).
 3. Report to the chat UI, traffic-light:
 
 ```
 🩺 Quality Inspector weekly audit — <date> · 🟢 N ok · 🟡 N warn · 🔴 N fail
-Week in numbers: issues tested N (verified a · failed b · inconclusive c · blocked d) · env failures N · cache replay x %
+Week in numbers: issues tested N (verified a · failed b · inconclusive c · blocked d) · env failures N · cache replay x % · pages covered c/p
 🔴 <id> — <detail>          (every fail, never summarized away)
 🟡 <id> — <detail>
 🟢 all other checks passed (<count>)

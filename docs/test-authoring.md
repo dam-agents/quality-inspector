@@ -44,6 +44,11 @@ test('#42 AC-1: a renamed agent keeps its sessions', { session: 'owner', tags: [
 - **The `// AC-<k> begin` / `end` block holds only the checks**, written from the
   criteria file's *Then* line before the first run. Everything before it — navigation,
   setup, `agent.act` — is free to change.
+- **Every AC block discriminates**: at least one `expect` on data the test itself created
+  (a `unique()` name) or on state the test itself changed — never only on a static page
+  element, which passes on a build without the feature. `check-asserts.sh --lint <file>`
+  lists the blocks that name no `unique()` identifier; each one listed checks changed
+  state, or gets such a check.
 - After the first candidate run, an edit inside an AC block may only repair *how* the
   same thing is located (a locator that never matched), keeping the matcher and the
   expected value. Name every such edit in the report. Promoted tests: never, without the
@@ -54,8 +59,15 @@ test('#42 AC-1: a renamed agent keeps its sessions', { session: 'owner', tags: [
 - Every `agent.act` is followed by a check of its outcome (an `expect`, `waitFor` or
   `agent.assert`) — that verification is what lets the replay cache record it.
 - Keep each `act` to one goal; wrap generated names in `unique()` so replays survive.
-- Tags: `issue-<n>` and `ac-<k>` on every test; `smoke` only on the skeleton's smoke test.
+- Tags: `issue-<n>` and `ac-<k>` on every AC test; `smoke` only on the skeleton's smoke and
+  injection canary tests (never edit the canary's judgement; [nested-env.md](nested-env.md) → Failures).
 - Sign-in comes from the `owner` setup session; never type credentials in a test.
+
+**Explorations** ([explorations.md](explorations.md)) live in the same file, one test per
+EX tagged `issue-<n>-ex`, `ex-<k>`, `from-ac-<j>`, with `// EX-<k> begin` / `end` blocks
+and an `EX-<k>:` screenshot written by the rules above. Their blocks are hashed apart
+(`check-asserts.sh --ex-hash`) and are not promoted state; a role session other than `owner`
+comes from the setup test too.
 
 ## Finding the steps
 

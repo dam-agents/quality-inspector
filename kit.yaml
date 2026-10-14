@@ -65,10 +65,21 @@ schedules:
       its worklist is already appended below. If its JSON says nothing_to_do, report its
       logs in one line and end the run. Otherwise follow CLAUDE.md → "Benchmark run":
       read docs/benchmark.md and run every case.
+  - name: quality-inspector-security-weekly
+    cron: "0 4 * * 0"
+    sessionMode: fresh
+    enabled: false
+    precheck: 'bash "$HOME/scripts/precheck.sh" security'
+    task: >-
+      QA security run. Run `bash "$HOME/scripts/preflight.sh" security` first unless its
+      worklist is already appended below. If its JSON says nothing_to_do, report its
+      logs in one line and end the run. Otherwise follow CLAUDE.md → "Security run":
+      read docs/security.md and run every check against the worklist's candidate.
   - name: quality-inspector-audit-weekly
     cron: "0 7 * * 5"
     sessionMode: fresh
     enabled: false
+    precheck: 'bash "$HOME/scripts/precheck.sh" audit'
     task: >-
       Weekly self-audit. Run `bash "$HOME/scripts/preflight.sh" audit`, then follow
       CLAUDE.md → "Audit run": read docs/audit.md and report.

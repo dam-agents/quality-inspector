@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // scan-issues.mjs — the issues pre-flight's per-issue decisions in one process: spec text,
-// ac_hash, spec lint, the QA.md row, lock age and liveness, the retest gate, the cap.
+// ac_hash, spec lint (with injection suspects), the QA.md row, lock age and liveness, the retest gate, the cap.
 // A shell loop forked a dozen tools per issue; this keeps the Precheck far inside its two
 // minutes. Byte-for-byte the same spec text and hash as lib/state.sh (test_scan_parity.sh).
 //
@@ -30,13 +30,46 @@ export function specText(title, body) {
 export const hasDoneWhen = (body) => String(body ?? '').split('\n').some((l) => /^#{1,6}[ \t]+done[ \t]+when[ \t]*$/i.test(l.replace(/\r$/, '')));
 // Same as state.sh text_hash: whitespace runs to one space, trimmed, sha256, 12 hex.
 export const textHash = (t) => createHash('sha256').update(t.replace(/\s+/g, ' ').replace(/^ /, '').replace(/ $/, '')).digest('hex').slice(0, 12);
+// Prompt-injection suspects: sentences of the spec that address the agent instead of
+// describing the product. Each pattern runs on one sentence with its bullet marker
+// stripped; product verbs (run, delete, fetch) count only as a sentence-initial
+// imperative or aimed at the tracker itself, so "the user can delete an item" stays a
+// criterion. A matched sentence is frozen as an instruction (docs/acceptance-criteria.md).
+// One list, here; nothing else may restate it.
+export const INJECTION = [
+  { id: 'ignore', re: /\bignore (?:the|all|any|previous|prior|above|your)\b/i },
+  { id: 'agent-role', re: /\bas (?:the|an?) (?:qa|test|testing|ai)[ -]?(?:agent|bot|assistant|model)\b/i },
+  { id: 'agent-address', re: /^(?:dear )?(?:qa|test|ai) (?:agent|bot|assistant)\s*[:,]/i },
+  { id: 'you-must', re: /\byou (?:must|should|are)\b(?! (?:able|now|then|shown|redirected|taken|asked|prompted|signed|logged|notified|presented|see|get|receive)\b)/i },
+  { id: 'run', re: /^(?:run|execute) |\b(?:run|execute) (?:this|these|the following|the command)\b/i },
+  { id: 'curl', re: /\b(?:curl|wget) /i },
+  { id: 'post-comment', re: /\bpost (?:a|the|this) comment\b/i },
+  { id: 'delete', re: /^delete |\bdelete (?:this|the) (?:issue|repo|repository|branch|comment|label|file)s?\b/i },
+  { id: 'fetch', re: /^fetch |\bfetch (?:this|the) (?:url|link|page|file)\b/i },
+  { id: 'open-link', re: /\bopen (?:this|the|a) (?:pr|pull request|link|url)\b/i },
+  { id: 'mark-passed', re: /\b(?:mark|report)\b.{0,60}?\b(?:as )?(?:passed|verified)\b/i },
+];
+const sentences = (t) => t.replace(/<!--|-->/g, '\n').split(/\n|(?<=[.!?])\s+/)
+  .map((x) => x.replace(/^[ \t]*(?:[-*+]|[0-9]+[.)]|>)[ \t]+/, '').trim()).filter(Boolean);
+export function injectionLint(spec) {
+  const urls = (spec.match(/\bhttps?:\/\/\S+|\bwww\.\S+/gi) ?? []).length;
+  const code_fences = Math.ceil(spec.split('\n').filter((l) => /^[ \t]*(```|~~~)/.test(l)).length / 2);
+  const html_comments = (spec.match(/<!--/g) ?? []).length;
+  const imperatives = [];
+  for (const s of sentences(spec)) {
+    const hit = INJECTION.filter((p) => p.re.test(s)).map((p) => p.id);
+    if (hit.length) imperatives.push({ patterns: hit, sentence: s.slice(0, 240) });
+  }
+  return { injection: { urls, code_fences, html_comments, imperatives },
+    injection_suspect: urls + code_fences + html_comments + imperatives.length > 0 };
+}
 export function specLint(title, body) {
   const spec = specText(title, body).split('\n').slice(1).join('\n');
   const items = spec.split('\n').filter((l) => /^[ \t]*([-*+]|[0-9]+[.)])[ \t]+/.test(l)).length;
   const vague = [...new Set((spec.match(VAGUE) ?? []).map((w) => w.toLowerCase()))].sort();
   const words = spec.split(/\s+/).filter(Boolean).length;
   const d = hasDoneWhen(body);
-  return { has_done_when: d, items, vague, words, weak: items === 0 && (!d || words < 8) };
+  return { has_done_when: d, items, vague, words, weak: items === 0 && (!d || words < 8), ...injectionLint(`${title}\n${spec}`) };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
@@ -85,7 +118,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     else if (row.status === 'report_pending') { reports.push({ issue: n }); logs.push(`issue #${n}: report pending delivery — due`); continue; }
     else { logs.push(`issue #${n}: done at ac=${hash} — skip`); continue; }
     if (due.length >= max) { deferred++; logs.push(`issue #${n}: ${kind} — deferred (max_issues_per_run)`); continue; }
-    due.push({ issue: n, ac_hash: hash, kind, takeover, has_done_when: hasDoneWhen(body), retest_label_present: isRetest, spec: specLint(title, body) });
+    due.push({ issue: n, ac_hash: hash, kind, takeover, has_done_when: hasDoneWhen(body), retest_label_present: isRetest,
+      author_association: it.author_association ?? null, spec: specLint(title, body) });
     logs.push(`issue #${n}: ${kind} (ac=${hash}) — due`);
   }
   console.log(JSON.stringify({ due, reports, logs, deferred }));

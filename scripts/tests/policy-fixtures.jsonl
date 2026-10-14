@@ -1,0 +1,84 @@
+{"name":"issues listing","expect":"allow","tool":"Bash","input":{"command":"gh api -X GET \"repos/acme/widgets/issues\" -f labels=qa:ready -f state=all -f per_page=100"}}
+{"name":"issue re-check, repo in a variable","expect":"allow","tool":"Bash","input":{"command":"T=acme/widgets; gh api repos/$T/issues/7 --jq .labels"}}
+{"name":"comment post","expect":"allow","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/7/comments -X POST -F body=@/tmp/quality-inspector-c.md"}}
+{"name":"retest label removal","expect":"allow","tool":"Bash","input":{"command":"gh api -X DELETE repos/acme/widgets/issues/7/labels/qa:retest"}}
+{"name":"another repository's pulls","expect":"allow","tool":"Bash","input":{"command":"gh api repos/other/definition/pulls?state=open"}}
+{"name":"pulls","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api 'repos/acme/widgets/pulls?per_page=1'"}}
+{"name":"issue timeline","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/1/timeline"}}
+{"name":"issue events","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/1/events"}}
+{"name":"contents, profile dir included","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets/contents/qa"}}
+{"name":"commits over curl, mixed case","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"curl -s -H 'Accept: application/json' https://api.github.com/repos/Acme/Widgets/commits"}}
+{"name":"git refs through a variable","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api \"repos/${T}/git/refs/heads\""}}
+{"name":"graphql","expect":"deny","rule":"gh-graphql","tool":"Bash","input":{"command":"gh api graphql -f query='{ viewer { login } }'"}}
+{"name":"code search","expect":"deny","rule":"gh-search","tool":"Bash","input":{"command":"gh api 'search/code?q=token+repo:acme/widgets'"}}
+{"name":"code search, repo in a variable","expect":"deny","rule":"gh-search","tool":"Bash","input":{"command":"gh api \"search/code?q=token+repo:$T\""}}
+{"name":"gh pr list","expect":"deny","rule":"gh-cli","tool":"Bash","input":{"command":"gh pr list -R acme/widgets --limit 5"}}
+{"name":"gh pr view, repo in a variable","expect":"deny","rule":"gh-cli","tool":"Bash","input":{"command":"gh pr view 3 --repo \"$T\""}}
+{"name":"gh search code, repo in a variable","expect":"deny","rule":"gh-cli","tool":"Bash","input":{"command":"gh search code token --repo=${T}"}}
+{"name":"gh repo clone","expect":"deny","rule":"gh-cli","tool":"Bash","input":{"command":"cd /tmp && gh repo clone acme/widgets"}}
+{"name":"gh repo clone, repo in a variable","expect":"deny","rule":"gh-cli","tool":"Bash","input":{"command":"gh repo clone $T /tmp/quality-inspector-src"}}
+{"name":"definition PR, repo from origin","expect":"allow","tool":"Bash","input":{"command":"gh pr create --repo \"$(git -C /home/agent remote get-url origin)\" --base main --head fix/x --title t --body b"}}
+{"name":"gh pr reviewer in a variable","expect":"allow","tool":"Bash","input":{"command":"gh pr create -r $REVIEWER --title t --body b"}}
+{"name":"gh issue view","expect":"allow","tool":"Bash","input":{"command":"gh issue view 7 -R acme/widgets --comments"}}
+{"name":"raw host","expect":"deny","rule":"raw-host","tool":"Bash","input":{"command":"curl -fsSL https://raw.githubusercontent.com/acme/widgets/HEAD/README.md"}}
+{"name":"codeload target","expect":"deny","rule":"codeload","tool":"Bash","input":{"command":"wget -q https://codeload.github.com/acme/widgets/tar.gz/HEAD"}}
+{"name":"codeload, repo in a variable","expect":"deny","rule":"codeload","tool":"Bash","input":{"command":"curl -sL https://codeload.github.com/$T/tar.gz/main -o /tmp/quality-inspector-s.tgz"}}
+{"name":"codeload other repository","expect":"allow","tool":"Bash","input":{"command":"curl -sL https://codeload.github.com/other/skill/tar.gz/main -o /tmp/quality-inspector-s.tgz"}}
+{"name":"git clone over https","expect":"deny","rule":"repo-web","tool":"Bash","input":{"command":"git clone https://github.com/acme/widgets.git /tmp/quality-inspector-src"}}
+{"name":"git clone, repo in a variable","expect":"deny","rule":"repo-web","tool":"Bash","input":{"command":"git clone https://github.com/$T /tmp/quality-inspector-src"}}
+{"name":"git clone over ssh","expect":"deny","rule":"repo-web","tool":"Bash","input":{"command":"git clone git@github.com:acme/widgets.git"}}
+{"name":"git clone over ssh, owner and repo in variables","expect":"deny","rule":"repo-web","tool":"Bash","input":{"command":"git clone git@github.com:${OWNER}/${REPO}.git"}}
+{"name":"profile boundary url","expect":"deny","rule":"profile-url","tool":"Bash","input":{"command":"curl -s https://docs.internal.example/acme/widgets/architecture/db.html"}}
+{"name":"served source map","expect":"deny","rule":"source-map","tool":"Bash","input":{"command":"curl -s http://localhost:8080/assets/index-abc.js.map"}}
+{"name":"localhost app url","expect":"allow","tool":"Bash","input":{"command":"curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/"}}
+{"name":"js map() is not a source map","expect":"allow","tool":"Bash","input":{"command":"node -e 'console.log([1,2].map(x => x * 2))'"}}
+{"name":"product package read","expect":"deny","rule":"product-package","tool":"Read","input":{"file_path":"@WORK@/suite/node_modules/@acme/cli/dist/index.js"}}
+{"name":"product package, relative","expect":"deny","rule":"product-package","tool":"Read","input":{"file_path":"suite/node_modules/@acme/cli/package.json","cwd":"@WORK@"}}
+{"name":"product package cat","expect":"deny","rule":"product-package","tool":"Bash","input":{"command":"head -50 work/suite/node_modules/@acme/cli/lib/main.js"}}
+{"name":"product package grep","expect":"deny","rule":"product-package","tool":"Grep","input":{"pattern":"secret","path":"@WORK@/suite/node_modules/@acme"}}
+{"name":"e2e docs","expect":"allow","tool":"Read","input":{"file_path":"@WORK@/suite/node_modules/e2e/docs/README.md"}}
+{"name":"chart template read","expect":"deny","rule":"chart-template","tool":"Read","input":{"file_path":"@WORK@/env/chart/templates/deployment.yaml"}}
+{"name":"pulled chart listing","expect":"deny","rule":"chart-template","tool":"Bash","input":{"command":"ls /tmp/quality-inspector-chart-1.2.3/app/templates"}}
+{"name":"helm get manifest","expect":"deny","rule":"chart-template","tool":"Bash","input":{"command":"helm -n app get manifest app | head"}}
+{"name":"helm show values","expect":"deny","rule":"chart-template","tool":"Bash","input":{"command":"helm show values oci://registry.example.com/charts/app --version 1.2.3"}}
+{"name":"helm get values, computed","expect":"deny","rule":"chart-template","tool":"Bash","input":{"command":"helm -n app get values app --all"}}
+{"name":"helm get values, computed, short flag","expect":"deny","rule":"chart-template","tool":"Bash","input":{"command":"helm get values -a app -o yaml"}}
+{"name":"helm get hooks","expect":"deny","rule":"chart-template","tool":"Bash","input":{"command":"helm -n app get hooks app"}}
+{"name":"helm upgrade dry run","expect":"deny","rule":"chart-template","tool":"Bash","input":{"command":"helm upgrade --install app oci://registry.example.com/charts/app --dry-run"}}
+{"name":"helm install dry run, flag first","expect":"deny","rule":"chart-template","tool":"Bash","input":{"command":"helm install --dry-run=server app oci://registry.example.com/charts/app"}}
+{"name":"helm get values, user-supplied","expect":"allow","tool":"Bash","input":{"command":"helm -n app get values app"}}
+{"name":"helm status","expect":"allow","tool":"Bash","input":{"command":"helm -n app status app"}}
+{"name":"kubectl logs","expect":"allow","tool":"Bash","input":{"command":"k3s kubectl -n app logs deploy/web --tail 50"}}
+{"name":"run-dir source map","expect":"deny","rule":"source-map","tool":"Read","input":{"file_path":"@WORK@/suite/.e2e/runs/issue-7-candidate/main.js.map"}}
+{"name":"source map glob","expect":"deny","rule":"source-map","tool":"Glob","input":{"pattern":"**/*.map","path":"@WORK@/suite/.e2e"}}
+{"name":"git clean","expect":"deny","rule":"git-clean","tool":"Bash","input":{"command":"git -C /home/agent clean -fdx"}}
+{"name":"git clean after cd","expect":"deny","rule":"git-clean","tool":"Bash","input":{"command":"cd ~ && git clean -n"}}
+{"name":"git clean under bash -c","expect":"deny","rule":"git-clean","tool":"Bash","input":{"command":"bash -c \"git clean -fdx\""}}
+{"name":"doc text in a literal heredoc","expect":"allow","tool":"Bash","input":{"command":"cat > /tmp/quality-inspector-d.md <<'EOF'\n- **Never run `git clean` in `$HOME`**\ngit clean -fdx\nEOF"}}
+{"name":"git clean after a heredoc","expect":"deny","rule":"git-clean","tool":"Bash","input":{"command":"cat > /tmp/quality-inspector-d.md <<'EOF'\ntext\nEOF\ngit clean -fdx"}}
+{"name":"git status","expect":"allow","tool":"Bash","input":{"command":"git -C /home/agent status --porcelain"}}
+{"name":"kubectl exec","expect":"deny","rule":"container-fs","tool":"Bash","input":{"command":"k3s kubectl -n app exec -it web-0 -- cat /app/main.js"}}
+{"name":"kubectl cp","expect":"deny","rule":"container-fs","tool":"Bash","input":{"command":"kubectl cp app/web-0:/app /tmp/quality-inspector-app"}}
+{"name":"k3s ctr","expect":"deny","rule":"container-fs","tool":"Bash","input":{"command":"k3s ctr images export /tmp/quality-inspector-img.tar registry/app:1"}}
+{"name":"crictl","expect":"deny","rule":"container-fs","tool":"Bash","input":{"command":"sudo crictl ps"}}
+{"name":"docker run","expect":"deny","rule":"container-fs","tool":"Bash","input":{"command":"docker run --rm registry/app:1 cat /app/server.js"}}
+{"name":"write inside work","expect":"allow","tool":"Write","input":{"file_path":"@WORK@/issues/7/criteria-abc.md"}}
+{"name":"write inside work, scheduled","mode":"scheduled","expect":"allow","tool":"Write","input":{"file_path":"@WORK@/issues/7/criteria-abc.md"}}
+{"name":"write run tmp","expect":"allow","tool":"Write","input":{"file_path":"/tmp/quality-inspector-x/notes.txt"}}
+{"name":"write harness settings","expect":"deny","rule":"write-outside","tool":"Write","input":{"file_path":"@HOME@/.claude/settings.json"}}
+{"name":"edit escaping work","expect":"deny","rule":"write-outside","tool":"Edit","input":{"file_path":"@WORK@/../outside.txt"}}
+{"name":"write run marker","expect":"deny","rule":"run-mode","tool":"Write","input":{"file_path":"@WORK@/env/RUN_MODE"}}
+{"name":"definition edit, direct","expect":"allow","tool":"Edit","input":{"file_path":"@DEF@/docs/black-box.md"}}
+{"name":"definition edit, scheduled","mode":"scheduled","expect":"deny","rule":"scheduled-def","tool":"Edit","input":{"file_path":"@DEF@/docs/black-box.md"}}
+{"name":"config edit, direct","expect":"allow","tool":"Edit","input":{"file_path":"@WORK@/CONFIG.md"}}
+{"name":"config edit, scheduled","mode":"scheduled","expect":"deny","rule":"scheduled-def","tool":"Write","input":{"file_path":"@WORK@/CONFIG.md"}}
+{"name":"commit, direct","expect":"allow","tool":"Bash","input":{"command":"git -C /home/agent commit -m 'fix: x'"}}
+{"name":"commit, scheduled","mode":"scheduled","expect":"deny","rule":"scheduled-git","tool":"Bash","input":{"command":"git -C /home/agent commit -m 'fix: x'"}}
+{"name":"push, scheduled","mode":"scheduled","expect":"deny","rule":"scheduled-git","tool":"Bash","input":{"command":"cd /home/agent && git push -u origin fix/x"}}
+{"name":"marker removal, scheduled","mode":"scheduled","expect":"deny","rule":"policy-tamper","tool":"Bash","input":{"command":"rm -f /home/agent/work/env/RUN_MODE"}}
+{"name":"settings merge, direct","expect":"allow","tool":"Bash","input":{"command":"bash \"$HOME/scripts/hooks/install.sh\""}}
+{"name":"stale marker is direct","mode":"stale","expect":"allow","tool":"Bash","input":{"command":"git push -u origin fix/x"}}
+{"name":"webfetch raw","expect":"deny","rule":"raw-host","tool":"WebFetch","input":{"url":"https://raw.githubusercontent.com/acme/widgets/main/src/app.ts","prompt":"x"}}
+{"name":"webfetch repo page","expect":"deny","rule":"repo-web","tool":"WebFetch","input":{"url":"https://github.com/acme/widgets/blob/main/src/app.ts","prompt":"x"}}
+{"name":"websearch repo","expect":"deny","rule":"repo-web","tool":"WebSearch","input":{"query":"site:github.com/acme/widgets session store"}}
+{"name":"webfetch another repository","expect":"allow","tool":"WebFetch","input":{"url":"https://github.com/other/tool/blob/main/README.md","prompt":"x"}}

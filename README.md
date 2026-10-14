@@ -28,7 +28,10 @@ library for evidence, the skill catalog for profiles, sub-agents for independent
   the last release and on the candidate, and reports (docs/issue-qa.md).
 - **Regression run** (nightly, off by default) — replays the tests the operator promoted
   against each new candidate; recorded steps replay without model calls, the LLM steps in
-  only where the UI changed (docs/regression.md).
+  only where the UI changed; it also maps which pages no promoted test reaches (docs/regression.md).
+- **Security run** (weekly, off by default) — frozen black-box checks of each new candidate:
+  access without or with the wrong session, stored XSS, headers, leaks, the deployment;
+  findings go to a private artifact only, never to an issue (docs/security.md).
 - **Weekly audit** (off by default) — health, the black-box boundary probes, assertion
   drift, cache efficiency (docs/audit.md).
 - Scripts only detect, and the profile only sets up the nested product; every judgment and every
@@ -72,13 +75,14 @@ Create a vm-backend agent by hand, grant the GitHub connection, then send it:
 
 The agent must not be able to read the target's source. Its rules say so
 ([docs/black-box.md](docs/black-box.md)); the egress rules make it true. Apply them with
-the CLI (`T` = the target, e.g. `acme/widgets`; `AGENT` = this agent's name):
+the CLI (`T` = the target, e.g. `acme/widgets`; `AGENT` = this agent's name; `RL` = the
+URL-encoded `retest_label`, e.g. `qa%3Aretest`):
 
 ```bash
 # The issues API — patterns end in * because the matched path includes the query string.
 dam network create "$AGENT" --host api.github.com --method GET    --path "/repos/$T/issues*"                 --yes
 dam network create "$AGENT" --host api.github.com --method POST   --path "/repos/$T/issues/*/comments*"      --yes
-dam network create "$AGENT" --host api.github.com --method DELETE --path "/repos/$T/issues/*/labels/*"       --yes
+dam network create "$AGENT" --host api.github.com --method DELETE --path "/repos/$T/issues/*/labels/$RL"     --yes
 # Longer than the allow above, so they win: timeline and events expose linked commits.
 dam network create "$AGENT" --host api.github.com --path "/repos/$T/issues/*/timeline*" --verdict deny --yes
 dam network create "$AGENT" --host api.github.com --path "/repos/$T/issues/*/events*"   --verdict deny --yes
@@ -103,6 +107,11 @@ Rules are matched by method first, then the longest path pattern, against the pa
 whole — **the deny rules are only proven by the probes**:
 `verify-onboarding.sh --live` and the weekly audit request each forbidden surface and
 fail when one answers. Approve no held request on the deny side.
+
+Inside the VM, a Claude Code `PreToolUse` hook and a `permissions.deny` list, merged into
+`~/.claude/settings.json` at onboarding, refuse the same surfaces before a tool call runs —
+plus `git clean`, container filesystems, writes outside `work/`, and commits or definition
+edits from a scheduled run ([docs/black-box.md](docs/black-box.md) → Enforcement layers).
 
 ## What a report looks like
 
@@ -139,12 +148,17 @@ configuration.
 | `target_repo` | asked | Repository whose issues are tested. `QI_TARGET_REPO` overrides. |
 | `issue_comments` | asked, default `disabled` | Opt-in: post verdicts on the issue. |
 | `spec_feedback` | asked, default `disabled` | Opt-in: suggest an observable "Done when" on issues with nothing testable. |
+| `auto_promote` | default `disabled` | `verified`: tests whose every criterion was verified join the nightly regression without the operator's "promote". |
 | `marker_prefix` | default `quality-inspector` | Dedup marker; **immutable once a comment exists**. |
 | `qa_label`, `retest_label` | defaults | The gates (`qa:ready`, `qa:retest`). |
 | `candidate_channel`, `baseline_channel` | the profile's defaults | What is tested against what (`none` turns red-green off). |
 | `artifact_reports`, `include_comments`, `max_issues_per_run`, `lock_ttl_min`, `display_name` | defaults | Reporting and pacing. |
 | `e2e_version`, `e2e_web_version`, `e2e_model` | defaults | Test framework pins and the model for agent steps. |
+| `confirm_regressions`, `bisect_max_steps` | defaults (off) | Opt-in: confirm a regression on the previous build, then narrow it over the builds in between — extra installs. |
 | `audit_report`, `log_level`, `media_retention_days` | defaults | Audit, diagnostics, local evidence retention. |
+| `explorations`, `max_explorations_per_ac` | defaults (`enabled`, `3`) | Agent-designed scenarios beyond the criteria, reported apart from the verdict ([docs/explorations.md](docs/explorations.md)). |
+| `security_checks`, `security_failed_logins` | defaults (`enabled`, `10`) | The security run ([docs/security.md](docs/security.md)); its schedule ships off. |
+| `max_wallclock_min_per_issue`, `max_model_steps_per_issue`, `min_free_disk_gi` | defaults | Per-issue budgets and the free disk an install needs. |
 
 ## Runtime requirements
 
@@ -159,8 +173,8 @@ configuration.
   and removal of the retest label.
 - **Cost:** idle hours wake no model. One issue costs three installs of the product (time,
   no tokens) plus authoring — expect a few hundred thousand tokens for the first
-  run of an issue; replays of promoted tests are mostly free, except `agent.assert`
-  checks, which always call the model.
+  run of an issue (explorations, on by default, add roughly 30–60 %); replays of promoted
+  tests are mostly free, except `agent.assert` checks, which always call the model.
 
 ## Persistence
 

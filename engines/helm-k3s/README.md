@@ -27,6 +27,9 @@ Needs a vm-backend agent (root), `k3s`, `curl`, `jq` and `node` in the image; in
 | `overlays` | `[{when: <config key>, values: {…}}]` — merged into `values` when that profile key is set |
 | `max_pages` | quay pages to read at most (default 30) |
 
+`bin/versions --between <from> <to>` (bisection) reads the same tag listing — tags only —
+and returns the tags of the channel both builds match, in that channel's order.
+
 ## Prerequisites
 
 | `kind` | Fields | Does |

@@ -13,9 +13,15 @@
 #                                 Extra args go to `e2e run`; a confirmation re-run adds
 #                                 `--repeat-each 3 --no-cache`, and by_test[].stability reads it
 #   suite.sh summary <label>      re-print the summary of an earlier run
+#   suite.sh roles                the e2e identities the profile provided, as a JSON array
+#                                 of role names (`["owner","member"]`) — names only, never a
+#                                 value (docs/explorations.md → Identities)
+#   suite.sh budget <claim-iso>   the per-issue budgets since the claim, JSON with `exceeded`
 #
 # The base URL is fixed to the nested platform; any APP_URL that is not localhost
-# is refused (CLAUDE.md → Hard invariants: nested target only).
+# is refused (CLAUDE.md → Hard invariants: nested target only). After every run the
+# credential values of work/env/credentials.env are masked in the run dir's text files
+# and in every summary (lib/secrets.mjs; the audit's secrets_in_runs proves it).
 
 set -u
 export LC_ALL=C
@@ -35,6 +41,8 @@ E2E_MODEL="$(cfg e2e_model)"; E2E_MODEL="${E2E_MODEL:-claude-sonnet-5}"
 APP_URL="${APP_URL:-$(profile_field '.app.url')}"
 
 die() { echo "suite: $*" >&2; logev error suite_failed "$*"; exit 1; }
+CRED="$WORK/env/credentials.env"
+unsecret() { node "$SCRIPT_DIR/lib/secrets.mjs" filter "$CRED"; }  # stdin -> stdout, masked
 
 cmd_init() {
   mkdir -p "$SUITE"
@@ -117,11 +125,11 @@ cmd_run() {
     (*) die "refusing APP_URL=$APP_URL — only the nested platform on localhost is a test target";;
   esac
   [ -d "$SUITE/node_modules/e2e" ] || die "suite not initialized — run: bash \"\$HOME/scripts/suite.sh\" init"
-  [ -f "$WORK/env/credentials.env" ] || die "work/env/credentials.env missing — run: bash \"\$HOME/scripts/env.sh\" init"
+  [ -f "$CRED" ] || die "work/env/credentials.env missing — run: bash \"\$HOME/scripts/env.sh\" init"
   local out=".e2e/runs/$label"
   (
     cd "$SUITE" || exit 1
-    set -a; . "$WORK/env/credentials.env"; set +a
+    set -a; . "$CRED"; set +a
     export APP_URL E2E_MODEL E2E_TELEMETRY_DISABLED=1 NODE_USE_ENV_PROXY=1 QI_STRICT="$strict"
     # Model calls leave through the gateway, which injects the provider credential.
     export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-injected-by-gateway}"
@@ -132,19 +140,55 @@ cmd_run() {
   )
   local rc=$?
   if [ ! -f "$SUITE/$out/report.json" ]; then
-    local e; e="$(tail -20 "/tmp/quality-inspector-run-$label.log" 2>/dev/null)"; rm -f "/tmp/quality-inspector-run-$label.log"
+    local e; e="$(tail -20 "/tmp/quality-inspector-run-$label.log" 2>/dev/null | unsecret)"; rm -f "/tmp/quality-inspector-run-$label.log"
+    [ -d "$SUITE/$out" ] && node "$SCRIPT_DIR/lib/secrets.mjs" mask "$CRED" "$SUITE/$out"
     die "e2e produced no report (exit $rc): $e"
   fi
   mv -f "/tmp/quality-inspector-run-$label.log" "$SUITE/$out/run.log" 2>/dev/null || true
+  # run.log and report.json carry agent-step params — the setup test's password among them.
+  node "$SCRIPT_DIR/lib/secrets.mjs" mask "$CRED" "$SUITE/$out" \
+    || die "masking credentials in $out failed — publish nothing from it (audit: secrets_in_runs)"
   logev info suite_run "$label exit=$rc"
-  summarize "$SUITE/$out/report.json" "$label"
+  masked_summary "$SUITE/$out/report.json" "$label"
 }
 
-cmd_summary() { local f="$SUITE/.e2e/runs/${1:?label}/report.json"; [ -f "$f" ] || die "no report for $1"; summarize "$f" "$1"; }
+# A role is provided when credentials.env sets a non-empty E2E_USER_<ROLE>_USERNAME (lib/profile.sh).
+cmd_roles() {
+  local f="$WORK/env/credentials.env"
+  [ -f "$f" ] || die "work/env/credentials.env missing — run: bash \"\$HOME/scripts/env.sh\" init"
+  provided_roles "$f"
+}
+
+# The summary on stdout is masked too; fails when either half of the pipe failed.
+masked_summary() { summarize "$1" "$2" | unsecret; [ "${PIPESTATUS[0]}${PIPESTATUS[1]}" = 00 ]; }
+cmd_summary() { local f="$SUITE/.e2e/runs/${1:?label}/report.json"; [ -f "$f" ] || die "no report for $1"; masked_summary "$f" "$1"; }
+
+# Per-issue budgets (docs/nested-env.md → Budgets): minutes since the claim, and the
+# model-backed steps — agent.act / agent.assert not replayed from the cache — of every run
+# written since then (the environment lock makes those runs this issue's).
+cmd_budget() { # <claim-iso>
+  local since="${1:-}" wall cap se el f m n=0 steps=0 k
+  wall="$(cfg max_wallclock_min_per_issue)"; case "$wall" in (''|*[!0-9]*) wall=150;; esac
+  cap="$(cfg max_model_steps_per_issue)"; case "$cap" in (''|*[!0-9]*) cap=400;; esac
+  se="$(date -u -d "$since" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$since" +%s 2>/dev/null)"
+  [ -n "$se" ] || { echo "suite: budget needs the claim time as ISO UTC, got '$since'" >&2; exit 2; }
+  el=$(( ($(date -u +%s) - se) / 60 ))
+  while IFS= read -r f; do
+    m="$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null)"; [ "${m:-0}" -ge "$se" ] || continue
+    k="$(jq '[.run.results[]?.attempts[]? | .. | objects | (.api? // "") as $a
+              | select(($a == "agent.act" or $a == "agent.assert") and .cache.mode? != "self-finalized")] | length' "$f" 2>/dev/null)"
+    n=$((n+1)); steps=$((steps + ${k:-0}))
+  done < <(find "$SUITE/.e2e/runs" -mindepth 2 -maxdepth 2 -name report.json 2>/dev/null)
+  jq -nc --arg s "$since" --argjson el "$el" --argjson w "$wall" --argjson n "$n" --argjson k "$steps" --argjson c "$cap" \
+    '{since:$s, elapsed_min:$el, max_wallclock_min:$w, runs:$n, model_steps:$k, max_model_steps:$c,
+      exceeded: ([if $el > $w then "wallclock" else empty end, if $k > $c then "model_steps" else empty end])}'
+}
 
 case "${1:-}" in
   init)    cmd_init ;;
   run)     shift; cmd_run "$@" ;;
   summary) cmd_summary "${2:-}" ;;
-  *) echo "usage: $0 init | run <label> [--evidence full|failures] [--strict] [e2e run args…] | summary <label>" >&2; exit 2 ;;
+  roles)   cmd_roles ;;
+  budget)  cmd_budget "${2:-}" ;;
+  *) echo "usage: $0 init | run <label> [--evidence full|failures] [--strict] [e2e run args…] | summary <label> | roles | budget <claim-iso>" >&2; exit 2 ;;
 esac

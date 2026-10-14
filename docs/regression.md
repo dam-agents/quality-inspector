@@ -9,7 +9,15 @@
 ```
 
 - `exploratory` — written by an issues run; `promoted_utc` is `-`. Not replayed nightly.
-- `regression` — promoted by the operator ("promote #N" → [on-demand.md](on-demand.md)).
+- `promotable` — written instead by an issues run when, in that run, every AC in the file
+  was `verified`, the file passed `--strict` on the candidate, no step inside an AC block
+  was `judged`, and `scripts/check-asserts.sh --agent-asserts <file>` prints nothing. Like
+  `exploratory` otherwise (not replayed, not drift-checked); the queue for "promote all
+  pending". With `auto_promote: verified` the issues run promotes such a file itself
+  (tier `regression`, `assert_hash`, `promoted_utc` now) — the risk: an AC freeze the
+  operator never read then gates every nightly run.
+- `regression` — promoted by the operator ("promote #N", "promote all pending" →
+  [on-demand.md](on-demand.md)) or by `auto_promote: verified`.
   `assert_hash` is the `scripts/check-asserts.sh --hash` value of its AC blocks; it changes
   only by a heal ([triage.md](triage.md), logged in `work/HEALS.md`) or by the operator.
 - `retired` — superseded by a completed issue ([triage.md](triage.md)); kept, not replayed.
@@ -19,8 +27,9 @@
 ## The regression run
 
 The worklist carries `candidate`, `previous_candidate` (the build last regression-tested,
-`null` the first time), `tests[]` and `assert_drift[]` (`null` when the check could not
-run — say so, never treat it as clean).
+`null` the first time), `tests[]`, `assert_drift[]` (`null` when the check could not
+run — say so, never treat it as clean), and `confirm_regressions` / `bisect_max_steps`
+([triage.md](triage.md) → Order of work, steps 5–6).
 
 1. `env.sh lock regression` (busy → end the run, log it).
 2. `env.sh reset`, `env.sh up <candidate>`, `suite.sh run smoke-<candidate> --tag smoke`.
@@ -28,24 +37,31 @@ run — say so, never treat it as clean).
    `<ISO> ERROR: environment candidate=<c>` to `work/REGRESSION.log`, unlock, end.
 3. **Build the change context** ([change-awareness.md](change-awareness.md)): the UI map
    of the candidate, its diff against `previous_candidate`'s map, the completed issues in
-   the window, the impact per test, and your one-line expectation per impacted test.
+   the window, the published interfaces' diff, the impact per test, and your one-line
+   expectation per impacted test. Rewrite `work/COVERAGE.md` from the new map
+   ([change-awareness.md](change-awareness.md) → Coverage).
 4. Drifted tests (`assert_drift`) are **not run** — list them for the operator.
 5. Replay: `suite.sh run regression-<candidate> --evidence failures --tag issue-<a> --tag issue-<b> …`.
-   `criterion()` judges a check whose control moved instead of failing it.
+   `criterion()` judges a check whose control moved instead of failing it. Explorations
+   (`issue-<n>-ex`) are never replayed in this version ([explorations.md](explorations.md)).
 6. **Triage** every result that is not plain `unchanged` per [triage.md](triage.md):
    re-run without cache, look, check the context, decide, heal or retire where the rules
    allow. Re-run every healed file strictly.
 7. **Report**: write `work/regression/<candidate>/verdicts.json` with `"mode": "regression"`
    — one entry per criterion that was not `unchanged`, each with `issue`, `id`, `name`,
    `then`, `verdict` (the category), `explanation`, `because_issue` when an issue explains
-   it, `heal` `{from, to}` for a repair, and `before_shot` (the previous map's screenshot
-   of the page). Add `context` `{previous, window, issues[{number,title}], ui_diff}` (the
-   diff's `--md` text). Render it with `scripts/render-report.mjs` into
+   it, `heal` `{from, to}` for a repair, `regressed_between` `{from, to, builds_between}`
+   for a confirmed regression, and `before_shot` (the previous map's screenshot of the
+   page). Add `context` `{previous, window, issues[{number,title}], ui_diff, iface_diff, signals}`
+   (`ui_diff`, `iface_diff`: the diffs' `--md` text; `signals`: `{console_errors_new,
+   failed_requests_new, slower_pages, slow_tests}` — the UI diff's lists plus `slow_tests` from
+   `node "$HOME/scripts/perf-trend.mjs" regression-<candidate>`, each item made a
+   `needs-review` entry per [triage.md](triage.md) → **Signals no test covers**). Render it with `scripts/render-report.mjs` into
    `work/regression/<candidate>/report/` and publish as in
    [reporting.md](reporting.md) → Delivery (artifact only, its reference in
    `work/regression/<candidate>/artifact.id`; regression runs never comment).
    The run's top verdict is `regression` if any criterion is, else `needs-review` if any
-   is, else `healed`, `relearned` or `unchanged`.
+   criterion or signal is, else `healed`, `relearned` or `unchanged`.
 8. Append `<ISO> ran candidate=<c> unchanged=<n> relearned=<n> healed=<n> needs_review=<n> superseded=<n> flaky=<n> regression=<n> blocked=<n> drift=<n>`
    to `work/REGRESSION.log` — the pre-flight keys "already tested" and
    `previous_candidate` on `ran candidate=`.
