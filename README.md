@@ -96,8 +96,8 @@ rules depend on the instance, so onboarding prints them — `bash scripts/egress
 agent's name and run them (`--kit` adds the kit's rules for an agent created by hand or
 from a kit before 2.11.0). They make the target's GitHub hosts deny-by-default, so a
 skill from another GitHub repository needs `--source <owner>/<repo>`; a profile inside the
-target gets only its directory (`profile_source_path`). A rule counts only once a probe
-proves it:
+target gets no file outside its directory (`profile_source_path`). A rule counts only once
+a probe proves it:
 `verify-onboarding.sh --live` and the weekly audit request each forbidden surface and
 fail when one answers. Approve no held request on the deny side.
 

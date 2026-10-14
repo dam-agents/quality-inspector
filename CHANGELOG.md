@@ -17,7 +17,9 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    has: the new `GET /repos/<T>` and `GET /repos/<T>/git/refs/heads/*` allows, which the
    platform's scan of a private source needs ([docs/black-box.md](docs/black-box.md) →
    **Egress rules**).
-2. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:`.
+2. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:`. Its new
+   probe `boundary:…/issues/<n>/TIMELINE` fails or warns on every agent until the platform
+   carries dam-agents/dam#4909.
 
 ## 2.13.0 — 2026-10-14
 

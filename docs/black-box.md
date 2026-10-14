@@ -75,7 +75,8 @@ platform picks one rule per request:
 Before any rule, the gateway denies a path with a `.` or `..` segment (raw, `%2e`, or
 with a `;` suffix): GitHub's contents API resolves them, so `<path>/../src` would pass an
 allow for `<path>/*`. The platform must do this and the case-blind GitHub deny (README →
-Runtime requirements); the probes show whether it does.
+Runtime requirements); the probes `…/contents/<path>/..` and `…/issues/<n>/TIMELINE` (only
+a case-blind deny beats the `issues*` allow there) show whether it does.
 
 The `trusted` preset and the GitHub connection allow their hosts (`github.com`, its API,
 codeload, raw, `gitlab.com`, `codeberg.org`, …) with method and path `*` before the kit's

@@ -60,6 +60,7 @@ allow POST https://api.github.com/repos/acme/widgets/issues/7/comments
 allow DELETE https://api.github.com/repos/acme/widgets/issues/7/labels/qa%3Aretest
 deny DELETE https://api.github.com/repos/acme/widgets/issues/7/labels/qa%3Aready
 deny GET https://api.github.com/repos/acme/widgets/issues/7/timeline
+deny GET https://api.github.com/repos/acme/widgets/issues/7/TIMELINE
 deny GET https://api.github.com/repos/acme/widgets/issues/7/events?per_page=1
 deny GET https://api.github.com/repos/acme/widgets/issues/events
 deny GET https://api.github.com/repos/acme/widgets/contents/README.md
@@ -214,6 +215,8 @@ printf '%s\n' "$(STUB_OPEN="$PROFILE_OPEN" STUB_LIST_FAIL=1 probe)" \
   || { echo "  assertion failed: a failed listing warns instead of passing"; FAILED=1; }
 printf '%s\n' "$out" | grep -qF 'ok boundary:repos/acme/widgets/issues/7/timeline refused' \
   || { echo "  assertion failed: {issue} resolves to a real issue"; FAILED=1; }
+printf '%s\n' "$out" | grep -qF 'ok boundary:repos/acme/widgets/issues/7/TIMELINE refused' \
+  || { echo "  assertion failed: the case-blind GitHub deny probed"; FAILED=1; }
 printf '%s\n' "$out" | grep -qF 'ok boundary:repositories/1/contents/ refused' \
   || { echo "  assertion failed: a repository by number probed"; FAILED=1; }
 grep -qE '(^| )repos/acme/widgets( |$)' "$STUB_DIR/gh.calls" \
@@ -237,6 +240,9 @@ assert_eq "a dot-segment fail drops the profile allows, never re-applies them" \
 assert_eq "a plain fail gets the printed rules" \
   "the operator applies the rules bash scripts/egress-rules.sh prints (docs/black-box.md → Egress rules)" \
   "$(fix "source surface reachable (HTTP 200)")"
+case_fail="$(STUB_OPEN="$PROFILE_OPEN|TIMELINE\$" probe | sed -n 's|^fail boundary:repos/acme/widgets/issues/7/TIMELINE ||p')"
+assert_eq "a deny in exact case only names the platform, never re-applies the rules" \
+  "report the gateway to the platform (dam-agents/dam#4909)" "$(fix "$case_fail")"
 
 # An invalid profile_source_path fails the probe, which then requests nothing in it.
 printf -- '- target_repo: acme/widgets\n- profile_source_path: qa*\n' > "$WORK_DIR/CONFIG.md"
