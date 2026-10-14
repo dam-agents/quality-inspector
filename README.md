@@ -61,7 +61,10 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
    needs issue write access on the target. Use a dedicated bot account, and where the
    connection allows it (a GitHub App installation, a fine-grained token) only Issues on
    the target — no Contents, Pull requests or Actions. The egress, not the token, keeps
-   forks and mirrors out of reach: a public target's are readable by anyone.
+   forks and mirrors out of reach: a public target's are readable by anyone. With a work
+   backup (`work_repo`), add Contents read & write on that one private repository, and
+   protect its `main` so only this account pushes (a private repository needs a paid GitHub
+   plan for that; without it, the next persist logs and reverts a foreign commit).
 3. **Create the agent on the vm backend** when the profile requires root (most nested
    products do). The kit asks for 8 CPU, 16 Gi and 80 Gi; the profile's README says what
    its product needs.
@@ -102,8 +105,8 @@ rules depend on the instance, so onboarding prints them — `bash scripts/egress
 agent's name and run them (`--kit` adds the kit's rules for an agent created by hand or
 from a kit before 2.11.0). They make the target's GitHub hosts deny-by-default, so a
 skill from another GitHub repository needs `--source <owner>/<repo>`; a profile inside the
-target gets only its directory (`profile_source_path`). A rule counts only once a probe
-proves it:
+target gets no file outside its directory (`profile_source_path`). A rule counts only once
+a probe proves it:
 `verify-onboarding.sh --live` and the weekly audit request each forbidden surface and
 fail when one answers. Approve no held request on the deny side.
 
@@ -125,6 +128,15 @@ side: a **video of the whole test run**, screenshots captioned by step — inclu
 exact screen the criterion is checked on — the step list, the assertion error when one
 failed, and the trace. A reader can confirm a `verified` verdict by watching the feature
 fail on the release and work on the candidate. Media add a few MB per criterion.
+
+## The test catalog
+
+One more artifact shows the whole suite: every criterion, exploration and scenario test with
+its Given/When/Then, steps, tier, verdict history per build, heals, flakiness and the still of
+the screen it checks — filterable, sortable and groupable by tier, origin, verdict, area, page,
+label or the operator's own collections, with a gallery, a coverage map of the UI, a
+build-by-test heatmap and the promotion funnel. It holds test-related content only, so the
+operator may share it ([docs/catalog.md](docs/catalog.md)).
 
 ## When the UI changes
 
@@ -150,6 +162,7 @@ configuration.
 | `profile.<key>` | asked or defaulted, per the profile | The profile's own settings ([docs/profile-contract.md](docs/profile-contract.md)). |
 | `target_repo` | asked | Repository whose issues are tested. `QI_TARGET_REPO` overrides. |
 | `profile_source_path` | asked when the profile lives in `target_repo` | Its skill source's path there (DAM: `qa`) — the one directory the egress opens. |
+| `work_repo` | asked, default unset (local-only) | A private repository the Stop hook backs `work/` up to after every turn; a fresh volume or another pod restores from it ([docs/persistence.md](docs/persistence.md) → Backup & restore). |
 | `issue_comments` | asked, default `disabled` | Opt-in: post verdicts on the issue. |
 | `spec_feedback` | asked, default `disabled` | Opt-in: suggest an observable "Done when" on issues with nothing testable. |
 | `scenario_discovery`, `scenario_channel` | asked, default `disabled` / empty | Opt-in: weekly scenario proposals (`propose`), also tested (`run`); the Slack conversation for their digest. |
@@ -158,6 +171,7 @@ configuration.
 | `marker_prefix` | default `quality-inspector` | Dedup marker; **immutable once a comment exists**. |
 | `qa_label`, `retest_label` | defaults | The gates (`qa:ready`, `qa:retest`). |
 | `candidate_channel`, `baseline_channel` | the profile's defaults | What is tested against what (`none` turns red-green off). |
+| `test_catalog` | default `enabled` | One page to browse, describe, filter, group and categorize every test, published as an artifact after a run that changes it ([docs/catalog.md](docs/catalog.md)). |
 | `artifact_reports`, `include_comments`, `max_issues_per_run`, `lock_ttl_min`, `display_name` | defaults | Reporting and pacing. |
 | `e2e_version`, `e2e_web_version`, `e2e_model` | defaults | Test framework pins and the model for agent steps. |
 | `confirm_regressions`, `bisect_max_steps` | defaults (off) | Opt-in: confirm a regression on the previous build, then narrow it over the builds in between — extra installs. |
@@ -173,16 +187,18 @@ configuration.
 - **Platform:** a DAM agent (vm backend when the profile requires root; Node ≥ 24.8 and
   Playwright with its Chromium baked in the image), `$HOME` on a persistent volume, the
   gateway for credentials, `mcp__platform-outbound__*` for schedules and the artifact
-  tools.
+  tools. Its egress gateway denies paths with dot segments and matches GitHub denies in
+  any letter case (dam-agents/dam#4909) — without that, a profile inside the target
+  repository opens the whole repository.
 - **Identity:** the GitHub connection's account — a dedicated bot; read access to the
   target's issues, plus issues write when comments are enabled.
 - **External surfaces:** artifacts in the platform's artifact library (private by
   default); with `issue_comments: enabled`, **public comments** on the target's issues,
   and removal of the retest label; optionally a Slack channel bound to the agent (replies
   in request threads; with `scenario_channel`, one weekly digest post; with `slack_channel`,
-  issue tests people order there). The platform runtime's session state
-  (`PLATFORM_RUNTIME_URL`) frees a dead run's environment lock at once; without it the lock
-  waits `lock_ttl_min`.
+  issue tests people order there); with `work_repo`, pushes of the `work/` backup to that
+  private repository. The platform runtime's session state (`PLATFORM_RUNTIME_URL`) frees a
+  dead run's environment lock at once; without it the lock waits `lock_ttl_min`.
 - **Cost:** idle hours wake no model. One issue costs up to three installs of the product
   (time, no tokens; an install of the build already up returns at once) plus authoring — expect a few hundred thousand tokens for the first
   run of an issue (explorations, on by default, add roughly 30–60 %); replays of promoted
@@ -192,10 +208,13 @@ configuration.
 
 ## Persistence
 
-`work/` is **local-only** by choice: the suite, its replay cache, the frozen criteria and
-the reports live only on the agent's volume. A lost volume loses them; verdict rows can be
-rebuilt from issue comments when comments were enabled. Definition updates arrive as the
-platform's Kit Update and never touch `work/` ([docs/persistence.md](docs/persistence.md)).
+With `work_repo` set, a Claude Code `Stop` hook pushes `work/` — the suite, its replay
+cache, the frozen criteria, the state tables and the reports' text, never credentials or
+media — to that **private** repository after every turn; a fresh volume or another pod
+restores it at onboarding. The backup is never read back otherwise and refuses a public
+repository, the target or its fork. Without it, `work/` is local-only and a lost volume
+loses it. Definition updates arrive as the platform's Kit Update and never touch `work/`
+([docs/persistence.md](docs/persistence.md) → Backup & restore).
 
 ## Files
 
@@ -211,6 +230,7 @@ platform's Kit Update and never touch `work/` ([docs/persistence.md](docs/persis
 - [`scripts/`](scripts/) — pre-flight and Precheck, the environment lock and profile
   dispatch (`env.sh`),
   the suite runner (`suite.sh`), the evidence page renderer (`render-report.mjs`), the
+  work backup (`work-backup.sh`), the test catalog (`catalog.mjs`, `catalog/viewer.html`), the
   assertion guard, verification, offline tests.
 - [`VERSION`](VERSION) + [`CHANGELOG.md`](CHANGELOG.md) — semver and upgrade steps.
 - [`LICENSE`](LICENSE) — Apache-2.0.

@@ -60,7 +60,7 @@ baseline_channel issue_comments artifact_reports include_comments max_issues_per
 e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback profile_source_path
 explorations max_explorations_per_ac auto_promote security_checks security_failed_logins
 confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi
-scenario_discovery scenario_channel max_scenarios_per_run max_scenarios_per_day
+scenario_discovery scenario_channel max_scenarios_per_run max_scenarios_per_day work_repo test_catalog
 lend_model live_browser slack_channel slack_tests_per_day"
 
 if [ "$STRUCTURE" = 1 ]; then
@@ -121,6 +121,8 @@ if [ "$STRUCTURE" = 1 ]; then
   bad="$(table_rows "$WORK/SCENARIOS.md" | awk -F'|' 'NF!=11 || $2 !~ /^ *S-[0-9]+ *$/ || $3 !~ /^ *(slack|operator|discovery) *$/ || $8 !~ /^ *(passed|failed|regression|needs-review|blocked|flaky|not-testable|-) *$/ || $9 !~ /^ *(proposed|queued|in_progress|report_pending|reported|rejected) *$/' | head -3)"
   [ -z "$bad" ] && ok scenarios_rows "row format" || fail scenarios_rows "malformed rows (a scenario is never verified): $bad" "fix the rows to the format in docs/scenarios.md → State"
   [ -f "$WORK/LESSONS.md" ] && ok lessons "present" || fail lessons "work/LESSONS.md missing" "ONBOARDING.md Step 2b"
+  [ "$(grep '^|' "$WORK/CATALOG.md" 2>/dev/null | head -1)" = "$CATALOG_HEADER" ] \
+    && ok catalog_collections "header intact" || fail catalog_collections "work/CATALOG.md missing or header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
   # perf-trend.mjs creates it on first use; missing is only worth a note.
   [ -d "$WORK/perf" ] && ok perf_dir "present" || warn perf_dir "work/perf missing — mkdir -p work/perf (ONBOARDING.md Step 2b)"
   if [ -f "$WORK/env/credentials.env" ]; then
@@ -147,13 +149,20 @@ if [ -f "$CONFIG" ]; then
   if [ -z "$v" ]; then ok cfg:profile_source_path "empty — the profile lives outside target_repo"
   elif _bb_profile_path_ok "$v"; then ok cfg:profile_source_path "$v"
   else fail cfg:profile_source_path "'$v' is not a plain directory path" "set the skill source's path in target_repo (no * % ?, no . or .. segment), or leave it empty"; fi
+  w="$(cfg work_repo)"
+  if [ -z "$w" ]; then ok cfg:work_repo "unset — work/ is local-only"
+  elif ! printf '%s' "$w" | grep -qE '^([A-Za-z0-9.-]+/)?[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'; then
+    fail cfg:work_repo "'$w' is not [host/]owner/repo" "name the private backup repository, or remove the key"
+  elif [ "$(_bb_lower "$(_bb_host "$w")/$(_bb_repo "$w")")" = "$(_bb_lower "$(_bb_host "$t")/$(_bb_repo "$t")")" ]; then
+    fail cfg:work_repo "is the target repository" "name a separate private repository (docs/persistence.md → Backup & restore)"
+  else ok cfg:work_repo "$w"; fi
   enum() { local v; v="$(cfg "$1")"; [ -z "$v" ] && { ok "cfg:$1" "default"; return; }
     case " $2 " in (*" $v "*) ok "cfg:$1" "$v";; (*) fail "cfg:$1" "'$v' is not one of: $2" "set a documented value (CLAUDE.md → Runtime configuration)";; esac; }
   enum issue_comments "enabled disabled"; enum artifact_reports "enabled disabled"
   enum include_comments "enabled disabled"; enum audit_report "enabled disabled"; enum log_level "info debug"
   enum spec_feedback "enabled disabled"; enum explorations "enabled disabled"; enum auto_promote "disabled verified"
   enum security_checks "enabled disabled"; enum confirm_regressions "enabled disabled"; enum lend_model "enabled disabled"
-  enum scenario_discovery "disabled propose run"
+  enum scenario_discovery "disabled propose run"; enum test_catalog "enabled disabled"
   v="$(cfg scenario_channel)"
   if [ -z "$v" ]; then ok cfg:scenario_channel "empty — proposals stay in the chat UI"
   elif printf '%s' "$v" | grep -qE '^[CDG][A-Z0-9]{6,}$'; then ok cfg:scenario_channel "$v"
@@ -216,6 +225,12 @@ if [ "$LIVE" = 1 ]; then
       (*)    warn "$id" "$detail";;
     esac
   done < <(boundary_probe "$T")
+  wb="$(bash "$SCRIPT_DIR/work-backup.sh" check 2>/dev/null)"
+  if [ "$(jq -r '.configured // empty' <<<"$wb" 2>/dev/null)" = true ]; then
+    jq -e '.problem' >/dev/null 2>&1 <<<"$wb" \
+      && fail work_backup "$(jq -r .problem <<<"$wb")" "make work_repo a private repository the connection can push to, never the target or its fork, and apply the rules egress-rules.sh prints" \
+      || ok work_backup "$(jq -r .repo <<<"$wb") private and reachable"
+  fi
   cv="$(profile_run versions 2>&1)" && printf '%s' "$cv" | jq -e '.candidate' >/dev/null 2>&1 \
     && ok builds "$cv" || fail builds "$cv" "fix the profile's bin/versions or its egress (profile README)"
   code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 https://api.anthropic.com/v1/models \

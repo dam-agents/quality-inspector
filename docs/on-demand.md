@@ -15,7 +15,8 @@ scheduled ([persistence.md](persistence.md) → **Scheduled or direct session**)
   side by side, then on a yes write or update its `work/SUITE.md` row: tier `regression`,
   `assert_hash` from `bash "$HOME/scripts/check-asserts.sh" --hash <file>`,
   `promoted_utc` now ([regression.md](regression.md) → Tiers). Re-promoting a drifted
-  file is the same command and needs the same yes.
+  file is the same command and needs the same yes. After any promote or demote, the catalog
+  ([catalog.md](catalog.md) → **Build and publish**).
 - **"promote all pending"** — the same for every `promotable` row at once: show each
   file side by side with its criteria, then one yes promotes them all (the operator may
   drop files first).
@@ -40,5 +41,11 @@ scheduled ([persistence.md](persistence.md) → **Scheduled or direct session**)
   ignoring "already tested".
 - **"run the security checks"** — [security.md](security.md) → **The run** with the current candidate, ignoring "already tested".
 - **"show the environment"** — `env.sh status` plus non-running pods; read-only.
+- **"add #N to the collection <name>"** / **"remove … from …"** / **"show the catalog"** — edit
+  `work/CATALOG.md` ([catalog.md](catalog.md) → Describing and categorizing), then build and
+  publish it; "show" just builds, publishes and gives the artifact reference.
+- **"back up now"** — `bash "$HOME/scripts/work-backup.sh" persist`, then `… check`; a
+  deletion the operator confirms passes with `persist --allow-delete`. **"restore from the
+  backup"** — fresh volume only: [persistence.md](persistence.md) → **Backup & restore**.
 - **Configuration changes** — CLAUDE.md → Runtime configuration (refuse `marker_prefix`
   after first use). **Definition changes** — [self-modification.md](self-modification.md).

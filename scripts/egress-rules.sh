@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # egress-rules.sh — print the `dam network create` commands this instance's black-box
-# boundary needs (docs/black-box.md → Egress rules): the target's rules and the profile's
-# `egress`. --kit adds the kit's own rules, which an agent created from a kit older than
-# 2.11.0 (or by hand) lacks; --source allows one more skill source's repository on the
-# target's GitHub host, which is otherwise deny-by-default. Prints only — the operator
-# runs them, with AGENT set to this agent's name; the probes of
+# boundary needs (docs/black-box.md → Egress rules): the target's rules, the work backup
+# repository's (`work_repo`) and the profile's `egress`. --kit adds the kit's own rules, which
+# an agent created from a kit older than 2.11.0 (or by hand) lacks; --source allows one more
+# skill source's repository on the target's GitHub host, which is otherwise deny-by-default.
+# Prints only — the operator runs them, with AGENT set to this agent's name; the probes of
 # `verify-onboarding.sh --live` then prove them.
 #
 #   egress-rules.sh [--kit] [--source <owner>/<repo>]…
@@ -41,6 +41,9 @@ done
 PP="$(_bb_profile_path)"
 [ -z "$PP" ] || _bb_profile_path_ok "$PP" || {
   echo "profile_source_path '$PP' is not a plain directory path (no * % ?, no . or .. segment): its allow would open more than the profile's directory" >&2; exit 2; }
+W="$(cfg work_repo)"
+[ -n "$W" ] && [ "$(_bb_host "$W")/$(_bb_repo "$W" | tr 'A-Z' 'a-z')" = "$(_bb_host "$T")/$(_bb_repo "$T" | tr 'A-Z' 'a-z')" ] \
+  && { echo "work_repo is the target repository — refused (docs/persistence.md → Backup & restore)" >&2; exit 1; }
 
 cmd() { # <verdict> <method> <host> <path pattern> [why]
   local c="dam network create \"\$AGENT\" --host"
@@ -76,6 +79,10 @@ fi
 echo "# The target $T (docs/black-box.md → Egress rules)."
 while read -r v m h p; do cmd "$v" "$m" "$h" "$p"; done < <(boundary_rules "$T" ${SOURCES[@]+"${SOURCES[@]}"})
 _bb_definition >/dev/null || echo "# This definition's origin is unreadable: when it is on the target's host, allow its repository by hand (docs/black-box.md → Egress rules)."
+if [ -n "$W" ]; then
+  echo "# The work backup $W (docs/persistence.md → Backup & restore)."
+  while read -r v m h p; do cmd "$v" "$m" "$h" "$p"; done < <(work_repo_rules)
+fi
 if dir="$(profile_dir)" && [ -f "$dir/profile.json" ]; then
   echo "# The profile's egress ($(jq -r '.product // "profile"' "$dir/profile.json"))."
   jq -r '.egress[]? | [(.verdict // "allow"), (.method // "*"), .host, (.pathPattern // .path // "*"), (.why // "")] | @tsv' \

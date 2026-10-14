@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Test catalog</title>
+<link rel="icon" href="data:,">
+<!-- The test catalog viewer (docs/catalog.md). scripts/catalog.mjs replaces the data token below
+     with the catalog JSON. Read-only; every data string is untrusted and only ever set as text. -->
+<style>
+:root{--bg:#fff;--fg:#1d1f23;--dim:#6b7078;--card:#f6f7f9;--line:#e3e5e8;--ok:#127a3a;--okbg:#e3f5e9;--bad:#b42318;--badbg:#fdecea;--warn:#8a5a00;--warnbg:#fff4d6;--muted:#555b63;--mutedbg:#eceef1;--link:#1a5fb4;--sel:#e8f0fe;--shadow:0 1px 2px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.06)}
+@media (prefers-color-scheme:dark){:root{--bg:#15171a;--fg:#e8eaed;--dim:#9aa0a6;--card:#1e2125;--line:#2e3238;--ok:#6fd58f;--okbg:#173322;--bad:#ff8a80;--badbg:#3a1d1b;--warn:#f5c26b;--warnbg:#3a2f14;--muted:#b0b5bb;--mutedbg:#2a2e33;--link:#8ab4f8;--sel:#1f2a3d;--shadow:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.35)}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+button,input,select{font:inherit;color:inherit}
+a{color:var(--link)}
+:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+.wrap{max-width:1500px;margin:0 auto;padding:0 16px}
+header.top{border-bottom:1px solid var(--line);padding:12px 0 0}
+.title{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline}
+.title h1{font-size:18px;margin:0}
+.meta{color:var(--dim);font-size:12.5px}
+.tabs{display:flex;gap:2px;overflow-x:auto;margin-top:8px;scrollbar-width:thin}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:8px 12px;cursor:pointer;color:var(--dim);white-space:nowrap}
+.tabs button[aria-selected=true]{color:var(--fg);border-bottom-color:var(--link);font-weight:600}
+.tabs .sp{flex:1}
+main{padding:16px 0 48px}
+.btn{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer}
+.btn:hover{border-color:var(--dim)}
+.btn.on{background:var(--sel);border-color:var(--link)}
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:2px 10px;cursor:pointer;font-size:12.5px;white-space:nowrap}
+.chip.on{background:var(--sel);border-color:var(--link)}
+.badge{display:inline-block;border-radius:4px;padding:0 6px;font-size:12px;font-weight:600;white-space:nowrap;line-height:1.6}
+.ok{color:var(--ok);background:var(--okbg)}.warn{color:var(--warn);background:var(--warnbg)}.bad{color:var(--bad);background:var(--badbg)}.muted{color:var(--muted);background:var(--mutedbg)}.none{color:var(--dim);background:transparent;border:1px dashed var(--line)}
+.tier{display:inline-block;border:1px solid var(--line);border-radius:4px;padding:0 6px;font-size:12px;white-space:nowrap;line-height:1.6}
+.tier.regression{border-color:var(--link);color:var(--link)}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+.token{background:var(--sel);border-radius:3px;padding:0 3px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.grid-kpi{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.kpi b{display:block;font-size:22px;line-height:1.2}
+.kpi span{color:var(--dim);font-size:12.5px}
+.panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:14px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;min-width:0}
+.panel h2,.panel h3{font-size:14px;margin:0 0 8px}
+.att li{margin:4px 0;list-style:none}
+.att{padding:0;margin:0}
+.linkish{background:none;border:0;padding:0;color:var(--link);cursor:pointer;text-align:left}
+.linkish:hover{text-decoration:underline}
+svg text{fill:var(--dim);font-size:10px}
+.layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:16px}
+.side details{border-bottom:1px solid var(--line);padding:6px 0}
+.side summary{cursor:pointer;font-weight:600;font-size:13px}
+.side label{display:flex;gap:6px;align-items:center;font-size:13px;padding:1px 0;cursor:pointer}
+.side label .n{margin-left:auto;color:var(--dim);font-size:12px}
+.side label.zero{opacity:.45}
+.side .more{font-size:12px}
+.filters-toggle{display:none}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.toolbar input[type=search]{flex:1 1 220px;min-width:0;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.toolbar select{padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.count{color:var(--dim);font-size:12.5px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table.list{border-collapse:collapse;width:100%;font-size:13px}
+table.list th,table.list td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+table.list th{position:sticky;top:0;background:var(--card);font-weight:600;white-space:nowrap;cursor:pointer;user-select:none}
+table.list th .arr{color:var(--link);font-size:11px}
+table.list tbody tr{cursor:pointer}
+table.list tbody tr:hover{background:var(--sel)}
+.name{min-width:220px;max-width:420px}
+td.nw{white-space:nowrap}
+.group{margin-bottom:12px}
+.group>summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:6px 0;font-weight:600}
+.minibar{display:inline-flex;width:120px;height:8px;border-radius:4px;overflow:hidden;background:var(--mutedbg);vertical-align:middle}
+.minibar i{display:block;height:100%}
+.minibar .ok,.bar .ok{background:var(--ok)}.minibar .warn,.bar .warn{background:var(--warn)}.minibar .bad,.bar .bad{background:var(--bad)}.minibar .muted,.bar .muted{background:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px;cursor:pointer;display:flex;flex-direction:column;gap:6px;min-width:0}
+.card:hover{border-color:var(--dim)}
+.card .then{color:var(--dim);font-size:12.5px}
+.card img,.gal img{width:100%;display:block;border-radius:6px;border:1px solid var(--line);background:#fff}
+.ph{aspect-ratio:16/10;border-radius:6px;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:12px}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.gal .card img{aspect-ratio:16/10;object-fit:cover;object-position:top}
+.more-row{text-align:center;margin:10px 0}
+.navgroup{margin-bottom:18px}
+.navgroup h3{display:flex;gap:10px;align-items:center;font-size:14px;margin:0 0 8px}
+.bar{display:inline-flex;height:8px;width:180px;border-radius:4px;overflow:hidden;background:var(--mutedbg)}
+.bar i{display:block;height:100%}
+.pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.page{border-radius:8px;border:1px solid var(--line);background:var(--card);padding:8px;cursor:pointer;display:flex;flex-direction:column;gap:6px;border-left:4px solid var(--muted)}
+.page.cov-regression{border-left-color:var(--ok)}.page.cov-exploratory{border-left-color:var(--warn)}.page.cov-none{border-left-color:var(--bad)}
+.page img{width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top;border-radius:4px;border:1px solid var(--line);background:#fff}
+.heat{overflow:auto;border:1px solid var(--line);border-radius:8px;max-height:75vh}
+.heat table{border-collapse:separate;border-spacing:2px;font-size:12px}
+.heat th{position:sticky;top:0;background:var(--bg);font-weight:500;color:var(--dim);writing-mode:vertical-rl;transform:rotate(180deg);height:90px;white-space:nowrap;padding:2px}
+.heat td.rowh{position:sticky;left:0;background:var(--bg);white-space:nowrap;padding-right:8px;max-width:260px;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.heat td.c{width:16px;min-width:16px;height:16px;border-radius:3px}
+.heat td.c.ok{background:var(--ok)}.heat td.c.warn{background:var(--warn)}.heat td.c.bad{background:var(--bad)}.heat td.c.muted{background:var(--muted)}.heat td.c.e{background:var(--mutedbg)}
+.funnel .row{display:grid;grid-template-columns:200px minmax(0,1fr) 60px;gap:10px;align-items:center;margin:6px 0}
+.funnel .fill{height:18px;border-radius:4px;background:var(--link);opacity:.75;min-width:2px}
+.cmd{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}
+.cmd input{font-family:ui-monospace,Menlo,monospace;font-size:12px;padding:2px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);width:16ch}
+#drawer{position:fixed;inset:0 0 0 auto;width:min(620px,100%);background:var(--bg);border-left:1px solid var(--line);box-shadow:var(--shadow);overflow:auto;z-index:20;padding:14px 16px 40px}
+#scrim{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:19}
+#drawer h2{font-size:17px;margin:4px 0}
+.dl{display:grid;grid-template-columns:110px minmax(0,1fr);gap:4px 10px;font-size:13px;margin:10px 0}
+.dl dt{color:var(--dim)}
+.dl dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.gwt{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:10px 0}
+.gwt p{margin:3px 0}
+.gwt b{display:inline-block;width:52px;color:var(--dim);font-weight:600}
+.steps{list-style:none;padding:0;margin:8px 0;border-left:2px solid var(--line)}
+.steps li{position:relative;padding:3px 0 3px 22px;overflow-wrap:anywhere}
+.steps li::before{content:attr(data-k);position:absolute;left:-9px;top:5px;width:16px;height:16px;border-radius:50%;background:var(--card);border:1px solid var(--line);font-size:9px;text-align:center;line-height:15px;color:var(--dim)}
+.steps li.expect{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.hist{display:flex;flex-wrap:wrap;gap:3px}
+.hist span{font-size:11px;border-radius:3px;padding:0 5px}
+.sec{margin-top:16px}
+.sec h3{font-size:13px;margin:0 0 6px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+.star{background:none;border:0;cursor:pointer;font-size:16px;line-height:1;color:var(--dim);padding:0 2px}
+.star.on{color:#e3a008}
+#legend{position:fixed;right:16px;top:60px;z-index:30;background:var(--bg);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);padding:12px;max-width:min(420px,calc(100% - 32px));max-height:80vh;overflow:auto}
+#legend ul{list-style:none;padding:0;margin:6px 0}
+#legend li{margin:3px 0}
+.empty{padding:40px 0;text-align:center;color:var(--dim)}
+.close{float:right}
+.muted-t{color:var(--dim)}
+@media (max-width:900px){.layout{grid-template-columns:minmax(0,1fr)}.side{display:none}.side.open{display:block}.filters-toggle{display:inline-block}.funnel .row{grid-template-columns:120px minmax(0,1fr) 44px}.dl{grid-template-columns:90px minmax(0,1fr)}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <div class="title"><h1 id="h-title">Test catalog</h1><span class="meta" id="h-meta"></span></div>
+  <nav class="tabs" role="tablist" aria-label="Views" id="tabs"></nav>
+</div></header>
+<main class="wrap" id="view" tabindex="-1"></main>
+<script type="application/json" id="qi-catalog-data">__QI_CATALOG_DATA__</script>
+<script>
+'use strict';
+(() => {
+// ------------------------------------------------------------------ helpers
+const $ = (s, r = document) => r.querySelector(s);
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === 'class') e.className = v;
+    else if (k === 'text') e.textContent = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v === true ? '' : String(v));
+  }
+  for (const c of kids.flat(Infinity)) if (c != null && c !== false) e.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  return e;
+}
+const SVGNS = 'http://www.w3.org/2000/svg';
+function s(tag, attrs, ...kids) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) if (v != null) e.setAttribute(k, String(v));
+  for (const c of kids.flat(Infinity)) if (c != null) e.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  return e;
+}
+const str = (v) => (v == null ? '' : String(v));
+const arr = (v) => (Array.isArray(v) ? v : []);
+const own = (o, k) => k != null && Object.prototype.hasOwnProperty.call(o, k); // a link's keys: never `constructor`
+const num = (r) => { const m = str(r).match(/\d+/); return m ? +m[0] : 0; };
+const debounce = (f, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), ms); }; };
+const fmtDate = (u) => { const d = new Date(u); return isNaN(d) ? '' : d.toISOString().slice(0, 10); };
+function rel(u) {
+  const d = new Date(u); if (isNaN(d)) return '';
+  const m = Math.round((Date.now() - d) / 60000);
+  if (m < 1) return 'just now'; if (m < 60) return `${m} min ago`; const hh = Math.round(m / 60);
+  if (hh < 48) return `${hh} h ago`; return `${Math.round(hh / 24)} days ago`;
+}
+const ms = (n) => (n == null ? '' : n < 1000 ? `${n} ms` : `${(n / 1000).toFixed(1)} s`);
+let storageOK = false;
+try { localStorage.setItem('qi-catalog:probe', '1'); localStorage.removeItem('qi-catalog:probe'); storageOK = true; } catch { /* sandboxed */ }
+
+// --------------------------------------------------------------------- data
+let D = {};
+try {
+  const t = $('#qi-catalog-data').textContent.trim();
+  if (t && !t.startsWith('__QI' + '_CATALOG')) D = JSON.parse(t) || {};
+} catch { D = {}; }
+if (typeof D !== 'object' || Array.isArray(D)) D = {};
+const images = D.images && typeof D.images === 'object' ? D.images : {};
+const img = (id) => { const v = id == null ? null : images[id]; return typeof v === 'string' && v.startsWith('data:image/') ? v : null; };
+
+const VAL = {
+  verified: ['Verified', 'ok'], passed: ['Passed', 'ok'], unchanged: ['Unchanged', 'ok'], relearned: ['UI changed · steps re-learned', 'ok'], 'observed-ok': ['Observed OK', 'ok'],
+  healed: ['UI changed · check repaired', 'warn'], 'needs-review': ['Needs review', 'warn'], flaky: ['Flaky', 'warn'], inconclusive: ['Inconclusive', 'warn'], partial: ['Partial', 'warn'], observation: ['Observation', 'warn'],
+  failed: ['Failed', 'bad'], regression: ['Regression', 'bad'],
+  blocked: ['Blocked', 'muted'], superseded: ['Superseded by a change', 'muted'], 'not-testable': ['Not testable', 'muted'], drift: ['Drift — not run', 'muted'],
+};
+const vLabel = (v) => (own(VAL, v) ? VAL[v][0] : v ? str(v) : 'No verdict yet');
+const vClass = (v) => (own(VAL, v) ? VAL[v][1] : 'none');
+const SEV = { bad: 0, warn: 1, muted: 2, ok: 3, none: 4 };
+const TIERS = ['regression', 'promotable', 'exploratory', 'quarantined', 'retired', 'untracked'];
+const tierRank = (t) => { const i = TIERS.indexOf(t); return i < 0 ? 9 : i; };
+const ATTN = new Set(['regression', 'failed', 'needs-review', 'flaky']);
+
+const items = arr(D.items).filter((x) => x && typeof x === 'object' && x.key).map((x) => {
+  const o = x.origin && typeof x.origin === 'object' ? x.origin : {};
+  const hist = arr(x.history).filter((e) => e && typeof e === 'object');
+  const verdict = x.verdict && typeof x.verdict === 'object' ? x.verdict : hist[hist.length - 1] || null;
+  const it = {
+    ...x, origin: o, history: hist, verdict, steps: arr(x.steps).filter((e) => e && typeof e === 'object'),
+    heals: arr(x.heals), flaky: arr(x.flaky), pages: arr(x.pages).map(str), duration_ms: arr(x.duration_ms).filter(Number.isFinite),
+    tier: x.tier || 'untracked', kind: x.kind === 'exploration' ? 'exploration' : 'criterion', checks: x.checks && typeof x.checks === 'object' ? x.checks : null,
+  };
+  it.ref = str(o.ref) || str(x.key).split('/')[0];
+  it.label = `${it.ref} ${str(x.id)}`.trim();
+  it.latest = verdict ? str(verdict.value) : '';
+  it.cls = vClass(it.latest);
+  it.dur = it.duration_ms.length ? it.duration_ms[it.duration_ms.length - 1] : null;
+  it.flags = [];
+  if (it.flaky.length || it.latest === 'flaky') it.flags.push('flaky');
+  if (it.heals.length) it.flags.push('healed');
+  if (x.drift) it.flags.push('drift');
+  if (it.tier === 'quarantined') it.flags.push('quarantined');
+  if (it.checks && it.checks.agent_asserts > 0) it.flags.push('agent.assert');
+  if (img(x.still)) it.flags.push('has still');
+  if (x.testable === false) it.flags.push('not testable');
+  if (ATTN.has(it.latest) || x.drift) it.flags.push('needs attention');
+  it.text = [it.label, x.name, x.given, x.when, x.then, x.summary, o.title, x.file, x.area, ...it.steps.map((e) => e.text)].map(str).join(' \n ').toLowerCase();
+  return it;
+});
+const byKey = new Map(items.map((i) => [i.key, i]));
+
+// Collections: "#42", "#42 AC-1", "S-7", "S-7 AC-1".
+const collections = arr(D.collections).filter((c) => c && c.name).map((c) => ({ name: str(c.name), members: arr(c.members).map(str) }));
+const memberOf = new Map();
+for (const c of collections) for (const m of c.members) {
+  const [ref, id] = m.trim().split(/\s+/);
+  for (const i of items) if (i.ref === ref && (!id || str(i.id) === id)) (memberOf.get(i.key) || memberOf.set(i.key, []).get(i.key)).push(c.name);
+}
+const colls = (i) => [...new Set(memberOf.get(i.key) || [])];
+
+// Pins (this browser only).
+const PIN_KEY = `qi-catalog:${str(D.target)}:pins`;
+let pins = new Set();
+if (storageOK) try { pins = new Set(JSON.parse(localStorage.getItem(PIN_KEY) || '[]')); } catch { pins = new Set(); }
+const savePins = () => { try { localStorage.setItem(PIN_KEY, JSON.stringify([...pins])); } catch { /* ignore */ } };
+
+const builds = arr(D.builds).filter((b) => b && b.id).map((b) => ({ id: str(b.id), utc: str(b.utc) }));
+const nights = arr(D.nights).filter((n) => n && n.build).sort((a, b) => str(a.utc).localeCompare(str(b.utc)));
+const pagesData = arr(D.pages).filter((p) => p && p.pattern);
+
+// ------------------------------------------------------------------ facets
+const FACETS = [
+  { id: 'tier', label: 'Tier', get: (i) => [i.tier], order: (a, b) => tierRank(a) - tierRank(b) },
+  { id: 'verdict', label: 'Latest verdict', get: (i) => [i.latest || 'none'], fmt: (v) => (v === 'none' ? 'No verdict yet' : vLabel(v)) },
+  { id: 'origin', label: 'Origin', get: (i) => [i.origin.kind || 'issue'] },
+  { id: 'kind', label: 'Kind', get: (i) => [i.kind] },
+  { id: 'flag', label: 'Flags', get: (i) => [...i.flags, ...(pins.has(i.key) ? ['pinned'] : [])] },
+  { id: 'collection', label: 'Collection', get: colls },
+  { id: 'area', label: 'Area', get: (i) => (i.area ? [str(i.area)] : []) },
+  { id: 'page', label: 'Page', get: (i) => i.pages },
+  { id: 'run', label: 'Last run type', get: (i) => (i.verdict && i.verdict.run ? [str(i.verdict.run)] : []) },
+  { id: 'surface', label: 'Surface', get: (i) => (i.surface ? [str(i.surface)] : []) },
+  { id: 'session', label: 'Session / role', get: (i) => (i.session ? [str(i.session)] : []) },
+  { id: 'label', label: 'Issue label', get: (i) => arr(i.origin.labels).map(str) },
+  { id: 'state', label: 'Issue state', get: (i) => (i.origin.state ? [str(i.origin.state)] : []) },
+];
+const FACET = Object.fromEntries(FACETS.map((f) => [f.id, f]));
+
+// ------------------------------------------------------------------- state
+const VIEWS = [['overview', 'Overview'], ['catalog', 'Catalog'], ['gallery', 'Gallery'], ['coverage', 'Coverage'], ['history', 'History'], ['lifecycle', 'Lifecycle']];
+const COLS = {
+  ref: ['Origin', (i) => i.ref, (a, b) => (a.origin.kind || '').localeCompare(b.origin.kind || '') || num(a.ref) - num(b.ref)],
+  id: ['ID', (i) => str(i.id), (a, b) => str(a.id).localeCompare(str(b.id)) || num(a.id) - num(b.id)],
+  name: ['Criterion', null, (a, b) => str(a.name).localeCompare(str(b.name))],
+  tier: ['Tier', null, (a, b) => tierRank(a.tier) - tierRank(b.tier)],
+  verdict: ['Latest verdict', null, (a, b) => SEV[a.cls] - SEV[b.cls] || a.latest.localeCompare(b.latest)],
+  area: ['Area', (i) => str(i.area), (a, b) => str(a.area).localeCompare(str(b.area))],
+  surface: ['Surface', (i) => str(i.surface), (a, b) => str(a.surface).localeCompare(str(b.surface))],
+  session: ['Session', (i) => str(i.session), (a, b) => str(a.session).localeCompare(str(b.session))],
+  last: ['Last run', (i) => (i.verdict ? fmtDate(i.verdict.utc) : ''), (a, b) => str(a.verdict && a.verdict.utc).localeCompare(str(b.verdict && b.verdict.utc))],
+  build: ['Build', (i) => str(i.verdict && i.verdict.build), (a, b) => str(a.verdict && a.verdict.build).localeCompare(str(b.verdict && b.verdict.build))],
+  promoted: ['Promoted', (i) => fmtDate(i.promoted_utc), (a, b) => str(a.promoted_utc).localeCompare(str(b.promoted_utc))],
+  duration: ['Duration', (i) => ms(i.dur), (a, b) => (a.dur ?? -1) - (b.dur ?? -1)],
+  heals: ['Heals', (i) => (i.heals.length || ''), (a, b) => a.heals.length - b.heals.length],
+  flaky: ['Flaky', (i) => (i.flaky.length || ''), (a, b) => a.flaky.length - b.flaky.length],
+  pages: ['Pages', (i) => i.pages.join(', '), (a, b) => a.pages.length - b.pages.length],
+};
+const DEFAULT_COLS = ['ref', 'id', 'name', 'tier', 'verdict', 'area', 'last'];
+const GROUPS = { none: 'No grouping', origin: 'Origin', tier: 'Tier', area: 'Area', page: 'Page', verdict: 'Latest verdict', collection: 'Collection', label: 'Issue label' };
+const QUICK = [
+  ['Nightly regression', { tier: ['regression'] }], ['Needs attention', { flag: ['needs attention'] }], ['Promotable queue', { tier: ['promotable'] }],
+  ['Flaky & healed', { flag: ['flaky', 'healed'] }], ['Costly (agent.assert)', { flag: ['agent.assert'] }], ['Explorations', { kind: ['exploration'] }], ['Scenarios', { origin: ['scenario'] }],
+];
+const S = { v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS.slice(), i: null, hall: false, hsort: 'recent', limit: 100, side: false };
+
+const DEFAULTS = JSON.stringify({ v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS, i: null });
+function readHash() {
+  let p;
+  try { p = new URLSearchParams(location.hash.slice(1)); } catch { return; }
+  Object.assign(S, JSON.parse(DEFAULTS));
+  const v = p.get('v'); if (VIEWS.some(([k]) => k === v)) S.v = v;
+  S.q = p.get('q') || '';
+  S.f = {};
+  for (const [k, val] of p) if (k.startsWith('f.') && own(FACET, k.slice(2))) S.f[k.slice(2)] = val.split('|').filter(Boolean);
+  if (p.get('s')) S.sort = p.get('s').split(',').map((x) => [x.replace(/^-/, ''), x.startsWith('-') ? -1 : 1]).filter(([k]) => own(COLS, k));
+  if (own(GROUPS, p.get('g'))) S.g = p.get('g');
+  if (p.get('l') === 'cards') S.l = 'cards';
+  if (p.get('c')) { const c = p.get('c').split(',').filter((k) => own(COLS, k)); if (c.length) S.cols = c; }
+  S.i = p.get('i') && byKey.has(p.get('i')) ? p.get('i') : null;
+}
+function writeHash() {
+  const p = new URLSearchParams();
+  if (S.v !== 'overview') p.set('v', S.v);
+  if (S.q) p.set('q', S.q);
+  for (const [k, vals] of Object.entries(S.f)) if (vals.length) p.set(`f.${k}`, vals.join('|'));
+  const sk = S.sort.map(([k, d]) => (d < 0 ? '-' : '') + k).join(',');
+  if (sk !== 'ref,id') p.set('s', sk);
+  if (S.g !== 'none') p.set('g', S.g);
+  if (S.l !== 'table') p.set('l', S.l);
+  if (S.cols.join(',') !== DEFAULT_COLS.join(',')) p.set('c', S.cols.join(','));
+  if (S.i) p.set('i', S.i);
+  try { history.replaceState(null, '', `#${p.toString()}`); } catch { /* sandboxed: state stays in memory */ }
+}
+
+// ---------------------------------------------------------------- filtering
+const matchesQ = (i) => !S.q || S.q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => i.text.includes(w));
+function passes(i, except) {
+  if (!matchesQ(i)) return false;
+  for (const [k, vals] of Object.entries(S.f)) {
+    if (k === except || !vals.length) continue;
+    const have = FACET[k].get(i);
+    if (!vals.some((v) => have.includes(v))) return false;
+  }
+  return true;
+}
+const filtered = () => items.filter((i) => passes(i));
+function sorted(list) {
+  const keys = S.sort.length ? S.sort : [['ref', 1]];
+  return list.slice().sort((a, b) => { for (const [k, d] of keys) { const c = COLS[k][2](a, b); if (c) return c * d; } return 0; });
+}
+const toggleFacet = (k, v) => { const cur = S.f[k] || []; S.f[k] = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v]; S.limit = 100; };
+
+// ----------------------------------------------------------------- widgets
+const badge = (v) => h('span', { class: `badge ${vClass(v)}`, title: v || 'no verdict yet' }, vLabel(v));
+const tierB = (t) => h('span', { class: `tier ${t}` }, t);
+function stepText(t) {
+  return str(t).split(/(\{[A-Za-z_]\w*\})/).map((p) => (/^\{[A-Za-z_]\w*\}$/.test(p) ? h('span', { class: 'token' }, p) : p));
+}
+function copyBox(text) {
+  const box = h('span', { class: 'cmd' }, h('code', {}, text));
+  const b = h('button', { class: 'btn', type: 'button', onclick: async () => {
+    try { await navigator.clipboard.writeText(text); b.textContent = 'Copied'; setTimeout(() => { b.textContent = 'Copy'; }, 1500); return; } catch { /* no clipboard */ }
+    const inp = h('input', { readonly: true, value: text, 'aria-label': 'Command to copy' }); b.replaceWith(inp); inp.focus(); inp.select();
+  } }, 'Copy');
+  box.append(b); return box;
+}
+function minibar(list, cls = 'minibar') {
+  const c = { bad: 0, warn: 0, muted: 0, ok: 0 }; for (const i of list) if (c[i.cls] != null) c[i.cls]++;
+  const n = list.length || 1;
+  return h('span', { class: cls, title: `ok ${c.ok} · warn ${c.warn} · bad ${c.bad} · muted ${c.muted}`, 'aria-hidden': true },
+    ['ok', 'warn', 'bad', 'muted'].map((k) => (c[k] ? h('i', { class: k, style: `width:${(100 * c[k]) / n}%` }) : null)));
+}
+const star = (i) => (storageOK ? h('button', { class: `star${pins.has(i.key) ? ' on' : ''}`, type: 'button', 'aria-pressed': pins.has(i.key) ? 'true' : 'false', title: 'Pin (this browser only)', 'aria-label': `Pin ${i.label}`,
+  onclick: (e) => { e.stopPropagation(); pins.has(i.key) ? pins.delete(i.key) : pins.add(i.key); savePins(); render(); } }, pins.has(i.key) ? '★' : '☆') : null);
+const openItem = (key) => { S.i = key; writeHash(); renderDrawer(); };
+const commands = (i) => {
+  const out = [];
+  if (i.kind === 'exploration') return out;
+  const r = i.origin.kind === 'scenario' ? i.ref : `#${num(i.ref)}`;
+  if (i.tier === 'promotable' || i.tier === 'exploratory' || i.tier === 'quarantined') out.push(`promote ${r}`);
+  if (i.tier === 'regression') out.push(`demote ${r}`);
+  if (i.origin.kind !== 'scenario') out.push(`test ${r}`);
+  return out;
+};
+
+// ------------------------------------------------------------------ header
+function renderHeader() {
+  const a = D.agent || {};
+  $('#h-title').textContent = `${D.product ? `${str(D.product)} · ` : ''}Test catalog`;
+  document.title = $('#h-title').textContent;
+  const meta = $('#h-meta'); meta.textContent = '';
+  meta.append([str(D.target), str(a.display_name), a.version ? `v${a.version}` : '', D.generated_utc ? `generated ${rel(D.generated_utc)} (${str(D.generated_utc)})` : ''].filter(Boolean).join(' · '));
+  const tabs = $('#tabs'); tabs.textContent = '';
+  for (const [k, label] of VIEWS) tabs.append(h('button', { role: 'tab', type: 'button', 'aria-selected': S.v === k ? 'true' : 'false', onclick: () => { S.v = k; S.limit = 100; writeHash(); render(); } }, label));
+  tabs.append(h('span', { class: 'sp' }), h('button', { type: 'button', onclick: toggleLegend, 'aria-expanded': $('#legend') ? 'true' : 'false' }, 'Legend'));
+}
+function toggleLegend() {
+  const old = $('#legend'); if (old) { old.remove(); renderHeader(); return; }
+  const groups = { ok: [], warn: [], bad: [], muted: [] };
+  for (const [k, [label, c]] of Object.entries(VAL)) groups[c].push([k, label]);
+  document.body.append(h('div', { id: 'legend', role: 'dialog', 'aria-label': 'Legend' },
+    h('button', { class: 'btn close', type: 'button', onclick: toggleLegend }, 'Close'), h('b', {}, 'Verdicts'),
+    Object.entries(groups).map(([c, l]) => h('ul', {}, l.map(([k]) => h('li', {}, badge(k), ' ', h('span', { class: 'muted-t mono' }, k))))),
+    h('b', {}, 'Tiers'), h('ul', {},
+      h('li', {}, tierB('regression'), ' replayed every night against the newest build'),
+      h('li', {}, tierB('promotable'), ' verified, waiting for "promote all pending"'),
+      h('li', {}, tierB('exploratory'), ' written by an issue run, not replayed'),
+      h('li', {}, tierB('quarantined'), ' flaky on two builds, not replayed'),
+      h('li', {}, tierB('retired'), ' superseded by a completed issue'),
+      h('li', {}, tierB('untracked'), ' no test (not testable) or no suite row')),
+    h('p', { class: 'muted-t' }, 'The catalog is read-only. Commands are pasted into the agent\'s own chat.')));
+  renderHeader();
+}
+
+// ---------------------------------------------------------------- overview
+function lineChart(series, labels, w = 460, hgt = 150) {
+  const max = Math.max(1, ...series.flatMap((x) => x.values));
+  const n = labels.length; const pad = 24; const x = (k) => pad + (n <= 1 ? 0 : (k * (w - pad - 8)) / (n - 1)); const y = (v) => hgt - 18 - (v * (hgt - 30)) / max;
+  const svg = s('svg', { viewBox: `0 0 ${w} ${hgt}`, width: '100%', role: 'img', 'aria-label': series.map((x2) => `${x2.name}: ${x2.values[x2.values.length - 1] ?? 0}`).join(', ') });
+  svg.append(s('line', { x1: pad, x2: w - 8, y1: hgt - 18, y2: hgt - 18, stroke: 'var(--line)' }), s('text', { x: 2, y: 12 }, String(max)), s('text', { x: 2, y: hgt - 18 }, '0'));
+  if (n) svg.append(s('text', { x: pad, y: hgt - 4 }, labels[0]), s('text', { x: w - 8, y: hgt - 4, 'text-anchor': 'end' }, labels[n - 1]));
+  for (const se of series) svg.append(s('polyline', { fill: 'none', stroke: se.color, 'stroke-width': 2, points: se.values.map((v, k) => `${x(k)},${y(v)}`).join(' ') }));
+  return h('div', {}, svg, h('div', { class: 'meta' }, series.map((se) => h('span', { style: 'margin-right:12px' }, h('span', { style: `color:${se.color}` }, '■ '), se.name))));
+}
+function nightsChart(list, w = 460, hgt = 150) {
+  const KEYS = [['regression', 'var(--bad)'], ['needs-review', 'var(--warn)'], ['flaky', 'var(--warn)'], ['healed', 'var(--warn)'], ['blocked', 'var(--muted)'], ['superseded', 'var(--muted)'], ['drift', 'var(--muted)'], ['relearned', 'var(--ok)'], ['unchanged', 'var(--ok)']];
+  const tot = (n) => KEYS.reduce((t, [k]) => t + (+((n.counts || {})[k]) || 0), 0);
+  const max = Math.max(1, ...list.map(tot)); const bw = (w - 30) / Math.max(1, list.length);
+  const svg = s('svg', { viewBox: `0 0 ${w} ${hgt}`, width: '100%', role: 'img', 'aria-label': 'Nightly outcomes per build' });
+  list.forEach((n, k) => {
+    let y0 = hgt - 18;
+    for (const [key, color] of KEYS) {
+      const v = +((n.counts || {})[key]) || 0; if (!v) continue;
+      const hh = (v * (hgt - 30)) / max; y0 -= hh;
+      svg.append(s('rect', { x: 26 + k * bw, y: y0, width: Math.max(1, bw - 2), height: hh, fill: color, opacity: key === 'relearned' ? 0.6 : 1 }, s('title', {}, `${str(n.build)} · ${key}: ${v}`)));
+    }
+  });
+  svg.append(s('text', { x: 2, y: 12 }, String(max)), s('line', { x1: 26, x2: w, y1: hgt - 18, y2: hgt - 18, stroke: 'var(--line)' }));
+  if (list.length) svg.append(s('text', { x: 26, y: hgt - 4 }, fmtDate(list[0].utc)), s('text', { x: w, y: hgt - 4, 'text-anchor': 'end' }, fmtDate(list[list.length - 1].utc)));
+  return svg;
+}
+function viewOverview() {
+  const v = $('#view');
+  if (!items.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No tests in the catalog yet.'), h('p', {}, 'Tests appear here after the first issue run.'))); return; }
+  const t = (x) => items.filter((i) => i.tier === x).length;
+  const origins = new Set(items.map((i) => `${i.origin.kind}:${i.ref}`));
+  const cov = pagesData.filter((p) => p.covered === 'regression').length;
+  const last = nights[nights.length - 1];
+  const lastTxt = last ? (last.counts && +last.counts.regression ? `${last.counts.regression} regression(s)` : 'no regression') : 'no night yet';
+  v.append(h('div', { class: 'grid-kpi' },
+    [['Regression tier', t('regression'), { tier: ['regression'] }], ['Promotable', t('promotable'), { tier: ['promotable'] }], ['Exploratory', t('exploratory'), { tier: ['exploratory'] }],
+      ['Retired · quarantined', t('retired') + t('quarantined'), { tier: ['retired', 'quarantined'] }],
+      ['Criteria · explorations', `${items.filter((i) => i.kind === 'criterion').length} · ${items.filter((i) => i.kind === 'exploration').length}`, null],
+      ['Issues · scenarios', `${[...origins].filter((o) => o.startsWith('issue')).length} · ${[...origins].filter((o) => o.startsWith('scenario')).length}`, null],
+      ['Pages covered', pagesData.length ? `${cov} / ${pagesData.length}` : '–', null], ['Last night', lastTxt, last ? null : null],
+      ['Flaky', items.filter((i) => i.flags.includes('flaky')).length, { flag: ['flaky'] }], ['Drift', items.filter((i) => i.flags.includes('drift')).length, { flag: ['drift'] }]]
+      .map(([label, val, f]) => h(f ? 'button' : 'div', { class: 'kpi', type: f ? 'button' : null, style: f ? 'text-align:left;cursor:pointer' : null,
+        onclick: f ? () => { S.f = JSON.parse(JSON.stringify(f)); S.v = 'catalog'; writeHash(); render(); } : null }, h('b', {}, String(val)), h('span', {}, label)))));
+  const att = items.filter((i) => i.flags.includes('needs attention')).sort((a, b) => SEV[a.cls] - SEV[b.cls] || str(b.verdict && b.verdict.utc).localeCompare(str(a.verdict && a.verdict.utc)));
+  const labels = builds.map((b) => fmtDate(b.utc) || b.id);
+  const all = builds.map((b) => items.filter((i) => i.file && i.history.length && str(i.history[0].utc) <= b.utc).length);
+  const reg = builds.map((b) => items.filter((i) => i.promoted_utc && str(i.promoted_utc) <= b.utc && i.tier === 'regression').length);
+  const dist = {}; for (const i of items) dist[i.latest || 'none'] = (dist[i.latest || 'none'] || 0) + 1;
+  v.append(h('div', { class: 'panels' },
+    h('section', { class: 'panel' }, h('h2', {}, `Needs attention (${att.length})`), att.length ? h('ul', { class: 'att' }, att.slice(0, 14).map((i) => h('li', {}, badge(i.latest || (i.flags.includes('drift') ? 'drift' : '')), ' ',
+      h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key) }, `${i.label} — ${str(i.name)}`)))) : h('p', { class: 'muted-t' }, 'Nothing needs attention.')),
+    h('section', { class: 'panel' }, h('h2', {}, 'Suite size over builds'), builds.length ? lineChart([{ name: 'tests', color: 'var(--link)', values: all }, { name: 'regression tier', color: 'var(--ok)', values: reg }], labels) : h('p', { class: 'muted-t' }, 'No builds yet.')),
+    h('section', { class: 'panel' }, h('h2', {}, `Nightly outcomes (${Math.min(30, nights.length)} nights)`), nights.length ? nightsChart(nights.slice(-30)) : h('p', { class: 'muted-t' }, 'The nightly regression has not run yet.')),
+    h('section', { class: 'panel' }, h('h2', {}, 'Latest verdicts'), h('ul', { class: 'att' }, Object.entries(dist).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
+      h('li', {}, h('button', { class: 'linkish', type: 'button', onclick: () => { S.f = { verdict: [k] }; S.v = 'catalog'; writeHash(); render(); } }, badge(k === 'none' ? '' : k)), ` ${n}`))))));
+}
+
+// ----------------------------------------------------------------- catalog
+function sidebar() {
+  const side = h('aside', { class: `side${S.side ? ' open' : ''}`, 'aria-label': 'Filters' });
+  for (const f of FACETS) {
+    const counts = new Map();
+    for (const i of items) if (passes(i, f.id)) for (const v of new Set(f.get(i))) counts.set(v, (counts.get(v) || 0) + 1);
+    const sel = S.f[f.id] || [];
+    for (const v of sel) if (!counts.has(v)) counts.set(v, 0);
+    if (!counts.size) continue;
+    let vals = [...counts.keys()].sort(f.order || ((a, b) => counts.get(b) - counts.get(a) || str(a).localeCompare(str(b))));
+    const many = vals.length > 10 && !S['all_' + f.id];
+    const shown = many ? vals.slice(0, 10) : vals;
+    const det = h('details', { open: sel.length || ['tier', 'verdict', 'flag', 'origin'].includes(f.id) ? true : null },
+      h('summary', {}, f.label, sel.length ? ` (${sel.length})` : ''),
+      shown.map((v) => h('label', { class: counts.get(v) ? '' : 'zero' }, h('input', { type: 'checkbox', checked: sel.includes(v) ? true : null, onchange: () => { toggleFacet(f.id, v); writeHash(); render(); } }),
+        h('span', {}, f.fmt ? f.fmt(v) : str(v)), h('span', { class: 'n' }, String(counts.get(v))))),
+      many ? h('button', { class: 'linkish more', type: 'button', onclick: () => { S['all_' + f.id] = true; render(); } }, `Show all ${vals.length}`) : null);
+    side.append(det);
+  }
+  return side;
+}
+function toolbar(list, gallery) {
+  const q = h('input', { type: 'search', placeholder: 'Search criteria, steps, titles, files…', value: S.q, 'aria-label': 'Search' });
+  q.addEventListener('input', debounce(() => { S.q = q.value; S.limit = 100; writeHash(); render(true); }, 180));
+  const g = h('select', { 'aria-label': 'Group by', onchange: (e) => { S.g = e.target.value; writeHash(); render(); } }, Object.entries(GROUPS).map(([k, l]) => h('option', { value: k, selected: S.g === k ? true : null }, `Group: ${l}`)));
+  const colsDet = h('details', { style: 'position:relative' }, h('summary', { class: 'btn' }, 'Columns'),
+    h('div', { class: 'panel', style: 'position:absolute;z-index:5;right:0;min-width:180px' }, Object.entries(COLS).map(([k, [label]]) =>
+      h('label', { style: 'display:flex;gap:6px' }, h('input', { type: 'checkbox', checked: S.cols.includes(k) ? true : null, onchange: () => { S.cols = S.cols.includes(k) ? S.cols.filter((x) => x !== k) : [...S.cols, k]; if (!S.cols.length) S.cols = ['ref']; writeHash(); render(); } }), label))));
+  const active = Object.values(S.f).some((x) => x.length) || S.q;
+  return h('div', {},
+    h('div', { class: 'toolbar' }, h('button', { class: 'btn filters-toggle', type: 'button', onclick: () => { S.side = !S.side; render(); } }, 'Filters'), q, g,
+      gallery ? null : h('button', { class: `btn${S.l === 'table' ? ' on' : ''}`, type: 'button', 'aria-pressed': S.l === 'table' ? 'true' : 'false', onclick: () => { S.l = 'table'; writeHash(); render(); } }, 'Table'),
+      gallery ? null : h('button', { class: `btn${S.l === 'cards' ? ' on' : ''}`, type: 'button', 'aria-pressed': S.l === 'cards' ? 'true' : 'false', onclick: () => { S.l = 'cards'; writeHash(); render(); } }, 'Cards'),
+      !gallery && S.l === 'table' ? colsDet : null),
+    h('div', { class: 'chips' }, QUICK.map(([label, f]) => {
+      const on = JSON.stringify(Object.fromEntries(Object.entries(S.f).filter(([, x]) => x.length))) === JSON.stringify(f) && !S.q;
+      return h('button', { class: `chip${on ? ' on' : ''}`, type: 'button', 'aria-pressed': on ? 'true' : 'false', onclick: () => { S.f = on ? {} : JSON.parse(JSON.stringify(f)); S.q = ''; S.limit = 100; writeHash(); render(); } }, label);
+    }), active ? h('button', { class: 'chip', type: 'button', onclick: () => { S.f = {}; S.q = ''; writeHash(); render(); } }, '✕ Clear') : null,
+    h('span', { class: 'count', 'aria-live': 'polite' }, `${list.length} of ${items.length} items`)));
+}
+function table(list) {
+  const head = h('tr', {}, storageOK ? h('th', { 'aria-label': 'Pinned' }, '') : null, S.cols.map((k) => {
+    const pos = S.sort.findIndex(([x]) => x === k);
+    return h('th', { scope: 'col', tabindex: 0, 'aria-sort': pos === 0 ? (S.sort[0][1] > 0 ? 'ascending' : 'descending') : null, title: 'Click to sort, shift-click to add a key',
+      onclick: (e) => sortBy(k, e.shiftKey), onkeydown: (e) => { if (e.key === 'Enter') sortBy(k, e.shiftKey); } },
+    COLS[k][0], pos >= 0 ? h('span', { class: 'arr' }, ` ${S.sort[pos][1] > 0 ? '▲' : '▼'}${S.sort.length > 1 ? pos + 1 : ''}`) : '');
+  }));
+  const body = h('tbody', {}, list.map((i) => h('tr', { tabindex: 0, onclick: () => openItem(i.key), onkeydown: (e) => { if (e.key === 'Enter') openItem(i.key); } },
+    storageOK ? h('td', {}, star(i)) : null,
+    S.cols.map((k) => h('td', { class: k === 'name' ? 'name' : ['last', 'promoted', 'build', 'duration', 'ref', 'id'].includes(k) ? 'nw' : null },
+      k === 'name' ? [h('div', {}, str(i.name) || str(i.then)), i.kind === 'exploration' ? h('span', { class: 'meta' }, 'exploration') : null]
+        : k === 'tier' ? tierB(i.tier) : k === 'verdict' ? badge(i.latest) : COLS[k][1](i))))));
+  return h('div', { class: 'tablewrap' }, h('table', { class: 'list' }, h('thead', {}, head), body));
+}
+function sortBy(k, add) {
+  const pos = S.sort.findIndex(([x]) => x === k);
+  if (add) { if (pos >= 0) S.sort[pos][1] *= -1; else S.sort.push([k, 1]); }
+  else if (pos === 0 && S.sort.length === 1) S.sort[0][1] *= -1;
+  else S.sort = [[k, pos === 0 ? -S.sort[0][1] : 1]];
+  writeHash(); render();
+}
+function cards(list, gallery) {
+  return h('div', { class: gallery ? 'gal' : 'cards' }, list.map((i) => {
+    const src = img(i.still);
+    return h('div', { class: 'card', role: 'button', tabindex: 0, onclick: () => openItem(i.key), onkeydown: (e) => { if (e.key === 'Enter') openItem(i.key); } },
+      gallery ? (src ? h('img', { src, alt: `${i.label}: ${str(i.then)}`, loading: 'lazy' }) : h('div', { class: 'ph' }, 'no still yet')) : null,
+      h('div', { style: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' }, h('b', {}, i.label), tierB(i.tier), badge(i.latest), star(i)),
+      h('div', {}, str(i.name)), i.then ? h('div', { class: 'then' }, `Then ${str(i.then)}`) : null,
+      !gallery && src ? h('img', { src, alt: '', loading: 'lazy', style: 'max-height:120px;object-fit:cover;object-position:top' }) : null);
+  }));
+}
+function groupsOf(list) {
+  if (S.g === 'none') return [[null, list]];
+  const get = { origin: (i) => [`${i.ref} — ${str(i.origin.title)}`], tier: (i) => [i.tier], area: (i) => [str(i.area) || '(no area)'], page: (i) => (i.pages.length ? i.pages : ['(no page)']),
+    verdict: (i) => [vLabel(i.latest)], collection: (i) => (colls(i).length ? colls(i) : ['(no collection)']), label: (i) => (arr(i.origin.labels).length ? i.origin.labels.map(str) : ['(no label)']) }[S.g];
+  const m = new Map(); for (const i of list) for (const k of get(i)) (m.get(k) || m.set(k, []).get(k)).push(i);
+  const keys = [...m.keys()];
+  if (S.g === 'tier') keys.sort((a, b) => tierRank(a) - tierRank(b)); else if (S.g === 'origin') keys.sort((a, b) => num(a) - num(b) || a.localeCompare(b)); else keys.sort((a, b) => m.get(b).length - m.get(a).length || a.localeCompare(b));
+  return keys.map((k) => [k, m.get(k)]);
+}
+function viewList(gallery) {
+  const v = $('#view');
+  const list = sorted(filtered());
+  const main = h('div', {}, toolbar(list, gallery));
+  if (!list.length) main.append(h('div', { class: 'empty' }, items.length ? 'No item matches these filters.' : 'No tests in the catalog yet.'));
+  let budget = S.limit;
+  for (const [g, gl] of groupsOf(list)) {
+    if (budget <= 0) break;
+    const part = gl.slice(0, budget); budget -= part.length;
+    const body = gallery || S.l === 'cards' ? cards(part, gallery) : table(part);
+    main.append(g == null ? body : h('details', { class: 'group', open: true }, h('summary', {}, h('span', {}, g), h('span', { class: 'count' }, `${gl.length}`), minibar(gl)), body));
+  }
+  const total = S.g === 'none' ? list.length : groupsOf(list).reduce((t, [, gl]) => t + gl.length, 0);
+  if (total > S.limit) main.append(h('div', { class: 'more-row' }, h('button', { class: 'btn', type: 'button', onclick: () => { S.limit += 100; render(); } }, `Show more (${total - S.limit} left)`)));
+  v.append(h('div', { class: 'layout' }, sidebar(), main));
+}
+
+// ---------------------------------------------------------------- coverage
+function viewCoverage() {
+  const v = $('#view');
+  if (!pagesData.length) { v.append(h('div', { class: 'empty' }, 'No UI map yet — the coverage appears after the first nightly regression run.')); return; }
+  const groups = new Map(); for (const p of pagesData) { const k = str(p.nav) || '(other)'; (groups.get(k) || groups.set(k, []).get(k)).push(p); }
+  const tot = { regression: 0, exploratory: 0, none: 0 }; for (const p of pagesData) tot[p.covered in tot ? p.covered : 'none']++;
+  v.append(h('p', {}, h('b', {}, `${tot.regression} of ${pagesData.length}`), ' pages reached by a regression test · ', `${tot.exploratory} only by exploratory tests · ${tot.none} by none.`,
+    arr(D.uncovered_nav).length ? h('span', {}, ' Navigation without a golden path: ', h('b', {}, arr(D.uncovered_nav).map(str).join(', '))) : null));
+  for (const [nav, ps] of [...groups].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const c = { regression: 0, exploratory: 0, none: 0 }; for (const p of ps) c[p.covered in c ? p.covered : 'none']++;
+    v.append(h('section', { class: 'navgroup' }, h('h3', {}, str(nav), h('span', { class: 'bar', title: `regression ${c.regression} · exploratory ${c.exploratory} · none ${c.none}` },
+      ['regression', 'exploratory', 'none'].map((k, n) => (c[k] ? h('i', { class: ['ok', 'warn', 'bad'][n], style: `width:${(100 * c[k]) / ps.length}%` }) : null))), h('span', { class: 'count' }, `${ps.length} pages`)),
+    h('div', { class: 'pages' }, ps.map((p) => {
+      const src = img(p.shot); const its = arr(p.items).filter((k) => byKey.has(k));
+      return h('div', { class: `page cov-${p.covered in c ? p.covered : 'none'}`, role: 'button', tabindex: 0, title: 'Show the items that reach this page',
+        onclick: () => { S.f = { page: [str(p.pattern)] }; S.v = 'catalog'; writeHash(); render(); }, onkeydown: (e) => { if (e.key === 'Enter') { S.f = { page: [str(p.pattern)] }; S.v = 'catalog'; writeHash(); render(); } } },
+      src ? h('img', { src, alt: str(p.title), loading: 'lazy' }) : null, h('b', {}, str(p.title) || str(p.pattern)), h('code', {}, str(p.pattern)),
+      h('div', {}, h('span', { class: `badge ${{ regression: 'ok', exploratory: 'warn' }[p.covered] || 'bad'}` }, p.covered === 'regression' ? 'regression' : p.covered === 'exploratory' ? 'exploratory only' : 'not covered'),
+        ' ', h('span', { class: 'count' }, `${its.length} item(s)`), p.golden_path === false ? h('span', { class: 'badge warn', style: 'margin-left:6px' }, 'no golden path') : null));
+    }))));
+  }
+}
+
+// ----------------------------------------------------------------- history
+function viewHistory() {
+  const v = $('#view');
+  const cols = builds.slice(-40);
+  let list = items.filter((i) => (S.hall ? i.history.length : i.tier === 'regression')).filter((i) => passes(i));
+  const lastBad = (i) => { for (let k = i.history.length - 1; k >= 0; k--) if (vClass(i.history[k].value) === 'bad') return str(i.history[k].utc); return ''; };
+  const flakes = (i) => i.history.filter((e) => e.value === 'flaky').length + i.flaky.length;
+  list = list.sort(S.hsort === 'flaky' ? (a, b) => flakes(b) - flakes(a) : S.hsort === 'ref' ? COLS.ref[2] : (a, b) => lastBad(b).localeCompare(lastBad(a)) || COLS.ref[2](a, b));
+  v.append(h('div', { class: 'toolbar' },
+    h('label', {}, h('input', { type: 'checkbox', checked: S.hall ? true : null, onchange: () => { S.hall = !S.hall; render(); } }), ' All items (not only the regression tier)'),
+    h('select', { 'aria-label': 'Sort rows', onchange: (e) => { S.hsort = e.target.value; render(); } },
+      [['recent', 'Most recent failure first'], ['flaky', 'Most flaky first'], ['ref', 'By origin']].map(([k, l]) => h('option', { value: k, selected: S.hsort === k ? true : null }, l))),
+    h('span', { class: 'count' }, `${list.length} rows × ${cols.length} builds${Object.values(S.f).some((x) => x.length) || S.q ? ' (catalog filters apply)' : ''}`)));
+  if (!list.length || !cols.length) { v.append(h('div', { class: 'empty' }, 'No history yet.')); return; }
+  const shown = list.slice(0, S.limit);
+  v.append(h('div', { class: 'heat' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', { style: 'writing-mode:horizontal-tb;transform:none;left:0;z-index:2' }, ''), cols.map((b) => h('th', { title: `${b.id} · ${b.utc}` }, `${fmtDate(b.utc)} ${b.id}`.trim())))),
+    h('tbody', {}, shown.map((i) => {
+      const at = new Map(); for (const e of i.history) at.set(str(e.build), e);
+      return h('tr', {}, h('td', { class: 'rowh', title: str(i.name), onclick: () => openItem(i.key) }, `${i.label} ${str(i.name)}`),
+        cols.map((b) => { const e = at.get(b.id); return h('td', { class: `c ${e ? vClass(e.value) : 'e'}`, title: `${i.label} · ${b.id}: ${e ? `${vLabel(e.value)} (${str(e.run)})` : 'not run'}` }); }));
+    })))));
+  if (list.length > S.limit) v.append(h('div', { class: 'more-row' }, h('button', { class: 'btn', type: 'button', onclick: () => { S.limit += 100; render(); } }, `Show more (${list.length - S.limit} left)`)));
+}
+
+// --------------------------------------------------------------- lifecycle
+function viewLifecycle() {
+  const v = $('#view');
+  const origins = new Set(items.map((i) => `${i.origin.kind}:${i.ref}`));
+  const crit = items.filter((i) => i.kind === 'criterion');
+  const tests = crit.filter((i) => i.file);
+  const tier = (t) => tests.filter((i) => i.tier === t).length;
+  const rows = [
+    ['Issues & scenarios', origins.size], ['Criteria', crit.length], ['…not testable', crit.filter((i) => i.testable === false).length],
+    ['Criterion tests', tests.length], ['…exploratory', tier('exploratory')], ['…promotable', tier('promotable')], ['…regression tier', tier('regression')],
+    ['…retired', tier('retired')], ['…quarantined', tier('quarantined')], ['Exploration tests (outside every verdict)', items.filter((i) => i.kind === 'exploration' && i.file).length]];
+  const max = Math.max(1, ...rows.map((r) => r[1]));
+  v.append(h('section', { class: 'panel funnel' }, h('h2', {}, 'From issue to nightly regression'), rows.map(([l, n]) => h('div', { class: 'row' }, h('span', {}, l), h('div', {}, h('div', { class: 'fill', style: `width:${(100 * n) / max}%` })), h('b', {}, String(n))))));
+  const queue = items.filter((i) => i.tier === 'promotable');
+  const refs = [...new Set(queue.map((i) => (i.origin.kind === 'scenario' ? i.ref : `#${num(i.ref)}`)))];
+  v.append(h('section', { class: 'panel', style: 'margin-top:14px' }, h('h2', {}, `Promotable queue (${refs.length})`),
+    refs.length ? [h('p', {}, 'Paste into the agent\'s direct session: ', copyBox('promote all pending')),
+      h('ul', { class: 'att' }, refs.map((r) => h('li', {}, copyBox(`promote ${r}`), ' ', queue.filter((i) => i.ref === r || `#${num(i.ref)}` === r).map((i) => h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key), style: 'margin-right:8px' }, `${i.id}`)))))]
+      : h('p', { class: 'muted-t' }, 'Nothing waits for promotion.')));
+}
+
+// ------------------------------------------------------------------ detail
+function sparkline(vals, w = 220, hh = 36) {
+  if (vals.length < 2) return vals.length ? h('span', {}, ms(vals[0])) : null;
+  const max = Math.max(...vals), min = Math.min(...vals); const x = (k) => (k * (w - 4)) / (vals.length - 1) + 2; const y = (v) => hh - 4 - ((v - min) * (hh - 8)) / Math.max(1, max - min);
+  return h('span', {}, s('svg', { viewBox: `0 0 ${w} ${hh}`, width: w, height: hh, role: 'img', 'aria-label': `durations ${vals.map(ms).join(', ')}` },
+    s('polyline', { fill: 'none', stroke: 'var(--link)', 'stroke-width': 1.5, points: vals.map((v, k) => `${x(k)},${y(v)}`).join(' ') })), ` latest ${ms(vals[vals.length - 1])}`);
+}
+let lastFocus = null;
+function renderDrawer() {
+  for (const e of ['#drawer', '#scrim']) { const n = $(e); if (n) n.remove(); }
+  const i = S.i && byKey.get(S.i);
+  if (!i) { if (lastFocus && lastFocus.isConnected) lastFocus.focus(); return; }
+  if (!$('#drawer')) lastFocus = document.activeElement;
+  const close = () => { S.i = null; writeHash(); renderDrawer(); };
+  const o = i.origin;
+  let link = null;
+  const tpl = str(D.issue_url);
+  if (o.kind === 'issue' && tpl.startsWith('https://') && tpl.includes('{n}') && Number.isInteger(o.number)) link = h('a', { href: tpl.replace('{n}', String(o.number)), target: '_blank', rel: 'noopener noreferrer' }, 'open the issue');
+  const sib = items.filter((x) => x.key !== i.key && ((i.file && x.file === i.file) || (!i.file && x.ref === i.ref)));
+  const src = img(i.still);
+  const d = h('div', { id: 'drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${i.label} details`, tabindex: -1, onkeydown: (e) => { if (e.key === 'Escape') close(); } },
+    h('button', { class: 'btn close', type: 'button', onclick: close }, 'Close'),
+    h('div', { class: 'meta' }, o.kind === 'scenario' ? `Scenario ${i.ref}${o.source ? ` · from ${str(o.source)}` : ''}` : `Issue ${i.ref}${o.state ? ` · ${str(o.state)}` : ''}`, link ? ' · ' : '', link),
+    h('h2', {}, `${i.label} — ${str(i.name)}`, ' ', star(i)),
+    o.title ? h('div', {}, str(o.title)) : null,
+    arr(o.labels).length ? h('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin-top:4px' }, o.labels.map((l) => h('span', { class: 'tier' }, str(l)))) : null,
+    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' }, tierB(i.tier), badge(i.latest), i.kind === 'exploration' ? h('span', { class: 'badge muted' }, 'exploration — outside every verdict') : null,
+      i.drift ? h('span', { class: 'badge muted' }, 'drift — not run until re-promoted') : null, i.testable === false ? h('span', { class: 'badge muted' }, 'not testable') : null),
+    i.summary ? h('p', {}, str(i.summary)) : null,
+    h('div', { class: 'gwt' }, h('p', {}, h('b', {}, 'Given'), str(i.given) || '–'), h('p', {}, h('b', {}, 'When'), str(i.when) || '–'), h('p', {}, h('b', {}, i.kind === 'exploration' ? 'Expect' : 'Then'), str(i.then) || '–')),
+    src ? h('figure', { style: 'margin:10px 0' }, h('img', { src, alt: `The screen ${i.id} is checked on`, style: 'width:100%;border-radius:6px;border:1px solid var(--line);background:#fff' }), h('figcaption', { class: 'meta' }, `The screen right before the ${i.id} check`)) : null,
+    h('dl', { class: 'dl' },
+      h('dt', {}, 'File'), h('dd', {}, i.file ? h('code', {}, str(i.file)) : '– (no test)'),
+      h('dt', {}, 'Area'), h('dd', {}, str(i.area) || '–'), h('dt', {}, 'Pages'), h('dd', {}, i.pages.length ? i.pages.map((p, k) => [k ? ', ' : '', h('code', {}, p)]) : '–'),
+      h('dt', {}, 'Session'), h('dd', {}, str(i.session) || '–'), h('dt', {}, 'Surface'), h('dd', {}, str(i.surface) || '–'),
+      h('dt', {}, 'Promoted'), h('dd', {}, i.promoted_utc ? fmtDate(i.promoted_utc) : '–'),
+      h('dt', {}, 'Checks'), h('dd', {}, i.checks ? `${i.checks.expects ?? 0} expect · ${i.checks.agent_asserts ?? 0} agent.assert` : '–', i.checks && i.checks.agent_asserts ? h('div', { class: 'meta' }, 'agent.assert calls the model on every run — it costs tokens every night.') : null),
+      h('dt', {}, 'Duration'), h('dd', {}, sparkline(i.duration_ms) || '–'),
+      h('dt', {}, 'Evidence'), h('dd', {}, i.evidence ? h('code', {}, str(i.evidence)) : '–'),
+      h('dt', {}, 'Collections'), h('dd', {}, colls(i).join(', ') || '–')),
+    i.steps.length ? h('section', { class: 'sec' }, h('h3', {}, 'Steps'), h('ol', { class: 'steps' }, i.steps.map((st) => h('li', { 'data-k': { open: '↗', act: '▶', assert: '?', expect: '=', shot: '◉' }[st.kind] || '•', class: st.kind }, h('span', { class: 'meta' }, `${str(st.kind)} `), stepText(st.text))))) : null,
+    h('section', { class: 'sec' }, h('h3', {}, `History (${i.history.length})`), i.history.length ? h('div', { class: 'hist' }, i.history.map((e) => h('span', { class: vClass(e.value), title: `${str(e.build)} · ${str(e.run)} · ${vLabel(e.value)} · ${str(e.utc)}` }, `${fmtDate(e.utc)} ${vLabel(e.value)}`))) : h('p', { class: 'muted-t' }, 'Not run yet.')),
+    i.heals.length ? h('section', { class: 'sec' }, h('h3', {}, 'Repaired checks'), h('ul', {}, i.heals.map((x) => h('li', {}, `${fmtDate(x.utc)} on ${str(x.build)} — basis: ${str(x.basis)}`)))) : null,
+    i.flaky.length ? h('section', { class: 'sec' }, h('h3', {}, 'Flaky confirmations'), h('ul', {}, i.flaky.map((x) => h('li', {}, `${fmtDate(x.utc)} on ${str(x.build)} — ${x.passes ?? '?'} of ${x.runs ?? '?'} runs passed`)))) : null,
+    commands(i).length ? h('section', { class: 'sec' }, h('h3', {}, 'Commands for the agent\'s direct session'), commands(i).map((c) => h('div', { style: 'margin:4px 0' }, copyBox(c)))) : null,
+    sib.length ? h('section', { class: 'sec' }, h('h3', {}, 'Same file'), h('ul', { class: 'att' }, sib.map((x) => h('li', {}, badge(x.latest), ' ', h('button', { class: 'linkish', type: 'button', onclick: () => openItem(x.key) }, `${x.label} — ${str(x.name)}`))))) : null);
+  document.body.append(h('div', { id: 'scrim', onclick: close }), d);
+  d.focus();
+}
+
+// ------------------------------------------------------------------ render
+function render(keepSearchFocus) {
+  const pos = keepSearchFocus && document.activeElement && document.activeElement.type === 'search' ? document.activeElement.selectionStart : null;
+  renderHeader();
+  const v = $('#view'); v.textContent = '';
+  ({ overview: viewOverview, catalog: () => viewList(false), gallery: () => viewList(true), coverage: viewCoverage, history: viewHistory, lifecycle: viewLifecycle }[S.v] || viewOverview)();
+  if (pos != null) { const q = $('input[type=search]'); if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch { /* ignore */ } } }
+}
+readHash();
+render();
+renderDrawer();
+window.addEventListener('hashchange', () => { readHash(); render(); renderDrawer(); });
+})();
+</script>
+</body>
+</html>

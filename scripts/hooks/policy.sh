@@ -56,6 +56,10 @@
 #                                          out, while RUN_MODE is a fresh `slack <ISO> - <n> <session>`
 #                                          (precheck.sh slack <n>; <session> this one, or -) and the
 #                                          work/QA.md row of <n> is report_pending
+#   backup-override  Bash                  a command naming QI_WORK_BACKUP_ (the offline tests' remote and clone
+#                                          overrides): the backup's destination is work_repo alone
+#   backup-direct    Bash (scheduled)      scripts/work-backup.sh — there the Stop hook alone backs up
+#                                          (docs/persistence.md → Backup & restore)
 #
 # Every denial logs one `policy_denied` event (scripts/log.sh): `tool=<name> rule=<id>`
 # plus `at=<host/path or file>` — never a full command or a query string.
@@ -435,6 +439,8 @@ check_bash() {
   local seg e
   case "$CMD" in (*RUN_MODE*|*scripts/hooks/*|*.claude/settings*)
     scheduled && deny policy-tamper "" "a scheduled run never touches the policy or its run marker";; esac
+  case "$CMD" in (*QI_WORK_BACKUP_*) deny backup-override "" "the backup's destination comes from work_repo alone";; esac
+  case "$CMD" in (*work-backup.sh*) scheduled && deny backup-direct "" "a scheduled run or a channel turn never backs up by hand — the Stop hook does";; esac
   case "$CMD" in (*'<<'*) strip_heredocs "$CMD"; CMD="$X";; esac
   while IFS= read -r seg; do check_simple "$seg"; done <<<"$(printf '%s\n' "$CMD" | tr ';&|()' '\n\n\n\n\n')"
   case "$CMD" in (*node_modules/*)

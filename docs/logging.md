@@ -46,6 +46,7 @@ run type (`issues`, `regression`, `security`, `scenario`, `discovery`, `audit`, 
 | `suite_run` / `suite_failed` | `scripts/suite.sh` | `<label> exit=<rc>` / free text |
 | `onboarding_verify` | `scripts/verify-onboarding.sh` | free text |
 | `policy_denied` (warn) | `scripts/hooks/policy.sh` | `tool=<name> rule=<id>[ at=<host/path or file>]` — never a command or query string |
+| `work_backup` | `scripts/work-backup.sh` (job `backup` from the Stop hook) | free text; `error` = a refused or failed persist, foreign commits, a failed restore ([persistence.md](persistence.md) → **Backup & restore**) |
 
 The issue events are what the pre-flight's row liveness reads when the environment lock
 cannot tell whether its holder runs ([nested-env.md](nested-env.md) → Shape): it matches
@@ -61,7 +62,7 @@ Retention: 14 days, swept by the audit pre-flight.
 
 Every outward effect — a verdict comment, a spec-feedback comment, a label removal, an
 artifact publish (create or revision, its uploads included), the audit's definition-repo
-issue, a Slack reply — is one `external_write` pair: `intent` (`info`) as the last line before the send,
+issue, a Slack reply, a push of the `work/` backup — is one `external_write` pair: `intent` (`info`) as the last line before the send,
 then `done` (`info`) or `failed` (`error`) as the first write after it returns (a create's
 `artifact.id` alone comes first — it is the dedup key), and only then the state flip.
 Never a body, a link with a token, or a credential. A marker found by the pre-post check
@@ -75,10 +76,11 @@ never holds a space (`%20`), and `intent` and its outcome share `surface`, `issu
 | `comment` | `<ac_hash>@<candidate>` (the marker's `ac`, `build`) | `target_repo` |
 | `spec_comment` | `<ac_hash>` | `target_repo` |
 | `label` | the label name | `target_repo` |
-| `artifact` | `<ac_hash>@<candidate>`; regression: `issue=-`, `regression@<candidate>` | `artifact:<id>`, `artifact:new` before a first create |
+| `artifact` | `<ac_hash>@<candidate>`; regression: `issue=-`, `regression@<candidate>`; the test catalog: `issue=-`, `catalog@<hash>` | `artifact:<id>`, `artifact:new` before a first create |
 | `definition_issue` | 12-hex sha256 of the `failures[]` signature; `issue=-` | `<definition repo>`, `#<n>` appended on `done` |
 | `slack` | a scenario's answer `S-<k>:<spec_hash>`, a digest `digest@<candidate>`; `issue=-` | the conversation id |
 | `slack_test` | `start` or `report` of a Slack-ordered "test #N" ([slack.md](slack.md)) | `slack:<slack_channel>` |
+| `backup` | the pushed tree's sha, 12 hex; `issue=-`; written by `scripts/work-backup.sh` | `work_repo` |
 
 A scenario's artifact is surface `artifact`, `issue=-`, key `S-<k>:<spec_hash>@<build>`.
 

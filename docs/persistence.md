@@ -1,14 +1,15 @@
-# State, versions & evolving the definition
+# State, backup, versions & evolving the definition
 
-Read this file when the operator asks to update the agent or check its version, or asks
-for a change to the agent definition itself.
+Read this file for the `work/` backup and its restore, when the operator asks to update the
+agent or check its version, or asks for a change to the agent definition itself.
 
 ## The definition and `work/`
 
 | Path | Kind | Holds |
 | --- | --- | --- |
 | `/home/agent` (outer) | git repo, remote `origin` (the kit's seed) | Definition: `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `docs/`, `scripts/`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `LICENSE`, `engines/`, `skills/`. |
-| `/home/agent/work` | **plain data directory** (no `.git`), local-only | Config, `QA.md`, `SUITE.md`, `SCENARIOS.md`, `LESSONS.md`, `issues/`, `scenarios/`, `suite/` (tests, replay cache, `node_modules`), `env/` (values, credentials, lock, the last install's result), logs. |
+| `/home/agent/work` | **plain data directory** (no `.git`), backed up to `work_repo` when set | Config, `QA.md`, `SUITE.md`, `SCENARIOS.md`, `LESSONS.md`, `issues/`, `scenarios/`, `suite/` (tests, replay cache, `node_modules`), `env/` (values, credentials, lock, the last install's result), logs. |
+| `work_repo` (`work/CONFIG.md`) | private git remote | The durable, versioned backup of `work/` — **Backup & restore** below. |
 | `$HOME/.agents/skills/<profile>` | the product profile skill | Reinstalled from its source; never edited here. |
 | the profile's own paths (its README) | the nested product's state and tools | Rebuildable by `scripts/env.sh` through the profile. |
 
@@ -17,10 +18,56 @@ there under concurrent runs corrupts. The outer `.gitignore` is an allowlist, so
 and the home secrets are invisible to the definition repo; **never run `git clean` in
 `/home/agent`** and never `git add` outside the allowlist.
 
-**There is no remote backup.** On a lost volume: `QA.md` rows can be rebuilt from issue
-comment markers when `issue_comments` was enabled (ONBOARDING Step 4); the suite, the
-replay cache, the criteria files and the reports cannot — the next issues run re-tests
-from scratch. The nested product is always rebuildable through the profile.
+Without `work_repo` a lost volume loses the suite, the replay cache, the criteria files and
+the reports; only `QA.md` rows come back, from issue comment markers when `issue_comments` was
+enabled (ONBOARDING Step 4). The nested product is always rebuildable through the profile.
+
+## Backup & restore
+
+`scripts/work-backup.sh` backs `work/` up to `work_repo` — a **private** repository the
+connection can push to, never the target or a fork of it — and restores it on a fresh volume.
+
+- **When.** The Stop hook (`scripts/hooks/backup.sh`, registered by `scripts/hooks/install.sh`)
+  starts `work-backup.sh persist`, fully detached, after every turn of the main agent —
+  scheduled, channel or direct. No turn waits for it, no instruction can skip or redirect it.
+  In a scheduled run or a channel turn the agent never runs the script itself (policy rule
+  `backup-direct`); in the direct session "back up now" runs `persist`.
+- **How.** A clone on tmpfs (`/dev/shm/qi-work-backup`) is refilled from `work/`, committed as
+  `quality-inspector` and pushed to `main`, never forced; a rejected push refetches the tip and
+  retries (3 attempts), a failure is logged and the next turn retries. Overlapping turns share a
+  lock; a deferred one makes the holder run once more. Nothing changed since the last persist
+  (by mtime, `logs/` aside) → no git at all.
+- **What travels:** all of `work/` except `env/` (credentials, locks, the run marker),
+  `suite/node_modules`, `suite/.e2e/runs`, `.cache`, transient files (`*.lock`, `*.tmp`, …),
+  the rebuilt catalog page, evidence media (videos, images, trace zips — they live in the
+  artifacts; the catalog's small thumbnails do travel) and any file over 20 MiB (logged).
+- **Refused** (logged as an error, nothing pushed): the repository is not private, is the
+  target or a fork of it, or its metadata cannot be read; the snapshot holds a credential value
+  of `work/env/credentials.env` or a token (`secrets.mjs scan-all`); the snapshot deletes
+  `CONFIG.md`, `VERSION`, a state table or more than half of the backed-up files — an unhydrated
+  `work/`: restore first. `persist --allow-delete` passes a deletion the operator asked for.
+- **A backup, never an input.** Nothing reads it but a restore. A commit not made by the
+  script is logged as an error at the next persist (`foreign commits …`) and reverted by its
+  snapshot; the restore names such commits. Branch protection, where the GitHub plan offers it,
+  keeps `main` writable by the connection's account alone (README → Setup).
+- Every push is ledgered (surface `backup`, [logging.md](logging.md)); the audit's
+  `work_backup` check and `verify-onboarding.sh --live` report the destination and anything
+  left unpushed.
+
+**Restore** — direct session, fresh volume (ONBOARDING Step 2a):
+`bash "$HOME/scripts/work-backup.sh" restore` copies `main` into `work/` and verifies every file:
+exit `0` restored · `2` nothing to restore (no `work_repo`, an empty repository, no `CONFIG.md`
+in it) · `1` failed, or refused because `work/` already holds QA or SUITE rows (`--force` only
+continues a failed restore). Then:
+
+1. Onboarding goes on: Step 2b seeds only what is missing, Step 2d recreates
+   `work/env/credentials.env` and the suite's `node_modules`, Step 3 keeps the restored values,
+   Step 7 migrates from the restored `work/VERSION` instead of overwriting it.
+2. Commits the restore names as not made by the script: show them to the operator before
+   any run.
+3. A `report_pending` row it names lost its media: re-test it before delivery — an issue by
+   "test #N", a scenario from step 5 of [scenarios.md](scenarios.md) → The pipeline.
+4. Restored `artifact.id` files keep working: any agent of the same owner revises them.
 
 ## Definition version & upgrade
 

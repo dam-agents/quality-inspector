@@ -6,7 +6,7 @@ sentinel; all steps are idempotent, so a failed run is safe to re-run from the t
 | Path | Repo | Purpose |
 | --- | --- | --- |
 | `/home/agent` | the **definition repo** (`origin`) | Agent definition, evolved via PRs. |
-| `/home/agent/work` | **plain data directory** (not a repo), local-only | Runtime state, the test suite, the product environment's state. |
+| `/home/agent/work` | **plain data directory** (not a repo), backed up to `work_repo` when set | Runtime state, the test suite, the product environment's state. |
 | `$HOME/.agents/skills/<profile>` | the **product profile** skill, installed from its source | How to run and know the product ([docs/profile-contract.md](docs/profile-contract.md)). |
 
 ## Guard — skip if already onboarded
@@ -42,6 +42,9 @@ operator-only steps, and tick each with `complete_onboarding_step` as it is sett
 5. *Issue comments* — enable or keep disabled.
 6. *Profile settings* — a value for every profile key it marks `ask`.
 7. *Model credential* — confirm agent steps reach Anthropic through the gateway.
+8. *Work backup* — a private repository for `work/` (or local-only): the connection's account
+   may push to it, its `main` is protected for that account where the GitHub plan allows it, its
+   egress rules are applied.
 
 The schedules are **held** until Step 7 marks onboarding complete.
 
@@ -83,6 +86,28 @@ The operator assigns the profile on the platform; you never install it yourself.
    (recreate the agent on the vm backend); each `commands` entry must be on `PATH`.
 4. Read its `SKILL.md` once and tell the operator in two lines what the profile says the
    nested product cannot do. Tick item 1.
+
+## Step 2a — Work backup and restore
+
+Ask for `work_repo` ([docs/persistence.md](docs/persistence.md) → **Backup & restore**): a
+**private** `[<host>/]<owner>/<repo>` — empty for a new agent, or a previous instance's backup
+to continue from — never the target or a fork of it; or "local-only" (the default: a lost
+volume then loses the suite). Local-only → tick item 8, go to 2b. Otherwise write
+`- work_repo:` and the asked `- target_repo:` into `work/CONFIG.md` (only what is missing),
+show `bash "$HOME/scripts/egress-rules.sh"` (item 8 needs its work backup lines), and — unless
+`work/QA.md` or `work/SUITE.md` already has rows — restore:
+
+```bash
+LOG_JOB=session bash "$HOME/scripts/work-backup.sh" restore; RC=$?
+grep -q '^- work_repo:' /home/agent/work/CONFIG.md || printf -- '- work_repo: %s\n' "<work_repo>" >> /home/agent/work/CONFIG.md
+```
+
+- `0` — restored: name the instance that continues (its `target_repo`, `work/VERSION`), show
+  the restore's notes and follow **Backup & restore** → Restore; Step 4 is skipped.
+- `2` — nothing to restore: a new agent; the Stop hook backs it up once Step 2e is in place.
+- `1` — stop and report the output: an unreachable repository is item 8 (access, egress).
+
+Tick item 8 once `bash "$HOME/scripts/work-backup.sh" check` shows `"problem": null`.
 
 ## Step 2b — Provision `work/`
 
@@ -131,6 +156,12 @@ EOF
 [ -f LESSONS.md ] || cat > LESSONS.md <<'EOF'
 # Operational lessons — verified environment facts only, each with its evidence.
 EOF
+[ -f CATALOG.md ] || cat > CATALOG.md <<'EOF'
+# Catalog collections — set by the operator in the direct session (docs/catalog.md)
+
+| collection | members |
+| --- | --- |
+EOF
 ```
 
 **2c — the harness entry pointer:**
@@ -162,9 +193,9 @@ not done yet: ask the operator to apply the egress rules, then re-run this block
 `- profile: <name>` into `work/CONFIG.md` first (Step 3 completes the file) — both
 scripts find the profile through it.
 
-**2e — the policy hook:** `bash "$HOME/scripts/hooks/install.sh"` merges the PreToolUse
-hook and the deny list into `$HOME/.claude/settings.json` (other keys kept; re-running
-changes nothing); it applies from the next session ([docs/black-box.md](docs/black-box.md)
+**2e — the hooks:** `bash "$HOME/scripts/hooks/install.sh"` merges the PreToolUse policy
+hook, the Stop backup hook and the deny list into `$HOME/.claude/settings.json` (other keys
+kept; re-running changes nothing); they apply from the next session ([docs/black-box.md](docs/black-box.md)
 → **Enforcement layers**).
 
 ## Step 3 — Configure (`work/CONFIG.md`, interactive)
@@ -210,6 +241,7 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - profile: qi-profile-dam
 - target_repo: acme/widgets
 - profile_source_path:
+- work_repo: acme/widgets-qa-backup
 - display_name: Quality Inspector
 - qa_label: qa:ready
 - retest_label: qa:retest
@@ -218,6 +250,7 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - baseline_channel:
 - issue_comments: disabled
 - artifact_reports: enabled
+- test_catalog: enabled
 - include_comments: disabled
 - spec_feedback: disabled
 - auto_promote: disabled
@@ -307,7 +340,7 @@ bash "$HOME/scripts/env.sh" unlock operator
 ## Step 7 — Version, sentinel, verify, release, report
 
 ```bash
-head -1 "$HOME/VERSION" > "$HOME/work/VERSION"
+[ -f "$HOME/work/VERSION" ] || head -1 "$HOME/VERSION" > "$HOME/work/VERSION"   # a restored one is migrated
 date -u +%Y-%m-%dT%H:%M:%SZ > "$HOME/.quality-inspector-onboarded"
 bash "$HOME/scripts/verify-onboarding.sh" --live --schedules /tmp/quality-inspector-schedules.json
 rm -f /tmp/quality-inspector-schedules.json
@@ -323,7 +356,7 @@ Then tick item 4 (the boundary probes passed) and item 2, and call
 **Summary for the operator:**
 
 1. The final `work/CONFIG.md`, verbatim.
-2. Schedules and which are disabled; state is local-only (README → Persistence).
+2. Schedules and which are disabled; where state is backed up (`work_repo`, or local-only).
 3. Day-to-day: label an issue `qa:ready` to have it tested within the hour; add
    `qa:retest` to test it again; say "promote #N" (or "promote all pending") to move
    tests into the nightly regression; "test #N" runs one now; reports land in the artifact library (and on the
