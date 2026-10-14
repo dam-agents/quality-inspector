@@ -257,6 +257,7 @@ bash "$HOME/scripts/env.sh" unlock operator
   broke; a repeated proxy or pull failure usually means checklist item 4.
 - The smoke run fails in the setup test → adjust `work/suite/tests/auth.setup.e2e.ts`
   to what the nested sign-in really shows (keep its final checks), re-run.
+- The injection canary fails or is skipped → [docs/nested-env.md](docs/nested-env.md) → Failures.
 - An `agent.act` step fails with a model or provider error → checklist item 7: the
   gateway does not inject an Anthropic credential for this agent; the operator fixes the
   connection. Tick item 7 once a smoke run passes.

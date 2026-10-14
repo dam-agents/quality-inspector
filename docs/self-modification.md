@@ -193,7 +193,9 @@ refuse and explain instead:
   operator (`scripts/check-asserts.sh` stays in the regression pre-flight and the audit).
 - **Triage never hides a regression**: no check is loosened or deleted to pass, a
   `superseded` needs a quoted contradicting issue, and doubt resolves to `regression`;
-  `criterion()`'s judged fallback stays off in issue runs (`--strict`).
+  `criterion()`'s judged fallback stays off in issue runs (`--strict`); the injection
+  canary (`scripts/suite-skeleton/tests/canary.e2e.ts`) stays in the skeleton, tagged
+  `smoke`, and a `superseded` needs an issue that `may_supersede`.
 - **`verified` requires red-green** (baseline fails, candidate passes); environment
   failures never become verdicts, and neither does an exploration ([explorations.md](explorations.md)).
 - Dedup marker format `<!-- <marker_prefix> issue=<n> ac=<ac_hash> build=<candidate> -->`

@@ -7,6 +7,15 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.7.0 — 2026-10-14
+
+**Upgrade:**
+1. Run `bash "$HOME/scripts/suite.sh" init` — it adds `work/suite/tests/canary.e2e.ts`
+   (missing files only; existing tests are untouched).
+2. Unless `work/suite/e2e.config.ts` already contains `dataNotInstructions`, copy that
+   constant and the `agents:` line from `scripts/suite-skeleton/e2e.config.ts` into it
+   (`init` never overwrites an existing config).
+
 ## 2.6.0 — 2026-10-14
 
 **Upgrade:**

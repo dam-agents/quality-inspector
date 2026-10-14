@@ -8,10 +8,13 @@ when `audit_report: disabled` (still append the log line).
    profile and its builds, the profile's requirements, disk, `work/` not a repo, leftovers, stale locks, assertion drift,
    the issues pre-flight cadence, definition cleanliness and version, the policy hook and
    the week's refusals (`policy_hook`, `policy_denied`), `secrets_in_runs` (a credential
-   value left in a raw run's text files; a `fail` names the paths, never the value), and
+   value left in a raw run's text files; a `fail` names the paths, never the value),
    **coverage** of the newest UI map (`warn` while pages are uncovered, never `fail`;
-   [change-awareness.md](change-awareness.md) → Coverage). `failures[]` groups the week's
-   error events; `stats` counts verdicts and `stats.coverage` the pages.
+   [change-awareness.md](change-awareness.md) → Coverage), and `criteria_injection` (the
+   week's criteria files holding URLs, code fences or HTML comments; the week's
+   `issue_injection_suspect` events) — a `warn` lists the issues: sample one and check its
+   instruction sentences are `testable: no`. `failures[]` groups the week's error events;
+   `stats` counts verdicts and `stats.coverage` the pages.
 2. Add the judgment half:
    - `mcp__platform-outbound__list_schedules`: the three `quality-inspector-*` schedules exist; their
      task text and precheck match `kit.yaml` (drift is a `warn` — the operator updates a

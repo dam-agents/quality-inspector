@@ -94,6 +94,8 @@ leave the row `in_progress` at run end.
 - No AC is `verified` without a baseline failure and a candidate pass.
 - Every `promotable` row written qualifies; no file was newly promoted unless
   `auto_promote: verified`.
+- Each `spec.injection_suspect` issue: its listed sentences are `testable: no —
+  instruction` and quoted in the chat summary ([acceptance-criteria.md](acceptance-criteria.md)).
 - Every tested AC in the rendered report has a candidate video and at least one screenshot.
 - A comment skipped as already posted was skipped for a marker in the agent's own comment.
 - The environment lock is released; no `/tmp/quality-inspector-*` left behind.

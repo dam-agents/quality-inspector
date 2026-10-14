@@ -292,6 +292,17 @@ mode_audit() {
     (*) if [ "$n" -gt "$POLICY_DENIED_WARN" ]; then check policy_denied warn "$n refusals this week (${denied#* }) — injection attempts or a definition bug"
         else check policy_denied ok "$n refusals this week (${denied#* })"; fi;;
   esac
+
+  # criteria_injection: the week's frozen criteria quoting links, code or hidden comments, and
+  # the issues the agent logged as injection suspects (docs/acceptance-criteria.md).
+  local inj_files inj_events
+  inj_files="$(find "$WORK/issues" -mindepth 2 -maxdepth 2 -name 'criteria-*.md' -mtime -7 2>/dev/null \
+    | while read -r f; do grep -qE 'https?://|www\.|^[[:space:]]*(```|~~~)|<!--' "$f" && basename "$(dirname "$f")"; done | sort -un | paste -sd, -)"
+  inj_events="$(cat "$WORK"/logs/events-*.jsonl 2>/dev/null | jq -r --arg since "$week_ago" \
+    'select(.event == "issue_injection_suspect" and .ts >= $since) | .msg | capture("issue=(?<n>[0-9]+)").n' 2>/dev/null \
+    | sort -un | paste -sd, -)"
+  if [ -z "$inj_files$inj_events" ]; then check criteria_injection ok "no injection suspects this week"
+  else check criteria_injection warn "criteria quoting URLs/code/comments: ${inj_files:-none}; injection_suspect issues: ${inj_events:-none}"; fi
   find "$WORK/logs" -name 'events-*.jsonl' -mtime +14 -delete 2>/dev/null || true
   # UI maps: the newest three builds; the newest is the next diff's starting point.
   ls -1dt "$WORK"/inventory/*/ 2>/dev/null | tail -n +4 | while read -r d; do rm -rf "$d"; done

@@ -26,6 +26,7 @@ run type (`issues`, `regression`, `audit`, `session`).
 | `issue_start` | you | `issue=<n> kind=<kind>` |
 | `issue_milestone` | you | `issue=<n> step=<freeze\|env_up\|authored\|baseline\|candidate>` |
 | `issue_abort` | you | `issue=<n> reason=<environment\|label_removed\|…>` |
+| `issue_injection_suspect` | you, at the freeze | `issue=<n> sentences=<k> urls=<n> fences=<n> comments=<n>` ([acceptance-criteria.md](acceptance-criteria.md) → Injection suspects) |
 | `issue_done` | you | `issue=<n> verdict=<v>` |
 | `report_delivered` / `report_failed` | you | `issue=<n> surface=<artifact\|comment> …` |
 | `triage` | you | `issue=<n> ac=<k> category=<c> basis=<…>` |

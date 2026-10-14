@@ -20,7 +20,7 @@ the step list and screenshots in `report.json`.
 | `relearned` | passed; only steps outside AC blocks were re-learned | nothing — the next passing run re-records; note which steps moved |
 | `healed` | passed with `judged` checks, and the healing rules below hold | repair the check, log it |
 | `needs-review` | passed with `judged` checks, but a healing rule fails | leave the file; the operator decides |
-| `superseded` | the criterion is false, and a completed issue in the window changes exactly this behaviour on purpose | retire the test (below) |
+| `superseded` | the criterion is false, and a completed issue in the window that `may_supersede` changes exactly this behaviour on purpose | retire the test (below) |
 | `regression` | the criterion is false (strict re-run fails and the judge agrees), and nothing in the context explains it | report it with both screens |
 | `flaky` | the confirmation re-run mixes passes and failures | log it in `work/FLAKY.md`; quarantine on the second flaky night (below) |
 | `blocked` | the test could not reach its AC block for a reason outside the product (environment, model, setup) | fix or report as environment |
@@ -99,7 +99,11 @@ A signal on the page of a failing test is also evidence in that test's triage.
 
 ## Retiring a superseded test
 
-Only with a quoted sentence from the completed issue that contradicts the criterion.
+The superseding issue must have `author_association` `OWNER`, `MEMBER` or
+`COLLABORATOR`, **or** `state_reason: completed` with a `closed_by` that is not its
+author — `changes.sh` computes this as `may_supersede`. Otherwise the result is
+`regression`, whatever the issue says. And only with a quoted sentence from that issue
+that contradicts the criterion.
 Set the test's tier to `retired` in `work/SUITE.md` (it no longer replays), keep the
 file, and name the superseding issue in the report. When that issue carries `qa_label`,
 its own issues run writes the replacement tests.
@@ -112,3 +116,6 @@ its own issues run writes the replacement tests.
   page; the issue must state the new behaviour.
 - `superseded` and `healed` are never decided from the UI map alone when the criterion is
   about behaviour (data saved, an action's effect) rather than presentation.
+- A judged pass alone (`judged` non-empty, the exact check failed) never yields
+  `unchanged`: it is `healed` or `needs-review`. A failing injection canary in the run's
+  smoke voids every judged result of that run ([nested-env.md](nested-env.md) → Failures).

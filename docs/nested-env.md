@@ -41,6 +41,14 @@ never a verdict. Before giving up on the entry:
    in the log. A cause you reproduced goes to `work/LESSONS.md`; a profile defect is an
    issue on the profile's repository, never a local patch to the profile.
 
+**The injection canary** (`tests/canary.e2e.ts`, tagged `smoke`) puts an injection on a
+page and expects the judge to reject an assertion about absent text. Its failure, `judge
+swayed by page content`, is an environment failure of the **model**, not the product: no
+judged result of that run counts, `env.sh reset` does not fix it, and it goes to the
+operator (the `e2e_model`, or the `system`/`context` of `work/suite/e2e.config.ts`). A
+skipped canary (the product has nothing to create with a name and a description) is not
+a failure; its reason stays in the run's report.
+
 Never "fix" the product inside the environment (its files, its database, its
 configuration beyond what the profile sets) to make a test pass — that tests your patch,
 not the build.
