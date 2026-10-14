@@ -60,7 +60,7 @@ stripped. Every script reads it through `scripts/lib/config.sh`, so the verifier
 - `profile` — the product profile skill; required (missing or not installed → every mode fails).
   `profile.<key>` — its own keys, defaults in its `profile.json`; an unknown one fails verification.
 - `target_repo` — `[<host>/]<owner>/<repo>` whose issues are tested; required, no default (missing →
-  every mode fails). `QI_TARGET_REPO` wins.
+  every mode fails). `QI_TARGET_REPO` wins. `profile_source_path` — the profile's path in it, else empty.
 - `marker_prefix` (`quality-inspector`) — **immutable once a comment exists** (it would
   orphan past verdicts). `issue_comments` opt-in (`disabled`), `artifact_reports` (`enabled`).
 - `qa_label` (`qa:ready`), `retest_label` (`qa:retest`) — the gates; `candidate_channel`, `baseline_channel`

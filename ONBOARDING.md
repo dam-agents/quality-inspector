@@ -173,7 +173,8 @@ with an existing file → keep its values, ask only for missing keys. Ask, valid
 
 1. **`profile`** — the name found in Step 2.
 2. **`target_repo`** — ask. Validate with `gh api repos/<owner>/<repo>/issues?per_page=1`
-   (host flag for a three-segment ref). Tick item 3.
+   (host flag for a three-segment ref). Tick item 3. When the profile's skill source is
+   this repository, write its path as **`profile_source_path`** (DAM: `qa`); else empty.
 3. **`issue_comments`** — ask, default `disabled`. State the consequence: comments are
    posted publicly on the target's issues as the connection's account, and the
    connection then needs write access to issues. Tick item 5.
@@ -201,6 +202,7 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 
 - profile: qi-profile-dam
 - target_repo: acme/widgets
+- profile_source_path:
 - display_name: Quality Inspector
 - qa_label: qa:ready
 - retest_label: qa:retest
@@ -239,8 +241,9 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 ```
 
 Then `bash "$HOME/scripts/verify-onboarding.sh" --config`, apply every `fix:`, and show the
-file to the operator — and the output of `bash "$HOME/scripts/egress-rules.sh"`, the
-egress commands checklist item 4 asks them to run.
+file to the operator — and the output of `bash "$HOME/scripts/egress-rules.sh"` (with
+`--source <owner>/<repo>` per other GitHub skill source the operator names), the egress
+commands checklist item 4 asks them to run.
 
 ## Step 4 — Reconstruct `QA.md` (only when it has no rows and comments were used before)
 

@@ -56,7 +56,7 @@ warn() { WARNS=$((WARNS+1)); printf 'warn %s — %s\n' "$1" "$2"; }
 SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-benchmark-monthly quality-inspector-security-weekly quality-inspector-audit-weekly quality-inspector-scenarios-weekly"
 KNOWN_KEYS="profile target_repo display_name qa_label retest_label marker_prefix candidate_channel
 baseline_channel issue_comments artifact_reports include_comments max_issues_per_run lock_ttl_min
-e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback
+e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback profile_source_path
 explorations max_explorations_per_ac auto_promote security_checks security_failed_logins
 confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi
 scenario_discovery scenario_channel max_scenarios_per_run max_scenarios_per_day"
@@ -199,7 +199,7 @@ if [ "$LIVE" = 1 ]; then
     && ok issues_read "target issues readable" || fail issues_read "cannot list target issues" "check target_repo and the connection's repository access"
   while read -r status id detail; do
     case "$status" in
-      (fail) fail "$id" "$detail" "the operator adds the deny rule (bash scripts/egress-rules.sh)";;
+      (fail) fail "$id" "$detail" "the operator applies the rules bash scripts/egress-rules.sh prints (docs/black-box.md → Egress rules)";;
       (ok)   ok "$id" "$detail";;
       (*)    warn "$id" "$detail";;
     esac

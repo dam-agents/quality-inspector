@@ -58,39 +58,47 @@ layer that holds against a deliberate bypass.
 The kit seeds the rules every deployment shares. The target's depend on the instance:
 `bash scripts/egress-rules.sh` prints them, with the profile's `egress`, as `dam network
 create` commands for the operator (`--kit` adds the kit's, for an agent created by hand
-or from a kit before 2.11.0). The platform picks one rule per request:
+or from a kit before 2.11.0; `--source <owner>/<repo>` allows another skill source). The
+platform picks one rule per request:
 
 1. the exact host, then its `*.parent` wildcard (one label), then `*`;
 2. a named method over `*` — so a deny that must beat a `GET` allow is a `GET` rule;
 3. a path over `*`, then the longer path. `*` matches anything, `/` and the query string
-   included.
+   included; the match is SQL `LIKE` — `_` is any one character, and letter case counts.
 
 The `trusted` preset and the GitHub connection allow their hosts (`github.com`, its API,
 codeload, raw, `gitlab.com`, `codeberg.org`, …) with method and path `*` before the kit's
-rules land, and a kit rule contradicting one fails the apply. So a kit deny names a path
-— `/*` for a whole host — which also outranks their `*` (`validate-definition.sh` checks).
+rules land, and a kit rule contradicting one fails the apply. So a deny names a path —
+`/*` for a whole host — which also outranks their `*` (`validate-definition.sh` checks).
+
+**The target's GitHub hosts are deny-by-default.** A deny by the target's name cannot
+hold: the connection — and anyone, for a public target — reads its forks and mirrors, the
+target spelled in another case (`/repos/ACME/Widgets/…`: GitHub ignores the case, the
+match does not), and the same data by number, search or GraphQL. `<D>` is this
+definition's repository (from `origin`), `<S>` each `--source`:
 
 | Host | Allowed | Denied |
 | --- | --- | --- |
-| `api.github.com` (kit) | the rest (connection) | `/graphql*`, `/search/code*`, `/search/commits*`, `/repositories/*`, `/gists*` |
-| `api.github.com` (target) | `GET /repos/<T>/issues*`; `POST …/issues/*/comments*`; `DELETE …/issues/*/labels/<retest_label>` — that label only, URL-encoded (`qa%3Aretest`) | `GET …/issues/*/timeline*`, `GET …/issues/*/events*`, `GET …/issues/events*`; every other path under `/repos/<T>/` |
-| `github.com`, `codeload.github.com` (target) | this agent's definition, skill installs | `/<T>*`, `/<T>/*` |
+| `api.github.com` (kit) | — | `/graphql*`, `/search/code*`, `/search/commits*`, `/repositories/*`, `/gists*` |
+| `api.github.com` (target) | `GET /user`; `GET /repos/<T>/issues*`; `POST …/issues/*/comments*`; `DELETE …/issues/*/labels/<retest_label>` — that label only, URL-encoded (`qa%3Aretest`); `GET /repos/<T>/contents/<profile_source_path>/*` and `…/<profile_source_path>?*` (below); `/repos/<D>/*`; `GET /repos/<S>/*` | `GET …/issues/*/timeline*`, `GET …/issues/*/events*`, `GET …/issues/events*`; `/*` |
+| `github.com` (target) | `/<D>/*`, `/<D>.git/*`; the profile's `egress` paths | `/*` |
+| `codeload.github.com` (target) | `GET /<S>/*` | `/*` |
 | `raw.githubusercontent.com`, gists, GitLab, Bitbucket, Codeberg, Gitea, Azure DevOps, Sourcegraph, SourceHut (kit) | — | `/*` |
 | `registry.npmjs.org` (kit) | `GET` (the `e2e` framework) | — |
 | `api.anthropic.com` (kit) | model calls for agent steps | — |
 | `cdn.playwright.dev`, `playwright.download.prss.microsoft.com` | `GET`, only when `e2e`'s Playwright differs from the image's | — |
 
-A target on GitHub Enterprise gets the same target rules on its own host — the API under
-`/api/v3` (on `api.<host>` for `ghe.com`), plus its GraphQL, search, raw and codeload
-paths, which the kit cannot name. Any host no rule matches — a company's own GitHub or
-GitLab included — is **held** for approval on the operator's Home: approve nothing on the
-deny side; a held probe shows as `warn` until it is an explicit deny.
+A target on GitHub Enterprise gets the same rules on its own host — the API under
+`/api/v3` there (on `api.<host>` for `ghe.com`) — plus `/*` denies on its `raw.` and
+`codeload.` hosts. Any host no rule matches — a company's own GitLab included — is
+**held** for approval on the operator's Home: approve nothing on the deny side; a held
+probe shows as `warn` until it is an explicit deny.
 
-What the rules cannot close:
-
-- **Other repositories.** The connection allows every repository its token can see, so a
-  fork or mirror of the target is readable: scope the token (README → Setup).
-- **A profile inside the target repository.** The platform installs a skill from its
-  whole repository's tarball through this agent's gateway (`/repos/<T>/tarball*`, then
-  codeload `/<T>/*`) — both denied, so a (re)install fails while the rules hold. A
-  `GET /repos/<T>/contents/<profile dir>*` allow only lets the Skills page preview it.
+**A profile inside the target repository** (`profile_source_path`, e.g. `qa`): when the
+egress denies the repository's archive and allows that path, the platform fetches only
+the profile's directory through the contents API, and refuses the install when the path
+is denied too. Two things keep the allow from opening the whole repository, and the
+probes prove both (`boundary:…/contents/<path>/..`, `profile_source`): the gateway
+matches a path only after resolving its dot segments (the contents API resolves
+`<path>/../src`), and the directory holds no symlink or submodule (the contents API
+answers a symlink to a file with that file).
