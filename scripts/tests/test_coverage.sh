@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # coverage.mjs: a page counts as covered only through a regression-tier test that opens it or
-# names a control only that page shows; nav items lead to pages; the audit reports counts.
+# names a control only that page shows; nav items lead to pages; the audit reports counts,
+# scenario tests included.
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 seed_work
@@ -48,4 +49,10 @@ echo '[]' > "$STUB_DIR/issues.json"
 a="$(HOME="$SANDBOX" bash "$SCRIPTS/preflight.sh" audit)"
 assert "audit reports the counts as a warn" '.checks[] | select(.id=="coverage") | .status=="warn" and (.detail | test("pages 5 · covered 2 · uncovered 3 · nav items without a golden path 2"))' "$a"
 assert "audit stats carry the counts" '.stats.coverage == {"pages":5,"covered":2,"uncovered":3,"nav_without_golden_path":2}' "$a"
+
+# A promoted scenario test covers pages in the audit as it does in work/COVERAGE.md.
+printf "await app.open('/reports');\n" > "$WORK_DIR/suite/tests/scenario-7.e2e.ts"
+echo '| tests/scenario-7.e2e.ts | S-7 | regression | 1b2c3d4e5f60 | 2026-10-02T00:00:00Z |' >> "$WORK_DIR/SUITE.md"
+a="$(HOME="$SANDBOX" bash "$SCRIPTS/preflight.sh" audit)"
+assert "audit counts a regression-tier scenario test" '.stats.coverage == {"pages":5,"covered":3,"uncovered":2,"nav_without_golden_path":1}' "$a"
 exit $FAILED

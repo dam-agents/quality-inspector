@@ -209,7 +209,7 @@ refuse and explain instead:
   ([logging.md](logging.md) → **Ledger of external writes**).
 - Every judged AC ships its evidence (issue runs use `--evidence full`; the report comes
   from `scripts/render-report.mjs`), and only tests tagged `issue-<n>` (its explorations:
-  `issue-<n>-ex`) are published — never the sign-in setup test.
+  `issue-<n>-ex`) or `scenario-<k>` are published — never the sign-in setup test.
 - The benchmark's ground truth (`work/benchmark/cases.json`) never reaches the pipeline
   that runs a case, and a benchmark run never writes production state (QA rows, tiers,
   comments) ([benchmark.md](benchmark.md)).

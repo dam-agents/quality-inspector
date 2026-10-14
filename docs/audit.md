@@ -12,10 +12,11 @@ when `audit_report: disabled` (still append the log line).
    value left in a raw run's text files; a `fail` names the paths, never the value),
    **coverage** of the newest UI map (`warn` while pages are uncovered, never `fail`;
    [change-awareness.md](change-awareness.md) → Coverage), and `criteria_injection` (the
-   week's criteria files holding URLs, code fences or HTML comments; the week's
-   `issue_injection_suspect` events) — a `warn` lists the issues: sample one and check its
-   instruction sentences are `testable: no`. `failures[]` groups the week's error events;
-   `stats` counts verdicts and `stats.coverage` the pages.
+   week's criteria files of issues and scenarios holding URLs, code fences or HTML comments;
+   the week's `issue_injection_suspect` and `scenario_injection_suspect` events) — a `warn`
+   lists the issues and `S-<k>`: sample one and check its instruction sentences are
+   `testable: no`. `failures[]` groups the week's error events; `stats` counts verdicts and
+   `stats.coverage` the pages.
    - `ledger_reconcile` ([logging.md](logging.md) → **Ledger of external writes**): for
      the newest 20 `reported` QA rows of the week, one `GET …/issues/<n>/comments?since=`
      each; every comment of the agent's login (`gh api user`) created this week (and after

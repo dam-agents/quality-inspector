@@ -71,4 +71,36 @@ echo "regression $(iso_ago 5)" > "$WORK_DIR/env/LOCK"
 assert "busy environment -> idle" '.nothing_to_do == true' "$(bash "$SCRIPTS/preflight.sh" discovery)"
 rm -f "$WORK_DIR/env/LOCK"
 
+# set: the one row writer — locked, checked, updated_utc now; a claim logs scenario_run
+S="$SCRIPTS/scenarios.sh"; rm -f "$WORK_DIR/SCENARIOS.md"
+row() { table_rows "$WORK_DIR/SCENARIOS.md" | awk -F'|' -v id="$1" '{x=$2; gsub(/[ \t]/,"",x)} x==id {print}'; }
+runs() { grep -c '"event":"scenario_run"' "$today"; }
+. "$SCRIPTS/lib/state.sh"
+bash "$S" set S-20 status=queued >/dev/null 2>&1; assert_eq "a first write without source is refused" 2 "$?"
+bash "$S" set S-20 source=slack requester=U0123ABCD thread=C0123ABCD/1.2 spec_hash=abc status=queued >/dev/null
+assert_eq "the seeded header" "$SCENARIOS_HEADER" "$(grep '^|' "$WORK_DIR/SCENARIOS.md" | head -1)"
+assert_eq "a new row, the rest '-'" "| S-20 | slack | U0123ABCD | C0123ABCD/1.2 | abc | - | - | queued |" "$(row S-20 | sed 's/ [0-9T:Z-]* |$//')"
+n0="$(runs)"
+bash "$S" set S-20 status=in_progress build=c1 >/dev/null
+assert_eq "one column changed, the others kept" "| S-20 | slack | U0123ABCD | C0123ABCD/1.2 | abc | c1 | - | in_progress |" "$(row S-20 | sed 's/ [0-9T:Z-]* |$//')"
+assert_eq "a claim logs scenario_run" "$((n0 + 1))" "$(runs)"
+bash "$S" set S-20 >/dev/null; bash "$S" set S-20 status=in_progress >/dev/null
+assert_eq "a refresh or a live re-claim logs nothing" "$((n0 + 1))" "$(runs)"
+sed -i.bak "s/| in_progress | [0-9T:Z-]* |$/| in_progress | $(iso_ago 400) |/" "$WORK_DIR/SCENARIOS.md"
+bash "$S" set S-20 status=in_progress >/dev/null
+assert_eq "a takeover of a stale claim logs it again" "$((n0 + 2))" "$(runs)"
+bash "$S" set S-20 verdict=verified >/dev/null 2>&1; assert_eq "a scenario is never verified" 2 "$?"
+bash "$S" set S-20 'thread=C1|x' >/dev/null 2>&1; assert_eq "a '|' in a value is refused" 2 "$?"
+bash "$S" set S-20 colour=red >/dev/null 2>&1; assert_eq "an unknown column is refused" 2 "$?"
+bash "$S" set S-20 verdict=passed status=reported >/dev/null
+for k in 21 22 23 24 25 26 27 28; do bash "$S" set "S-$k" source=discovery status=proposed >/dev/null & done; wait
+assert_eq "concurrent writers lose no row" 9 "$(table_rows "$WORK_DIR/SCENARIOS.md" | grep -c '^| S-')"
+assert_eq "one row per id" "| S-20 | slack | U0123ABCD | C0123ABCD/1.2 | abc | c1 | passed | reported |" "$(row S-20 | sed 's/ [0-9T:Z-]* |$//')"
+[ ! -d "$WORK_DIR/scenarios/.lock" ] || { echo "  the row lock was left behind"; FAILED=1; }
+v="$(HOME="$SANDBOX" bash "$SCRIPTS/verify-onboarding.sh" 2>/dev/null | grep ' scenarios_rows ')"
+case "$v" in (ok*) ;; (*) echo "  rows written by set fail the verifier: $v"; FAILED=1;; esac
+echo "| S-29 | slack | - | - | xyz | c1 | verified | reported | $(iso_ago 1) |" >> "$WORK_DIR/SCENARIOS.md"
+v="$(HOME="$SANDBOX" bash "$SCRIPTS/verify-onboarding.sh" 2>/dev/null | grep ' scenarios_rows ')"
+case "$v" in (FAIL*S-29*) ;; (*) echo "  a verified row passes the verifier: $v"; FAILED=1;; esac
+
 exit $FAILED

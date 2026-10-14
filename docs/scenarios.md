@@ -8,7 +8,7 @@ answered where it was asked, and — on request — queued for the regression ti
 
 ## State
 
-`work/SCENARIOS.md`, one row per scenario, written only by you:
+`work/SCENARIOS.md`, one row per scenario, written only through `scenarios.sh set` (below):
 
 ```
 | id | source | requester | thread | spec_hash | build | verdict | status | updated_utc |
@@ -25,7 +25,11 @@ answered where it was asked, and — on request — queued for the regression ti
   re-opens it).
 - `verdict`: `passed` | `failed` | `regression` | `needs-review` | `blocked` | `flaky` |
   `not-testable` | `-`. Never `verified`: no change is under test.
-- Rewrite with an atomic `tmp + mv` of the whole file; one row per id.
+- Write a row only with `bash "$HOME/scripts/scenarios.sh" set S-<k> <column>=<value>…`; a
+  status or verdict below means that call. Slack turns and runs write at once, so it
+  rewrites the file under a lock, one row per id, stamps `updated_utc` and refuses an unknown
+  column or value. A bare `set S-<k>` refreshes `updated_utc`. The first write (step 4) names
+  `source` and `status`.
 - `bash "$HOME/scripts/scenarios.sh" new <source>` reserves `S-<k>` and
   `work/scenarios/S-<k>/`: `request.md` (the words as received, verbatim, with requester,
   thread, received UTC and attachment names — or a proposal and its basis),
@@ -61,7 +65,7 @@ Classify each message; several intents → handle each, then send **one** reply:
 
 1. **Admit.** `bash "$HOME/scripts/scenarios.sh" admit`. `admit: false` → reply with the
    day's cap and stop.
-2. **Record.** `scenarios.sh new <source>` → `S-<k>`; write `request.md`; add the row; then
+2. **Record.** `scenarios.sh new <source>` → `S-<k>`; write `request.md`; then
    `scenarios.sh lint work/scenarios/S-<k>/request.md`.
 3. **Draft the criteria** from `request.md` alone, before you look at the product:
    [acceptance-criteria.md](acceptance-criteria.md) → Rules, header `# S-<k> — <title>`,
@@ -75,10 +79,12 @@ Classify each message; several intents → handle each, then send **one** reply:
    `criteria-<spec_hash>.md`. `revise` → apply exactly the judge's fixes, judge once more.
    A second `revise`, or a `reject` → status `rejected`; reply with the judge's reasons as a
    question to the requester; stop. Otherwise reply now with the frozen scenario in short
-   and when it runs; status `queued`.
+   and when it runs; status `queued`. Either status write also sets `source`, `requester`,
+   `thread` and `spec_hash`.
 5. **Claim.** `env.sh lock S-<k>`. Busy → stay `queued`, tell the requester it runs once the
-   current holder finishes (the next issues run takes it), end. Else `in_progress` — the
-   claim time the budgets count from — and log `scenario_run id=S-<k> build=<candidate>`.
+   current holder finishes (the next issues run takes it), end. Else `set S-<k>
+   status=in_progress build=<candidate>` — the claim time the budgets count from; it logs
+   the `scenario_run` that the daily cap counts.
 6. **Candidate**: `env.sh up <candidate>` and the smoke run, as [issue-qa.md](issue-qa.md)
    step 4. An environment failure sets `queued` back, unlocks, logs `scenario_abort`, and
    says so — never a verdict.
@@ -177,8 +183,8 @@ worklist carries `discovery`, `candidate`, `baseline`, `previous_candidate` and 
    pages with an action, then heuristics.
 4. Each one: `scenarios.sh new discovery`, then the pipeline steps 3–4 with the basis as the
    oracle and no reply. Accepted → `proposed`.
-5. `run` only, each `proposed` one: `scenarios.sh admit` (stop at `admit: false`), log
-   `scenario_run`, `in_progress`, then steps 7–12 under the `discovery` lock — the
+5. `run` only, each `proposed` one: `scenarios.sh admit` (stop at `admit: false`),
+   `in_progress` with `build=<candidate>`, then steps 7–12 under the `discovery` lock — the
    candidate is already up, and the answer is the digest, not a reply (`reported` once it
    is sent). All candidate runs first, then one `reset` + `up <baseline>` for every stable
    failure.

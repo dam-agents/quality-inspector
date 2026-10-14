@@ -101,8 +101,8 @@ Inside the VM, a Claude Code `PreToolUse` hook and a `permissions.deny` list, me
 `~/.claude/settings.json` at onboarding, refuse the same surfaces before a tool call runs
 (a repository by number, gists, a search that does not name the target and the other code
 hosts excepted: only the egress rules hold those) — plus `git clean`, container
-filesystems, writes outside `work/`, and commits or definition edits from a scheduled run
-or a Slack turn ([docs/black-box.md](docs/black-box.md) → Enforcement layers).
+filesystems, writes outside `work/`, commits or definition edits from a scheduled run or a
+Slack turn, and any GitHub write from a Slack turn ([docs/black-box.md](docs/black-box.md) → Enforcement layers).
 
 ## What a report looks like
 
@@ -149,7 +149,7 @@ configuration.
 | `e2e_version`, `e2e_web_version`, `e2e_model` | defaults | Test framework pins and the model for agent steps. |
 | `confirm_regressions`, `bisect_max_steps` | defaults (off) | Opt-in: confirm a regression on the previous build, then narrow it over the builds in between — extra installs. |
 | `audit_report`, `log_level`, `media_retention_days` | defaults | Audit, diagnostics, local evidence retention. |
-| `explorations`, `max_explorations_per_ac` | defaults (`enabled`, `3`) | Agent-designed scenarios beyond the criteria, reported apart from the verdict ([docs/explorations.md](docs/explorations.md)). |
+| `explorations`, `max_explorations_per_ac` | defaults (`enabled`, `3`) | Agent-designed checks beyond the criteria, reported apart from the verdict ([docs/explorations.md](docs/explorations.md)). |
 | `security_checks`, `security_failed_logins` | defaults (`enabled`, `10`) | The security run ([docs/security.md](docs/security.md)); its schedule ships off. |
 | `max_wallclock_min_per_issue`, `max_model_steps_per_issue`, `min_free_disk_gi` | defaults | Per-issue budgets and the free disk an install needs. |
 

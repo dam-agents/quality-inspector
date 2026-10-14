@@ -29,6 +29,12 @@ if (!verdictsPath || !outDir) {
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 const runsRoot = process.env.QI_RUNS_ROOT ?? join(work, 'suite', '.e2e', 'runs');
 const v = JSON.parse(readFileSync(verdictsPath, 'utf8'));
+// A scenario is never verified: no change is under test, so no red-green ran (CLAUDE.md →
+// Hard invariants). Refused before anything is written, so an earlier report stays.
+if (v.mode === 'scenario' && [v.verdict, ...(v.acs ?? []).map((ac) => ac.verdict)].includes('verified')) {
+  console.error('render-report: a scenario is never verified — use passed (docs/scenarios.md → The pipeline, step 9)');
+  process.exit(2);
+}
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
@@ -206,7 +212,7 @@ const observations = exps.filter((ex) => ex.verdict === 'observation').length;
 const exHtml = !exps.length ? '' : `
 <section id="beyond-the-criteria">
 <h2>Beyond the criteria</h2>
-<p class="dim"><b>Not part of the verdict.</b> Scenarios the agent derived from the criteria (negative paths, persistence, roles…) and ran on the candidate only. An <b>observation</b> is something worth a look; it never changes a criterion's verdict.${v.ex_hash ? ` · checks <code>ex=${esc(v.ex_hash)}</code>` : ''}</p>
+<p class="dim"><b>Not part of the verdict.</b> Checks the agent derived from the criteria (negative paths, persistence, roles…) and ran on the candidate only. An <b>observation</b> is something worth a look; it never changes a criterion's verdict.${v.ex_hash ? ` · checks <code>ex=${esc(v.ex_hash)}</code>` : ''}</p>
 <table><thead><tr><th>EX</th><th>From</th><th>Heuristic</th><th>Candidate</th><th>Result</th></tr></thead><tbody>${exps.map((ex) => `<tr><td><a href="#${esc(slug(key(ex)))}">${esc(ex.id)}</a></td><td>${esc(ex.from_ac)}</td><td>${esc(ex.heuristic)}</td><td>${stateBadge(ex.cand?.state ?? 'not-run')}</td><td>${badge(ex.verdict)} ${sevBadge(ex.severity)}</td></tr>`).join('')}</tbody></table>
 ${exps.map((ex) => `
 <article class="ac" id="${esc(slug(key(ex)))}">
