@@ -49,7 +49,7 @@ EOF
 }
 
 # The probes, one "<kind> <target>" per line: gh <api path> (GET), gql (a GraphQL call),
-# url <url>. {issue} and {id} stand for a real issue number and the repository id.
+# url <url>. {issue} stands for a real issue number, {id} for repository number 1.
 boundary_targets() { # <target>
   local h r dir p
   h="$(_bb_host "$1")"; r="$(_bb_repo "$1")"
@@ -68,13 +68,14 @@ boundary_targets() { # <target>
 # Run every probe: one "<ok|warn|fail> boundary:<target> <detail>" line each. Only the
 # gateway's refusal (403, or no connection) proves a deny; any other answer is no proof.
 boundary_probe() { # <target>
-  local h r ha=() issue id kind target out code rc label
+  local h r ha=() issue kind target out code rc label
   h="$(_bb_host "$1")"; r="$(_bb_repo "$1")"
   [ "$h" = github.com ] || ha=(--hostname "$h")
   issue="$(_bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} "repos/$r/issues?state=all&per_page=1" --jq '.[0].number // empty' 2>/dev/null)"
-  id="$(_bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} "repos/$r" --jq '.id // empty' 2>/dev/null)"
+  # {id} is repository 1, public on github.com: the /repositories/* deny is host-wide, and
+  # the target's own id needs GET /repos/<T>, which is not an issues endpoint.
   while read -r kind target; do
-    target="$(printf '%s' "$target" | sed "s/{issue}/${issue:-1}/g; s/{id}/${id:-0}/g")"
+    target="$(printf '%s' "$target" | sed "s/{issue}/${issue:-1}/g; s/{id}/1/g")"
     case "$kind" in
       (gh)  out="$({ _bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} -i "$target" </dev/null 2>/dev/null; echo "rc=$?"; } | sed -n '1p;$p')" ;;
       (gql) out="$({ _bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} -i graphql -f query='{viewer{login}}' </dev/null 2>/dev/null; echo "rc=$?"; } | sed -n '1p;$p')"

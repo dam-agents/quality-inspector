@@ -79,9 +79,10 @@ that lets the turn run writes `work/env/RUN_MODE` = `scheduled <ISO> <schedule i
 decline writes nothing, nor does a timed health check (`QI_PRECHECK_PROBE=1`). The policy
 hook ([black-box.md](black-box.md) → **Enforcement layers**) reads a marker younger than
 `lock_ttl_min` — by its timestamp or its mtime, whichever is newer — as a **scheduled
-run**: `git commit`/`push`, `gh pr create`/`merge`, edits of definition files and of
-`work/CONFIG.md`, and any command naming the marker, `scripts/hooks/` or
-`.claude/settings` are refused. No fresh marker is a **direct session**.
+run**: `git commit`/`push`, `gh pr create`/`merge`, a `gh api` write outside the
+target's issues, edits of definition files and of `work/CONFIG.md`, and any command
+naming the marker, `scripts/hooks/` or `.claude/settings` are refused. No fresh marker is
+a **direct session**.
 
 - It fails closed: a direct session opened within `lock_ttl_min` of a scheduled turn
   counts as scheduled until the marker ages out (its timestamp says since when).
