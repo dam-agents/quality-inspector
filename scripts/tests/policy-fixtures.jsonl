@@ -10,6 +10,8 @@
 {"name":"contents, the profile dir as the platform asks for it","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api 'repos/acme/widgets/contents/qa?ref=HEAD'"}}
 {"name":"contents, a sibling of the profile dir","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets/contents/qa-internal/notes.md"}}
 {"name":"contents, a dot segment out of the profile dir","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets/contents/qa/../src/index.ts"}}
+{"name":"repository metadata, open in the egress for the profile scan","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets --jq .default_branch"}}
+{"name":"a head ref, open in the egress for the profile scan","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api repos/acme/widgets/git/refs/heads/main"}}
 {"name":"commits over curl, mixed case","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"curl -s -H 'Accept: application/json' https://api.github.com/repos/Acme/Widgets/commits"}}
 {"name":"git refs through a variable","expect":"deny","rule":"gh-api-path","tool":"Bash","input":{"command":"gh api \"repos/${T}/git/refs/heads\""}}
 {"name":"graphql","expect":"deny","rule":"gh-graphql","tool":"Bash","input":{"command":"gh api graphql -f query='{ viewer { login } }'"}}

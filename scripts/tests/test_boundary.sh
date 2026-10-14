@@ -11,7 +11,7 @@ cat > "$QI_PROFILE_DIR/profile.json" <<'J'
  "egress":[{"host":"github.com","method":"GET","path":"/cert-manager/cert-manager/releases/*","why":"manifest"},
            {"host":"*.quay.io","method":"GET","why":"image layers"}]}
 J
-printf -- '- profile_source_path: /qa/\n' >> "$WORK_DIR/CONFIG.md"
+printf -- '- profile_source_path: /qa/\n- work_repo: acme/widgets-qa\n' >> "$WORK_DIR/CONFIG.md"
 export QI_DEFINITION_REPO=github.com/acme/quality-inspector
 cmds="$(bash "$SCRIPTS/egress-rules.sh" --kit --source acme/profiles)"
 assert_eq "the commands start with the AGENT guard" ': "${AGENT:?set AGENT to this agent'"'"'s name}"' "$(printf '%s\n' "$cmds" | head -1)"
@@ -20,10 +20,13 @@ printf '%s\n' "$cmds" | grep -qxF 'dam network create "$AGENT" --host "*.gitlab.
 printf '%s\n' "$cmds" | grep -qxF 'dam network create "$AGENT" --host "*.quay.io" --method GET --yes  # image layers' \
   || { echo "  assertion failed: profile egress line"; FAILED=1; }
 
-# A model of the platform's match (egress-rules-repository findMatch): the exact host,
-# then *.parent, then *; a named method over *; a path over *; the longer path; '*' in a
-# pattern is SQL LIKE '%' (a literal '%' is one too, '_' any one character). The `trusted` preset and the
-# GitHub connection hold host-wide allows on these hosts before the kit's rules land.
+# A model of the platform's gate and match (ext-authz gate, egress-rules-repository
+# findMatch): a path with a '.' or '..' segment (raw, %2e, with a ';' suffix) is denied
+# first; the host compares in any case; then the exact host, *.parent, *; a named method
+# over *; a path over *; the longer path. '*' in a pattern is SQL LIKE '%' (a literal '%'
+# is one too, '_' any one character); on GitHub's hosts a deny matches in any case, an
+# allow in exact case. The `trusted` preset and the GitHub connection hold host-wide
+# allows on these hosts before the kit's rules land.
 verdicts="$(printf '%s\n' "$cmds" | node -e '
 const lines = require("fs").readFileSync(0, "utf8").split("\n").filter(l => l.startsWith("dam network create"));
 const arg = (l, f) => { const m = l.match(new RegExp(f + " (\"[^\"]*\"|\\S+)")); return m ? m[1].replace(/"/g, "") : null; };
@@ -32,12 +35,16 @@ const rules = lines.map(l => ({ host: arg(l, "--host"), method: arg(l, "--method
 for (const h of ["github.com", "api.github.com", "codeload.github.com", "raw.githubusercontent.com",
                  "objects.githubusercontent.com", "gitlab.com", "codeberg.org", "registry.npmjs.org"])
   rules.push({ host: h, method: "*", path: "*", verdict: "allow" });
-const like = p => new RegExp("^" + [...p].map(c => c === "*" || c === "%" ? ".*" : c === "_" ? "." : c.replace(/[.+?^${}()|[\]\\\/]/g, "\\$&")).join("") + "$", "s");
+const like = (p, flags) => new RegExp("^" + [...p].map(c => c === "*" || c === "%" ? ".*" : c === "_" ? "." : c.replace(/[.+?^${}()|[\]\\\/]/g, "\\$&")).join("") + "$", flags);
 const rank = (r, host) => [r.host === host ? 0 : r.host === "*" ? 2 : 1, r.method === "*" ? 1 : 0, r.path === "*" ? 1 : 0, -r.path.length];
+const githubHost = h => ["github.com", "api.github.com", "codeload.github.com", "raw.githubusercontent.com"].includes(h) || h.endsWith(".ghe.com");
+const dotSegment = p => p.split("?")[0].split(/\/|\\|%2f|%5c/i).some(s => [".", ".."].includes(s.replace(/%2e/gi, ".").split(";")[0]));
 function decide(method, url) {
-  const u = new URL(url), host = u.hostname, path = u.pathname + u.search;
+  const m = url.match(/^https:\/\/([^/]+)(\/.*)$/), host = m[1].toLowerCase(), path = m[2];
+  if (dotSegment(path)) return "deny";
   const cands = host.includes(".") ? [host, "*." + host.slice(host.indexOf(".") + 1), "*"] : [host, "*"];
-  const hits = rules.filter(r => cands.includes(r.host) && (r.method === method || r.method === "*") && like(r.path).test(path));
+  const matches = r => like(r.path, "s").test(path) || (r.verdict === "deny" && githubHost(host) && like(r.path, "si").test(path));
+  const hits = rules.filter(r => cands.includes(r.host) && (r.method === method || r.method === "*") && matches(r));
   hits.sort((a, b) => { const x = rank(a, host), y = rank(b, host); for (let i = 0; i < 4; i++) if (x[i] !== y[i]) return x[i] - y[i]; return 0; });
   return hits.length ? hits[0].verdict : "hold";
 }
@@ -53,6 +60,7 @@ allow POST https://api.github.com/repos/acme/widgets/issues/7/comments
 allow DELETE https://api.github.com/repos/acme/widgets/issues/7/labels/qa%3Aretest
 deny DELETE https://api.github.com/repos/acme/widgets/issues/7/labels/qa%3Aready
 deny GET https://api.github.com/repos/acme/widgets/issues/7/timeline
+deny GET https://api.github.com/repos/acme/widgets/issues/7/TIMELINE
 deny GET https://api.github.com/repos/acme/widgets/issues/7/events?per_page=1
 deny GET https://api.github.com/repos/acme/widgets/issues/events
 deny GET https://api.github.com/repos/acme/widgets/contents/README.md
@@ -76,6 +84,16 @@ allow GET https://api.github.com/repos/acme/widgets/contents/qa?ref=HEAD
 allow GET https://api.github.com/repos/acme/widgets/contents/qa/qi-profile-stub?ref=0123abc
 allow GET https://api.github.com/repos/acme/widgets/contents/qa/qi-profile-stub/SKILL.md?ref=0123abc
 deny GET https://api.github.com/repos/acme/widgets/contents?ref=0123abc
+deny GET https://api.github.com/repos/acme/widgets/contents/qa
+deny GET https://api.github.com/repos/acme/widgets/contents/qa/../src/index.ts?ref=0123abc
+deny GET https://api.github.com/repos/acme/widgets/contents/qa/%2e%2e/src/index.ts
+deny GET https://api.github.com/repos/acme/widgets/contents/qa/..;x/src/index.ts
+allow GET https://api.github.com/repos/acme/widgets
+allow GET https://api.github.com/repos/acme/widgets/git/refs/heads/main
+deny GET https://api.github.com/repos/acme/widgets/git/refs/heads
+deny GET https://api.github.com/repos/acme/widgets/git/trees/main?recursive=1
+deny GET https://api.github.com/repos/acme/widgets/commits/HEAD
+deny GET https://API.GitHub.com/repos/acme/widgets/contents/src/index.ts
 deny GET https://api.github.com/repos/acme/widgets/contents/qa-internal/notes.md
 deny GET https://api.github.com/repos/ACME/Widgets/contents/src/index.ts
 deny GET https://api.github.com/repos/someone/widgets/contents/src/index.ts
@@ -103,6 +121,13 @@ deny GET https://dev.azure.com/acme/widgets/_git/widgets
 deny GET https://acme.visualstudio.com/widgets/_git/widgets
 deny GET https://sourcegraph.com/search?q=repo:acme/widgets
 deny GET https://git.sr.ht/~acme/widgets
+allow GET https://api.github.com/repos/acme/widgets-qa
+allow GET https://github.com/acme/widgets-qa.git/info/refs?service=git-receive-pack
+allow POST https://github.com/acme/widgets-qa.git/git-receive-pack
+deny GET https://api.github.com/repos/acme/widgets-qa/contents/QA.md
+deny GET https://github.com/acme/widgets-qa/blob/main/QA.md
+deny GET https://github.com/acme/widgets-qa2.git/info/refs?service=git-upload-pack
+deny GET https://api.github.com/repos/acme/widgets-qa2
 R
 ))"
 assert_eq "every request meets its expected verdict" "" "$verdicts"
@@ -110,6 +135,16 @@ assert_eq "every request meets its expected verdict" "" "$verdicts"
 # The target is never a --source: a profile there gets its directory, not the repository.
 bash "$SCRIPTS/egress-rules.sh" --source ACME/Widgets >/dev/null 2>&1
 assert_eq "a source naming the target is refused" "2" "$?"
+
+# work_repo is never the target, in any spelling: egress-rules.sh prints nothing, the verifier fails.
+printf -- '- target_repo: acme/widgets\n- work_repo: github.com/ACME/Widgets\n' > "$WORK_DIR/CONFIG.md"
+bash "$SCRIPTS/egress-rules.sh" >/dev/null 2>&1
+assert_eq "a work_repo naming the target is refused" "1" "$?"
+bash "$SCRIPTS/verify-onboarding.sh" --config 2>/dev/null | grep -q '^FAIL cfg:work_repo — is the target repository' \
+  || { echo "  assertion failed: verify-onboarding --config fails a work_repo that is the target"; FAILED=1; }
+printf -- '- target_repo: acme/widgets\n- work_repo: https://github.com/acme/widgets-qa\n' > "$WORK_DIR/CONFIG.md"
+bash "$SCRIPTS/verify-onboarding.sh" --config 2>/dev/null | grep -q "^FAIL cfg:work_repo — 'https://github.com/acme/widgets-qa' is not \[host/\]owner/repo" \
+  || { echo "  assertion failed: verify-onboarding --config fails a work_repo that is a URL"; FAILED=1; }
 
 # A GitHub Enterprise Server target: the API under /api/v3 on the same host, which is
 # deny-by-default as a whole; the definition on github.com gets nothing there, and a
@@ -197,6 +232,8 @@ printf '%s\n' "$(STUB_OPEN="$PROFILE_OPEN" STUB_LIST_FAIL=1 probe)" \
   || { echo "  assertion failed: a failed listing warns instead of passing"; FAILED=1; }
 printf '%s\n' "$out" | grep -qF 'ok boundary:repos/acme/widgets/issues/7/timeline refused' \
   || { echo "  assertion failed: {issue} resolves to a real issue"; FAILED=1; }
+printf '%s\n' "$out" | grep -qF 'ok boundary:repos/acme/widgets/issues/7/TIMELINE refused' \
+  || { echo "  assertion failed: the case-blind GitHub deny probed"; FAILED=1; }
 printf '%s\n' "$out" | grep -qF 'ok boundary:repositories/1/contents/ refused' \
   || { echo "  assertion failed: a repository by number probed"; FAILED=1; }
 grep -qE '(^| )repos/acme/widgets( |$)' "$STUB_DIR/gh.calls" \
@@ -220,6 +257,9 @@ assert_eq "a dot-segment fail drops the profile allows, never re-applies them" \
 assert_eq "a plain fail gets the printed rules" \
   "the operator applies the rules bash scripts/egress-rules.sh prints (docs/black-box.md → Egress rules)" \
   "$(fix "source surface reachable (HTTP 200)")"
+case_fail="$(STUB_OPEN="$PROFILE_OPEN|TIMELINE\$" probe | sed -n 's|^fail boundary:repos/acme/widgets/issues/7/TIMELINE ||p')"
+assert_eq "a deny in exact case only names the platform, never re-applies the rules" \
+  "report the gateway to the platform (dam-agents/dam#4909)" "$(fix "$case_fail")"
 
 # An invalid profile_source_path fails the probe, which then requests nothing in it.
 printf -- '- target_repo: acme/widgets\n- profile_source_path: qa*\n' > "$WORK_DIR/CONFIG.md"

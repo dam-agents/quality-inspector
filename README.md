@@ -58,7 +58,8 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
    the target — no Contents, Pull requests or Actions. The egress, not the token, keeps
    forks and mirrors out of reach: a public target's are readable by anyone. With a work
    backup (`work_repo`), add Contents read & write on that one private repository, and
-   protect its `main` so only this account pushes.
+   protect its `main` so only this account pushes (a private repository needs a paid GitHub
+   plan for that; without it, the next persist logs and reverts a foreign commit).
 3. **Create the agent on the vm backend** when the profile requires root (most nested
    products do). The kit asks for 8 CPU, 16 Gi and 80 Gi; the profile's README says what
    its product needs.
@@ -99,8 +100,8 @@ rules depend on the instance, so onboarding prints them — `bash scripts/egress
 agent's name and run them (`--kit` adds the kit's rules for an agent created by hand or
 from a kit before 2.11.0). They make the target's GitHub hosts deny-by-default, so a
 skill from another GitHub repository needs `--source <owner>/<repo>`; a profile inside the
-target gets only its directory (`profile_source_path`). A rule counts only once a probe
-proves it:
+target gets no file outside its directory (`profile_source_path`). A rule counts only once
+a probe proves it:
 `verify-onboarding.sh --live` and the weekly audit request each forbidden surface and
 fail when one answers. Approve no held request on the deny side.
 
@@ -178,7 +179,9 @@ configuration.
 - **Platform:** a DAM agent (vm backend when the profile requires root; Node ≥ 24.8 and
   Playwright with its Chromium baked in the image), `$HOME` on a persistent volume, the
   gateway for credentials, `mcp__platform-outbound__*` for schedules and the artifact
-  tools.
+  tools. Its egress gateway denies paths with dot segments and matches GitHub denies in
+  any letter case (dam-agents/dam#4909) — without that, a profile inside the target
+  repository opens the whole repository.
 - **Identity:** the GitHub connection's account — a dedicated bot; read access to the
   target's issues, plus issues write when comments are enabled.
 - **External surfaces:** artifacts in the platform's artifact library (private by

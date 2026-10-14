@@ -43,7 +43,8 @@ operator-only steps, and tick each with `complete_onboarding_step` as it is sett
 6. *Profile settings* — a value for every profile key it marks `ask`.
 7. *Model credential* — confirm agent steps reach Anthropic through the gateway.
 8. *Work backup* — a private repository for `work/` (or local-only): the connection's account
-   may push to it, its `main` is protected for that account, its egress rules are applied.
+   may push to it, its `main` is protected for that account where the GitHub plan allows it, its
+   egress rules are applied.
 
 The schedules are **held** until Step 7 marks onboarding complete.
 

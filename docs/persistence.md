@@ -48,8 +48,8 @@ connection can push to, never the target or a fork of it — and restores it on 
   `work/`: restore first. `persist --allow-delete` passes a deletion the operator asked for.
 - **A backup, never an input.** Nothing reads it but a restore. A commit not made by the
   script is logged as an error at the next persist (`foreign commits …`) and reverted by its
-  snapshot; the restore names such commits. Branch protection keeps `main` writable by the
-  connection's account alone (README → Setup).
+  snapshot; the restore names such commits. Branch protection, where the GitHub plan offers it,
+  keeps `main` writable by the connection's account alone (README → Setup).
 - Every push is ledgered (surface `backup`, [logging.md](logging.md)); the audit's
   `work_backup` check and `verify-onboarding.sh --live` report the destination and anything
   left unpushed.

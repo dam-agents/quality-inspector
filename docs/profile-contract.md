@@ -14,9 +14,9 @@ agent does not install it), which lands in the agent's skill path
 (`$HOME/.agents/skills/<name>/`, also seen as `$HOME/.claude/skills/<name>/`). It usually
 lives **in the product's own repository** — a source on that repository with `path` set
 to the profile's parent directory — so the product team versions it with the product.
-In the target repository, that path is `profile_source_path`: the egress allows only it,
-so the platform fetches only that directory ([black-box.md](black-box.md) → **Egress
-rules**); keep symlinks and submodules out of it.
+In the target repository, that path is `profile_source_path`: of its files the egress
+allows only that directory, so the platform fetches only it
+([black-box.md](black-box.md) → **Egress rules**); keep symlinks and submodules out of it.
 `scripts/lib/profile.sh` resolves it; `QI_PROFILE_DIR` overrides the lookup (tests,
 local development). The core never edits a profile; changes go to its own repository.
 
