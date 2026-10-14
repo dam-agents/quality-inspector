@@ -103,13 +103,16 @@ git -C /home/agent checkout -b "fix/<short-slug>" origin/main
 git -C /home/agent add -- kit.yaml CLAUDE.md AGENTS.md ONBOARDING.md README.md VERSION CHANGELOG.md .gitignore LICENSE docs scripts engines
 git -C /home/agent commit -m "<describe the change>"
 git -C /home/agent push -u origin "fix/<short-slug>"
-gh pr create --repo "$(git -C /home/agent remote get-url origin)" --base main --head "fix/<short-slug>" \
-  --title "<title>" --body "<what and why>"
+o="$(git -C /home/agent remote get-url origin)"; o="${o#https://}"; o="${o%.git}"; pulls="repos/${o#*/}/pulls"
+gh api --hostname "${o%%/*}" "$pulls" -f base=main -f head="fix/<short-slug>" \
+  -f title="<title>" -f body="<what and why>" --jq .html_url
 ```
 
 The agent's job ends at "PR opened". Use fresh descriptive branch names; runtime state
 never goes to this repo.
 
-The definition repository may sit on a different GitHub host than the target: `gh`
-calls about it take the host from `origin` (`--repo` accepts the URL), plain
-`git fetch`/`push` need nothing extra.
+The definition repository may sit on a different GitHub host than the target: the PR
+call takes the host from `origin`, plain `git fetch`/`push` need nothing extra. It is
+REST on purpose — `gh pr create` speaks GraphQL, which the egress denies
+([black-box.md](black-box.md) → **Egress rules**); the path sits in a variable because the
+policy hook reads `repos/<variable>/…` as the target's.

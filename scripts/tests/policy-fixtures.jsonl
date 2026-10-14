@@ -60,6 +60,10 @@
 {"name":"commit, direct","expect":"allow","tool":"Bash","input":{"command":"git -C /home/agent commit -m 'fix: x'"}}
 {"name":"commit, scheduled","mode":"scheduled","expect":"deny","rule":"scheduled-git","tool":"Bash","input":{"command":"git -C /home/agent commit -m 'fix: x'"}}
 {"name":"push, scheduled","mode":"scheduled","expect":"deny","rule":"scheduled-git","tool":"Bash","input":{"command":"cd /home/agent && git push -u origin fix/x"}}
+{"name":"definition PR over REST, scheduled","mode":"scheduled","expect":"deny","rule":"scheduled-git","tool":"Bash","input":{"command":"o=\"$(git -C /home/agent remote get-url origin)\"; o=\"${o#https://}\"; o=\"${o%.git}\"; pulls=\"repos/${o#*/}/pulls\"\ngh api --hostname \"${o%%/*}\" \"$pulls\" -f base=main -f head=\"fix/x\" -f title=\"t\" -f body=\"b\" --jq .html_url"}}
+{"name":"definition PR over REST, direct","expect":"allow","tool":"Bash","input":{"command":"o=\"$(git -C /home/agent remote get-url origin)\"; o=\"${o#https://}\"; o=\"${o%.git}\"; pulls=\"repos/${o#*/}/pulls\"\ngh api --hostname \"${o%%/*}\" \"$pulls\" -f base=main -f head=\"fix/x\" -f title=\"t\" -f body=\"b\" --jq .html_url"}}
+{"name":"comment post, scheduled","mode":"scheduled","expect":"allow","tool":"Bash","input":{"command":"gh api repos/acme/widgets/issues/7/comments -X POST -F body=@/tmp/quality-inspector-c.md"}}
+{"name":"issues listing, scheduled","mode":"scheduled","expect":"allow","tool":"Bash","input":{"command":"gh api -X GET \"repos/acme/widgets/issues\" -f labels=qa:ready -f state=all -f per_page=100"}}
 {"name":"marker removal, scheduled","mode":"scheduled","expect":"deny","rule":"policy-tamper","tool":"Bash","input":{"command":"rm -f /home/agent/work/env/RUN_MODE"}}
 {"name":"settings merge, direct","expect":"allow","tool":"Bash","input":{"command":"bash \"$HOME/scripts/hooks/install.sh\""}}
 {"name":"stale marker is direct","mode":"stale","expect":"allow","tool":"Bash","input":{"command":"git push -u origin fix/x"}}

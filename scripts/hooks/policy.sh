@@ -38,7 +38,9 @@
 #                                          and — in a direct session — the definition's .gitignore allowlist
 #   run-mode         Write Edit …          work/env/RUN_MODE (only the Precheck writes it)
 #   scheduled-def    Write Edit … (sched.) definition files and work/CONFIG.md
-#   scheduled-git    Bash (scheduled)      git commit, git push, gh pr create|merge
+#   scheduled-git    Bash (scheduled)      git commit, git push, gh pr create|merge, and a `gh api` write
+#                                          (-X POST|PUT|PATCH|DELETE or a field) on no issues path — so a
+#                                          pull request opened over REST too
 #   policy-tamper    Bash (scheduled)      any command naming RUN_MODE, scripts/hooks/ or .claude/settings
 #
 # Every denial logs one `policy_denied` event (scripts/log.sh): `tool=<name> rule=<id>`
@@ -259,7 +261,9 @@ check_simple() { # <one simple command>
         (api)
           case "$rest" in (*" graphql "*|*" /graphql "*) deny gh-graphql "$API_HOST/graphql" "GraphQL is off limits; use the issues REST endpoints";; esac
           check_repo_paths "$rest"
-          if [ -n "$T" ]; then case "$rest" in (*search/code*"$T"*|*search/commits*"$T"*) deny gh-search "$API_HOST/search" "searching the target's code or commits is off limits";; esac; fi;;
+          if [ -n "$T" ]; then case "$rest" in (*search/code*"$T"*|*search/commits*"$T"*) deny gh-search "$API_HOST/search" "searching the target's code or commits is off limits";; esac; fi
+          case "$rest" in (*" -X GET "*|*" --method GET "*) ;; (*" -X "*|*" --method "*|*" -f "*|*" -F "*|*" --field "*|*" --raw-field "*|*" --input "*)
+            case "$rest" in (*/issues*) ;; (*) scheduled && deny scheduled-git "" "a scheduled run writes only the target's issue comments and labels";; esac;; esac;;
         (pr) case "$rest" in (" pr create "*|" pr merge "*) scheduled && deny scheduled-git "" "a scheduled run never opens or merges a PR";; esac;;
       esac
       case "$sub" in (pr|repo|release|run|workflow|browse|gist|search|cache|attestation|codespace|ruleset|project)

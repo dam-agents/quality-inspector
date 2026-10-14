@@ -7,6 +7,18 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.11.0 — 2026-10-14
+
+**Upgrade:**
+1. **operator-only:** run the commands `bash "$HOME/scripts/egress-rules.sh" --kit`
+   prints, skipping the rules the agent already has ([docs/black-box.md](docs/black-box.md)
+   → **Egress rules**): the kit's denies (GraphQL, code search, `/repositories/*`, gists,
+   the code hosts) and `GET` denies for the target's issue timelines and events — the
+   earlier method-`*` ones lost to the `GET` issues allow.
+2. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:` — the
+   probes now also cover GraphQL, code search, a repository by number, the target's web
+   archive and the code hosts, and report a `404` as unproven instead of refused.
+
 ## 2.10.0 — 2026-10-14
 
 **Upgrade:**

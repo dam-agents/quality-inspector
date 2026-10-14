@@ -51,6 +51,7 @@ warn() { WARNS=$((WARNS+1)); printf 'warn %s — %s\n' "$1" "$2"; }
 . "$SCRIPT_DIR/lib/config.sh" || { echo "cannot source lib/config.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/state.sh" || { echo "cannot source lib/state.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/profile.sh" || { echo "cannot source lib/profile.sh" >&2; exit 1; }
+. "$SCRIPT_DIR/lib/boundary.sh" || { echo "cannot source lib/boundary.sh" >&2; exit 1; }
 
 SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-benchmark-monthly quality-inspector-security-weekly quality-inspector-audit-weekly"
 KNOWN_KEYS="profile target_repo display_name qa_label retest_label marker_prefix candidate_channel
@@ -186,16 +187,13 @@ if [ "$LIVE" = 1 ]; then
   [ -n "$login" ] && ok github_identity "acting as $login" || fail github_identity "gh api user failed" "grant the GitHub connection to this agent (README → Setup)"
   timeout 20 gh api ${HA[@]+"${HA[@]}"} "repos/$RP/issues?per_page=1" >/dev/null 2>&1 \
     && ok issues_read "target issues readable" || fail issues_read "cannot list target issues" "check target_repo and the connection's repository access"
-  while read -r kind target; do
-    if [ "$kind" = gh ]; then timeout 20 gh api ${HA[@]+"${HA[@]}"} "$target" >/dev/null 2>&1; r=$?
-    else code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$target" 2>/dev/null)"
-      case "$code" in (2??) r=0;; (000) r=124;; (*) r=1;; esac; fi
-    case $r in
-      (0)   fail "boundary:${target%%\?*}" "source surface reachable" "the operator adds the deny rule (README → Black-box boundary)";;
-      (124) warn "boundary:${target%%\?*}" "request held for approval — make it an explicit deny so nobody approves it by accident";;
-      (*)   ok "boundary:${target%%\?*}" "refused";;
+  while read -r status id detail; do
+    case "$status" in
+      (fail) fail "$id" "$detail" "the operator adds the deny rule (bash scripts/egress-rules.sh)";;
+      (ok)   ok "$id" "$detail";;
+      (*)    warn "$id" "$detail";;
     esac
-  done < <(boundary_targets "$RP")
+  done < <(boundary_probe "$T")
   cv="$(profile_run versions 2>&1)" && printf '%s' "$cv" | jq -e '.candidate' >/dev/null 2>&1 \
     && ok builds "$cv" || fail builds "$cv" "fix the profile's bin/versions or its egress (profile README)"
   code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 https://api.anthropic.com/v1/models \

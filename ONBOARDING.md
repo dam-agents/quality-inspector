@@ -37,7 +37,7 @@ operator-only steps, and tick each with `complete_onboarding_step` as it is sett
 2. *Backend* — the agent runs on the backend and size the profile's README asks for
    (vm backend when it requires root).
 3. *Target repository* — the `target_repo` whose issues are tested.
-4. *Egress rules* — apply README → Black-box boundary, plus the profile's `egress`.
+4. *Egress rules* — run the commands `scripts/egress-rules.sh` prints (Step 3 shows them).
 5. *Issue comments* — enable or keep disabled.
 6. *Profile settings* — a value for every profile key it marks `ask`.
 7. *Model credential* — confirm agent steps reach Anthropic through the gateway.
@@ -222,7 +222,8 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 ```
 
 Then `bash "$HOME/scripts/verify-onboarding.sh" --config`, apply every `fix:`, and show the
-file to the operator.
+file to the operator — and the output of `bash "$HOME/scripts/egress-rules.sh"`, the
+egress commands checklist item 4 asks them to run.
 
 ## Step 4 — Reconstruct `QA.md` (only when it has no rows and comments were used before)
 

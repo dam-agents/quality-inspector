@@ -14,8 +14,10 @@ agent does not install it), which lands in the agent's skill path
 (`$HOME/.agents/skills/<name>/`, also seen as `$HOME/.claude/skills/<name>/`). It usually
 lives **in the product's own repository** — a source on that repository with `path` set
 to the profile's parent directory — so the product team versions it with the product.
-The platform fetches only that directory, and the agent's egress allows only it
-(README → Black-box boundary).
+The platform installs it from that repository's whole tarball, through this agent's
+gateway — which the black-box rules deny for the target, so a profile inside the target
+repository fails to (re)install while they hold ([black-box.md](black-box.md) →
+**Egress rules**).
 `scripts/lib/profile.sh` resolves it; `QI_PROFILE_DIR` overrides the lookup (tests,
 local development). The core never edits a profile; changes go to its own repository.
 
