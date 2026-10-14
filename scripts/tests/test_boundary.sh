@@ -75,6 +75,16 @@ deny GET https://api.bitbucket.org/2.0/repositories
 deny GET https://codeberg.org/
 allow GET https://registry.npmjs.org/@acme%2fe2e
 allow GET https://cdn01.quay.io/layer
+deny GET https://api.github.com/search/commits?q=repo:acme/widgets+x
+deny GET https://api.github.com/gists/0123abc
+deny GET https://gist.github.com/someone/0123abc
+deny GET https://gist.githubusercontent.com/someone/0123abc/raw/app.ts
+deny GET https://bitbucket.org/acme/widgets/src/main/
+deny GET https://gitea.com/acme/widgets
+deny GET https://dev.azure.com/acme/widgets/_git/widgets
+deny GET https://acme.visualstudio.com/widgets/_git/widgets
+deny GET https://sourcegraph.com/search?q=repo:acme/widgets
+deny GET https://git.sr.ht/~acme/widgets
 R
 ))"
 assert_eq "every request meets its expected verdict" "" "$verdicts"
@@ -94,6 +104,7 @@ BIN="$SANDBOX/bin"; mkdir -p "$BIN"
 cat > "$BIN/gh" <<'S'
 #!/usr/bin/env bash
 args="$*"
+printf '%s\n' "$args" >> "$STUB_DIR/gh.calls"
 case "$args" in
   *"--jq .[0].number"*) echo 7; exit 0 ;;
   *"--jq .id"*) echo 42; exit 0 ;;
@@ -118,8 +129,10 @@ out="$(probe)"
 assert_eq "every surface refused" "" "$(printf '%s\n' "$out" | grep -v '^ok ')"
 printf '%s\n' "$out" | grep -qF 'ok boundary:repos/acme/widgets/issues/7/timeline refused' \
   || { echo "  assertion failed: {issue} resolves to a real issue"; FAILED=1; }
-printf '%s\n' "$out" | grep -qF 'ok boundary:repositories/42/contents/ refused' \
-  || { echo "  assertion failed: {id} resolves to the repository id"; FAILED=1; }
+printf '%s\n' "$out" | grep -qF 'ok boundary:repositories/1/contents/ refused' \
+  || { echo "  assertion failed: a repository by number probed"; FAILED=1; }
+grep -qE '(^| )repos/acme/widgets( |$)' "$STUB_DIR/gh.calls" \
+  && { echo "  assertion failed: a probe read GET /repos/<T>, not an issues endpoint"; FAILED=1; }
 printf '%s\n' "$out" | grep -qF 'ok boundary:graphql refused' || { echo "  assertion failed: graphql probed"; FAILED=1; }
 
 out="$(STUB_OPEN='^repos/.*/contents/$|archive/' STUB_404='timeline$' STUB_HELD='gitlab' probe)"

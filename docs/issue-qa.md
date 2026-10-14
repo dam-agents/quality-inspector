@@ -47,9 +47,10 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
 5. **Author** `work/suite/tests/issue-<n>.e2e.ts` per [test-authoring.md](test-authoring.md):
    one test per testable AC, AC blocks written from the criteria file, steps found by
    exploring the candidate. Iterate until every test *reaches* its AC block on the
-   candidate. Then `bash "$HOME/scripts/check-asserts.sh" --lint <file>`: give every AC it
-   lists a discriminating check ([test-authoring.md](test-authoring.md)). One test per EX
-   too, tagged `issue-<n>-ex` ([explorations.md](explorations.md) → **Tests**). Refresh the row.
+   candidate. One test per EX too, tagged `issue-<n>-ex` ([explorations.md](explorations.md)
+   → **Tests**). Then `bash "$HOME/scripts/check-asserts.sh" --lint <file>`: give every AC in
+   `no_unique_ref` a discriminating check ([test-authoring.md](test-authoring.md)), and
+   retag every EX in `ex_with_issue_tag`. Refresh the row.
 6. **Red-green**, both runs with full evidence (video, screenshots, steps for every test):
    - `env.sh reset`, `env.sh up <baseline>`,
      `suite.sh run issue-<n>-baseline --evidence full --strict --tag issue-<n>`.

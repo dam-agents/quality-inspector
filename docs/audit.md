@@ -41,7 +41,8 @@ when `audit_report: disabled` (still append the log line).
      tested AC has a candidate video and its `AC-<k>` screenshot; AC blocks contain checks
      only; no internal identifiers or credentials in the text, the screenshots or the
      first and last frames you look at; every block `check-asserts.sh --lint` lists checks
-     state the test changed (else a warn — the AC may not discriminate); the explorations
+     state the test changed (else a warn — the AC may not discriminate), and the lint's
+     `ex_with_issue_tag` is empty (else a warn); the explorations
      file predates the test file and the report states its observations count
      ([explorations.md](explorations.md)).
    - Benchmark: the newest line of `work/benchmark/history.jsonl` — its age, accuracy and

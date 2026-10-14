@@ -17,9 +17,12 @@
 #                                                   (exploratory, promotable, retired, quarantined: never)
 #   check-asserts.sh --agent-asserts <test-file> -> the AC ids whose block calls agent.assert, one per
 #                                                   line; empty = promotable (docs/regression.md → Tiers)
-#   check-asserts.sh --lint <test-file>          -> {"unique_ids":[...], "no_unique_ref":["AC-2",...]}:
-#                                                   AC blocks naming no identifier the file declares
-#                                                   with unique( — informational (docs/test-authoring.md)
+#   check-asserts.sh --lint <test-file>          -> {"unique_ids":[...], "no_unique_ref":["AC-2",...],
+#                                                   "ex_with_issue_tag":["EX-1",...]}: AC blocks naming no
+#                                                   identifier the file declares with unique( — informational
+#                                                   (docs/test-authoring.md); EX blocks whose test carries an
+#                                                   exact issue-<n> tag, so AC runs select them — fix before
+#                                                   red-green (docs/explorations.md → Tests)
 #
 # Read-only. Exit 0 unless the arguments are wrong.
 
@@ -66,12 +69,23 @@ lint_blocks() { # <file> <ids>
   ' "$1"
 }
 
+# EX ids, one per line, whose test — the nearest `tags:` line above the block — carries an
+# exact `issue-<n>` tag (an exploration's tag is `issue-<n>-ex`).
+ex_with_issue_tag() { # <file>
+  awk -v q="'" '
+    /tags[ \t]*:/ { t = $0 }
+    match($0, /\/\/[ \t]*EX-[0-9]+[ \t]+begin/) { id=$0; sub(/.*\/\/[ \t]*/, "", id); sub(/[ \t]+begin.*/, "", id)
+      if (t ~ ("[\"`" q "]issue-[0-9]+[\"`" q "]")) print id }
+  ' "$1"
+}
+
 case "${1:-}" in
   --lint)
     [ -f "${2:-}" ] || { echo "usage: $0 --lint <test-file>" >&2; exit 2; }
     ids="$(unique_ids "$2")"
-    jq -nc --arg ids "$ids" --arg bad "$(lint_blocks "$2" "$(printf '%s' "$ids" | tr '\n' ' ')")" \
-      '{unique_ids: ($ids | split("\n") | map(select(length > 0))), no_unique_ref: ($bad | split("\n") | map(select(length > 0)))}' ;;
+    jq -nc --arg ids "$ids" --arg bad "$(lint_blocks "$2" "$(printf '%s' "$ids" | tr '\n' ' ')")" --arg ex "$(ex_with_issue_tag "$2")" \
+      '{unique_ids: ($ids | split("\n") | map(select(length > 0))), no_unique_ref: ($bad | split("\n") | map(select(length > 0))),
+        ex_with_issue_tag: ($ex | split("\n") | map(select(length > 0)))}' ;;
   --hash)
     [ -f "${2:-}" ] || { echo "usage: $0 --hash <test-file>" >&2; exit 2; }
     file_hash "$2" ;;

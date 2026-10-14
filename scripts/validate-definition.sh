@@ -103,13 +103,15 @@ else
   # The egress preset and the connections write host-wide allows (path "*") before the
   # kit's rules; a kit deny on the same tuple fails the apply, which deletes the agent.
   # A deny that names a path ("/*" for a whole host) never collides and outranks "*".
+  # A key counts on the item's "- " line too, quoted or not, before a trailing comment;
+  # scripts/egress-rules.sh reads the kit the same way (scripts/tests/test_egress_rules.sh).
   if grep -qE '^egressRules:' kit.yaml; then
     bad_denies="$(sed -n '/^egressRules:/,/^[a-z]/p' kit.yaml | awk '
-      function val(s) { sub(/^[^:]*:[[:space:]]*/, "", s); gsub(/["\047]/, "", s); return s }
+      function val(s) { sub(/^[^:]*:[[:space:]]*/, "", s); sub(/[[:space:]]+#.*$/, "", s); gsub(/["\047]/, "", s); sub(/[[:space:]]+$/, "", s); return s }
       /^  - / { if (deny && !path) print host; host = ""; deny = 0; path = 0 }
-      /^  - host:|^    host:/ { host = val($0) }
-      /^    verdict:[[:space:]]*deny/ { deny = 1 }
-      /^    pathPattern:/ { if (val($0) != "*") path = 1 }
+      /^(  - |    )host:/ { host = val($0) }
+      /^(  - |    )verdict:/ { deny = (val($0) == "deny") }
+      /^(  - |    )pathPattern:/ { pp = val($0); path = (pp != "*" && pp != "") }
       END { if (deny && !path) print host }')"
     [ -z "$bad_denies" ] \
       && pass "kit.yaml egress denies each name a path" \
