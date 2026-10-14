@@ -22,8 +22,8 @@ tags_quay() { # <repo> <pages>
   local repo="$1" pages="${2:-30}" p body
   for p in $(seq 1 "$pages"); do
     body="$(curl -fsS --max-time 20 "https://quay.io/api/v1/repository/$repo/tag/?limit=100&onlyActiveTags=true&page=$p")" || return 1
-    printf '%s' "$body" | jq -r '.tags[]? | "\(.name) \(.start_ts // 0)"'
-    [ "$(printf '%s' "$body" | jq -r '.has_additional // false')" = true ] || break
+    jq -r '.tags[]? | "\(.name) \(.start_ts // 0)"' <<<"$body" || return 1
+    [ "$(jq -r '.has_additional // false' <<<"$body")" = true ] || break
   done
 }
 
