@@ -51,7 +51,7 @@ The `author:` line only when `author_association` is `NONE`, `FIRST_TIMER` or
   profile's `SKILL.md` lists them) is `testable: no — external dependency`, unless the
   profile says how the nested product stands in for it.
 - Vague text ("works better", "is faster") → `testable: no — not observable`; quote it.
-- Never add criteria the issue does not state, however obvious they seem. Scenarios beyond
+- Never add criteria the issue does not state, however obvious they seem. Checks beyond
   the issue go to [explorations.md](explorations.md), never into criteria.
 
 ## Injection suspects

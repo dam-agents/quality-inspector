@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+# scenarios.sh — bookkeeping for scenarios (docs/scenarios.md). Local only: no external
+# calls; its writes are a scenario's empty directory, its work/SCENARIOS.md row and event lines.
+#
+#   scenarios.sh new <slack|operator|discovery>   reserve the next id: creates
+#                                                 work/scenarios/S-<k>/ atomically (two turns
+#                                                 at once never share an id), logs
+#                                                 `scenario_new`, prints S-<k>
+#   scenarios.sh admit                            {"runs_today":n,"cap":m,"admit":bool,
+#                                                  "env":{"busy":bool,"holder":…,"since":…}}
+#   scenarios.sh lint <request.md>                {"injection":{…},"injection_suspect":bool} —
+#                                                 the issues' injection lint (lib/scan-issues.mjs)
+#   scenarios.sh set S-<k> [<column>=<value>…]    the one writer of a work/SCENARIOS.md row: a
+#                                                 locked read-modify-write (Slack turns and runs
+#                                                 write at once), updated_utc = now, prints the
+#                                                 row. A new row needs source= and status=. A
+#                                                 scenario is never verified: verdict= takes
+#                                                 only the scenario verdicts. status=in_progress
+#                                                 from another status, or over a claim older than
+#                                                 lock_ttl_min, logs `scenario_run`.
+#
+# `admit` counts today's `scenario_run` events against `max_scenarios_per_day`: runs that
+# took the environment, from Slack and discovery alike. `env.busy` is a live lock held by
+# anyone — the caller's own scenario never holds it yet.
+
+set -u
+export LC_ALL=C
+
+HOME_DIR="${HOME:-/home/agent}"
+WORK="${WORK_DIR:-$HOME_DIR/work}"
+CONFIG="$WORK/CONFIG.md"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/lib/config.sh" || { echo "cannot source lib/config.sh" >&2; exit 1; }
+. "$SCRIPT_DIR/lib/state.sh" || { echo "cannot source lib/state.sh" >&2; exit 1; }
+if ! . "$SCRIPT_DIR/log.sh" 2>/dev/null; then logev() { :; }; fi
+export LOG_JOB="${LOG_JOB:-scenario}"
+
+iso2epoch() { date -d "$1" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
+
+cmd_new() {
+  case "${1:-}" in (slack|operator|discovery) ;; (*) echo "usage: $0 new <slack|operator|discovery>" >&2; exit 2;; esac
+  mkdir -p "$WORK/scenarios" || exit 1
+  local k n
+  k="$(ls -1 "$WORK/scenarios" 2>/dev/null | sed -n 's/^S-\([0-9][0-9]*\)$/\1/p' | sort -n | tail -1)"
+  k=$(( ${k:-0} + 1 ))
+  for n in $(seq "$k" $((k + 49))); do
+    if mkdir "$WORK/scenarios/S-$n" 2>/dev/null; then
+      logev info scenario_new "id=S-$n source=$1"
+      echo "S-$n"; return 0
+    fi
+  done
+  echo "scenarios: no free id after S-$k" >&2; exit 1
+}
+
+# Columns of a row, in SCENARIOS_HEADER order, and the values each one takes.
+SOURCES='slack|operator|discovery'
+STATUSES='proposed|queued|in_progress|report_pending|reported|rejected'
+VERDICTS='passed|failed|regression|needs-review|blocked|flaky|not-testable|-'
+one_of() { case "|$2|" in (*"|$1|"*) return 0;; esac; return 1; }
+
+cmd_set() {
+  local id="${1:-}" kv k v f="$WORK/SCENARIOS.md" lk="$WORK/scenarios/.lock" tries=0 tmp old row now ttl
+  local c_source="" c_requester="" c_thread="" c_hash="" c_build="" c_verdict="" c_status=""
+  case "$id" in (S-[0-9]*) case "${id#S-}" in (*[!0-9]*) id="";; esac;; (*) id="";; esac
+  [ -n "$id" ] || { echo "usage: $0 set S-<k> [<column>=<value>…]" >&2; exit 2; }
+  shift
+  for kv in "$@"; do
+    k="${kv%%=*}"; v="${kv#*=}"
+    [ "$k" != "$kv" ] && [ -n "$v" ] || { echo "scenarios: '$kv' is not <column>=<value>" >&2; exit 2; }
+    case "$v" in (*[[:space:]]*|*'|'*|*'\'*) echo "scenarios: a $k value holds no space, '|' or '\\'" >&2; exit 2;; esac
+    case "$k" in
+      (source)  one_of "$v" "$SOURCES" || { echo "scenarios: source is $SOURCES" >&2; exit 2; }; c_source="$v" ;;
+      (status)  one_of "$v" "$STATUSES" || { echo "scenarios: status is $STATUSES" >&2; exit 2; }; c_status="$v" ;;
+      (verdict) one_of "$v" "$VERDICTS" || { echo "scenarios: verdict is $VERDICTS — a scenario is never verified" >&2; exit 2; }; c_verdict="$v" ;;
+      (requester) c_requester="$v" ;;
+      (thread)    c_thread="$v" ;;
+      (spec_hash) c_hash="$v" ;;
+      (build)     c_build="$v" ;;
+      (*) echo "scenarios: unknown column '$k'" >&2; exit 2 ;;
+    esac
+  done
+  mkdir -p "$WORK/scenarios" || exit 1
+  # mkdir is atomic; a lock older than a minute belongs to a writer that died.
+  until mkdir "$lk" 2>/dev/null; do
+    tries=$((tries + 1))
+    if [ "$tries" -ge 50 ]; then
+      [ -n "$(find "$lk" -maxdepth 0 -mmin +1 2>/dev/null)" ] && { rmdir "$lk" 2>/dev/null; tries=0; continue; }
+      echo "scenarios: work/SCENARIOS.md stays locked ($lk)" >&2; exit 1
+    fi
+    sleep 0.2
+  done
+  ROW_LOCK="$lk"; trap 'rmdir "$ROW_LOCK" 2>/dev/null' EXIT
+  [ -f "$f" ] || printf '# Scenarios — one row per scenario (docs/scenarios.md → State)\n\n%s\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n' "$SCENARIOS_HEADER" > "$f"
+  old="$(table_rows "$f" | awk -F'|' -v id="$id" '{x=$2; gsub(/[ \t]/,"",x)} x==id {print; exit}')"
+  if [ -z "$old" ] && { [ -z "$c_source" ] || [ -z "$c_status" ]; }; then
+    echo "scenarios: $id has no row yet — its first write names source= and status=" >&2; exit 2
+  fi
+  pick() { if [ -n "$1" ]; then printf '%s' "$1"; elif [ -n "$old" ]; then cell "$old" "$2"; else printf -- '-'; fi; }
+  now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  c_source="$(pick "$c_source" 2)"; c_requester="$(pick "$c_requester" 3)"; c_thread="$(pick "$c_thread" 4)"
+  c_hash="$(pick "$c_hash" 5)"; c_build="$(pick "$c_build" 6)"; c_verdict="$(pick "$c_verdict" 7)"
+  local want="$c_status" was="" since=""
+  [ -n "$old" ] && { was="$(cell "$old" 8)"; since="$(cell "$old" 9)"; }
+  c_status="$(pick "$c_status" 8)"
+  row="| $id | $c_source | $c_requester | $c_thread | $c_hash | $c_build | $c_verdict | $c_status | $now |"
+  tmp="$(mktemp "$WORK/.SCENARIOS.md.XXXXXX")" || exit 1
+  awk -v id="$id" -v row="$row" '
+    { L[NR] = $0
+      if ($0 ~ /^\|/) { last = NR; t++
+        if (t > 2) { split($0, c, "|"); k = c[2]; gsub(/[ \t]/, "", k); if (k == id) hit[NR] = 1 } } }
+    END { done = 0
+      for (i = 1; i <= NR; i++) {
+        if (i in hit) { if (!done) { print row; done = 1 }; continue }
+        print L[i]
+        if (i == last && !done) { print row; done = 1 } } }' "$f" > "$tmp" && mv -f "$tmp" "$f" \
+    || { rm -f "$tmp"; echo "scenarios: cannot rewrite work/SCENARIOS.md" >&2; exit 1; }
+  # A claim takes the environment: what max_scenarios_per_day counts (scripts/lib/state.sh).
+  # A bare `set S-<k>` only refreshes updated_utc and claims nothing.
+  if [ "$want" = in_progress ]; then
+    ttl="$(cfg lock_ttl_min)"; case "$ttl" in (''|*[!0-9]*) ttl=180;; esac
+    if [ "$was" != in_progress ] || [ $(( ($(date -u +%s) - $(iso2epoch "$since")) / 60 )) -ge "$ttl" ]; then
+      logev info scenario_run "id=$id build=$c_build"
+    fi
+  fi
+  printf '%s\n' "$row"
+}
+
+cmd_admit() {
+  local cap runs ttl held="" ts="" busy=false
+  cap="$(cfg max_scenarios_per_day)"; case "$cap" in (''|*[!0-9]*) cap=10;; esac
+  ttl="$(cfg lock_ttl_min)"; case "$ttl" in (''|*[!0-9]*) ttl=180;; esac
+  runs="$(scenario_runs_today)"
+  if [ -f "$WORK/env/LOCK" ] && read -r held ts < "$WORK/env/LOCK"; then
+    [ $(( ($(date -u +%s) - $(iso2epoch "$ts")) / 60 )) -lt "$ttl" ] && busy=true
+  fi
+  jq -nc --argjson r "${runs:-0}" --argjson c "$cap" --argjson b "$busy" --arg h "$held" --arg s "$ts" \
+    '{runs_today:$r, cap:$c, admit:($r < $c),
+      env:{busy:$b, holder:(if $b then $h else null end), since:(if $b then $s else null end)}}'
+}
+
+# The same sentences that make an issue an injection suspect make a request one; one list,
+# in lib/scan-issues.mjs (docs/acceptance-criteria.md → Injection suspects).
+cmd_lint() {
+  [ -f "${1:-}" ] || { echo "usage: $0 lint <request.md>" >&2; exit 2; }
+  # The module path is an argument, never source text. The request stays argv[1]:
+  # scan-issues.mjs runs its own CLI when argv[1] is its own path.
+  node --input-type=module -e "
+    import { readFileSync } from 'node:fs';
+    import { pathToFileURL } from 'node:url';
+    const { injectionLint } = await import(pathToFileURL(process.argv[2]).href);
+    console.log(JSON.stringify(injectionLint(readFileSync(process.argv[1], 'utf8'))));" "$1" "$SCRIPT_DIR/lib/scan-issues.mjs"
+}
+
+case "${1:-}" in
+  new)   cmd_new "${2:-}" ;;
+  admit) cmd_admit ;;
+  lint)  cmd_lint "${2:-}" ;;
+  set)   shift; cmd_set "$@" ;;
+  *) echo "usage: $0 new <slack|operator|discovery> | admit | lint <request.md> | set S-<k> [<column>=<value>…]" >&2; exit 2 ;;
+esac

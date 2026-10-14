@@ -7,20 +7,21 @@ Two layers under `work/`, both append-only, never loaded whole into context (`ta
 
 | File | Writer | Line |
 | --- | --- | --- |
-| `work/ISSUES.log` | pre-flight (every call, declined ones included) and you (`ran …`) | `<ISO> candidate=<c> baseline=<b> due=<n> reports=<n> deferred=<n>` / `<ISO> ran issues=<…> verdicts=<…>` / `<ISO> busy holder=<o>` |
+| `work/ISSUES.log` | pre-flight (every call, declined ones included) and you (`ran …`) | `<ISO> candidate=<c> baseline=<b> due=<n> reports=<n> deferred=<n> scenarios=<n>` / `<ISO> ran issues=<…> verdicts=<…>` / `<ISO> busy holder=<o>` |
 | `work/REGRESSION.log` | pre-flight and you | `<ISO> due candidate=<c> tests=<n>` / `<ISO> ran candidate=<c> passed=… failed=… drift=… replayed=… handed_off=… missed=…` |
 | `work/SECURITY.log` | pre-flight and you | `<ISO> due candidate=<c> inventory=<yes\|no>` / `<ISO> ran candidate=<c> critical=<n> high=<n> medium=<n> low=<n> info=<n> skipped=<n>` |
+| `work/DISCOVERY.log` | pre-flight and you | `<ISO> due candidate=<c> budget=<n>` / `<ISO> ran candidate=<c> proposed=<n> rejected=<n> passed=<n> failed=<n> regression=<n>` |
 | `work/AUDIT.log` | you | `<ISO> ok=<n> warn=<n> red=<n> sent=chat` |
 
 A failure line starts `<ISO> ERROR: ` — one grep finds them. The pre-flight keys
-"already regression-tested" and "already security-tested" on `ran candidate=`; never write
+"already regression-tested", "already security-tested" and "already explored" on `ran candidate=`; never write
 that prefix for a run that did not finish.
 
 ## Structured events — `work/logs/events-YYYY-MM-DD.jsonl`
 
 Written through `scripts/log.sh` (`logev <level> <event> <msg>`), one JSON line
 `{ts, run, job, level, event, msg}`, secrets masked before writing. Set `LOG_JOB` to the
-run type (`issues`, `regression`, `security`, `audit`, `session`).
+run type (`issues`, `regression`, `security`, `scenario`, `discovery`, `audit`, `session`).
 
 | Event | Writer | `msg` grammar (parsed) |
 | --- | --- | --- |
@@ -34,6 +35,11 @@ run type (`issues`, `regression`, `security`, `audit`, `session`).
 | `issue_budget_exceeded` | you | `issue=<n> budget=<wallclock\|model_steps> used=<n> limit=<n>` |
 | `triage` | you | `issue=<n> ac=<k> category=<c> basis=<…>` |
 | `heal` | you | `issue=<n> ac=<k> old=<hash> new=<hash>` |
+| `scenario_new` | `scripts/scenarios.sh` | `id=S-<k> source=<s>` |
+| `scenario_run` | `scripts/scenarios.sh` (`set … status=in_progress`) | `id=S-<k> build=<c>` — what `max_scenarios_per_day` counts |
+| `scenario_done` / `scenario_abort` | you | `id=S-<k> verdict=<v>` / `id=S-<k> reason=<environment\|budget\|…>` |
+| `scenario_injection_suspect` / `scenario_saved` / `scenario_declined` | you | `id=S-<k> sentences=<k>` / `id=S-<k> by=<user id>` / `intent=<intent>` |
+| `discovery_done` | you | `candidate=<c> proposed=<n> rejected=<n>` |
 | `security_run` | you | `candidate=<c> critical=<n> high=<n> medium=<n> low=<n> skipped=<n>` |
 | `env_up` / `env_reset` / `env_failed` / `env_lock_takeover` | `scripts/env.sh` | free text |
 | `suite_run` / `suite_failed` | `scripts/suite.sh` | `<label> exit=<rc>` / free text |
@@ -69,5 +75,8 @@ never holds a space (`%20`), and `intent` and its outcome share `surface`, `issu
 | `label` | the label name | `target_repo` |
 | `artifact` | `<ac_hash>@<candidate>`; regression: `issue=-`, `regression@<candidate>` | `artifact:<id>`, `artifact:new` before a first create |
 | `definition_issue` | 12-hex sha256 of the `failures[]` signature; `issue=-` | `<definition repo>`, `#<n>` appended on `done` |
+| `slack` | a scenario's answer `S-<k>:<spec_hash>`, a digest `digest@<candidate>`; `issue=-` | the conversation id |
+
+A scenario's artifact is surface `artifact`, `issue=-`, key `S-<k>:<spec_hash>@<build>`.
 
 The audit's `ledger_reconcile` checks it against GitHub ([audit.md](audit.md)).

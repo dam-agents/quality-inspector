@@ -4,7 +4,7 @@ import { expect, credentials } from 'e2e';
 // Signs each provided role in once per run and saves its session under the role's name:
 // the owner always, member / viewer / outsider only when the profile wrote a username for
 // them (docs/explorations.md → Identities). Agent-maintained: adjust the steps to what the
-// nested platform actually shows, keeping the final check and the session names.
+// nested product actually shows, keeping the final check and the session names.
 const ROLES = ['owner', 'member', 'viewer', 'outsider'] as const;
 const provided = ROLES.filter((role) => role === 'owner' || (process.env[`E2E_USER_${role.toUpperCase()}_USERNAME`] ?? '') !== '');
 

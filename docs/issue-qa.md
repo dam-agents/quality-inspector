@@ -94,7 +94,8 @@ work the same way ([nested-env.md](nested-env.md) → **Budgets**).
 ## Self-check before ending the run
 
 - Every `issues_due` entry ended `reported`, `report_pending` (delivery failed, logged),
-  or restored with an `issue_abort` event.
+  or restored with an `issue_abort` event. Every `scenarios_due` entry ended `reported`,
+  `report_pending` or `queued`, never `in_progress` ([scenarios.md](scenarios.md)).
 - Every send of this run has its `intent` and `done`/`failed` ledger lines
   ([logging.md](logging.md) → **Ledger of external writes**).
 - `criteria-<ac_hash>.md` and `explorations-<ac_hash>.md` predate the first test file edit of this run.

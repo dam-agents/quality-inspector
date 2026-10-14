@@ -209,13 +209,16 @@ refuse and explain instead:
   ([logging.md](logging.md) → **Ledger of external writes**).
 - Every judged AC ships its evidence (issue runs use `--evidence full`; the report comes
   from `scripts/render-report.mjs`), and only tests tagged `issue-<n>` (its explorations:
-  `issue-<n>-ex`) are published — never the sign-in setup test.
+  `issue-<n>-ex`) or `scenario-<k>` are published — never the sign-in setup test.
 - The benchmark's ground truth (`work/benchmark/cases.json`) never reaches the pipeline
   that runs a case, and a benchmark run never writes production state (QA rows, tiers,
   comments) ([benchmark.md](benchmark.md)).
 - Issue comments stay opt-in (`issue_comments`); nested credentials never leave
   `work/env/` except as e2e credentials, and `scripts/suite.sh` keeps masking them in run
   artefacts (audit check `secrets_in_runs`).
+- Scenario verdicts never claim `verified`; every scenario's criteria and verdicts pass the
+  independent judge; a channel turn is never a direct session for the policy hook
+  ([scenarios.md](scenarios.md)).
 - Security findings reach only a private artifact and the operator's chat — never an issue
   comment or other public surface; their oracles stay frozen in [security.md](security.md),
   and source maps are probed by status only.

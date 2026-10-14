@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ui-inventory.mjs — a read-only map of the nested platform's UI for one build: every
+// ui-inventory.mjs — a read-only map of the nested product's UI for one build: every
 // reachable page pattern with its headings, navigation, buttons, tabs, form fields and
 // links, plus an accessibility snapshot and a screenshot, and the page's signals: console
 // errors, failed same-origin requests and load timing. Two maps diff into what was added,
@@ -26,7 +26,7 @@ const out = args.find((a) => !a.startsWith('--') && !/^\d+$/.test(a) && !a.start
 const opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 if (!out) { console.error('usage: ui-inventory.mjs <out-dir> [--base URL] [--max-pages N] [--depth N]'); process.exit(2); }
 const base = new URL(opt('base', process.env.APP_URL ?? 'http://localhost'));
-if (!['localhost', '127.0.0.1'].includes(base.hostname)) { console.error(`refusing ${base}: only the nested platform`); process.exit(2); }
+if (!['localhost', '127.0.0.1'].includes(base.hostname)) { console.error(`refusing ${base}: only the nested product`); process.exit(2); }
 const maxPages = Number(opt('max-pages', 60));
 const maxDepth = Number(opt('depth', 3));
 const samples = Math.max(1, Number(opt('timing-samples', 1)) || 1);

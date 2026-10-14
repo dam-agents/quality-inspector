@@ -7,10 +7,24 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 2.11.1 — 2026-10-14
+## 2.12.1 — 2026-10-14
 
 **Upgrade:**
 Nothing — engine scripts are read per run.
+
+## 2.12.0 — 2026-10-14
+
+**Upgrade:**
+1. Seed `work/SCENARIOS.md` and `work/scenarios/` as in ONBOARDING.md Step 2b (only what
+   is missing).
+2. Create the schedule `quality-inspector-scenarios-weekly` from its `kit.yaml` entry,
+   **disabled**, unless it exists (ONBOARDING.md Step 5).
+3. Offer `scenario_discovery: propose` (weekly judged scenario proposals) or `run` (also
+   tested, a few hundred thousand tokens per scenario), and `scenario_channel` for their
+   Slack digest — off when unanswered ([docs/scenarios.md](docs/scenarios.md)).
+4. **operator-only:** to take scenario requests from Slack, connect a channel to the agent
+   on the platform. The policy hook treats its turns as non-direct by itself.
+5. Run `bash "$HOME/scripts/verify-onboarding.sh"` and apply every `fix:`.
 
 ## 2.11.0 — 2026-10-14
 

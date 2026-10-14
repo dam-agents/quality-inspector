@@ -12,7 +12,7 @@
 #   .nothing_to_do == true  -> the agent ends the run immediately.
 #   otherwise               -> the agent processes the arrays per CLAUDE.md + docs/.
 #
-# Modes: issues (default) | regression | audit | benchmark | security.
+# Modes: issues (default) | regression | discovery | audit | benchmark | security.
 # Requires: bash, jq, gh, curl, sed/grep/awk, GNU date (Linux pod).
 
 set -u
@@ -79,7 +79,7 @@ retention_sweep() {
   while IFS= read -r d; do
     local owner; owner="$(dirname "$(dirname "$d")")"
     if [ -f "$owner/artifact.id" ] || [ "$art" = disabled ]; then rm -rf "$d" && n=$((n+1)); fi
-  done < <(find "$WORK/issues" "$WORK/regression" "$WORK/security" -mindepth 3 -maxdepth 3 -type d -name media -mtime +"$MEDIA_DAYS" 2>/dev/null)
+  done < <(find "$WORK/issues" "$WORK/scenarios" "$WORK/regression" "$WORK/security" -mindepth 3 -maxdepth 3 -type d -name media -mtime +"$MEDIA_DAYS" 2>/dev/null)
   [ "$n" -gt 0 ] && log "retention: removed $n media directories older than ${MEDIA_DAYS}d"
   return 0
 }
@@ -134,13 +134,37 @@ mode_issues() {
   [ -n "$scan" ] || fail_out "the issue scan failed (node scripts/lib/scan-issues.mjs)"
   due="$(jq -c .due <<<"$scan")"; reports="$(jq -c .reports <<<"$scan")"; deferred="$(jq -r .deferred <<<"$scan")"
   while IFS= read -r l; do log "$l"; done < <(jq -r '.logs[]' <<<"$scan")
+  local scen sc; scen="$(scenarios_due)"; [ -n "$scen" ] || scen='[]'; sc="$(printf '%s' "$scen" | jq length)"
+  [ "$sc" = 0 ] || log "$sc scenario(s) waiting: $(printf '%s' "$scen" | jq -r 'map(.id + " " + .kind) | join(", ")')"
+  [ "$(scenario_runs_today)" -ge "$SCEN_CAP" ] && table_rows "$WORK/SCENARIOS.md" | grep -qE '\| *queued *\|' \
+    && log "daily scenario cap reached ($SCEN_CAP) — queued scenarios wait for the next UTC day"
   local count rc; count="$(printf '%s' "$due" | jq length)"; rc="$(printf '%s' "$reports" | jq length)"
-  runlog ISSUES "candidate=$candidate baseline=${baseline:-none} due=$count reports=$rc deferred=$deferred"
+  runlog ISSUES "candidate=$candidate baseline=${baseline:-none} due=$count reports=$rc deferred=$deferred scenarios=$sc"
   jq -nc --arg mode issues --arg c "$candidate" --arg b "$baseline" \
-    --argjson due "$due" --argjson rep "$reports" --argjson logs "$(logs_json)" \
-    '{mode:$mode, nothing_to_do:(($due|length)==0 and ($rep|length)==0),
+    --argjson due "$due" --argjson rep "$reports" --argjson scen "$scen" --argjson logs "$(logs_json)" \
+    '{mode:$mode, nothing_to_do:(($due|length)==0 and ($rep|length)==0 and ($scen|length)==0),
       candidate:$c, baseline:(if $b=="" then null else $b end),
-      issues_due:$due, reports_due:$rep, logs:$logs}'
+      issues_due:$due, reports_due:$rep, scenarios_due:$scen, logs:$logs}'
+}
+
+# Scenarios this run takes over (docs/scenarios.md → Waiting scenarios): frozen and
+# waiting for the environment, abandoned in_progress past the TTL, or finished with an
+# undelivered report. Oldest first. A full daily cap holds back the runs (not the
+# deliveries), so a waiting queue does not wake a model every hour for nothing.
+SCEN_CAP="$(cfg max_scenarios_per_day)"; case "$SCEN_CAP" in (''|*[!0-9]*) SCEN_CAP=10;; esac
+scenarios_due() {
+  local row id st upd kind full=0
+  [ "$(scenario_runs_today)" -ge "$SCEN_CAP" ] && full=1
+  table_rows "$WORK/SCENARIOS.md" | while IFS= read -r row; do
+    [ -n "$row" ] || continue
+    id="$(cell "$row" 1)"; st="$(cell "$row" 8)"; upd="$(cell "$row" 9)"; kind=""
+    case "$st" in
+      (queued) [ "$full" = 0 ] && kind=queued ;;
+      (report_pending) kind=report ;;
+      (in_progress) [ "$full" = 0 ] && [ $(( (NOW_EPOCH - $(iso2epoch "$upd")) / 60 )) -ge "$LOCK_TTL_MIN" ] && kind=takeover ;;
+    esac
+    [ -n "$kind" ] && printf '%s\t%s\t%s\n' "$upd" "$id" "$kind"
+  done | sort | jq -R 'split("\t") | {id: .[1], kind: .[2]}' | jq -sc .
 }
 
 # ======================================================== REGRESSION MODE ====
@@ -296,6 +320,10 @@ mode_audit() {
     r_upd="$(cell "$row" 7)"
     [ $(( (NOW_EPOCH - $(iso2epoch "$r_upd")) / 60 )) -ge "$LOCK_TTL_MIN" ] && stale=$((stale+1))
   done < <(table_rows "$WORK/QA.md")
+  while IFS= read -r row; do
+    [ -n "$row" ] && [ "$(cell "$row" 8)" = in_progress ] || continue
+    [ $(( (NOW_EPOCH - $(iso2epoch "$(cell "$row" 9)")) / 60 )) -ge "$LOCK_TTL_MIN" ] && stale=$((stale+1))
+  done < <(table_rows "$WORK/SCENARIOS.md")
   [ "$stale" = 0 ] && check stale_locks ok "none" || check stale_locks warn "$stale in_progress rows past the TTL"
   ledger_reconcile "$login" "$week_ago"
   local drift; drift="$(bash "$SCRIPT_DIR/check-asserts.sh" --json 2>/dev/null | jq -c '.drift // []' 2>/dev/null)"
@@ -307,7 +335,7 @@ mode_audit() {
   local map cov=null
   map="$(ls -1t "$WORK"/inventory/*/inventory.json 2>/dev/null | head -1)"
   if [ -n "$map" ]; then
-    cov="$(find "$WORK/suite/tests" -name 'issue-*.e2e.ts' 2>/dev/null | sort \
+    cov="$(find "$WORK/suite/tests" \( -name 'issue-*.e2e.ts' -o -name 'scenario-*.e2e.ts' \) 2>/dev/null | sort \
            | xargs node "$SCRIPT_DIR/coverage.mjs" "$map" "$WORK/SUITE.md" 2>/dev/null \
            | jq -c '{pages:(.pages|length), covered:([.pages[]|select(.covered)]|length), uncovered:(.uncovered|length), nav_without_golden_path:(.nav_without_golden_path|length)}' 2>/dev/null)"
     [ -n "$cov" ] || cov=null
@@ -354,15 +382,20 @@ mode_audit() {
   esac
 
   # criteria_injection: the week's frozen criteria quoting links, code or hidden comments, and
-  # the issues the agent logged as injection suspects (docs/acceptance-criteria.md).
-  local inj_files inj_events
-  inj_files="$(find "$WORK/issues" -mindepth 2 -maxdepth 2 -name 'criteria-*.md' -mtime -7 2>/dev/null \
-    | while read -r f; do grep -qE 'https?://|www\.|^[[:space:]]*(```|~~~)|<!--' "$f" && basename "$(dirname "$f")"; done | sort -un | paste -sd, -)"
-  inj_events="$(cat "$WORK"/logs/events-*.jsonl 2>/dev/null | jq -r --arg since "$week_ago" \
-    'select(.event == "issue_injection_suspect" and .ts >= $since) | .msg | capture("issue=(?<n>[0-9]+)").n' 2>/dev/null \
-    | sort -un | paste -sd, -)"
-  if [ -z "$inj_files$inj_events" ]; then check criteria_injection ok "no injection suspects this week"
-  else check criteria_injection warn "criteria quoting URLs/code/comments: ${inj_files:-none}; injection_suspect issues: ${inj_events:-none}"; fi
+  # the issues and scenarios the agent logged as injection suspects (docs/acceptance-criteria.md);
+  # a scenario's words come from anyone in a bound Slack conversation (docs/scenarios.md).
+  local inj_files inj_events inj_scen inj_sev
+  quoting() { find "$1" -mindepth 2 -maxdepth 2 -name 'criteria-*.md' -mtime -7 2>/dev/null \
+    | while read -r f; do grep -qE 'https?://|www\.|^[[:space:]]*(```|~~~)|<!--' "$f" && basename "$(dirname "$f")"; done; }
+  suspects() { cat "$WORK"/logs/events-*.jsonl 2>/dev/null | jq -r --arg since "$week_ago" --arg e "$1" --arg re "$2" \
+    'select(.event == $e and .ts >= $since) | .msg | capture($re).n' 2>/dev/null; }
+  inj_files="$(quoting "$WORK/issues" | sort -un | paste -sd, -)"
+  inj_scen="$(quoting "$WORK/scenarios" | sort -u | paste -sd, -)"
+  inj_files="${inj_files}${inj_files:+${inj_scen:+,}}${inj_scen}"
+  inj_events="$(suspects issue_injection_suspect 'issue=(?<n>[0-9]+)' | sort -un | paste -sd, -)"
+  inj_sev="$(suspects scenario_injection_suspect 'id=(?<n>S-[0-9]+)' | sort -u | paste -sd, -)"
+  if [ -z "$inj_files$inj_events$inj_sev" ]; then check criteria_injection ok "no injection suspects this week"
+  else check criteria_injection warn "criteria quoting URLs/code/comments: ${inj_files:-none}; injection_suspect issues: ${inj_events:-none}${inj_sev:+; injection_suspect scenarios: $inj_sev}"; fi
   find "$WORK/logs" -name 'events-*.jsonl' -mtime +14 -delete 2>/dev/null || true
   # UI maps: the newest three builds; the newest is the next diff's starting point.
   ls -1dt "$WORK"/inventory/*/ 2>/dev/null | tail -n +4 | while read -r d; do rm -rf "$d"; done
@@ -372,6 +405,11 @@ mode_audit() {
   stats="$(table_rows "$WORK/QA.md" | awk -F'|' -v since="$week_ago" '{u=$8; v=$6; gsub(/[ \t]/,"",u); gsub(/[ \t]/,"",v)} u>=since {print v}' \
            | jq -R . | jq -sc 'group_by(.) | map({key:.[0], value:length}) | from_entries')"
   [ -n "$stats" ] || stats='{}'
+  # scenarios touched this week, by source/verdict (docs/scenarios.md)
+  local sstats
+  sstats="$(table_rows "$WORK/SCENARIOS.md" | awk -F'|' -v since="$week_ago" '{u=$10; s=$3; v=$8; gsub(/[ \t]/,"",u); gsub(/[ \t]/,"",s); gsub(/[ \t]/,"",v)} u>=since {print s "/" v}' \
+            | jq -R . | jq -sc 'group_by(.) | map({key:.[0], value:length}) | from_entries')"
+  [ -n "$sstats" ] || sstats='{}'
   # needs-review signal items (context.signals, docs/triage.md) per week starting Monday
   # UTC, newest eight weeks, from the regression verdicts files; an unreadable file is skipped.
   local f sigweeks
@@ -385,13 +423,51 @@ mode_audit() {
   stats="$(jq -nc --argjson v "$stats" --arg runs "$(count_lines '' "$WORK/ISSUES.log")" \
     --arg reg "$(count_lines 'ran candidate=' "$WORK/REGRESSION.log")" \
     --arg heals "$(count_lines '^| 20' "$WORK/HEALS.md")" --argjson sw "$sigweeks" \
-    --argjson cov "$cov" \
-    '{verdicts_7d:$v, issues_preflights_total:($runs|tonumber), regression_runs_total:($reg|tonumber), heals_total:($heals|tonumber),
+    --argjson cov "$cov" --argjson sc "$sstats" \
+    '{verdicts_7d:$v, scenarios_7d:$sc, issues_preflights_total:($runs|tonumber), regression_runs_total:($reg|tonumber), heals_total:($heals|tonumber),
       signals_by_week:$sw, coverage:$cov}')"
 
   runlog AUDIT_PREFLIGHT "checks=$(printf '%s' "$CHECKS" | jq length)"
   jq -nc --argjson c "$CHECKS" --argjson f "$failures" --argjson s "$stats" --argjson logs "$(logs_json)" \
     '{mode:"audit", nothing_to_do:false, checks:$c, failures:$f, stats:$s, logs:$logs}'
+}
+
+# ========================================================== DISCOVERY MODE ====
+# Due when scenario_discovery proposes, the candidate was not explored yet, and (for
+# `run`) today's scenario cap leaves room. docs/scenarios.md → Discovery.
+mode_discovery() {
+  local mode versions candidate baseline last per runs budget
+  mode="$(cfg scenario_discovery)"
+  case "$mode" in
+    (propose|run) ;;
+    (*) log "scenario discovery is disabled (scenario_discovery: ${mode:-disabled})"; runlog DISCOVERY "skip=disabled"
+        jq -nc --argjson logs "$(logs_json)" '{mode:"discovery", nothing_to_do:true, logs:$logs}'; return ;;
+  esac
+  env_busy_out DISCOVERY
+  versions="$(versions_json 2>/dev/null)" || fail_out "cannot resolve product builds"
+  candidate="$(printf '%s' "$versions" | jq -r .candidate)"
+  baseline="$(printf '%s' "$versions" | jq -r '.baseline // empty')"
+  last="$(grep -o 'ran candidate=[^ ]*' "$WORK/DISCOVERY.log" 2>/dev/null | tail -1 | cut -d= -f2)"
+  if [ "$last" = "$candidate" ]; then
+    log "candidate $candidate already explored"; runlog DISCOVERY "skip=same-candidate candidate=$candidate"
+    jq -nc --arg c "$candidate" --argjson logs "$(logs_json)" '{mode:"discovery", nothing_to_do:true, candidate:$c, logs:$logs}'; return
+  fi
+  per="$(cfg max_scenarios_per_run)"; case "$per" in (''|*[!0-9]*) per=3;; esac
+  budget="$per"
+  if [ "$mode" = run ]; then
+    runs="$(scenario_runs_today)"
+    [ $((SCEN_CAP - runs)) -lt "$budget" ] && budget=$((SCEN_CAP - runs))
+    [ "$budget" -lt 0 ] && budget=0
+  fi
+  if [ "$budget" = 0 ]; then
+    log "no scenario budget left (max_scenarios_per_run / max_scenarios_per_day)"; runlog DISCOVERY "skip=budget candidate=$candidate"
+    jq -nc --arg c "$candidate" --argjson logs "$(logs_json)" '{mode:"discovery", nothing_to_do:true, candidate:$c, logs:$logs}'; return
+  fi
+  log "candidate $candidate not explored yet (last: ${last:-never}) — due, budget $budget"
+  runlog DISCOVERY "due candidate=$candidate budget=$budget"
+  jq -nc --arg m "$mode" --arg c "$candidate" --arg b "$baseline" --arg p "$last" --argjson n "$budget" --argjson logs "$(logs_json)" \
+    '{mode:"discovery", nothing_to_do:false, discovery:$m, candidate:$c, baseline:(if $b=="" then null else $b end),
+      previous_candidate:(if $p=="" then null else $p end), budget:$n, logs:$logs}'
 }
 
 # ========================================================== BENCHMARK MODE ====
@@ -436,6 +512,7 @@ case "$MODE" in
   security)   mode_security ;;
   issues)     mode_issues ;;
   regression) mode_regression ;;
+  discovery)  mode_discovery ;;
   audit)      mode_audit ;;
   *)          fail_out "unknown mode: $MODE" ;;
 esac
