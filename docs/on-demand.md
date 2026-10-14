@@ -39,5 +39,8 @@ scheduled ([persistence.md](persistence.md) → **Scheduled or direct session**)
   ignoring "already tested".
 - **"run the security checks"** — [security.md](security.md) → **The run** with the current candidate, ignoring "already tested".
 - **"show the environment"** — `env.sh status` plus non-running pods; read-only.
+- **"back up now"** — `bash "$HOME/scripts/work-backup.sh" persist`, then `… check`; a
+  deletion the operator confirms passes with `persist --allow-delete`. **"restore from the
+  backup"** — fresh volume only: [persistence.md](persistence.md) → **Backup & restore**.
 - **Configuration changes** — CLAUDE.md → Runtime configuration (refuse `marker_prefix`
   after first use). **Definition changes** — [self-modification.md](self-modification.md).

@@ -7,6 +7,21 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.16.0 — 2026-10-14
+
+**Upgrade:**
+1. Run `bash "$HOME/scripts/hooks/install.sh"` — it adds the Stop backup hook, a no-op until
+   `work_repo` is set; it applies from the next session.
+2. Offer `work_repo` (unset = local-only): a private repository the Stop hook backs `work/` up
+   to after every turn, so the suite, replay cache, criteria and state survive a lost volume or
+   a move to another pod ([docs/persistence.md](docs/persistence.md) → **Backup & restore**). On a
+   yes — **operator-only:** create the private repository (empty), give the connection's account
+   Contents read & write on it, protect its `main` for that account where the GitHub plan offers
+   protection on a private repository, run the work backup lines
+   `bash "$HOME/scripts/egress-rules.sh"` prints; then write the key and run
+   `bash "$HOME/scripts/work-backup.sh" persist` and `… check` in the direct session.
+3. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:`.
+
 ## 2.15.0 — 2026-10-14
 
 **Upgrade:**

@@ -111,3 +111,8 @@
 {"name":"webfetch repo page","expect":"deny","rule":"repo-web","tool":"WebFetch","input":{"url":"https://github.com/acme/widgets/blob/main/src/app.ts","prompt":"x"}}
 {"name":"websearch repo","expect":"deny","rule":"repo-web","tool":"WebSearch","input":{"query":"site:github.com/acme/widgets session store"}}
 {"name":"webfetch another repository","expect":"allow","tool":"WebFetch","input":{"url":"https://github.com/other/tool/blob/main/README.md","prompt":"x"}}
+{"name":"backup remote override","expect":"deny","rule":"backup-override","tool":"Bash","input":{"command":"QI_WORK_BACKUP_REMOTE=https://github.com/other/x.git bash \"$HOME/scripts/work-backup.sh\" persist"}}
+{"name":"backup by hand, scheduled","mode":"scheduled","expect":"deny","rule":"backup-direct","tool":"Bash","input":{"command":"bash \"$HOME/scripts/work-backup.sh\" persist"}}
+{"name":"restore, channel turn","mode":"channel","expect":"deny","rule":"backup-direct","tool":"Bash","input":{"command":"bash \"$HOME/scripts/work-backup.sh\" restore --force"}}
+{"name":"backup by hand, direct","expect":"allow","tool":"Bash","input":{"command":"bash \"$HOME/scripts/work-backup.sh\" persist"}}
+{"name":"restore, direct","expect":"allow","tool":"Bash","input":{"command":"LOG_JOB=session bash \"$HOME/scripts/work-backup.sh\" restore"}}
