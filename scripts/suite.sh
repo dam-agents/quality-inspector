@@ -79,7 +79,7 @@ pick_browser() {
   else
     path="$HOME_DIR/.cache/ms-playwright"
     ( cd "$SUITE" && PLAYWRIGHT_BROWSERS_PATH="$path" npx playwright-core install chromium >/dev/null 2>&1 ) \
-      || die "playwright-core $core differs from the image's $baked and its Chromium download failed (README → Black-box boundary)"
+      || die "playwright-core $core differs from the image's $baked and its Chromium download failed (docs/black-box.md → Egress rules)"
     logev warn browser_download "playwright-core $core differs from the baked $baked; Chromium installed into $path"
   fi
   printf '%s\n' "$path" > "$SUITE/.browsers-path"

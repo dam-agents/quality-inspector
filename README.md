@@ -45,7 +45,10 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
 1. **Find it under Starter kits** and open its setup page.
 2. **Grant the GitHub connection** (required) — reads the target's issues; with issue
    comments enabled it also posts verdicts and removes the retest label, so the account
-   needs issue write access on the target. Use a dedicated bot account.
+   needs issue write access on the target. Use a dedicated bot account, and where the
+   connection allows it (a GitHub App installation, a fine-grained token) only Issues on
+   the target — no Contents, Pull requests or Actions — so a fork or mirror of the source
+   stays out of reach too.
 3. **Create the agent on the vm backend** when the profile requires root (most nested
    products do). The kit asks for 8 CPU, 16 Gi and 80 Gi; the profile's README says what
    its product needs.
@@ -54,8 +57,9 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
    with path `qa`, skill `qi-profile-dam`. Onboarding checks it.
 5. **Make sure agent steps can reach Anthropic** through the gateway with an injected
    credential (the agent's provider connection). Onboarding checks it.
-6. **Apply the egress rules** below, then answer the onboarding dialog. Schedules are
-   held until onboarding completes, which includes a smoke test of the nested product.
+6. **Apply the egress rules** (Black-box boundary below), then answer the onboarding
+   dialog. Schedules are held until onboarding completes, which includes a smoke test of
+   the nested product.
 
 Not in a catalog yet? Add one entry to the catalog repository's `catalog.yaml`:
 
@@ -74,44 +78,22 @@ Create a vm-backend agent by hand, grant the GitHub connection, then send it:
 ## Black-box boundary
 
 The agent must not be able to read the target's source. Its rules say so
-([docs/black-box.md](docs/black-box.md)); the egress rules make it true. Apply them with
-the CLI (`T` = the target, e.g. `acme/widgets`; `AGENT` = this agent's name; `RL` = the
-URL-encoded `retest_label`, e.g. `qa%3Aretest`):
-
-```bash
-# The issues API — patterns end in * because the matched path includes the query string.
-dam network create "$AGENT" --host api.github.com --method GET    --path "/repos/$T/issues*"                 --yes
-dam network create "$AGENT" --host api.github.com --method POST   --path "/repos/$T/issues/*/comments*"      --yes
-dam network create "$AGENT" --host api.github.com --method DELETE --path "/repos/$T/issues/*/labels/$RL"     --yes
-# Longer than the allow above, so they win: timeline and events expose linked commits.
-dam network create "$AGENT" --host api.github.com --path "/repos/$T/issues/*/timeline*" --verdict deny --yes
-dam network create "$AGENT" --host api.github.com --path "/repos/$T/issues/*/events*"   --verdict deny --yes
-dam network create "$AGENT" --host api.github.com --path "/repos/$T/*" --verdict deny --yes
-# Source downloads: the tarball endpoint redirects to codeload, so deny the target there
-# by path — a host-wide codeload deny would also break skill installs (the profile).
-dam network create "$AGENT" --host codeload.github.com --path "/$T/*" --verdict deny --yes
-dam network create "$AGENT" --host raw.githubusercontent.com --verdict deny --yes
-dam network create "$AGENT" --host github.com --path "/$T*" --verdict deny --yes
-# Only when the profile lives in the target repository: its directory, nothing else
-# (longer than the deny above). P = the source path, e.g. qa.
-dam network create "$AGENT" --host api.github.com --method GET --path "/repos/$T/contents/$P*" --yes
-```
-
-The kit already seeds the rules every deployment shares (`registry.npmjs.org`,
-`api.anthropic.com`, a deny on `raw.githubusercontent.com`). Add `cdn.playwright.dev` only
-if `e2e`'s Playwright ever differs from the image's, then **every entry of the profile's
-`egress`** in its `profile.json` — the hosts its product needs to come up.
-
-Rules are matched by method first, then the longest path pattern, against the path
-**with its query string**; a connection grant may already allow the GitHub API host as a
-whole — **the deny rules are only proven by the probes**:
+([docs/black-box.md](docs/black-box.md)); the egress rules make it true. The kit seeds
+the ones every deployment shares: denies for GraphQL, code search and every code host
+the agent never needs (raw.githubusercontent.com, GitLab, Bitbucket, …). The target's
+rules depend on the instance, so onboarding prints them — `bash scripts/egress-rules.sh`
+— as `dam network create` commands, with the profile's `egress`; set `AGENT` to the
+agent's name and run them (`--kit` adds the kit's rules for an agent created by hand or
+from a kit before 2.11.0). A rule counts only once a probe proves it:
 `verify-onboarding.sh --live` and the weekly audit request each forbidden surface and
 fail when one answers. Approve no held request on the deny side.
 
 Inside the VM, a Claude Code `PreToolUse` hook and a `permissions.deny` list, merged into
-`~/.claude/settings.json` at onboarding, refuse the same surfaces before a tool call runs —
-plus `git clean`, container filesystems, writes outside `work/`, and commits or definition
-edits from a scheduled run ([docs/black-box.md](docs/black-box.md) → Enforcement layers).
+`~/.claude/settings.json` at onboarding, refuse the same surfaces before a tool call runs
+(a repository by number, gists, a search that does not name the target and the other code
+hosts excepted: only the egress rules hold those) — plus `git clean`, container
+filesystems, writes outside `work/`, and commits or definition edits from a scheduled run
+([docs/black-box.md](docs/black-box.md) → Enforcement layers).
 
 ## What a report looks like
 
