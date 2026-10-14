@@ -16,6 +16,9 @@ _bb_swapcase() { printf '%s' "$1" | tr 'a-zA-Z' 'A-Za-z'; }
 # profile_source_path, without leading or trailing slashes; empty = the profile lives
 # outside the target repository.
 _bb_profile_path() { cfg profile_source_path | sed -e 's|^/*||' -e 's|/*$||'; }
+# A plain directory path: a pattern character (* % ? …) or a . or .. segment in an allow
+# rule opens more than the profile's directory.
+_bb_profile_path_ok() { printf '%s' "$1" | grep -qE '^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$' && ! printf '/%s/' "$1" | grep -qE '/\.\.?/'; }
 # This definition's repository as "<host> <owner>/<repo>", from the checkout's origin
 # (https or scp-style); QI_DEFINITION_REPO (<host>/<owner>/<repo>) overrides.
 _bb_definition() {
@@ -51,7 +54,7 @@ deny GET $api $p/repos/$r/issues/events*
 EOF
   # The platform fetches a skill by directory when the archive is denied and this path
   # is not: `contents/<path>?ref=…`, then everything below `<path>/`.
-  [ -n "$pp" ] && printf 'allow GET %s %s\nallow GET %s %s\n' \
+  [ -n "$pp" ] && _bb_profile_path_ok "$pp" && printf 'allow GET %s %s\nallow GET %s %s\n' \
     "$api" "$p/repos/$r/contents/$pp/*" "$api" "$p/repos/$r/contents/$pp?*"
   if read -r dh dr < <(_bb_definition) && [ "$dh" = "$h" ] && [ "$(_bb_lower "$dr")" != "$(_bb_lower "$r")" ]; then
     printf 'allow * %s %s\nallow * %s %s\nallow * %s %s\n' "$api" "$p/repos/$dr/*" "$h" "/$dr/*" "$h" "/$dr.git/*"
@@ -59,7 +62,8 @@ EOF
   for s in "$@"; do
     [ "$(_bb_lower "$s")" = "$(_bb_lower "$r")" ] && continue
     echo "allow GET $api $p/repos/$s/*"
-    [ "$h" = github.com ] && echo "allow GET codeload.github.com /$s/*"
+    if [ "$h" = github.com ]; then echo "allow GET codeload.github.com /$s/*"
+    else printf 'allow GET %s %s\nallow GET %s %s\n' "$h" "/_codeload/$s/*" "codeload.$h" "/$s/*"; fi
   done
   echo "deny * $api /*"
   [ "$api" = "$h" ] || echo "deny * $h /*"
@@ -81,7 +85,7 @@ boundary_targets() { # <target>
   [ "$h" = github.com ] && printf '%s\n' "url https://raw.githubusercontent.com/$r/HEAD/README.md" \
     "url https://codeload.github.com/$r/tar.gz/HEAD" "url https://codeload.github.com/$R/tar.gz/HEAD"
   # Out of the profile's directory by a dot segment, which the contents API resolves.
-  [ -n "$pp" ] && printf '%s\n' "gh repos/$r/contents/$pp/.." "gh repos/$r/contents/$pp/%2e%2e"
+  [ -n "$pp" ] && _bb_profile_path_ok "$pp" && printf '%s\n' "gh repos/$r/contents/$pp/.." "gh repos/$r/contents/$pp/%2e%2e"
   dir="$(profile_dir)" && [ -f "$dir/profile.json" ] || return 0
   jq -r '.boundary.github_paths[]? // empty' "$dir/profile.json" | while read -r p; do printf 'gh repos/%s/%s\n' "$r" "${p#/}"; done
   jq -r '.boundary.urls[]? // empty' "$dir/profile.json" | sed "s|{repo}|$r|g; s|^|url |"
@@ -108,36 +112,46 @@ boundary_probe() { # <target>
     case "$code" in (''|000) case "$rc" in (124|28) code=held;; (*) code=000;; esac;; esac
     label="boundary:${target%%\?*}"
     case "$code:$target" in
-      (2??:*/..|2??:*%2e%2e) echo "fail $label source surface reachable (HTTP $code) — the gateway matches the path before resolving its dot segments, so the profile_source_path allow opens the whole repository: drop it and report the gateway";;
+      (2??:*/..|2??:*%2e%2e) echo "fail $label source surface reachable (HTTP $code): the gateway matches the path before it resolves dot segments, so the profile allows open the whole repository — empty profile_source_path, delete the profile allows, and report the gateway to the platform";;
       (2??:*|3??:*) echo "fail $label source surface reachable (HTTP $code)";;
       (403:*|000:*) echo "ok $label refused";;
       (held:*)  echo "warn $label request held for approval — make it an explicit deny so nobody approves it by accident";;
       (*)       echo "warn $label answered HTTP $code, not the gateway's refusal — the deny is unproven";;
     esac
   done < <(boundary_targets "$1")
-  # The one read the platform needs in the target: the profile's directory.
+  # The one read the platform needs in the target: the profile's directory, requested as the
+  # platform requests it — `<path>?ref=…`; the rules allow `<path>?*`, not `<path>` alone.
   local pp; pp="$(_bb_profile_path)"; [ -n "$pp" ] || return 0
-  code="$(_bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} -i "repos/$r/contents/$pp" </dev/null 2>/dev/null | awk '/^HTTP\//{print $2; exit}')"
+  _bb_profile_path_ok "$pp" || { echo "fail profile_source profile_source_path '$pp' is not a plain directory path — set the skill source's path in target_repo (no * % ?, no . or .. segment), or leave it empty"; return 0; }
+  code="$(_bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} -i "repos/$r/contents/$pp?ref=HEAD" </dev/null 2>/dev/null | awk '/^HTTP\//{print $2; exit}')"
   case "$code" in
     (2??) ;;
-    (*) echo "fail profile_source repos/$r/contents/$pp not readable (HTTP ${code:-none}) — the platform cannot (re)install the profile"; return 0;;
+    (*) echo "fail profile_source repos/$r/contents/$pp?ref=HEAD not readable (HTTP ${code:-none}), so the platform cannot (re)install the profile — apply the profile allows bash scripts/egress-rules.sh prints, and check profile_source_path against the skill source's path"; return 0;;
   esac
   local scan foreign unread
   scan="$(_bb_foreign_files "$r" "$pp")"
   foreign="$(printf '%s\n' "$scan" | sed -n 's/^foreign //p' | tr '\n' ' ')"
   unread="$(printf '%s\n' "$scan" | sed -n 's/^unreadable //p' | tr '\n' ' ')"
   if [ -n "$foreign" ]; then
-    echo "fail profile_source $pp serves content from elsewhere in the repository: ${foreign% } — the contents API answers a symlink with its target; remove the symlinks or submodules there"
+    echo "fail profile_source $pp serves content from elsewhere in the repository (the contents API answers a symlink with its target): ${foreign% } — remove those symlinks and submodules in the profile's repository"
   elif [ -n "$unread" ]; then
     echo "warn profile_source could not list or read ${unread% } — symlinks there are unchecked"
   elif printf '%s\n' "$scan" | grep -qx truncated; then
     echo "warn profile_source $pp is too large to check for symlinks"
   else
-    echo "ok profile_source repos/$r/contents/$pp readable, every file its own — the platform fetches only this directory"
+    echo "ok profile_source repos/$r/contents/$pp?ref=HEAD readable, every file its own — the platform fetches only this directory"
   fi
 }
 
-# Under <path>, one line per finding: "foreign <path>" for a file whose contents-API
+# The fix for a probe's fail line: the remedy it carries after " — ", else the generic one.
+boundary_fix() { # <detail>
+  case "$1" in
+    (*' — '*) printf '%s\n' "${1#* — }";;
+    (*) echo "the operator applies the rules bash scripts/egress-rules.sh prints (docs/black-box.md → Egress rules)";;
+  esac
+}
+
+# Under <path> at HEAD, one line per finding: "foreign <path>" for a file whose contents-API
 # answer is not the file listed there (a symlink lists the size of its link text and
 # serves its target; a submodule serves no file), "unreadable <path>" for a failed
 # request, "truncated" past 100 requests. Only the type and size are kept, never the
@@ -147,14 +161,14 @@ _bb_foreign_files() { # <owner/repo> <path>
   while [ ${#queue[@]} -gt 0 ]; do
     d="${queue[0]}"; queue=("${queue[@]:1}")
     n=$((n + 1)); [ "$n" -le 100 ] || { echo truncated; return 0; }
-    listing="$(_bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} "repos/$r/contents/$d" --jq '.[] | [.type, .path, .size] | @tsv' </dev/null 2>/dev/null)" \
+    listing="$(_bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} "repos/$r/contents/$d?ref=HEAD" --jq '.[] | [.type, .path, .size] | @tsv' </dev/null 2>/dev/null)" \
       || { echo "unreadable $d"; continue; }
     while IFS="$(printf '\t')" read -r type path size; do
       case "$type" in
         (dir) queue+=("$path");;
         (file|symlink|submodule)
           n=$((n + 1)); [ "$n" -le 100 ] || { echo truncated; return 0; }
-          got="$(_bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} "repos/$r/contents/$path" --jq '"\(.type) \(.size)"' </dev/null 2>/dev/null)" \
+          got="$(_bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} "repos/$r/contents/$path?ref=HEAD" --jq '"\(.type) \(.size)"' </dev/null 2>/dev/null)" \
             || { echo "unreadable $path"; continue; }
           [ "$got" = "file $size" ] || echo "foreign $path";;
       esac

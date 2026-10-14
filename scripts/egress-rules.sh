@@ -38,6 +38,9 @@ for s in ${SOURCES[@]+"${SOURCES[@]}"}; do
   [ "$(_bb_lower "$s")" = "$(_bb_lower "$(_bb_repo "$T")")" ] && {
     echo "--source $s is the target: a profile there takes profile_source_path, never the whole repository" >&2; exit 2; }
 done
+PP="$(_bb_profile_path)"
+[ -z "$PP" ] || _bb_profile_path_ok "$PP" || {
+  echo "profile_source_path '$PP' is not a plain directory path (no * % ?, no . or .. segment): its allow would open more than the profile's directory" >&2; exit 2; }
 
 cmd() { # <verdict> <method> <host> <path pattern> [why]
   local c="dam network create \"\$AGENT\" --host"

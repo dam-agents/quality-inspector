@@ -72,6 +72,7 @@ allow GET https://github.com/acme/quality-inspector.git/info/refs?service=git-up
 allow POST https://github.com/acme/quality-inspector.git/git-receive-pack
 allow POST https://api.github.com/repos/acme/quality-inspector/pulls
 allow GET https://api.github.com/repos/acme/widgets/contents/qa?ref=0123abc
+allow GET https://api.github.com/repos/acme/widgets/contents/qa?ref=HEAD
 allow GET https://api.github.com/repos/acme/widgets/contents/qa/qi-profile-stub?ref=0123abc
 allow GET https://api.github.com/repos/acme/widgets/contents/qa/qi-profile-stub/SKILL.md?ref=0123abc
 deny GET https://api.github.com/repos/acme/widgets/contents?ref=0123abc
@@ -101,15 +102,39 @@ bash "$SCRIPTS/egress-rules.sh" --source ACME/Widgets >/dev/null 2>&1
 assert_eq "a source naming the target is refused" "2" "$?"
 
 # A GitHub Enterprise Server target: the API under /api/v3 on the same host, which is
-# deny-by-default as a whole; the definition on github.com gets nothing there.
+# deny-by-default as a whole; the definition on github.com gets nothing there, and a
+# --source gets its archive paths there too.
 printf -- '- target_repo: ghe.acme.com/acme/widgets\n' > "$WORK_DIR/CONFIG.md"
-ghes="$(bash "$SCRIPTS/egress-rules.sh")"
+ghes="$(bash "$SCRIPTS/egress-rules.sh" --source acme/profiles)"
 for want in '--host ghe.acme.com --method GET --path "/api/v3/repos/acme/widgets/issues*" --yes' \
             '--host ghe.acme.com --path "/*" --verdict deny --yes' \
-            '--host raw.ghe.acme.com --path "/*" --verdict deny --yes'; do
+            '--host raw.ghe.acme.com --path "/*" --verdict deny --yes' \
+            '--host ghe.acme.com --method GET --path "/api/v3/repos/acme/profiles/*" --yes' \
+            '--host ghe.acme.com --method GET --path "/_codeload/acme/profiles/*" --yes' \
+            '--host codeload.ghe.acme.com --method GET --path "/acme/profiles/*" --yes'; do
   printf '%s\n' "$ghes" | grep -qF -- "$want" || { echo "  assertion failed: GHES rule: $want"; FAILED=1; }
 done
 printf '%s\n' "$ghes" | grep -q 'quality-inspector' && { echo "  assertion failed: no definition rule on another host"; FAILED=1; }
+
+# A profile_source_path that is not a plain directory path never becomes an allow.
+for bad in 'qa*' '*' '.' 'qa/../src' 'qa?x' 'qa%2f..'; do
+  printf -- '- target_repo: acme/widgets\n- profile_source_path: %s\n' "$bad" > "$WORK_DIR/CONFIG.md"
+  bash "$SCRIPTS/egress-rules.sh" >/dev/null 2>&1
+  assert_eq "egress-rules.sh refuses profile_source_path '$bad'" "2" "$?"
+done
+printf -- '- target_repo: acme/widgets\n- profile_source_path: qa*\n' > "$WORK_DIR/CONFIG.md"
+bash "$SCRIPTS/verify-onboarding.sh" --config 2>/dev/null | grep -q '^FAIL cfg:profile_source_path ' \
+  || { echo "  assertion failed: verify-onboarding --config fails a pattern in profile_source_path"; FAILED=1; }
+printf -- '- target_repo: acme/widgets\n- profile_source_path: .claude/skills\n' > "$WORK_DIR/CONFIG.md"
+bash "$SCRIPTS/egress-rules.sh" | grep -qF -- '--path "/repos/acme/widgets/contents/.claude/skills/*"' \
+  || { echo "  assertion failed: a dot-leading directory name is a plain path"; FAILED=1; }
+
+# This definition's repository from the forms an origin takes.
+defn() ( . "$SCRIPTS/lib/config.sh"; . "$SCRIPTS/lib/boundary.sh"; QI_DEFINITION_REPO="$1" _bb_definition )
+for o in git@github.com:acme/quality-inspector.git https://x:y@github.com/acme/quality-inspector.git \
+         ssh://git@github.com/acme/quality-inspector https://github.com/acme/quality-inspector/; do
+  assert_eq "the definition's repository from origin $o" "github.com acme/quality-inspector" "$(defn "$o")"
+done
 printf -- '- target_repo: acme/widgets\n- profile_source_path: qa\n' > "$WORK_DIR/CONFIG.md"
 
 # --------------------------------------------------------------- the probes
@@ -120,10 +145,10 @@ args="$*"
 case "$args" in
   *"--jq .[0].number"*) echo 7; exit 0 ;;
   *"--jq .id"*) echo 42; exit 0 ;;
-  *"contents/qa --jq"*) printf 'dir\tqa/p\t0\n'; exit 0 ;;
-  *"contents/qa/p --jq"*) [ -n "${STUB_LIST_FAIL:-}" ] && exit 1; printf 'file\tqa/p/SKILL.md\t10\nfile\tqa/p/link\t34\n'; exit 0 ;;
-  *"contents/qa/p/SKILL.md --jq"*) echo "file 10"; exit 0 ;;
-  *"contents/qa/p/link --jq"*) echo "file ${STUB_LINK_SIZE:-34}"; exit 0 ;;
+  *"contents/qa?ref=HEAD --jq"*) printf 'dir\tqa/p\t0\n'; exit 0 ;;
+  *"contents/qa/p?ref=HEAD --jq"*) [ -n "${STUB_LIST_FAIL:-}" ] && exit 1; printf 'file\tqa/p/SKILL.md\t10\nfile\tqa/p/link\t34\n'; exit 0 ;;
+  *"contents/qa/p/SKILL.md?ref=HEAD --jq"*) echo "file 10"; exit 0 ;;
+  *"contents/qa/p/link?ref=HEAD --jq"*) echo "file ${STUB_LINK_SIZE:-34}"; exit 0 ;;
 esac
 path="${*: -1}"; case "$args" in *graphql*) path=graphql;; esac
 if [ -n "${STUB_OPEN:-}" ] && printf '%s' "$path" | grep -qE "$STUB_OPEN"; then echo "HTTP/2.0 200 OK"; exit 0; fi
@@ -141,20 +166,23 @@ chmod +x "$BIN/gh" "$BIN/curl"
 probe() { ( PATH="$BIN:$PATH"; . "$SCRIPTS/lib/config.sh"; . "$SCRIPTS/lib/profile.sh"; . "$SCRIPTS/lib/boundary.sh"
             CONFIG="$WORK_DIR/CONFIG.md" boundary_probe acme/widgets ); }
 
-out="$(STUB_OPEN='contents/qa$' probe)"
+# The rules open the profile's directory as `qa?*` and `qa/*`, never `qa` alone: the stub
+# opens only that shape, so a probe that asks for `contents/qa` itself is refused.
+PROFILE_OPEN='contents/qa\?ref=HEAD$'
+out="$(STUB_OPEN="$PROFILE_OPEN" probe)"
 assert_eq "every surface refused" "" "$(printf '%s\n' "$out" | grep -v '^ok ')"
 printf '%s\n' "$out" | grep -qF 'ok boundary:repos/ACME/WIDGETS/contents/ refused' \
   || { echo "  assertion failed: the target in the other case probed"; FAILED=1; }
 printf '%s\n' "$out" | grep -qF 'ok boundary:repos/acme/widgets/contents/qa/%2e%2e refused' \
   || { echo "  assertion failed: an encoded dot segment out of the profile probed"; FAILED=1; }
-printf '%s\n' "$out" | grep -q '^ok profile_source repos/acme/widgets/contents/qa readable, every file its own' \
+printf '%s\n' "$out" | grep -qF 'ok profile_source repos/acme/widgets/contents/qa?ref=HEAD readable, every file its own' \
   || { echo "  assertion failed: the profile's directory must be readable"; FAILED=1; }
 printf '%s\n' "$(probe)" | grep -q '^fail profile_source .*not readable (HTTP 403)' \
   || { echo "  assertion failed: a refused profile directory fails"; FAILED=1; }
-printf '%s\n' "$(STUB_OPEN='contents/qa$' STUB_LINK_SIZE=7907 probe)" \
-  | grep -q '^fail profile_source qa serves content from elsewhere in the repository: qa/p/link — ' \
+printf '%s\n' "$(STUB_OPEN="$PROFILE_OPEN" STUB_LINK_SIZE=7907 probe)" \
+  | grep -qF 'fail profile_source qa serves content from elsewhere in the repository (the contents API answers a symlink with its target): qa/p/link — ' \
   || { echo "  assertion failed: a symlink out of the profile's directory fails"; FAILED=1; }
-printf '%s\n' "$(STUB_OPEN='contents/qa$' STUB_LIST_FAIL=1 probe)" \
+printf '%s\n' "$(STUB_OPEN="$PROFILE_OPEN" STUB_LIST_FAIL=1 probe)" \
   | grep -q '^warn profile_source could not list or read qa/p — symlinks there are unchecked' \
   || { echo "  assertion failed: a failed listing warns instead of passing"; FAILED=1; }
 printf '%s\n' "$out" | grep -qF 'ok boundary:repos/acme/widgets/issues/7/timeline refused' \
@@ -163,7 +191,7 @@ printf '%s\n' "$out" | grep -qF 'ok boundary:repositories/42/contents/ refused' 
   || { echo "  assertion failed: {id} resolves to the repository id"; FAILED=1; }
 printf '%s\n' "$out" | grep -qF 'ok boundary:graphql refused' || { echo "  assertion failed: graphql probed"; FAILED=1; }
 
-out="$(STUB_OPEN='^repos/.*/contents/$|archive/|contents/qa(/\.\.)?$' STUB_404='timeline$' STUB_HELD='gitlab' probe)"
+out="$(STUB_OPEN='^repos/.*/contents/$|archive/|contents/qa(/\.\.|\?ref=HEAD)$' STUB_404='timeline$' STUB_HELD='gitlab' probe)"
 assert_eq "an open surface fails" "5" "$(printf '%s\n' "$out" | grep -c '^fail ')"
 printf '%s\n' "$out" | grep -q '^fail boundary:repos/acme/widgets/contents/qa/\.\. .*dot segments' \
   || { echo "  assertion failed: a dot segment out of the profile names the gateway"; FAILED=1; }
@@ -171,5 +199,21 @@ printf '%s\n' "$out" | grep -q '^warn boundary:repos/acme/widgets/issues/7/timel
   || { echo "  assertion failed: a 404 is no proof of a deny"; FAILED=1; }
 printf '%s\n' "$out" | grep -q '^warn boundary:https://gitlab.com/ request held' \
   || { echo "  assertion failed: a held request warns"; FAILED=1; }
+
+# The fix of a fail line: its own remedy where it carries one, else the printed rules.
+fix() ( . "$SCRIPTS/lib/config.sh"; . "$SCRIPTS/lib/boundary.sh"; boundary_fix "$1" )
+dot="$(printf '%s\n' "$out" | sed -n 's|^fail boundary:repos/acme/widgets/contents/qa/\.\. ||p')"
+assert_eq "a dot-segment fail drops the profile allows, never re-applies them" \
+  "empty profile_source_path, delete the profile allows, and report the gateway to the platform" "$(fix "$dot")"
+assert_eq "a plain fail gets the printed rules" \
+  "the operator applies the rules bash scripts/egress-rules.sh prints (docs/black-box.md → Egress rules)" \
+  "$(fix "source surface reachable (HTTP 200)")"
+
+# An invalid profile_source_path fails the probe, which then requests nothing in it.
+printf -- '- target_repo: acme/widgets\n- profile_source_path: qa*\n' > "$WORK_DIR/CONFIG.md"
+out="$(probe)"
+printf '%s\n' "$out" | grep -qF "fail profile_source profile_source_path 'qa*' is not a plain directory path — " \
+  || { echo "  assertion failed: an invalid profile_source_path fails the probe"; FAILED=1; }
+printf '%s\n' "$out" | grep -q 'contents/qa\*' && { echo "  assertion failed: no probe inside an invalid profile_source_path"; FAILED=1; }
 
 exit $FAILED

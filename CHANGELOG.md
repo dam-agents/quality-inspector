@@ -22,7 +22,8 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 3. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:` — the
    probes now also cover the target in the other case and a dot segment out of the
    profile's directory, and check that directory is readable and symlink-free. A `fail`
-   on `…/contents/<path>/..` is the platform's gateway: drop the profile allow and report it.
+   on `…/contents/<path>/..` is the platform's gateway: its `fix:` empties
+   `profile_source_path` and drops the profile allows; report the gateway.
 
 ## 2.12.0 — 2026-10-14
 

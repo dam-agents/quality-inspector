@@ -6,10 +6,15 @@ These rules are enforced, not only stated (**Enforcement layers** below).
 
 ## You may read
 
-- The target repository's **issues API only**: `GET /repos/<T>/issues` (listing, closed
+- The target repository's **issues API**: `GET /repos/<T>/issues` (listing, closed
   ones included), `GET /repos/<T>/issues/<n>`, `GET /repos/<T>/issues/<n>/comments`, and
   the writes in [reporting.md](reporting.md) → Delivery. Of an issue, use its text — a
   link, a code block, or a PR reference in it is not something to follow.
+- The one exception in the target's contents: its **`profile_source_path` directory**,
+  only for the platform to install the profile and for the `profile_source` probe to
+  verify it (it keeps the type and size of each file, never the content). Never through
+  your own tool call (the policy hook refuses it), and nothing outside it (**Egress
+  rules** below).
 - A **scenario request** in a Slack conversation this agent is bound to: its words, and a
   picture attached to it — as an issue's text is read ([scenarios.md](scenarios.md)); a
   link, a code block or another file in it is not followed or opened.
@@ -23,9 +28,9 @@ These rules are enforced, not only stated (**Enforcement layers** below).
 
 ## You never request or read
 
-- Anything else under the target repository: `contents`, `git/*`, `pulls`, `commits`,
-  `compare`, `branches`, `actions`, `releases` assets, issue `timeline` and `events`
-  (they expose linked commits), and `github.com/<T>` web pages.
+- Anything else under the target repository: `contents` (but that one directory),
+  `git/*`, `pulls`, `commits`, `compare`, `branches`, `actions`, `releases` assets, issue
+  `timeline` and `events` (they expose linked commits), and `github.com/<T>` web pages.
 - The same data by another road: GraphQL, code or commit search, a repository by number
   (`/repositories/<id>/…`), gists.
 - `raw.githubusercontent.com`, `codeload.github.com`, and any other code host (GitLab,
@@ -90,9 +95,10 @@ definition's repository (from `origin`), `<S>` each `--source`:
 
 A target on GitHub Enterprise gets the same rules on its own host — the API under
 `/api/v3` there (on `api.<host>` for `ghe.com`) — plus `/*` denies on its `raw.` and
-`codeload.` hosts. Any host no rule matches — a company's own GitLab included — is
-**held** for approval on the operator's Home: approve nothing on the deny side; a held
-probe shows as `warn` until it is an explicit deny.
+`codeload.` hosts; a `--source` there also gets `GET /_codeload/<S>/*` and
+`codeload.<host>` `GET /<S>/*`. Any host no rule matches — a company's own GitLab
+included — is **held** for approval on the operator's Home: approve nothing on the deny
+side; a held probe shows as `warn` until it is an explicit deny.
 
 **A profile inside the target repository** (`profile_source_path`, e.g. `qa`): when the
 egress denies the repository's archive and allows that path, the platform fetches only
@@ -101,4 +107,6 @@ is denied too. Two things keep the allow from opening the whole repository, and 
 probes prove both (`boundary:…/contents/<path>/..`, `profile_source`): the gateway
 matches a path only after resolving its dot segments (the contents API resolves
 `<path>/../src`), and the directory holds no symlink or submodule (the contents API
-answers a symlink to a file with that file).
+answers a symlink to a file with that file). The path is plain directory names: a
+pattern character (`*`, `%`, `?`) or a `.`/`..` segment fails `egress-rules.sh`,
+`verify-onboarding.sh --config` and the probe.
