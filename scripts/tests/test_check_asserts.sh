@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-asserts.sh: only AC blocks count, whitespace does not; EX blocks hash apart; agent.assert inside an AC block is named.
+# check-asserts.sh: only AC blocks count, whitespace does not; EX blocks hash apart; agent.assert inside an AC block is named; --lint names blocks without unique() data.
 . "$(dirname "$0")/lib.sh"
 f="$SANDBOX/t.e2e.ts"
 printf 'await agent.act("a");\n// AC-1 begin\nawait expect(x).toBeVisible();\n// AC-1 end\n' > "$f"
@@ -29,4 +29,22 @@ assert_eq "a changed EX check leaves the AC hash alone" "$h1" "$(bash "$SCRIPTS/
 mkdir -p "$WORK_DIR/suite/tests"; cp "$f" "$WORK_DIR/suite/tests/issue-42.e2e.ts"
 printf '| test | issue | tier | assert_hash | promoted_utc |\n| --- | --- | --- | --- | --- |\n| tests/issue-42.e2e.ts | 42 | regression | %s | 2026-10-03T08:12:40Z |\n' "$h1" > "$WORK_DIR/SUITE.md"
 assert "EX edits are not drift" '.drift == [] and .unmarked == []' "$(bash "$SCRIPTS/check-asserts.sh" --json)"
+cat > "$f" <<'T'
+const name = unique(`qa-${Date.now()}`);
+let other_id = await unique('x');
+// AC-1 begin
+await expect(screen.getByRole('heading', { name: `${name}-2` })).toBeVisible();
+// AC-1 end
+// AC-2 begin
+await expect(screen.getByRole('heading', { name: 'Settings' })).toBeVisible();
+// AC-2 end
+// AC-3 begin
+await expect(screen.getByText(other_idx)).toBeVisible();
+// AC-3 end
+T
+l="$(bash "$SCRIPTS/check-asserts.sh" --lint "$f")"
+assert "lint finds the unique() identifiers" '.unique_ids == ["name","other_id"]' "$l"
+assert "lint lists static-only and near-miss blocks" '.no_unique_ref == ["AC-2","AC-3"]' "$l"
+printf '// AC-1 begin\nawait expect(x).toBeVisible();\n// AC-1 end\n' > "$f"
+assert "no unique() at all lists every block" '.no_unique_ref == ["AC-1"] and .unique_ids == []' "$(bash "$SCRIPTS/check-asserts.sh" --lint "$f")"
 exit $FAILED

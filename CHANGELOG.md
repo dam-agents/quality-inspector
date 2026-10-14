@@ -7,6 +7,22 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.9.0 — 2026-10-14
+
+**Upgrade:**
+1. Run `bash "$HOME/scripts/verify-onboarding.sh" --config` — it now knows
+   `confirm_regressions` and `bisect_max_steps`; apply every `fix:`.
+2. Offer once per key not yet in `work/CONFIG.md`, never enable unasked (missing = off):
+   `- confirm_regressions: enabled` re-runs an unexplained regression on the previous
+   build before reporting it — one extra install (15–25 min) on a night with one, none
+   otherwise; `- bisect_max_steps: <n>` (needs the former) narrows a confirmed regression
+   over the builds in between — up to n more installs, 15–25 min each
+   ([docs/triage.md](docs/triage.md) → **Order of work**).
+3. **operator-only**, optional: the profile's maintainers may add `interfaces` (`cli`,
+   `openapi`) to its `profile.json`, and `bin/versions --between` to a profile with its
+   own `bin/versions` ([docs/profile-contract.md](docs/profile-contract.md)); the
+   interface snapshots then start on their own. Nothing else to run.
+
 ## 2.8.0 — 2026-10-14
 
 **Upgrade:**

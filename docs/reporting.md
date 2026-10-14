@@ -9,7 +9,9 @@ and the failing traces:
 
 | Candidate | Baseline | AC verdict |
 | --- | --- | --- |
-| passed | failed — assertion false, or the feature is absent | `verified` |
+| passed | failed — assertion ran and was false | `verified` |
+| passed | blocked, `baseline_blocked_reason: absent` | `verified` |
+| passed | blocked for `environment`, `model` or `setup` | `inconclusive`, with a note naming the reason |
 | passed | passed | `inconclusive` — the behaviour predates the change, or the test does not discriminate |
 | passed | not run (`baseline_channel: none`) | `inconclusive` |
 | failed — assertion ran and was false | any | `failed` |
@@ -20,6 +22,20 @@ and the failing traces:
 Issue verdict: `failed` if any AC failed; else `verified` if every testable AC is
 verified; else `partial` if at least one is verified; else `inconclusive` / `blocked`
 (a `flaky` AC counts as blocked) by majority; `not-testable` when no AC was testable.
+
+**Baseline blocked.** On the baseline the usual red is a test that ends before its AC
+block because the control the issue introduces does not exist yet. Every AC whose baseline
+run did not reach its AC block gets one `baseline_blocked_reason`:
+
+- `absent` — counts as red. The failing step acts on or waits for a control or page the
+  issue introduces (named in its criteria), the step's screenshot shows the screen without
+  it, and the failure text (the agent's, or a locator's timeout) says nothing matched.
+- `environment` (the product did not answer), `model` (the agent step failed on its own: a
+  model error, a limit, a wrong turn on a screen that has the control), `setup` (the test
+  failed before the issue's area) — not red.
+- `null` — the baseline reached the AC block, or did not run.
+
+Doubt between `absent` and the others is not `absent`: a `verified` needs the proof.
 
 A `failed` verdict claims a product defect. Before you write it, read the candidate
 trace and confirm the assertion evaluated a screen that got there the way a user would.
@@ -34,7 +50,8 @@ Your judgment, the renderer's only input besides the runs:
  "candidate_run": "issue-42-candidate", "baseline_run": "issue-42-baseline",
  "verdict": "partial", "generated_utc": "2026-10-12T19:20:00Z", "display_name": "<display_name>",
  "acs": [{"id": "AC-1", "name": "…", "given": "…", "when": "…", "then": "…", "surface": "ui",
-          "testable": true, "verdict": "verified", "note": "optional, one sentence"}],
+          "testable": true, "verdict": "verified", "baseline_blocked_reason": null,
+          "note": "optional, one sentence"}],
  "notes": ["assertion edits after the first run, blocked reasons, anything a reader needs"]}
 ```
 

@@ -44,6 +44,11 @@ test('#42 AC-1: a renamed agent keeps its sessions', { session: 'owner', tags: [
 - **The `// AC-<k> begin` / `end` block holds only the checks**, written from the
   criteria file's *Then* line before the first run. Everything before it — navigation,
   setup, `agent.act` — is free to change.
+- **Every AC block discriminates**: at least one `expect` on data the test itself created
+  (a `unique()` name) or on state the test itself changed — never only on a static page
+  element, which passes on a build without the feature. `check-asserts.sh --lint <file>`
+  lists the blocks that name no `unique()` identifier; each one listed checks changed
+  state, or gets such a check.
 - After the first candidate run, an edit inside an AC block may only repair *how* the
   same thing is located (a locator that never matched), keeping the matcher and the
   expected value. Name every such edit in the report. Promoted tests: never, without the

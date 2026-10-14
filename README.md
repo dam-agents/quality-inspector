@@ -154,6 +154,7 @@ configuration.
 | `candidate_channel`, `baseline_channel` | the profile's defaults | What is tested against what (`none` turns red-green off). |
 | `artifact_reports`, `include_comments`, `max_issues_per_run`, `lock_ttl_min`, `display_name` | defaults | Reporting and pacing. |
 | `e2e_version`, `e2e_web_version`, `e2e_model` | defaults | Test framework pins and the model for agent steps. |
+| `confirm_regressions`, `bisect_max_steps` | defaults (off) | Opt-in: confirm a regression on the previous build, then narrow it over the builds in between — extra installs. |
 | `audit_report`, `log_level`, `media_retention_days` | defaults | Audit, diagnostics, local evidence retention. |
 | `explorations`, `max_explorations_per_ac` | defaults (`enabled`, `3`) | Agent-designed scenarios beyond the criteria, reported apart from the verdict ([docs/explorations.md](docs/explorations.md)). |
 | `security_checks`, `security_failed_logins` | defaults (`enabled`, `10`) | The security run ([docs/security.md](docs/security.md)); its schedule ships off. |

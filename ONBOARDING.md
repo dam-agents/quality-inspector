@@ -200,6 +200,8 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - spec_feedback: disabled
 - auto_promote: disabled
 - media_retention_days: 14
+- confirm_regressions: disabled
+- bisect_max_steps: 0
 - max_issues_per_run: 1
 - lock_ttl_min: 180
 - e2e_version: 0.17.0

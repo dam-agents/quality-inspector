@@ -28,11 +28,13 @@ when `audit_report: disabled` (still append the log line).
      definition bug → one deduplicated issue on the definition repository (search open
      issues first) — the audit's only external write.
    - Sample up to three reports of the week: criteria file predates the test file; no
-     `verified` without a baseline failure; every tested AC has a candidate video and its
-     `AC-<k>` screenshot; AC blocks contain checks only; no internal identifiers or
-     credentials in the text, the screenshots or the first and last frames you look at;
-     the explorations file predates the test file and the report states its observations
-     count ([explorations.md](explorations.md)).
+     `verified` without a baseline failure or `baseline_blocked_reason: absent`; every
+     tested AC has a candidate video and its `AC-<k>` screenshot; AC blocks contain checks
+     only; no internal identifiers or credentials in the text, the screenshots or the
+     first and last frames you look at; every block `check-asserts.sh --lint` lists checks
+     state the test changed (else a warn — the AC may not discriminate); the explorations
+     file predates the test file and the report states its observations count
+     ([explorations.md](explorations.md)).
    - Benchmark: the newest line of `work/benchmark/history.jsonl` — its age, accuracy and
      `false_verified` (above 0 is a red line until a later run is clean); a benchmark
      never run, or older than two months with cases defined, is a warn.

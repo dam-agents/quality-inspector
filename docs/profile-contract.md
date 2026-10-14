@@ -61,6 +61,7 @@ own business) as `QI_ENGINE_CONFIG`, and never product facts of its own.
   },
   "egress": [{ "host": "registry.example.com", "method": "GET", "why": "product images" }],
   "requires": { "root": true, "commands": ["docker"], "memory_gi": 8 },
+  "interfaces": { "cli": "widgets", "openapi": "/api/openapi.json" },
   "config": {
     "image_ref": { "default": "registry.example.com/widgets", "about": "image repository the builds come from" },
     "admin_email": { "default": "", "about": "which address the seeded admin account uses", "ask": true }
@@ -84,6 +85,10 @@ own business) as `QI_ENGINE_CONFIG`, and never product facts of its own.
 - `security` (optional) — `entity`: the noun of the main object a user creates, with a
   name and a description (`"project"`); `namespace`: where its pods run, when the engine
   names none. The security run's input and deployment checks need them ([security.md](security.md)).
+- `interfaces` — optional, both fields too: `cli`, the published CLI's command (on `PATH`
+  or installed into `work/suite`), and `openapi`, the path under `app.url` that serves the
+  API description as JSON. Their snapshots are change context
+  ([change-awareness.md](change-awareness.md)); absent → no snapshot.
 - `config` — the profile's own keys, written in `work/CONFIG.md` as
   `- profile.<key>: <value>`, each with a default and an `about` sentence; `"ask": true`
   makes onboarding ask the operator instead of defaulting. The core validates that no
@@ -108,6 +113,10 @@ Every executable runs with cwd `$HOME/work`, and with:
 
 - `bin/versions` → stdout `{"candidate": "<build>", "baseline": "<build>"|null}` for the
   channels; exit non-zero with a reason on stderr when it cannot look. Never a guess.
+- `bin/versions --between <from> <to>` — **optional** → stdout a JSON array of the builds
+  published strictly between the two (same channel), oldest first; `[]` when adjacent.
+  Not implemented → exit 2 (output that is not an array counts the same); bisection is
+  then skipped with that reason ([triage.md](triage.md) → Order of work, step 6).
 - `bin/build-time <build>` → stdout one ISO-8601 UTC timestamp, the moment the build was
   published; non-zero when unknown. The change window of [change-awareness.md](change-awareness.md).
 

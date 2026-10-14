@@ -5,6 +5,10 @@
 #
 #   env.sh lock <owner> | unlock <owner>     one run at a time (exit 1 when a live holder has it)
 #   env.sh init | up <build> | reset | status | down    → the profile
+#   env.sh between <from> <to>   read-only: the profile's `bin/versions --between` — a JSON
+#                                array of builds between the two, oldest first; exit 2 when
+#                                the profile does not implement it (no array), 1 when it
+#                                cannot look (docs/triage.md → Order of work, step 6)
 #
 # Every command is idempotent; a failed `up` is safe to re-run.
 
@@ -55,10 +59,20 @@ delegate() { # <cmd> [args]
   return "$rc"
 }
 
+cmd_between() { # <from> <to>
+  local out rc
+  out="$(profile_run versions --between "$1" "$2")"; rc=$?
+  [ "$rc" = 2 ] && { echo "env: the profile cannot list builds between two builds" >&2; return 2; }
+  [ "$rc" = 0 ] || { echo "env: bin/versions --between exited $rc" >&2; return 1; }
+  printf '%s' "$out" | jq -ce 'if type == "array" then . else error("not an array") end' 2>/dev/null \
+    || { echo "env: bin/versions ignores --between (no JSON array) — treated as not implemented" >&2; return 2; }
+}
+
 case "${1:-}" in
+  between) [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "usage: $0 between <from> <to>" >&2; exit 1; }; cmd_between "$2" "$3" ;;
   lock)   cmd_lock "${2:-}" ;;
   unlock) cmd_unlock "${2:-}" ;;
   init|reset|status|down) delegate "$1" ;;
   up)     [ -n "${2:-}" ] || { echo "usage: $0 up <build>" >&2; exit 2; }; delegate up "$2" ;;
-  *) echo "usage: $0 lock <owner>|unlock <owner>|init|up <build>|reset|status|down" >&2; exit 2 ;;
+  *) echo "usage: $0 lock <owner>|unlock <owner>|init|up <build>|reset|status|down|between <from> <to>" >&2; exit 2 ;;
 esac

@@ -121,6 +121,12 @@ const VERDICT = {
 };
 const SEVERITY = { info: 'muted', minor: 'warn', major: 'bad' };
 const sevBadge = (x) => (x ? `<span class="badge ${SEVERITY[x] ?? 'muted'}">${esc(x)}</span>` : '');
+const BLOCKED = {
+  absent: 'Baseline stopped before the check because the feature is absent there — counts as the red of red-green.',
+  environment: 'Baseline stopped before the check for an environment reason — not a red; the criterion stays inconclusive.',
+  model: 'Baseline stopped before the check because an agent step failed — not a red; the criterion stays inconclusive.',
+  setup: 'Baseline stopped before the check in the test setup — not a red; the criterion stays inconclusive.',
+};
 const badge = (x) => { const [t, c] = VERDICT[x] ?? [x, 'muted']; return `<span class="badge ${c}">${esc(t)}</span>`; };
 const stateBadge = (s) => {
   const map = { passed: 'ok', pass: 'ok', flaky: 'warn', failed: 'bad', fail: 'bad', 'timed-out': 'bad', interrupted: 'muted', skipped: 'muted' };
@@ -223,6 +229,7 @@ const contextHtml = !ctx ? '' : `
 ${(ctx.issues ?? []).length ? `<p><b>Completed issues in the window</b> (${esc(ctx.window ?? '')})</p><ul>${ctx.issues.map((i) => `<li>#${esc(i.number)} — ${esc(i.title)}</li>`).join('')}</ul>` : '<p class="dim">No completed issues in the window.</p>'}
 ${ctx.ui_diff ? `<p><b>UI map difference</b></p><pre>${esc(ctx.ui_diff)}</pre>` : ''}
 ${signalItems.length ? `<p><b>Signals no test covers</b> — console errors, failed requests and slowdowns that are new on this build</p><ul class="signals">${signalItems.join('')}</ul>` : ''}
+${ctx.iface_diff ? `<p><b>CLI and API difference</b></p><pre>${esc(ctx.iface_diff)}</pre>` : ''}
 </section>`;
 
 const acHtml = acs.map((ac) => `
@@ -232,6 +239,8 @@ const acHtml = acs.map((ac) => `
   ${ac.note ? `<p class="note">${esc(ac.note)}</p>` : ''}
   ${ac.explanation ? `<p><b>Why:</b> ${esc(ac.explanation)}${ac.because_issue ? ` — see #${esc(ac.because_issue)}` : ''}</p>` : ''}
   ${ac.heal ? `<p class="dim">Check repaired: <code>${esc(ac.heal.from)}</code> → <code>${esc(ac.heal.to)}</code></p>` : ''}
+  ${ac.baseline_blocked_reason ? `<p class="dim">${BLOCKED[ac.baseline_blocked_reason] ?? `Baseline stopped before the check (${esc(ac.baseline_blocked_reason)}).`}</p>` : ''}
+  ${ac.regressed_between ? `<p><b>Regressed between</b> <code>${esc(ac.regressed_between.from)}</code> (passes) and <code>${esc(ac.regressed_between.to)}</code> (fails)${ac.regressed_between.builds_between == null ? '' : ac.regressed_between.builds_between ? ` · ${esc(ac.regressed_between.builds_between)} untested builds in between` : ' · adjacent builds'}</p>` : ''}
   ${ac.testable === false ? '' : `<div class="sides">${sideHtml(`${regression ? 'Build' : 'Candidate'} ${v.candidate ?? ''}`, ac.cand)}${regression
     ? (ac.before ? `<section class="side"><h4>Previous build ${esc(ctx?.previous ?? '')}</h4><figure><a href="${esc(ac.before)}" target="_blank"><img src="${esc(ac.before)}" alt="previous build"></a><figcaption>the same page on the previous build</figcaption></figure></section>` : '')
     : sideHtml(`Baseline ${v.baseline ?? ''}`, ac.base)}</div>`}

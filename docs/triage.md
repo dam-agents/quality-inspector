@@ -19,7 +19,7 @@ the step list and screenshots in `report.json`.
 | `unchanged` | passed, nothing judged, nothing re-learned | nothing |
 | `relearned` | passed; only steps outside AC blocks were re-learned | nothing — the next passing run re-records; note which steps moved |
 | `healed` | passed with `judged` checks, and the healing rules below hold | repair the check, log it |
-| `needs-review` | passed with `judged` checks, but a healing rule fails | leave the file; the operator decides |
+| `needs-review` | passed with `judged` checks, but a healing rule fails; or fails on the previous build too (step 5) | leave the file; the operator decides |
 | `superseded` | the criterion is false, and a completed issue in the window that `may_supersede` changes exactly this behaviour on purpose | retire the test (below) |
 | `regression` | the criterion is false (strict re-run fails and the judge agrees), and nothing in the context explains it | report it with both screens |
 | `flaky` | the confirmation re-run mixes passes and failures | log it in `work/FLAKY.md`; quarantine on the second flaky night (below) |
@@ -41,6 +41,28 @@ the step list and screenshots in `report.json`.
    (*"the tab is now 'Access tokens' — UI map, likely rename"*, *"#4552 replaces the
    export button with a share link"*, *"nothing in 13 completed issues touches agent
    lists; the list shows two agents after creating one"*).
+5. **Confirm on the previous build** — only with `confirm_regressions: true` in the
+   worklist, once per run, after every criterion is decided and every heal re-run. When
+   any criterion is headed for `regression`: `env.sh lock regression` (refreshes it),
+   `env.sh reset`, `env.sh up <previous_candidate>`, then per such criterion
+   `suite.sh run prev-<n>-<k> --strict --tag issue-<n> --tag ac-<k> --tag-mode all
+   --repeat-each 3 --no-cache`:
+   - `stable-pass` → a confirmed `regression`; its verdicts entry gets
+     `regressed_between: {from: <previous_candidate>, to: <candidate>}`.
+   - `stable-fail` → not new: `needs-review`, explanation *"fails on <previous> as well —
+     drift or test defect"*. Never `regression`, never a pass.
+   - Anything else (flaky, blocked, the install fails, `previous_candidate` is `null`) →
+     it stays `regression`, unconfirmed; the explanation says why.
+6. **Bisect** — only with `bisect_max_steps` > 0, for the regressions step 5 confirmed.
+   `env.sh between <previous_candidate> <candidate>` lists the builds in between, oldest
+   first; non-zero → skip, and say why in the report (exit 2: the profile cannot list
+   them). Each step probes the middle build of the widest interval that still holds an
+   untested build: `env.sh lock regression`, `env.sh reset`, `env.sh up <build>`, the
+   step-5 run of each criterion whose interval holds it. `stable-pass` moves that criterion's `from` up
+   to the build, `stable-fail` its `to` down; anything else ends the bisection. Stop after
+   `bisect_max_steps` installs or when no interval holds an untested build. Report the
+   smallest interval as `regressed_between`, plus `builds_between` (the untested builds
+   left inside it; `0` = adjacent builds).
 
 ## Healing rules — when a check may be repaired without the operator
 

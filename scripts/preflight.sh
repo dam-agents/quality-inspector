@@ -144,7 +144,7 @@ mode_issues() {
 
 # ======================================================== REGRESSION MODE ====
 mode_regression() {
-  local tests last versions candidate drift
+  local tests last versions candidate drift confirm bisect
   # Only the `regression` tier replays; exploratory, promotable, retired and quarantined never do.
   tests="$(table_rows "$WORK/SUITE.md" | awk -F'|' '{t=$2; tier=$4; gsub(/[ \t]/,"",t); gsub(/[ \t]/,"",tier)} tier=="regression" {print t}' \
            | jq -R . | jq -sc .)"
@@ -163,11 +163,20 @@ mode_regression() {
   drift="$(bash "$SCRIPT_DIR/check-asserts.sh" --json 2>/dev/null | jq -c '.drift // []' 2>/dev/null)" || drift='null'
   [ -n "$drift" ] || drift='null'
   [ "$drift" = null ] && log "WARN: assertion drift check could not run"
+  # Reverse red-green and bisection (docs/triage.md → Order of work, steps 5–6): off unless set.
+  confirm="$(cfg confirm_regressions)"; bisect="$(cfg bisect_max_steps)"
+  case "$confirm" in (enabled) confirm=true;; (''|disabled) confirm=false;;
+    (*) log "WARN: confirm_regressions '$confirm' is not enabled|disabled — treated as disabled"; confirm=false;; esac
+  case "$bisect" in (''|*[!0-9]*) [ -n "$bisect" ] && log "WARN: bisect_max_steps '$bisect' is not a number — treated as 0"; bisect=0;; esac
+  if [ "$bisect" -gt 0 ] && [ "$confirm" = false ]; then
+    log "WARN: bisect_max_steps ignored — bisection needs confirm_regressions: enabled"; bisect=0
+  fi
   log "candidate $candidate is new (last regression: ${last:-never}) — due"
   runlog REGRESSION "due candidate=$candidate tests=$(printf '%s' "$tests" | jq length)"
   jq -nc --arg c "$candidate" --arg p "$last" --argjson t "$tests" --argjson d "$drift" --argjson logs "$(logs_json)" \
+    --argjson cr "$confirm" --argjson bs "$((10#$bisect))" \
     '{mode:"regression", nothing_to_do:false, candidate:$c, previous_candidate:(if $p=="" then null else $p end),
-      tests:$t, assert_drift:$d, logs:$logs}'
+      tests:$t, assert_drift:$d, confirm_regressions:$cr, bisect_max_steps:$bs, logs:$logs}'
 }
 
 # ============================================================= AUDIT MODE ====

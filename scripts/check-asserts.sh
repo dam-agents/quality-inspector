@@ -17,6 +17,9 @@
 #                                                   (exploratory, promotable, retired, quarantined: never)
 #   check-asserts.sh --agent-asserts <test-file> -> the AC ids whose block calls agent.assert, one per
 #                                                   line; empty = promotable (docs/regression.md → Tiers)
+#   check-asserts.sh --lint <test-file>          -> {"unique_ids":[...], "no_unique_ref":["AC-2",...]}:
+#                                                   AC blocks naming no identifier the file declares
+#                                                   with unique( — informational (docs/test-authoring.md)
 #
 # Read-only. Exit 0 unless the arguments are wrong.
 
@@ -45,7 +48,30 @@ file_hash() { # <file> [AC|EX]
   text_hash "$b"
 }
 
+# Identifiers declared as `const|let|var <id> = [await] unique(`, one per line.
+unique_ids() {
+  grep -oE '(const|let|var)[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=[[:space:]]*(await[[:space:]]+)?unique\(' "$1" \
+    | sed -E 's/^(const|let|var)[[:space:]]+([A-Za-z_][A-Za-z0-9_]*).*/\2/' | sort -u
+}
+
+# AC ids, one per line, whose block mentions none of the identifiers (space-separated) —
+# an object key (`{ name: … }`) or a property (`x.name`) is not a mention.
+lint_blocks() { # <file> <ids>
+  awk -v ids="$2" '
+    BEGIN { n = split(ids, I, " ") }
+    match($0, /\/\/[ \t]*AC-[0-9]+[ \t]+begin/) { id=$0; sub(/.*\/\/[ \t]*/, "", id); sub(/[ \t]+begin.*/, "", id); on=1; hit=0; next }
+    match($0, /\/\/[ \t]*AC-[0-9]+[ \t]+end/)   { if (on && !hit) print id; on=0; next }
+    on { l=$0; gsub(/[A-Za-z_][A-Za-z0-9_]*[ \t]*:/, "", l); gsub(/\.[A-Za-z_][A-Za-z0-9_]*/, "", l)  # object keys, .props
+         for (i = 1; i <= n; i++) if (I[i] != "" && match(l, "(^|[^A-Za-z0-9_])" I[i] "([^A-Za-z0-9_]|$)")) hit=1 }
+  ' "$1"
+}
+
 case "${1:-}" in
+  --lint)
+    [ -f "${2:-}" ] || { echo "usage: $0 --lint <test-file>" >&2; exit 2; }
+    ids="$(unique_ids "$2")"
+    jq -nc --arg ids "$ids" --arg bad "$(lint_blocks "$2" "$(printf '%s' "$ids" | tr '\n' ' ')")" \
+      '{unique_ids: ($ids | split("\n") | map(select(length > 0))), no_unique_ref: ($bad | split("\n") | map(select(length > 0)))}' ;;
   --hash)
     [ -f "${2:-}" ] || { echo "usage: $0 --hash <test-file>" >&2; exit 2; }
     file_hash "$2" ;;
@@ -73,5 +99,5 @@ case "${1:-}" in
       fi
     done < <(table_rows "$WORK/SUITE.md")
     jq -nc --argjson d "$drift" --argjson u "$unmarked" '{drift:$d, unmarked:$u}' ;;
-  *) echo "usage: $0 --hash <test-file> | --ex-hash <test-file> | --agent-asserts <test-file> | --json" >&2; exit 2 ;;
+  *) echo "usage: $0 --hash <test-file> | --ex-hash <test-file> | --agent-asserts <test-file> | --json | --lint <test-file>" >&2; exit 2 ;;
 esac

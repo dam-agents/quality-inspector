@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# preflight.sh regression: no tests, same candidate, new candidate with drift; promotable never replays.
+# preflight.sh regression: no tests, same candidate, new candidate with drift, confirmation settings; promotable never replays.
 . "$(dirname "$0")/lib.sh"
 seed_work
 mkdir -p "$WORK_DIR/suite/tests"
@@ -29,4 +29,11 @@ out="$(bash "$SCRIPTS/preflight.sh" regression)"
 assert "changed AC block is drift" '.assert_drift | length == 1 and .[0].test=="tests/issue-7.e2e.ts"' "$out"
 assert "promotable is never replayed" '.tests == ["tests/issue-7.e2e.ts"]' "$out"
 assert "previous candidate is the last one tested" '.previous_candidate == "0.0.0-main.aaa1111"' "$out"
+assert "confirmation and bisection off by default" '.confirm_regressions == false and .bisect_max_steps == 0' "$out"
+echo "- bisect_max_steps: 4" >> "$WORK_DIR/CONFIG.md"
+out="$(bash "$SCRIPTS/preflight.sh" regression)"
+assert "bisection without confirmation is ignored" '.bisect_max_steps == 0 and (.logs | map(select(test("needs confirm_regressions"))) | length == 1)' "$out"
+echo "- confirm_regressions: enabled" >> "$WORK_DIR/CONFIG.md"
+out="$(bash "$SCRIPTS/preflight.sh" regression)"
+assert "confirmation and bisection on" '.confirm_regressions == true and .bisect_max_steps == 4' "$out"
 exit $FAILED

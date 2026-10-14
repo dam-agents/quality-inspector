@@ -27,8 +27,9 @@
 ## The regression run
 
 The worklist carries `candidate`, `previous_candidate` (the build last regression-tested,
-`null` the first time), `tests[]` and `assert_drift[]` (`null` when the check could not
-run — say so, never treat it as clean).
+`null` the first time), `tests[]`, `assert_drift[]` (`null` when the check could not
+run — say so, never treat it as clean), and `confirm_regressions` / `bisect_max_steps`
+([triage.md](triage.md) → Order of work, steps 5–6).
 
 1. `env.sh lock regression` (busy → end the run, log it).
 2. `env.sh reset`, `env.sh up <candidate>`, `suite.sh run smoke-<candidate> --tag smoke`.
@@ -36,8 +37,9 @@ run — say so, never treat it as clean).
    `<ISO> ERROR: environment candidate=<c>` to `work/REGRESSION.log`, unlock, end.
 3. **Build the change context** ([change-awareness.md](change-awareness.md)): the UI map
    of the candidate, its diff against `previous_candidate`'s map, the completed issues in
-   the window, the impact per test, and your one-line expectation per impacted test.
-   Rewrite `work/COVERAGE.md` from the new map ([change-awareness.md](change-awareness.md) → Coverage).
+   the window, the published interfaces' diff, the impact per test, and your one-line
+   expectation per impacted test. Rewrite `work/COVERAGE.md` from the new map
+   ([change-awareness.md](change-awareness.md) → Coverage).
 4. Drifted tests (`assert_drift`) are **not run** — list them for the operator.
 5. Replay: `suite.sh run regression-<candidate> --evidence failures --tag issue-<a> --tag issue-<b> …`.
    `criterion()` judges a check whose control moved instead of failing it. Explorations
@@ -48,10 +50,11 @@ run — say so, never treat it as clean).
 7. **Report**: write `work/regression/<candidate>/verdicts.json` with `"mode": "regression"`
    — one entry per criterion that was not `unchanged`, each with `issue`, `id`, `name`,
    `then`, `verdict` (the category), `explanation`, `because_issue` when an issue explains
-   it, `heal` `{from, to}` for a repair, and `before_shot` (the previous map's screenshot
-   of the page). Add `context` `{previous, window, issues[{number,title}], ui_diff, signals}`
-   (`ui_diff`: the diff's `--md` text; `signals`: `{console_errors_new, failed_requests_new,
-   slower_pages, slow_tests}` — the diff's lists plus `slow_tests` from
+   it, `heal` `{from, to}` for a repair, `regressed_between` `{from, to, builds_between}`
+   for a confirmed regression, and `before_shot` (the previous map's screenshot of the
+   page). Add `context` `{previous, window, issues[{number,title}], ui_diff, iface_diff, signals}`
+   (`ui_diff`, `iface_diff`: the diffs' `--md` text; `signals`: `{console_errors_new,
+   failed_requests_new, slower_pages, slow_tests}` — the UI diff's lists plus `slow_tests` from
    `node "$HOME/scripts/perf-trend.mjs" regression-<candidate>`, each item made a
    `needs-review` entry per [triage.md](triage.md) → **Signals no test covers**). Render it with `scripts/render-report.mjs` into
    `work/regression/<candidate>/report/` and publish as in

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # render-report.mjs: every tested AC gets its video and captioned screenshot; the setup test never appears;
-# explorations render apart from the verdict, and a verdicts file without them renders as before.
+# explorations render apart from the verdict, and a verdicts file without them renders as before;
+# a baseline blocked reason and a regression's build interval are shown.
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 R="$SANDBOX/runs"
@@ -23,7 +24,7 @@ J
 mk_run cand passed; mk_run base failed
 cat > "$SANDBOX/v.json" <<'J'
 {"issue":42,"title":"Rename <b>","ac_hash":"abc","candidate":"c1","baseline":"b1","candidate_run":"cand","baseline_run":"base",
- "verdict":"verified","acs":[{"id":"AC-1","name":"renamed","then":"the new name shows","testable":true,"verdict":"verified"},
+ "verdict":"verified","acs":[{"id":"AC-1","name":"renamed","then":"the new name shows","testable":true,"verdict":"verified","baseline_blocked_reason":"absent"},
  {"id":"AC-2","name":"internal","testable":false,"verdict":"not-testable"}]}
 J
 out="$(QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/v.json" "$SANDBOX/out")"
@@ -35,6 +36,7 @@ case "$h" in *'Rename &lt;b&gt;'*) ;; *) echo "  title not escaped"; FAILED=1;; 
 case "$h" in *ASSERTION_FAILED*) ;; *) echo "  baseline error missing"; FAILED=1;; esac
 [ "$(ls "$SANDBOX/out/media" | wc -l | tr -d ' ')" = 4 ] || { echo "  expected exactly the two AC-1 videos and screenshots (setup test must not be published)"; FAILED=1; }
 grep -q '| AC-1 | renamed | passed | failed | verified |' "$SANDBOX/out/comment.md" || { echo "  comment row missing"; FAILED=1; }
+case "$h" in *'feature is absent there'*) ;; *) echo "  baseline blocked reason not rendered"; FAILED=1;; esac
 # Backward compatibility: no "explorations" field → no section, no comment line, no new output keys.
 assert "no exploration keys without explorations" 'has("explorations") | not' "$out"
 case "$h" in *'Beyond the criteria'*) echo "  explorations section rendered without explorations"; FAILED=1;; esac
@@ -82,4 +84,16 @@ h="$(cat "$SANDBOX/rout/index.html")"
 case "$h" in *'Signals no test covers'*'Error: &lt;img onerror=x&gt;'*'media/signal-1-settings.png'*'POST /api/keys/:id → 500'*'took 9000 ms'*) ;; *) echo "  signals list missing or unescaped"; FAILED=1;; esac
 case "$h" in *'<img onerror'*) echo "  signal text not escaped"; FAILED=1;; esac
 [ -f "$SANDBOX/rout/media/signal-1-settings.png" ] || { echo "  signal screenshot not copied"; FAILED=1; }
+
+# Regression mode: a confirmed regression's build interval and the interface diff.
+cat > "$SANDBOX/r2.json" <<'J'
+{"mode":"regression","candidate":"c2","candidate_run":"cand","verdict":"regression",
+ "context":{"previous":"c1","issues":[],"iface_diff":"- removed flag --force of widgets agents rm"},
+ "acs":[{"issue":42,"id":"AC-1","name":"renamed","then":"the new name shows","verdict":"regression",
+         "explanation":"passes on c1, fails on c2","regressed_between":{"from":"c1.5","to":"c2","builds_between":0}}]}
+J
+QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/r2.json" "$SANDBOX/rout2" >/dev/null
+h="$(cat "$SANDBOX/rout2/index.html")"
+case "$h" in *'Regressed between</b> <code>c1.5</code> (passes) and <code>c2</code> (fails) · adjacent builds'*) ;; *) echo "  regressed_between not rendered"; FAILED=1;; esac
+case "$h" in *'removed flag --force'*) ;; *) echo "  interface diff not rendered"; FAILED=1;; esac
 exit $FAILED

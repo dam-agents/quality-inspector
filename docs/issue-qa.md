@@ -47,8 +47,9 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
 5. **Author** `work/suite/tests/issue-<n>.e2e.ts` per [test-authoring.md](test-authoring.md):
    one test per testable AC, AC blocks written from the criteria file, steps found by
    exploring the candidate. Iterate until every test *reaches* its AC block on the
-   candidate. One test per EX too, tagged `issue-<n>-ex`
-   ([explorations.md](explorations.md) → **Tests**). Refresh the row.
+   candidate. Then `bash "$HOME/scripts/check-asserts.sh" --lint <file>`: give every AC it
+   lists a discriminating check ([test-authoring.md](test-authoring.md)). One test per EX
+   too, tagged `issue-<n>-ex` ([explorations.md](explorations.md) → **Tests**). Refresh the row.
 6. **Red-green**, both runs with full evidence (video, screenshots, steps for every test):
    - `env.sh reset`, `env.sh up <baseline>`,
      `suite.sh run issue-<n>-baseline --evidence full --strict --tag issue-<n>`.
@@ -65,8 +66,10 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    work, step 1). A `flaky` AC gets the verdict `flaky`, never `failed` or `verified`.
    **Judge each AC** from the two summaries, the failing steps and the screenshots, per
    [reporting.md](reporting.md) → Verdicts: a step the test could not perform is
-   `blocked`, an assertion that ran and was false is `failed`. Judge each EX per
-   [explorations.md](explorations.md) → **Run and judge** — never into an AC verdict. Write
+   `blocked`, an assertion that ran and was false is `failed`; a baseline that stopped
+   before the AC block is judged per [reporting.md](reporting.md) → **Baseline blocked**.
+   Judge each EX per [explorations.md](explorations.md) → **Run and judge** — never into an
+   AC verdict. Write
    `verdicts-<ac_hash>-<candidate>.json` ([reporting.md](reporting.md) → Verdicts file).
 8. **Report.** Render it — `node "$HOME/scripts/render-report.mjs" <verdicts.json>
    work/issues/<n>/report-<ac_hash>-<candidate>` — open its `index.html` and check
@@ -91,7 +94,8 @@ leave the row `in_progress` at run end.
   or restored with an `issue_abort` event.
 - `criteria-<ac_hash>.md` and `explorations-<ac_hash>.md` predate the first test file edit of this run.
 - No observation changed an AC or issue verdict.
-- No AC is `verified` without a baseline failure and a candidate pass.
+- No AC is `verified` without a candidate pass and a baseline failure or
+  `baseline_blocked_reason: absent`.
 - Every `promotable` row written qualifies; no file was newly promoted unless
   `auto_promote: verified`.
 - Each `spec.injection_suspect` issue: its listed sentences are `testable: no —
