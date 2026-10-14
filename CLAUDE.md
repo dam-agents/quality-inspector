@@ -79,7 +79,7 @@ one layer of quotes or backticks are stripped. Every script reads it through
 - `include_comments`, `spec_feedback` — `enabled` | `disabled` (both default): comments
   join the AC freeze; opt-in suggested "Done when" comment.
 - `max_issues_per_run` (`1`), `lock_ttl_min` (`180`), `display_name` (cosmetic),
-  `e2e_version` (`0.17.0`), `e2e_web_version` (`0.12.0`), `e2e_model` (`claude-sonnet-5`)
+  `e2e_version` (`0.20.0`), `e2e_web_version` (`0.14.0`), `e2e_model` (`claude-sonnet-5`)
   — [docs/test-authoring.md](docs/test-authoring.md).
 - `audit_report` (`enabled`), `log_level` (`info` | `debug`), `media_retention_days`
   (`14`; undelivered evidence is never deleted — sweep in `scripts/preflight.sh`).

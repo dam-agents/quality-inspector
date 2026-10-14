@@ -85,5 +85,6 @@ next verified pass.
 `e2e_version` and `e2e_web_version` move together, by the operator, to releases at least
 seven days old. `@e2e-dev/web` pins its own `playwright-core`; when it no longer matches
 the image's Playwright, `suite.sh init` downloads the matching Chromium into the home
-(README → Black-box boundary lists the hosts). From `e2e` 0.19 the trace is a markdown
-page per test instead of a Playwright zip; the report renders either.
+(README → Black-box boundary lists the hosts). Since `e2e` 0.19 the trace is a markdown
+page per test (`results/<test>/trace.md`) instead of a Playwright zip, and `e2e mcp` is
+headless by default (no `--headless` flag); the report renders either trace.

@@ -189,8 +189,8 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - media_retention_days: 14
 - max_issues_per_run: 1
 - lock_ttl_min: 180
-- e2e_version: 0.17.0
-- e2e_web_version: 0.12.0
+- e2e_version: 0.20.0
+- e2e_web_version: 0.14.0
 - e2e_model: claude-sonnet-5
 - audit_report: enabled
 - log_level: info

@@ -16,4 +16,4 @@ APP_URL="$(profile_field '.app.url')"
 case "$APP_URL" in (http://localhost*|http://127.0.0.1*) ;; (*) echo "e2e-mcp: refusing app url '$APP_URL' — nested product only" >&2; exit 1;; esac
 export APP_URL E2E_TELEMETRY_DISABLED=1 NODE_USE_ENV_PROXY=1
 export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-injected-by-gateway}"
-exec npx e2e mcp --headless "$@"
+exec npx e2e mcp "$@"
