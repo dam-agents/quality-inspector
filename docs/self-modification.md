@@ -212,6 +212,9 @@ refuse and explain instead:
 - Issue comments stay opt-in (`issue_comments`); nested credentials never leave
   `work/env/` except as e2e credentials, and `scripts/suite.sh` keeps masking them in run
   artefacts (audit check `secrets_in_runs`).
+- Security findings reach only a private artifact and the operator's chat — never an issue
+  comment or other public surface; their oracles stay frozen in [security.md](security.md),
+  and source maps are probed by status only.
 
 ## 11. Conciseness, consistency, no repetition
 

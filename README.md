@@ -29,6 +29,9 @@ library for evidence, the skill catalog for profiles, sub-agents for independent
 - **Regression run** (nightly, off by default) — replays the tests the operator promoted
   against each new candidate; recorded steps replay without model calls, the LLM steps in
   only where the UI changed; it also maps which pages no promoted test reaches (docs/regression.md).
+- **Security run** (weekly, off by default) — frozen black-box checks of each new candidate:
+  access without or with the wrong session, stored XSS, headers, leaks, the deployment;
+  findings go to a private artifact only, never to an issue (docs/security.md).
 - **Weekly audit** (off by default) — health, the black-box boundary probes, assertion
   drift, cache efficiency (docs/audit.md).
 - Scripts only detect, and the profile only sets up the nested product; every judgment and every
@@ -153,6 +156,7 @@ configuration.
 | `e2e_version`, `e2e_web_version`, `e2e_model` | defaults | Test framework pins and the model for agent steps. |
 | `audit_report`, `log_level`, `media_retention_days` | defaults | Audit, diagnostics, local evidence retention. |
 | `explorations`, `max_explorations_per_ac` | defaults (`enabled`, `3`) | Agent-designed scenarios beyond the criteria, reported apart from the verdict ([docs/explorations.md](docs/explorations.md)). |
+| `security_checks`, `security_failed_logins` | defaults (`enabled`, `10`) | The security run ([docs/security.md](docs/security.md)); its schedule ships off. |
 
 ## Runtime requirements
 

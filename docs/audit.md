@@ -16,7 +16,7 @@ when `audit_report: disabled` (still append the log line).
    instruction sentences are `testable: no`. `failures[]` groups the week's error events;
    `stats` counts verdicts and `stats.coverage` the pages.
 2. Add the judgment half:
-   - `mcp__platform-outbound__list_schedules`: the three `quality-inspector-*` schedules exist; their
+   - `mcp__platform-outbound__list_schedules`: every `quality-inspector-*` schedule of `kit.yaml` exists; their
      task text and precheck match `kit.yaml` (drift is a `warn` — the operator updates a
      live schedule). Save the JSON to `/tmp/quality-inspector-schedules.json` and run
      `bash "$HOME/scripts/verify-onboarding.sh" --schedules /tmp/quality-inspector-schedules.json`
@@ -36,6 +36,9 @@ when `audit_report: disabled` (still append the log line).
    - Benchmark: the newest line of `work/benchmark/history.jsonl` — its age, accuracy and
      `false_verified` (above 0 is a red line until a later run is clean); a benchmark
      never run, or older than two months with cases defined, is a warn.
+   - Security: the newest `ran` line of `work/SECURITY.log` — a critical or high count above
+     0 stays a red line until a later run is clean; `security_checks` enabled with no run in
+     five weeks is a warn. Never quote a finding beyond its id.
    - Spec quality: this week's `not-testable` verdicts and `testable: no` ACs by reason,
      issues without "Done when", and how many suggested rewrites authors adopted (an
      issue that became due again by `ac_changed` after a `spec-feedback` file).

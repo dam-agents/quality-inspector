@@ -88,8 +88,9 @@ The operator assigns the profile on the platform; you never install it yourself.
 Create only what is missing; never overwrite an existing state file.
 
 ```bash
-mkdir -p /home/agent/work/issues /home/agent/work/logs /home/agent/work/inventory /home/agent/work/regression /home/agent/work/benchmark /home/agent/work/perf
+mkdir -p /home/agent/work/issues /home/agent/work/logs /home/agent/work/inventory /home/agent/work/regression /home/agent/work/benchmark /home/agent/work/perf /home/agent/work/security
 cd /home/agent/work
+touch SECURITY.log
 [ -f QA.md ] || cat > QA.md <<'EOF'
 # QA state — one row per issue (docs/issue-qa.md → State)
 
@@ -208,6 +209,8 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - log_level: info
 - explorations: enabled
 - max_explorations_per_ac: 3
+- security_checks: enabled
+- security_failed_logins: 10
 
 - profile.chart_ref: oci://quay.io/dam-agents/charts/platform
 - profile.mock_image:
@@ -230,10 +233,10 @@ the criteria files and the replay cache are not reconstructable.
 
 Start from `mcp__platform-outbound__list_schedules`. Expected: `quality-inspector-issues-1h`,
 `quality-inspector-regression-nightly`, `quality-inspector-benchmark-monthly`,
-`quality-inspector-audit-weekly`.
+`quality-inspector-security-weekly`, `quality-inspector-audit-weekly`.
 
-- Present → leave alone, including its enabled state; the regression and audit schedules
-  arrive switched off on purpose — offer to turn them on, never flip them unasked.
+- Present → leave alone, including its enabled state; every schedule but the issues one
+  arrives switched off on purpose — offer to turn them on, never flip them unasked.
 - Missing → create it with the name, cron, `sessionMode: fresh`, `precheck` and task text
   of its `kit.yaml` entry, verbatim.
 - Present but unknown (another definition version) → report; never delete.

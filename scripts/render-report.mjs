@@ -10,8 +10,11 @@
 // page for a whole regression run: no baseline column, the change context on top, and a
 // triage category per criterion (docs/triage.md). With "explorations" (docs/explorations.md)
 // it adds a "Beyond the criteria" section from the explorations_run, outside the verdict.
-// Nothing else is read, except the previous build's screenshots an AC names as "before_shot"
-// and the new map's screenshots a context.signals item names as "shot".
+// With "mode": "security" it is the security run's findings, severity-sorted, with the e2e
+// evidence of findings that carry a "tag"; it writes no comment.md — security findings never
+// go to an issue (docs/security.md). Nothing else is read, except the previous build's
+// screenshots an AC names as "before_shot" and the new map's screenshots a context.signals
+// item names as "shot".
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
@@ -58,8 +61,8 @@ function copyMedia(run, rel, acId) {
 function evidence(run, ac, suffix = '') {
   if (!run) return { state: 'not-run' };
   if (run.missing) return { state: 'missing', label: run.label };
-  const tag = ac.id.toLowerCase();
-  const res = run.results.find((r) => (r.tags ?? []).includes(`issue-${ac.issue ?? v.issue}${suffix}`) && (r.tags ?? []).includes(tag));
+  const tags = ac.tag ? [ac.tag] : [`issue-${ac.issue ?? v.issue}${suffix}`, ac.id.toLowerCase()];
+  const res = run.results.find((r) => tags.every((t) => (r.tags ?? []).includes(t)));
   if (!res) return { state: 'no-test', label: run.label };
   const att = res.attempts?.at(-1) ?? {};
   const arts = att.artifacts ?? [];
@@ -101,7 +104,7 @@ function findTracePage(run, rel) {
 }
 function readText(p) { try { return p ? readFileSync(p, 'utf8').slice(0, 20000) : null; } catch { return null; } }
 
-const key = (ac) => `${ac.issue ?? v.issue}-${ac.id}`;
+const key = (ac) => (ac.tag ? `${ac.tag}-${ac.target ?? ''}` : `${ac.issue ?? v.issue}-${ac.id}`);
 const regression = v.mode === 'regression';
 const runs = { candidate: loadRun(v.candidate_run), baseline: loadRun(v.baseline_run), explore: loadRun(v.explorations_run) };
 if (runs.candidate) runs.candidate.side = 'candidate';
@@ -114,12 +117,13 @@ const VERDICT = {
   unchanged: ['Unchanged', 'ok'], relearned: ['UI changed · steps re-learned', 'ok'], healed: ['UI changed · check repaired', 'warn'],
   superseded: ['Superseded by a change', 'muted'], regression: ['Regression', 'bad'], 'needs-review': ['Needs review', 'warn'],
   flaky: ['Flaky', 'warn'], 'observed-ok': ['Observed OK', 'ok'], observation: ['Observation', 'warn'],
+  critical: ['Critical', 'bad'], high: ['High', 'bad'], medium: ['Medium', 'warn'], low: ['Low', 'muted'], info: ['Info', 'muted'],
 };
 const SEVERITY = { info: 'muted', minor: 'warn', major: 'bad' };
 const sevBadge = (x) => (x ? `<span class="badge ${SEVERITY[x] ?? 'muted'}">${esc(x)}</span>` : '');
 const badge = (x) => { const [t, c] = VERDICT[x] ?? [x, 'muted']; return `<span class="badge ${c}">${esc(t)}</span>`; };
 const stateBadge = (s) => {
-  const map = { passed: 'ok', flaky: 'warn', failed: 'bad', 'timed-out': 'bad', interrupted: 'muted', skipped: 'muted' };
+  const map = { passed: 'ok', pass: 'ok', flaky: 'warn', failed: 'bad', fail: 'bad', 'timed-out': 'bad', interrupted: 'muted', skipped: 'muted' };
   const text = { 'not-run': 'not run', missing: 'run missing', 'no-test': 'no test' }[s] ?? s;
   return `<span class="state ${map[s] ?? 'muted'}">${esc(text)}</span>`;
 };
@@ -146,6 +150,29 @@ function sideHtml(name, ev) {
   ].join('');
   return `<section class="side"><h4>${esc(name)} ${stateBadge(ev.state)}</h4>${video}${err}${shots}${steps}${extra}</section>`;
 }
+
+const CSS = `:root{--bg:#fff;--fg:#1d1f23;--dim:#6b7078;--card:#f6f7f9;--line:#e3e5e8;--ok:#127a3a;--okbg:#e3f5e9;--bad:#b42318;--badbg:#fdecea;--warn:#8a5a00;--warnbg:#fff4d6;--muted:#555b63;--mutedbg:#eceef1;--link:#1a5fb4}
+@media (prefers-color-scheme:dark){:root{--bg:#15171a;--fg:#e8eaed;--dim:#9aa0a6;--card:#1e2125;--line:#2e3238;--ok:#6fd58f;--okbg:#173322;--bad:#ff8a80;--badbg:#3a1d1b;--warn:#f5c26b;--warnbg:#3a2f14;--muted:#b0b5bb;--mutedbg:#2a2e33;--link:#8ab4f8}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:1180px;margin:0 auto;padding:24px 16px 64px}h1{font-size:24px;margin:0 0 4px}h2{font-size:20px;margin:32px 0 4px}h3{margin:0;font-size:17px}h4{margin:0 0 8px;font-size:14px;display:flex;gap:8px;align-items:center}
+a{color:var(--link)}.dim{color:var(--dim)}.meta{color:var(--dim);margin:0 0 20px}
+.badge,.state{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;white-space:nowrap}
+.ok{color:var(--ok);background:var(--okbg)}.bad{color:var(--bad);background:var(--badbg)}.warn{color:var(--warn);background:var(--warnbg)}.muted{color:var(--muted);background:var(--mutedbg)}
+.hero{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.hero .badge{font-size:15px;padding:4px 14px}
+table{border-collapse:collapse;width:100%;margin:8px 0 28px}td,th{border-bottom:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}th{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+.ac{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:0 0 20px}
+.ac>header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:8px}
+blockquote{margin:0 0 12px;padding:8px 12px;border-left:3px solid var(--line);color:var(--fg)}
+.sides{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:16px}
+.side{min-width:0}video{width:100%;border-radius:8px;background:#000;aspect-ratio:16/9;object-fit:contain}
+.shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin:10px 0}
+figure{margin:0}img{width:100%;border-radius:6px;border:1px solid var(--line);display:block}figcaption{font-size:12px;color:var(--dim);margin-top:4px;overflow-wrap:anywhere}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;max-height:420px;overflow:auto}
+pre.error{color:var(--bad)}details{margin:6px 0}summary{cursor:pointer;color:var(--dim)}
+.steps{margin:6px 0;padding-left:22px;font-size:13px}.steps li.failed{color:var(--bad)}.steps code{font-size:12px}
+.note{font-style:italic;color:var(--dim)}.signals li{margin:0 0 12px}.sigshot{max-width:320px;margin-top:6px}footer{color:var(--dim);font-size:13px;margin-top:32px}`;
+
+if (v.mode === 'security') { renderSecurity(); process.exit(0); }
 
 const acs = (v.acs ?? []).map((ac) => {
   let before = null;
@@ -216,26 +243,7 @@ const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${regression ? `Regression ${esc(v.candidate)}` : `#${esc(v.issue)} QA verdict`}</title>
 <style>
-:root{--bg:#fff;--fg:#1d1f23;--dim:#6b7078;--card:#f6f7f9;--line:#e3e5e8;--ok:#127a3a;--okbg:#e3f5e9;--bad:#b42318;--badbg:#fdecea;--warn:#8a5a00;--warnbg:#fff4d6;--muted:#555b63;--mutedbg:#eceef1;--link:#1a5fb4}
-@media (prefers-color-scheme:dark){:root{--bg:#15171a;--fg:#e8eaed;--dim:#9aa0a6;--card:#1e2125;--line:#2e3238;--ok:#6fd58f;--okbg:#173322;--bad:#ff8a80;--badbg:#3a1d1b;--warn:#f5c26b;--warnbg:#3a2f14;--muted:#b0b5bb;--mutedbg:#2a2e33;--link:#8ab4f8}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
-main{max-width:1180px;margin:0 auto;padding:24px 16px 64px}h1{font-size:24px;margin:0 0 4px}h2{font-size:20px;margin:32px 0 4px}h3{margin:0;font-size:17px}h4{margin:0 0 8px;font-size:14px;display:flex;gap:8px;align-items:center}
-a{color:var(--link)}.dim{color:var(--dim)}.meta{color:var(--dim);margin:0 0 20px}
-.badge,.state{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;white-space:nowrap}
-.ok{color:var(--ok);background:var(--okbg)}.bad{color:var(--bad);background:var(--badbg)}.warn{color:var(--warn);background:var(--warnbg)}.muted{color:var(--muted);background:var(--mutedbg)}
-.hero{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.hero .badge{font-size:15px;padding:4px 14px}
-table{border-collapse:collapse;width:100%;margin:8px 0 28px}td,th{border-bottom:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}th{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
-.ac{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:0 0 20px}
-.ac>header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:8px}
-blockquote{margin:0 0 12px;padding:8px 12px;border-left:3px solid var(--line);color:var(--fg)}
-.sides{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:16px}
-.side{min-width:0}video{width:100%;border-radius:8px;background:#000;aspect-ratio:16/9;object-fit:contain}
-.shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin:10px 0}
-figure{margin:0}img{width:100%;border-radius:6px;border:1px solid var(--line);display:block}figcaption{font-size:12px;color:var(--dim);margin-top:4px;overflow-wrap:anywhere}
-pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;max-height:420px;overflow:auto}
-pre.error{color:var(--bad)}details{margin:6px 0}summary{cursor:pointer;color:var(--dim)}
-.steps{margin:6px 0;padding-left:22px;font-size:13px}.steps li.failed{color:var(--bad)}.steps code{font-size:12px}
-.note{font-style:italic;color:var(--dim)}.signals li{margin:0 0 12px}.sigshot{max-width:320px;margin-top:6px}footer{color:var(--dim);font-size:13px;margin-top:32px}
+${CSS}
 </style></head><body><main>
 ${regression ? `<div class="hero"><h1>Regression run — ${esc(v.candidate)}</h1>${badge(v.verdict)}</div>
 <p class="meta">previous build <code>${esc(ctx?.previous ?? '–')}</code> · ${esc(v.generated_utc ?? '')}</p>
@@ -267,3 +275,36 @@ const comment = [
 writeFileSync(join(outDir, 'comment.md'), `${comment}\n`);
 console.log(JSON.stringify({ out: outDir, acs: acs.length, videos: acs.flatMap((a) => [a.cand?.video, a.base?.video]).filter(Boolean).length, screenshots: acs.flatMap((a) => [...(a.cand?.shots ?? []), ...(a.base?.shots ?? [])]).length,
   ...(exps.length ? { explorations: exps.length, observations, exploration_videos: exps.filter((e) => e.cand?.video).length } : {}) }));
+
+// The security run's page: one severity-sorted table; e2e findings keep their video.
+function renderSecurity() {
+  const ORDER = ['critical', 'high', 'medium', 'low', 'info'];
+  const rank = (f) => (f.status === 'fail' ? 0 : f.status === 'skipped' ? 10 : 20) + Math.max(0, ORDER.indexOf(f.severity));
+  const findings = [...(v.findings ?? [])].sort((a, b) => rank(a) - rank(b) || String(a.id).localeCompare(String(b.id)));
+  const counts = v.counts ?? Object.fromEntries(ORDER.map((s) => [s, findings.filter((f) => f.status === 'fail' && f.severity === s).length]));
+  const row = (f) => `<tr><td>${badge(f.severity)}</td><td><code>${esc(f.id)}</code></td><td>${esc(f.target)}</td><td>${stateBadge(f.status)}</td><td>${esc(f.explanation ?? f.reason ?? '')}</td></tr>`;
+  const detail = (f) => {
+    const ev = f.tag && runs.candidate ? evidence(runs.candidate, f) : null;
+    return `<article class="ac"><header><h3>${esc(f.id)} — ${esc(f.target)}</h3>${badge(f.severity)}</header>
+  <p>${esc(f.explanation ?? f.reason ?? '')}</p>
+  <details open><summary>Evidence</summary><pre>${esc(JSON.stringify(f.evidence ?? {}, null, 2))}</pre></details>
+  ${ev ? `<div class="sides">${sideHtml(`Build ${v.candidate ?? ''}`, ev)}</div>` : ''}</article>`;
+  };
+  const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Security ${esc(v.candidate)}</title>
+<style>
+${CSS}
+</style></head><body><main>
+<div class="hero"><h1>Security checks — ${esc(v.candidate)}</h1></div>
+<p class="meta">${ORDER.map((s) => `${esc(s)} <b>${esc(counts[s] ?? 0)}</b>`).join(' · ')} · skipped <b>${esc(counts.skipped ?? findings.filter((f) => f.status === 'skipped').length)}</b> · ${esc(v.generated_utc ?? '')}</p>
+<p class="dim">Black-box checks of the nested product against the frozen catalogue (docs/security.md). Private: never forward this page to a public place.</p>
+<table><thead><tr><th>Severity</th><th>Check</th><th>Target</th><th>Status</th><th>Explanation</th></tr></thead><tbody>${findings.map(row).join('')}</tbody></table>
+${findings.filter((f) => f.status === 'fail').map(detail).join('')}
+${(v.notes ?? []).length ? `<h3>Notes</h3><ul>${v.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
+<footer>${esc(v.display_name ?? 'Quality Inspector')} · security run · e2e ${esc(runs.candidate?.version ?? '')}</footer>
+</main></body></html>
+`;
+  writeFileSync(join(outDir, 'index.html'), html);
+  console.log(JSON.stringify({ out: outDir, findings: findings.length, failed: findings.filter((f) => f.status === 'fail').length }));
+}

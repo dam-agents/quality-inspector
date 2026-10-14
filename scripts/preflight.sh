@@ -12,7 +12,7 @@
 #   .nothing_to_do == true  -> the agent ends the run immediately.
 #   otherwise               -> the agent processes the arrays per CLAUDE.md + docs/.
 #
-# Modes: issues (default) | regression | audit | benchmark.
+# Modes: issues (default) | regression | audit | benchmark | security.
 # Requires: bash, jq, gh, curl, sed/grep/awk, GNU date (Linux pod).
 
 set -u
@@ -78,7 +78,7 @@ retention_sweep() {
   while IFS= read -r d; do
     local owner; owner="$(dirname "$(dirname "$d")")"
     if [ -f "$owner/artifact.id" ] || [ "$art" = disabled ]; then rm -rf "$d" && n=$((n+1)); fi
-  done < <(find "$WORK/issues" "$WORK/regression" -mindepth 3 -maxdepth 3 -type d -name media -mtime +"$MEDIA_DAYS" 2>/dev/null)
+  done < <(find "$WORK/issues" "$WORK/regression" "$WORK/security" -mindepth 3 -maxdepth 3 -type d -name media -mtime +"$MEDIA_DAYS" 2>/dev/null)
   [ "$n" -gt 0 ] && log "retention: removed $n media directories older than ${MEDIA_DAYS}d"
   return 0
 }
@@ -342,8 +342,38 @@ mode_benchmark() {
   jq -nc --argjson d "$d" --argjson logs "$(logs_json)" '{mode:"benchmark", nothing_to_do:($d.due | not), cases:$d.cases, last_run:$d.last_run, logs:$logs}'
 }
 
+# =========================================================== SECURITY MODE ====
+# Due once per candidate build (docs/security.md). Keyed on `ran candidate=` in SECURITY.log.
+mode_security() {
+  if [ "$(cfg security_checks)" = disabled ]; then
+    log "security checks are disabled (security_checks: disabled)"; runlog SECURITY "skip=disabled"
+    jq -nc --argjson logs "$(logs_json)" '{mode:"security", nothing_to_do:true, logs:$logs}'; return
+  fi
+  env_busy_out SECURITY
+  local versions candidate last inv roles dep eng
+  versions="$(versions_json none 2>/dev/null)" || fail_out "cannot resolve the candidate build"
+  candidate="$(printf '%s' "$versions" | jq -r .candidate)"
+  last="$(grep -o 'ran candidate=[^ ]*' "$WORK/SECURITY.log" 2>/dev/null | tail -1 | cut -d= -f2)"
+  if [ "$last" = "$candidate" ]; then
+    log "candidate $candidate already security-tested"; runlog SECURITY "skip=same-candidate candidate=$candidate"
+    jq -nc --arg c "$candidate" --argjson logs "$(logs_json)" '{mode:"security", nothing_to_do:true, candidate:$c, logs:$logs}'; return
+  fi
+  # A map from before api_requests existed cannot drive the access checks: rebuild it.
+  inv="$WORK/inventory/$candidate/inventory.json"; jq -e 'has("api_requests")' "$inv" >/dev/null 2>&1 || inv=""
+  # Role names only, never values (docs/profile-contract.md → The bin/ contract).
+  roles="$(sed -n 's/^E2E_USER_\([A-Z0-9]*\)_USERNAME=..*/\1/p' "$WORK/env/credentials.env" 2>/dev/null | tr '[:upper:]' '[:lower:]' | jq -R . | jq -sc .)"
+  eng="$(profile_field '.engine')"
+  if [ "$eng" = helm-k3s ] || profile_field '.requires.commands[]?' | grep -qx kubectl; then dep=true; else dep=false; fi
+  log "candidate $candidate is new (last security run: ${last:-never}) — due"
+  runlog SECURITY "due candidate=$candidate inventory=$([ -n "$inv" ] && echo yes || echo no)"
+  jq -nc --arg c "$candidate" --arg p "$last" --arg inv "$inv" --argjson roles "${roles:-[]}" --argjson dep "$dep" --argjson logs "$(logs_json)" \
+    '{mode:"security", nothing_to_do:false, candidate:$c, previous_candidate:(if $p=="" then null else $p end),
+      inventory:(if $inv=="" then null else $inv end), roles:$roles, deployment_checks:$dep, logs:$logs}'
+}
+
 case "$MODE" in
   benchmark)  mode_benchmark ;;
+  security)   mode_security ;;
   issues)     mode_issues ;;
   regression) mode_regression ;;
   audit)      mode_audit ;;

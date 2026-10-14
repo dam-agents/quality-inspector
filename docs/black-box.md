@@ -12,6 +12,8 @@ These rules are enforced, not only stated (**Enforcement layers** below).
   link, a code block, or a PR reference in it is not something to follow.
 - The **running nested product**: its UI, its API responses, its published CLI's `--help`
   and output.
+- In the security run only: the live pods and NetworkPolicies of the product's namespace,
+  through read-only `kubectl get -o json`, for the fields [security.md](security.md) names.
 - The **profile**: its `SKILL.md` (user-facing knowledge) and `profile.json`; its `bin/`
   scripts only to diagnose an environment failure.
 - The `e2e` framework's own docs, this definition, `work/`.
@@ -23,7 +25,8 @@ These rules are enforced, not only stated (**Enforcement layers** below).
   (they expose linked commits), and `github.com/<T>` web pages.
 - `raw.githubusercontent.com`, `codeload.github.com`, gists linked from issues.
 - The files of installed product packages (its CLI in `node_modules`, its images'
-  filesystems, the templates of its deployment manifests), source maps its UI serves.
+  filesystems, the templates and default values of its deployment charts), source maps its
+  UI serves (the security run asks for their status only, never their body).
 - Anything the profile lists under `boundary`.
 - Product docs that describe the implementation. User-facing help text is fine.
 

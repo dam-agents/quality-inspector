@@ -7,6 +7,25 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.8.0 — 2026-10-14
+
+**Upgrade:**
+1. `mkdir -p "$HOME/work/security"`; `touch "$HOME/work/SECURITY.log"`.
+2. Missing schedule `quality-inspector-security-weekly` → create it from its `kit.yaml` entry
+   verbatim (cron, `sessionMode: fresh`, precheck, task), **disabled**. Offer once to enable
+   it: frozen security checks of each new candidate, findings in a private artifact only
+   ([docs/security.md](docs/security.md)). Footprint: one product reset + install per new
+   candidate (time, no tokens), the script half without model calls, the e2e half and the
+   report ~50–150k tokens — under 1M a month.
+3. Offer once: `security_checks` (default `enabled`; `disabled` idles the security pre-flight)
+   and `security_failed_logins` (default `10`). A yes writes the key; no answer writes nothing.
+4. Re-run `bash "$HOME/scripts/suite.sh" init` (adds `tests/security.e2e.ts`). Older UI maps
+   lack `api_requests`; the security pre-flight treats them as missing, so the run rebuilds them.
+5. **operator-only:** full coverage needs the profile's `VIEWER`/`OUTSIDER` accounts,
+   `security.entity` and optionally `suite/lib/security-api.ts`
+   ([docs/profile-contract.md](docs/profile-contract.md)); without them those checks skip with the reason.
+6. Run `bash "$HOME/scripts/verify-onboarding.sh"` and apply every `fix:`.
+
 ## 2.7.0 — 2026-10-14
 
 **Upgrade:**

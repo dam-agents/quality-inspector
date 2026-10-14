@@ -9,17 +9,18 @@ Two layers under `work/`, both append-only, never loaded whole into context (`ta
 | --- | --- | --- |
 | `work/ISSUES.log` | pre-flight (every call, declined ones included) and you (`ran …`) | `<ISO> candidate=<c> baseline=<b> due=<n> reports=<n> deferred=<n>` / `<ISO> ran issues=<…> verdicts=<…>` / `<ISO> busy holder=<o>` |
 | `work/REGRESSION.log` | pre-flight and you | `<ISO> due candidate=<c> tests=<n>` / `<ISO> ran candidate=<c> passed=… failed=… drift=… replayed=… handed_off=… missed=…` |
+| `work/SECURITY.log` | pre-flight and you | `<ISO> due candidate=<c> inventory=<yes\|no>` / `<ISO> ran candidate=<c> critical=<n> high=<n> medium=<n> low=<n> info=<n> skipped=<n>` |
 | `work/AUDIT.log` | you | `<ISO> ok=<n> warn=<n> red=<n> sent=chat` |
 
 A failure line starts `<ISO> ERROR: ` — one grep finds them. The pre-flight keys
-"already regression-tested" on `ran candidate=`; never write that prefix for a run that
-did not finish.
+"already regression-tested" and "already security-tested" on `ran candidate=`; never write
+that prefix for a run that did not finish.
 
 ## Structured events — `work/logs/events-YYYY-MM-DD.jsonl`
 
 Written through `scripts/log.sh` (`logev <level> <event> <msg>`), one JSON line
 `{ts, run, job, level, event, msg}`, secrets masked before writing. Set `LOG_JOB` to the
-run type (`issues`, `regression`, `audit`, `session`).
+run type (`issues`, `regression`, `security`, `audit`, `session`).
 
 | Event | Writer | `msg` grammar (parsed) |
 | --- | --- | --- |
@@ -31,6 +32,7 @@ run type (`issues`, `regression`, `audit`, `session`).
 | `report_delivered` / `report_failed` | you | `issue=<n> surface=<artifact\|comment> …` |
 | `triage` | you | `issue=<n> ac=<k> category=<c> basis=<…>` |
 | `heal` | you | `issue=<n> ac=<k> old=<hash> new=<hash>` |
+| `security_run` | you | `candidate=<c> critical=<n> high=<n> medium=<n> low=<n> skipped=<n>` |
 | `env_up` / `env_reset` / `env_failed` / `env_lock_takeover` | `scripts/env.sh` | free text |
 | `suite_run` / `suite_failed` | `scripts/suite.sh` | `<label> exit=<rc>` / free text |
 | `onboarding_verify` | `scripts/verify-onboarding.sh` | free text |

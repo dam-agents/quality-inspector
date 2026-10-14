@@ -33,6 +33,7 @@ scheduled ([persistence.md](persistence.md) → **Scheduled or direct session**)
   <version>`, `env.sh unlock operator`.
 - **"run the regression now"** — the regression run procedure with the current candidate,
   ignoring "already tested".
+- **"run the security checks"** — [security.md](security.md) → **The run** with the current candidate, ignoring "already tested".
 - **"show the environment"** — `env.sh status` plus non-running pods; read-only.
 - **Configuration changes** — CLAUDE.md → Runtime configuration (refuse `marker_prefix`
   after first use). **Definition changes** — [self-modification.md](self-modification.md).

@@ -12,10 +12,14 @@
 // navigates: it follows same-origin links and clicks navigation items and tabs (each name
 // once). It never clicks anything else, types, or submits. Signals are only listened to
 // while a page is visited; --timing-samples > 1 reloads the page for more timing samples.
+// Every same-origin API request the signed-in pages make is recorded once per method and
+// path shape (`api_requests`) — method and path only, never headers or bodies — for the
+// security run's replay (docs/security.md).
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { examplePath, pattern, STATIC } from './lib/url-pattern.mjs';
 
 const args = process.argv.slice(2);
 const out = args.find((a) => !a.startsWith('--') && !/^\d+$/.test(a) && !a.startsWith('http'));
@@ -34,9 +38,6 @@ const req = createRequire(process.env.QI_PLAYWRIGHT_FROM ?? join(work, 'suite', 
 let pw;
 try { pw = req('playwright-core'); } catch { pw = createRequire(req.resolve('@e2e-dev/web'))('playwright-core'); }
 
-// One pattern per page shape: ids, numbers and hashes in the path collapse to :id.
-const ID = /^(?:[0-9]+|[0-9a-f]{8,}|[0-9a-f-]{32,36}|[a-z]+-[0-9a-f]{12,}|[A-Za-z0-9_-]{20,})$/;
-const pattern = (u) => u.pathname.split('/').map((s) => (ID.test(s) ? ':id' : s)).join('/') || '/';
 const SKIP = /(log-?out|sign-?out|logout|\/api\/|\/auth\/|download|\.(zip|tar|gz|png|jpg|pdf|json)$)/i;
 
 mkdirSync(join(out, 'shots'), { recursive: true });
@@ -156,6 +157,14 @@ async function discover(url) {
 
 const routes = {};
 const signIn_ = await signIn();
+const api = new Map();
+page.on('request', (r) => {
+  if (!['xhr', 'fetch'].includes(r.resourceType()) || api.size >= 200) return;
+  let u; try { u = new URL(r.url()); } catch { return; }
+  if (u.origin !== base.origin || STATIC.test(u.pathname)) return;
+  const k = `${r.method()} ${pattern(u)}`;
+  if (!api.has(k)) api.set(k, { method: r.method(), path_pattern: pattern(u), example_path: examplePath(u) });
+});
 const queue = [[new URL(base.href), 0]];
 const seen = new Set();
 while (queue.length && Object.keys(routes).length < maxPages) {
@@ -198,6 +207,7 @@ while (queue.length && Object.keys(routes).length < maxPages) {
 }
 await browser.close();
 
-const inventory = { base: base.origin, generated_utc: new Date().toISOString().replace(/\.\d+Z$/, 'Z'), sign_in: signIn_, build: process.env.QI_BUILD ?? null, routes };
+const api_requests = [...api.values()].sort((a, b) => `${a.path_pattern} ${a.method}`.localeCompare(`${b.path_pattern} ${b.method}`));
+const inventory = { base: base.origin, generated_utc: new Date().toISOString().replace(/\.\d+Z$/, 'Z'), sign_in: signIn_, build: process.env.QI_BUILD ?? null, routes, api_requests };
 writeFileSync(join(out, 'inventory.json'), `${JSON.stringify(inventory, null, 2)}\n`);
-console.log(JSON.stringify({ out, routes: Object.keys(routes).length, sign_in: signIn_ }));
+console.log(JSON.stringify({ out, routes: Object.keys(routes).length, api_requests: api_requests.length, sign_in: signIn_ }));

@@ -26,7 +26,7 @@ local development). The core never edits a profile; changes go to its own reposi
   bin/env         optional — the product environment (else its engine's)
   bin/versions    optional — which builds exist (else its engine's)
   bin/build-time  optional — when a build was published (else its engine's)
-  suite/          optional: files merged into work/suite on init (fixtures, helpers)
+  suite/          optional: files merged into work/suite on init (fixtures, helpers, lib/security-api.ts)
   README.md       for the people who maintain the profile
 ```
 
@@ -81,6 +81,9 @@ own business) as `QI_ENGINE_CONFIG`, and never product facts of its own.
   rules. Listed, never applied by the agent.
 - `requires` — checked by `verify-onboarding.sh --live`: root (a vm-backend agent), the
   commands on `PATH`, memory.
+- `security` (optional) — `entity`: the noun of the main object a user creates, with a
+  name and a description (`"project"`); `namespace`: where its pods run, when the engine
+  names none. The security run's input and deployment checks need them ([security.md](security.md)).
 - `config` — the profile's own keys, written in `work/CONFIG.md` as
   `- profile.<key>: <value>`, each with a default and an `about` sentence; `"ask": true`
   makes onboarding ask the operator instead of defaulting. The core validates that no
@@ -111,12 +114,14 @@ Every executable runs with cwd `$HOME/work`, and with:
 **Acting commands** (only the agent calls them, under the environment lock):
 
 - `bin/env init` — idempotent: create `$QI_ENV_DIR` and **`$QI_ENV_DIR/credentials.env`**
-  (mode 600) with `E2E_USER_<ROLE>_USERNAME` / `_PASSWORD` pairs. `OWNER` is required —
-  the account the suite signs in as; optional roles: `MEMBER` (an ordinary user of the
-  owner's tenant), `VIEWER` (read-only there), `OUTSIDER` (another tenant or
-  organization). Every role written signs in after each `up`; `SKILL.md` says what each
-  may do. Further `E2E_USER_<NAME>_*` pairs the product needs are allowed. Never prints a
-  secret.
+  (mode 600) with `E2E_USER_<ROLE>_USERNAME` / `_PASSWORD` pairs — **the role convention**.
+  `OWNER` is required — the account the suite signs in as; optional roles: `MEMBER` (an
+  ordinary user of the owner's tenant or workspace), `VIEWER` (read-only there), `OUTSIDER`
+  (another tenant or organization, with no access to the owner's data). Every role written
+  signs in after each `up`; `SKILL.md` says what each may do. Explorations
+  ([explorations.md](explorations.md)) and the security run's access checks
+  ([security.md](security.md)) use them. Further `E2E_USER_<NAME>_*` pairs the product needs
+  are allowed. Never prints a secret.
 - `bin/env up <build>` — bring the product up at exactly that build, reachable at
   `app.url`; idempotent; exit 0 only when the UI answers. A forward-only upgrade is fine.
 - `bin/env reset` — wipe product data so the next `up` starts clean (fresh users, no
