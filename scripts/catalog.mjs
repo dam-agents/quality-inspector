@@ -7,7 +7,8 @@
 //                          "notes", "hash", "changed"}
 //
 // `notes` names every source that could not be read (the issues listing, the drift check, the
-// coverage of the UI map): the page is still built, without what that source gives.
+// coverage of the UI map): the page is still built, without what that source gives. A credential
+// value or a token in the data -> exit 1, {"refused", "notes", "hash", "changed": false}, no page.
 //
 // Test-related content only — the page may be shared: never a scenario's request text, its
 // requester or thread, a verdict's notes, a triage explanation, LESSONS.md, the operator
@@ -19,7 +20,8 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -227,10 +229,13 @@ for (const okey of [...origins].sort((a, b) => a.localeCompare(b, 'en', { numeri
     const ex = id.startsWith('EX');
     const hist = (history.get(key) ?? []).slice();
     if (row?.tier === 'regression' && !ex && t) {
-      for (const n of nights) {
-        if (row.promoted && n.utc < row.promoted) continue;
-        hist.push({ build: n.build, run: 'regression', value: nightOutcomes.get(n.build)?.get(key) ?? 'unchanged', utc: n.utc });
-      }
+      // A drifted file is not run (regression.md step 4), and only a heal or a new promotion
+      // ends the drift: while it is drifted, the trailing nights that skipped a drift show `drift`.
+      const since = nights.filter((n) => !row.promoted || n.utc >= row.promoted);
+      let skipped = since.length;
+      if (drifted(file)) while (skipped > 0 && since[skipped - 1].counts.drift > 0) skipped--;
+      since.forEach((n, j) => hist.push({ build: n.build, run: 'regression',
+        value: nightOutcomes.get(n.build)?.get(key) ?? (j >= skipped ? 'drift' : 'unchanged'), utc: n.utc }));
     }
     hist.sort((a, b) => String(a.utc).localeCompare(String(b.utc)));
     hist.splice(0, Math.max(0, hist.length - HISTORY_MAX));
@@ -381,7 +386,8 @@ for (const x of [...items, ...pages]) { delete x._thumb; delete x._shot; }
 const builds = [...new Map([...items.flatMap((i) => i.history), ...nights].filter((h) => h.build)
   .sort((a, b) => String(a.utc).localeCompare(String(b.utc))).map((h) => [h.build, { id: h.build, utc: h.utc }])).values()];
 const product = (() => { try {
-  const dir = execFileSync('bash', ['-c', `. "${join(HERE, 'lib', 'config.sh')}"; CONFIG="${join(work, 'CONFIG.md')}"; . "${join(HERE, 'lib', 'profile.sh')}"; profile_dir`],
+  const dir = execFileSync('bash', ['-c', '. "$1"; CONFIG="$2"; . "$3"; profile_dir', '_',
+    join(HERE, 'lib', 'config.sh'), join(work, 'CONFIG.md'), join(HERE, 'lib', 'profile.sh')],
     { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   return readJson(join(dir, 'profile.json'))?.product ?? null;
 } catch { return null; } })();
@@ -398,6 +404,21 @@ data.generated_utc = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 
 const template = read(join(HERE, 'catalog', 'viewer.html'));
 if (!template || !template.includes('__QI_CATALOG_DATA__')) { console.error('catalog: scripts/catalog/viewer.html missing or without its data token'); process.exit(1); }
+// The page may be shared: a credential value of work/env/credentials.env or a token in its data
+// (the images aside — base64 would match short values by chance) refuses the page, as the backup
+// refuses the snapshot. A scan that cannot run refuses too; the last page stays as it was.
+const scanDir = mkdtempSync(join(tmpdir(), 'quality-inspector-catalog-'));
+let leak = true;
+try {
+  writeFileSync(join(scanDir, 'data.json'), JSON.stringify({ ...data, images: {} }));
+  const r = JSON.parse(execFileSync(process.execPath, [join(HERE, 'lib', 'secrets.mjs'), 'scan-all', join(work, 'env', 'credentials.env'), scanDir],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
+  leak = !Array.isArray(r.files) || r.files.length > 0;
+} catch { /* the scan did not run: refused */ } finally { rmSync(scanDir, { recursive: true, force: true }); }
+if (leak) {
+  console.log(JSON.stringify({ refused: 'a credential value or a token in the page data, or the scan did not run', notes, hash, changed: false }));
+  process.exit(1);
+}
 mkdirSync(outDir, { recursive: true });
 const html = template.replace('__QI_CATALOG_DATA__', () => JSON.stringify(data).replace(/</g, '\\u003c'));
 writeFileSync(join(outDir, 'index.html.tmp'), html); renameSync(join(outDir, 'index.html.tmp'), join(outDir, 'index.html'));

@@ -13,13 +13,16 @@ The operator may share the page beyond themselves, so it carries only what conce
   source), the frozen Given/When/Then, tier, promotion date, drift, area, the file's summary,
   session, surface, the pages it opens, its steps (`app.open`, `agent.act`, `agent.assert`,
   `app.screenshot` and the AC block's `expect`s, from the test file), check counts, the verdict
-  per build (issue runs, nights, scenarios; the newest 30), heals (date, build, basis), flaky
-  confirmations, durations, the AC still and the evidence artifact's reference.
+  per build (issue runs, nights, scenarios; the newest 30 — a night that does not name a
+  regression-tier item is `unchanged`, or `drift` while its file is drifted), heals (date,
+  build, basis), flaky confirmations, durations, the AC still and the evidence artifact's
+  reference.
 - **Around them:** the newest UI map's pages with their coverage and shot, the nightly counts of
   `work/REGRESSION.log`, the operator's collections.
 - **Never:** a scenario's request text, requester or thread; a verdict's notes or a triage
   explanation; `work/LESSONS.md`; the operator conversation; anything of `work/security/` or
-  `work/env/`. A new field follows the same rule; `scripts/tests/test_catalog.sh` holds it.
+  `work/env/`; a credential value or a token (the builder refuses the page). A new field follows
+  the same rule; `scripts/tests/test_catalog.sh` holds it.
 
 ## Describing and categorizing
 
@@ -52,7 +55,9 @@ change:
 
 1. `node "$HOME/scripts/catalog.mjs"` → `{html, bytes, items, images, dropped_images,
    thumbnails, notes, hash, changed}`. `changed: false` → done. Each `notes` entry is a source it
-   could not read: log it as a `warn` and publish anyway.
+   could not read: log it as a `warn` and publish anyway. `refused` (exit 1): log it as an
+   `error` and publish nothing; `secrets.mjs scan-all work/env/credentials.env work/suite/tests
+   work/issues work/scenarios` (in `$HOME/scripts/lib/`) names the file to fix.
 2. Publish `work/catalog/index.html` as [reporting.md](reporting.md) → Delivery step 1 — artifact
    only, through an upload URL (it exceeds the inline limit); the reference lives in
    `work/catalog/artifact.id`, a revision when it exists — refused as not found, a new artifact

@@ -163,6 +163,7 @@ function s(tag, attrs, ...kids) {
 }
 const str = (v) => (v == null ? '' : String(v));
 const arr = (v) => (Array.isArray(v) ? v : []);
+const own = (o, k) => k != null && Object.prototype.hasOwnProperty.call(o, k); // a link's keys: never `constructor`
 const num = (r) => { const m = str(r).match(/\d+/); return m ? +m[0] : 0; };
 const debounce = (f, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), ms); }; };
 const fmtDate = (u) => { const d = new Date(u); return isNaN(d) ? '' : d.toISOString().slice(0, 10); };
@@ -192,8 +193,8 @@ const VAL = {
   failed: ['Failed', 'bad'], regression: ['Regression', 'bad'],
   blocked: ['Blocked', 'muted'], superseded: ['Superseded by a change', 'muted'], 'not-testable': ['Not testable', 'muted'], drift: ['Drift — not run', 'muted'],
 };
-const vLabel = (v) => (VAL[v] ? VAL[v][0] : v ? str(v) : 'No verdict yet');
-const vClass = (v) => (VAL[v] ? VAL[v][1] : 'none');
+const vLabel = (v) => (own(VAL, v) ? VAL[v][0] : v ? str(v) : 'No verdict yet');
+const vClass = (v) => (own(VAL, v) ? VAL[v][1] : 'none');
 const SEV = { bad: 0, warn: 1, muted: 2, ok: 3, none: 4 };
 const TIERS = ['regression', 'promotable', 'exploratory', 'quarantined', 'retired', 'untracked'];
 const tierRank = (t) => { const i = TIERS.indexOf(t); return i < 0 ? 9 : i; };
@@ -299,11 +300,11 @@ function readHash() {
   const v = p.get('v'); if (VIEWS.some(([k]) => k === v)) S.v = v;
   S.q = p.get('q') || '';
   S.f = {};
-  for (const [k, val] of p) if (k.startsWith('f.') && FACET[k.slice(2)]) S.f[k.slice(2)] = val.split('|').filter(Boolean);
-  if (p.get('s')) S.sort = p.get('s').split(',').map((x) => [x.replace(/^-/, ''), x.startsWith('-') ? -1 : 1]).filter(([k]) => COLS[k]);
-  if (GROUPS[p.get('g')]) S.g = p.get('g');
+  for (const [k, val] of p) if (k.startsWith('f.') && own(FACET, k.slice(2))) S.f[k.slice(2)] = val.split('|').filter(Boolean);
+  if (p.get('s')) S.sort = p.get('s').split(',').map((x) => [x.replace(/^-/, ''), x.startsWith('-') ? -1 : 1]).filter(([k]) => own(COLS, k));
+  if (own(GROUPS, p.get('g'))) S.g = p.get('g');
   if (p.get('l') === 'cards') S.l = 'cards';
-  if (p.get('c')) { const c = p.get('c').split(',').filter((k) => COLS[k]); if (c.length) S.cols = c; }
+  if (p.get('c')) { const c = p.get('c').split(',').filter((k) => own(COLS, k)); if (c.length) S.cols = c; }
   S.i = p.get('i') && byKey.has(p.get('i')) ? p.get('i') : null;
 }
 function writeHash() {

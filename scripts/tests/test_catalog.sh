@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # scripts/catalog.mjs: items from criteria, tests, verdicts, nights, heals and flakes; test-related
 # content only (no request text, requester, notes, explanations, lessons); escaped data; a stable
-# hash and `changed` against the published one; collections; coverage pages.
+# hash and `changed` against the published one; collections; coverage pages; drift nights; the
+# image budget; the credential and token refusal; the verifier's CATALOG.md and test_catalog checks.
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 seed_work
@@ -97,7 +98,8 @@ assert_eq "catalog exits 0" 0 "$rc"
 assert "summary" '.items == 4 and .changed == true and (.hash | test("^[0-9a-f]{12}$")) and (.thumbnails | test("none due|unavailable")) and .notes == []' "$out"
 [ -e "$W/catalog/thumbs/issue-99-ac-1.jpg" ] && { echo "  a thumbnail of a gone item was kept"; FAILED=1; }
 html="$(cat "$W/catalog/index.html")"
-data="$(node -e 'const h=require("fs").readFileSync(process.argv[1],"utf8");const m=h.match(/<script type="application\/json" id="qi-catalog-data">([\s\S]*?)<\/script>/);process.stdout.write(m[1])' "$W/catalog/index.html")"
+page_data() { node -e 'const h=require("fs").readFileSync(process.argv[1],"utf8");const m=h.match(/<script type="application\/json" id="qi-catalog-data">([\s\S]*?)<\/script>/);process.stdout.write(m[1])' "$W/catalog/index.html"; }
+data="$(page_data)"
 assert "schema and header" '.schema == "qi-catalog/v1" and .agent.display_name == "QA Bot" and .target == "acme/widgets" and .issue_url == "https://github.com/acme/widgets/issues/{n}"' "$data"
 i='.items[] | select(.key == "issue-42/AC-1")'
 assert "AC-1 from criteria, test and SUITE" "$i"' | .tier == "regression" and .then == "the project shows its new name with the task" and .area == "projects"
@@ -126,4 +128,41 @@ assert "same data, same hash, unchanged" '.hash == "'"$h1"'" and .changed == fal
 assert "a failed issues listing is a note, not a failure" '.notes | any(test("issue labels and state unavailable"))' "$(STUB_GH_FAIL=1 node "$SCRIPTS/catalog.mjs")"
 printf '| Smoke | #42 AC-1 |\n' >> "$W/CATALOG.md"
 assert "a collection change changes the hash" '.changed == true' "$(node "$SCRIPTS/catalog.mjs")"
+
+# A drifted file is not run: the trailing nights that skipped a drift show `drift`, not `unchanged`.
+printf '2026-10-13T03:00:00Z ran candidate=c4 unchanged=0 relearned=0 healed=0 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=1\n' >> "$W/REGRESSION.log"
+node "$SCRIPTS/catalog.mjs" >/dev/null; data="$(page_data)"
+assert "a drifted test's skipped night is drift, its run nights stay" "$i"' | .drift == true and ([.history[] | select(.run == "regression") | .value] == ["healed","unchanged","drift"]) and .verdict.value == "drift"' "$data"
+
+# Images within the budget, the regression tier first; the rest is dropped.
+head -c 900 /dev/zero | tr '\0' 'x' > "$W/catalog/thumbs/issue-42-ac-1.jpg"; cp "$W/catalog/thumbs/issue-42-ac-1.jpg" "$W/catalog/thumbs/scenario-7-ac-1.jpg"
+out="$(QI_CATALOG_IMG_BUDGET=2000 node "$SCRIPTS/catalog.mjs")"; data="$(page_data)"
+assert "one image fits, one is dropped" '.images == 1 and .dropped_images == 1' "$out"
+assert "the regression-tier still wins the budget" '(.items[] | select(.key == "issue-42/AC-1") | .still) != null and (.items[] | select(.key == "scenario-7/AC-1") | .still) == null' "$data"
+assert "both fit in the default budget" '.images == 2 and .dropped_images == 0' "$(node "$SCRIPTS/catalog.mjs")"
+
+# A credential value or a token in the data refuses the page; the last page stays.
+cp "$W/catalog/index.html" "$SANDBOX/last.html"
+mkdir -p "$W/env"; printf 'E2E_USER_OWNER_PASSWORD=s3cret-value\n' > "$W/env/credentials.env"
+cp "$W/suite/tests/scenario-7.e2e.ts" "$SANDBOX/scenario-7.e2e.ts"
+printf "test('S-7 AC-2: sign in', {}, async ({ agent }) => { await agent.act('type s3cret-value'); });\n" >> "$W/suite/tests/scenario-7.e2e.ts"
+out="$(node "$SCRIPTS/catalog.mjs")"; rc=$?
+assert_eq "a credential value refuses the page" 1 "$rc"
+assert "refused, not changed" '(.refused | test("credential")) and .changed == false' "$out"
+cmp -s "$W/catalog/index.html" "$SANDBOX/last.html" || { echo "  the refused page replaced the last one"; FAILED=1; }
+cp "$SANDBOX/scenario-7.e2e.ts" "$W/suite/tests/scenario-7.e2e.ts"
+printf "test('S-7 AC-2: token', {}, async ({ agent }) => { await agent.act('use ghp_%s'); });\n" "$(head -c 36 /dev/zero | tr '\0' 'a')" >> "$W/suite/tests/scenario-7.e2e.ts"
+node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a token refuses the page" 1 "$?"
+cp "$SANDBOX/scenario-7.e2e.ts" "$W/suite/tests/scenario-7.e2e.ts"
+node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a clean source builds again" 0 "$?"
+
+# The verifier: the CATALOG.md header and the test_catalog value.
+v="$(HOME="$SANDBOX" bash "$SCRIPTS/verify-onboarding.sh" 2>/dev/null | grep ' catalog_collections ')"
+case "$v" in (ok*) ;; (*) echo "  an intact CATALOG.md fails the verifier: $v"; FAILED=1;; esac
+sed -i.bak 's/^| collection | members |$/| name | members |/' "$W/CATALOG.md" && rm -f "$W/CATALOG.md.bak"
+v="$(HOME="$SANDBOX" bash "$SCRIPTS/verify-onboarding.sh" 2>/dev/null | grep ' catalog_collections ')"
+case "$v" in (FAIL*) ;; (*) echo "  a changed CATALOG.md header passes the verifier: $v"; FAILED=1;; esac
+printf -- '- test_catalog: maybe\n' >> "$W/CONFIG.md"
+bash "$SCRIPTS/verify-onboarding.sh" --config 2>/dev/null | grep -q '^FAIL cfg:test_catalog ' \
+  || { echo "  assertion failed: verify-onboarding --config fails test_catalog: maybe"; FAILED=1; }
 exit $FAILED

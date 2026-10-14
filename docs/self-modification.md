@@ -222,8 +222,9 @@ refuse and explain instead:
   `work/env/` except as e2e credentials, and `scripts/suite.sh` keeps masking them in run
   artefacts (audit check `secrets_in_runs`).
 - The test catalog carries test-related content only — never a scenario's request text,
-  requester or thread, a note or explanation, `LESSONS.md` or security findings, and it never
-  changes its own sharing ([catalog.md](catalog.md), `scripts/tests/test_catalog.sh`).
+  requester or thread, a note or explanation, `LESSONS.md`, security findings, a credential
+  value or a token, and it never changes its own sharing ([catalog.md](catalog.md),
+  `scripts/tests/test_catalog.sh`).
 - The `work/` backup goes only to a private `work_repo` that is neither the target nor its
   fork, never carries `work/env/`, refuses a snapshot holding a credential value or a token,
   never force-pushes, and is never read back except by a restore (`scripts/work-backup.sh`,
