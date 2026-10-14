@@ -1,15 +1,27 @@
 #!/usr/bin/env bash
 # helm-k3s engine: channels pick the right builds from both registry APIs; --between lists the builds
-# between two, oldest first; values fill placeholders and overlays.
+# between two, oldest first; a failed registry request fails the command; values fill placeholders and overlays.
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 ENG="$SCRIPTS/../engines/helm-k3s"
 mkdir -p "$SANDBOX/bin"
+# STUB_OCI_PAGED=ok|fail splits the /v2 listing into two pages (Link header via -D), the second failing
+# on `fail`; STUB_MANIFEST_FAIL=1 fails the manifest request.
 cat > "$SANDBOX/bin/curl" <<'S'
 #!/usr/bin/env bash
+hdr=/dev/null; prev=""
+for a in "$@"; do [ "$prev" = -D ] && hdr="$a"; prev="$a"; done
 for a in "$@"; do case "$a" in
   *quay.io/api/v1/*) cat "$STUB_DIR/quay.json"; exit 0;;
-  *"/v2/"*"/tags/list"*) echo '{"tags":["1.0.0","1.2.0","1.10.0","0.0.0-main.7","0.0.0-main.9","0.0.0-main.10","0.0.0-main.8","latest"]}'; exit 0;;
+  *"/v2/"*"/tags/list"*"last="*) [ "${STUB_OCI_PAGED:-}" = ok ] || exit 22
+    echo '{"tags":["1.2.0","1.10.0","0.0.0-main.9","0.0.0-main.10","0.0.0-main.8","latest"]}'; exit 0;;
+  *"/v2/"*"/tags/list"*) if [ -n "${STUB_OCI_PAGED:-}" ]; then
+      printf 'Link: </v2/acme/chart/tags/list?n=1000&last=1.0.0>; rel="next"\r\n' > "$hdr"
+      echo '{"tags":["0.0.0-main.7","1.0.0"]}'
+    else echo '{"tags":["1.0.0","1.2.0","1.10.0","0.0.0-main.7","0.0.0-main.9","0.0.0-main.10","0.0.0-main.8","latest"]}'; fi
+    exit 0;;
+  *"/v2/"*"/manifests/"*) [ "${STUB_MANIFEST_FAIL:-0}" = 1 ] && exit 22
+    echo '{"annotations":{"org.opencontainers.image.created":"2026-10-01T00:00:00Z"}}'; exit 0;;
   *"/v2/") exit 0;;
 esac; done
 exit 22
@@ -30,6 +42,14 @@ assert "quay main vs release" '. == {"candidate":"0.0.0-main.12","baseline":"1.1
 assert "quay release vs the release before" '. == {"candidate":"1.1.0","baseline":"1.0.0"}' "$(v quay release release)"
 assert "oci sorts numerically, not lexically" '. == {"candidate":"0.0.0-main.10","baseline":"1.10.0"}' "$(v oci main release)"
 assert "no baseline" '.baseline == null' "$(v oci main none)"
+# A failed page must fail the listing, never end it early with a wrong candidate (profile-contract: never a guess).
+vp() { ( export STUB_OCI_PAGED="$1"; v oci main release 2>/dev/null ); }
+assert "oci follows the Link header" '. == {"candidate":"0.0.0-main.10","baseline":"1.10.0"}' "$(vp ok)"
+vp fail >/dev/null && { echo "  a failed second page must fail bin/versions"; FAILED=1; }
+bt() { PATH="$SANDBOX/bin:$PATH" QI_ENGINE_CONFIG="$(cfg oci)" QI_PROFILE_CONFIG='{"img":"x","mock":""}' \
+       STUB_MANIFEST_FAIL="$1" bash "$ENG/bin/build-time" 1.0.0 2>/dev/null; }
+assert_eq "oci publish time" 2026-10-01T00:00:00Z "$(bt 0)"
+bt 1 >/dev/null && { echo "  a failed manifest request must fail bin/build-time"; FAILED=1; }
 vb() { PATH="$SANDBOX/bin:$PATH" QI_ENGINE_CONFIG="$(cfg "$1")" QI_PROFILE_CONFIG='{"img":"x","mock":""}' \
        QI_CANDIDATE_CHANNEL="" QI_BASELINE_CHANNEL="" bash "$ENG/bin/versions" --between "$2" "$3" 2>/dev/null; }
 assert "oci between, numeric order" '. == ["0.0.0-main.8","0.0.0-main.9"]' "$(vb oci 0.0.0-main.7 0.0.0-main.10)"
