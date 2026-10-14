@@ -7,6 +7,16 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.6.0 — 2026-10-14
+
+**Upgrade:**
+1. `work/COVERAGE.md` missing → create it with the `COVERAGE.md` block of
+   [ONBOARDING.md](ONBOARDING.md) Step 2b (header only; the next regression run fills it).
+2. Offer `auto_promote: verified` — the issues run promotes tests whose every criterion
+   was verified red-green into the nightly regression without the operator's "promote"
+   (missing key = `disabled`; [docs/regression.md](docs/regression.md) → Tiers).
+3. Run `bash "$HOME/scripts/verify-onboarding.sh"` and apply every `fix:`.
+
 ## 2.5.0 — 2026-10-14
 
 **Upgrade:**

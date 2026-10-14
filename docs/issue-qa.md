@@ -74,9 +74,11 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    `status: report_pending`, then deliver per [reporting.md](reporting.md) (which sets
    `reported`).
 9. **Register the tests.** One `work/SUITE.md` row per new or changed test file, tier
-   `exploratory`, `assert_hash` from `bash "$HOME/scripts/check-asserts.sh" --hash <file>`
-   ([regression.md](regression.md) → Tiers). A retest of a promoted file never demotes it
-   and never rewrites its hash — that is the operator's promotion.
+   `promotable` when the file qualifies, else `exploratory`, `assert_hash` from
+   `bash "$HOME/scripts/check-asserts.sh" --hash <file>` ([regression.md](regression.md) →
+   Tiers); `auto_promote: verified` writes a qualifying file as `regression` instead. A
+   retest of a promoted file never demotes it and never rewrites its hash. Name every
+   `promotable` (or auto-promoted) file in the run's chat summary.
 10. **Release.** `env.sh unlock issues`; log `issue_done issue=<n> verdict=<v>`.
 
 A failure between steps 5 and 8 that is not an environment failure → finish with the
@@ -90,6 +92,8 @@ leave the row `in_progress` at run end.
 - `criteria-<ac_hash>.md` and `explorations-<ac_hash>.md` predate the first test file edit of this run.
 - No observation changed an AC or issue verdict.
 - No AC is `verified` without a baseline failure and a candidate pass.
+- Every `promotable` row written qualifies; no file was newly promoted unless
+  `auto_promote: verified`.
 - Every tested AC in the rendered report has a candidate video and at least one screenshot.
 - A comment skipped as already posted was skipped for a marker in the agent's own comment.
 - The environment lock is released; no `/tmp/quality-inspector-*` left behind.

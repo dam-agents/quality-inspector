@@ -114,6 +114,12 @@ EOF
 | utc | test | ac | build | runs | passes |
 | --- | --- | --- | --- | --- | --- |
 EOF
+[ -f COVERAGE.md ] || cat > COVERAGE.md <<'EOF'
+# Coverage — pages of the newest UI map and the tests that reach them (docs/change-awareness.md → Coverage)
+
+| page | title | tests | covered |
+| --- | --- | --- | --- |
+EOF
 [ -f LESSONS.md ] || cat > LESSONS.md <<'EOF'
 # Operational lessons — verified environment facts only, each with its evidence.
 EOF
@@ -191,6 +197,7 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - artifact_reports: enabled
 - include_comments: disabled
 - spec_feedback: disabled
+- auto_promote: disabled
 - media_retention_days: 14
 - max_issues_per_run: 1
 - lock_ttl_min: 180
@@ -275,7 +282,7 @@ Then tick item 4 (the boundary probes passed) and item 2, and call
 1. The final `work/CONFIG.md`, verbatim.
 2. Schedules and which are disabled; state is local-only (README → Persistence).
 3. Day-to-day: label an issue `qa:ready` to have it tested within the hour; add
-   `qa:retest` to test it again; say "promote #N" to move its tests into the nightly
-   regression; "test #N" runs one now; reports land in the artifact library (and on the
+   `qa:retest` to test it again; say "promote #N" (or "promote all pending") to move
+   tests into the nightly regression; "test #N" runs one now; reports land in the artifact library (and on the
    issue when comments are enabled); `marker_prefix` cannot change after the first
    comment.

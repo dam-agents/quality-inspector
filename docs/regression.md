@@ -9,7 +9,15 @@
 ```
 
 - `exploratory` — written by an issues run; `promoted_utc` is `-`. Not replayed nightly.
-- `regression` — promoted by the operator ("promote #N" → [on-demand.md](on-demand.md)).
+- `promotable` — written instead by an issues run when, in that run, every AC in the file
+  was `verified`, the file passed `--strict` on the candidate, no step inside an AC block
+  was `judged`, and `scripts/check-asserts.sh --agent-asserts <file>` prints nothing. Like
+  `exploratory` otherwise (not replayed, not drift-checked); the queue for "promote all
+  pending". With `auto_promote: verified` the issues run promotes such a file itself
+  (tier `regression`, `assert_hash`, `promoted_utc` now) — the risk: an AC freeze the
+  operator never read then gates every nightly run.
+- `regression` — promoted by the operator ("promote #N", "promote all pending" →
+  [on-demand.md](on-demand.md)) or by `auto_promote: verified`.
   `assert_hash` is the `scripts/check-asserts.sh --hash` value of its AC blocks; it changes
   only by a heal ([triage.md](triage.md), logged in `work/HEALS.md`) or by the operator.
 - `retired` — superseded by a completed issue ([triage.md](triage.md)); kept, not replayed.
@@ -29,6 +37,7 @@ run — say so, never treat it as clean).
 3. **Build the change context** ([change-awareness.md](change-awareness.md)): the UI map
    of the candidate, its diff against `previous_candidate`'s map, the completed issues in
    the window, the impact per test, and your one-line expectation per impacted test.
+   Rewrite `work/COVERAGE.md` from the new map ([change-awareness.md](change-awareness.md) → Coverage).
 4. Drifted tests (`assert_drift`) are **not run** — list them for the operator.
 5. Replay: `suite.sh run regression-<candidate> --evidence failures --tag issue-<a> --tag issue-<b> …`.
    `criterion()` judges a check whose control moved instead of failing it. Explorations

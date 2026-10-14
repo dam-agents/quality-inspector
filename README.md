@@ -28,7 +28,7 @@ library for evidence, the skill catalog for profiles, sub-agents for independent
   the last release and on the candidate, and reports (docs/issue-qa.md).
 - **Regression run** (nightly, off by default) — replays the tests the operator promoted
   against each new candidate; recorded steps replay without model calls, the LLM steps in
-  only where the UI changed (docs/regression.md).
+  only where the UI changed; it also maps which pages no promoted test reaches (docs/regression.md).
 - **Weekly audit** (off by default) — health, the black-box boundary probes, assertion
   drift, cache efficiency (docs/audit.md).
 - Scripts only detect, and the profile only sets up the nested product; every judgment and every
@@ -145,6 +145,7 @@ configuration.
 | `target_repo` | asked | Repository whose issues are tested. `QI_TARGET_REPO` overrides. |
 | `issue_comments` | asked, default `disabled` | Opt-in: post verdicts on the issue. |
 | `spec_feedback` | asked, default `disabled` | Opt-in: suggest an observable "Done when" on issues with nothing testable. |
+| `auto_promote` | default `disabled` | `verified`: tests whose every criterion was verified join the nightly regression without the operator's "promote". |
 | `marker_prefix` | default `quality-inspector` | Dedup marker; **immutable once a comment exists**. |
 | `qa_label`, `retest_label` | defaults | The gates (`qa:ready`, `qa:retest`). |
 | `candidate_channel`, `baseline_channel` | the profile's defaults | What is tested against what (`none` turns red-green off). |

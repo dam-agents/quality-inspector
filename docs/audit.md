@@ -7,9 +7,11 @@ when `audit_report: disabled` (still append the log line).
    half: GitHub identity, issues reachability, **the black-box boundary probes**, the
    profile and its builds, the profile's requirements, disk, `work/` not a repo, leftovers, stale locks, assertion drift,
    the issues pre-flight cadence, definition cleanliness and version, the policy hook and
-   the week's refusals (`policy_hook`, `policy_denied`), and `secrets_in_runs` (a
-   credential value left in a raw run's text files; a `fail` names the paths, never the
-   value). `failures[]` groups the week's error events; `stats` counts verdicts.
+   the week's refusals (`policy_hook`, `policy_denied`), `secrets_in_runs` (a credential
+   value left in a raw run's text files; a `fail` names the paths, never the value), and
+   **coverage** of the newest UI map (`warn` while pages are uncovered, never `fail`;
+   [change-awareness.md](change-awareness.md) → Coverage). `failures[]` groups the week's
+   error events; `stats` counts verdicts and `stats.coverage` the pages.
 2. Add the judgment half:
    - `mcp__platform-outbound__list_schedules`: the three `quality-inspector-*` schedules exist; their
      task text and precheck match `kit.yaml` (drift is a `warn` — the operator updates a
@@ -38,7 +40,7 @@ when `audit_report: disabled` (still append the log line).
      one cause dominates (the same page, the nested product right after `up`).
    - Triage health: heals this week from `work/HEALS.md` (each one's basis is a UI-map
      change or an issue — sample one), tests at three heals a month, `needs-review` items
-     the operator has not answered, `retired` tests.
+     the operator has not answered, `retired` tests, `promotable` rows waiting.
    - Trends: verdict distribution (100 % one verdict is suspicious), `inconclusive`
      share (a non-discriminating suite), replay cache `handed_off + missed` share from
      `REGRESSION.log`, environment failures per week, observations per week by severity
@@ -49,7 +51,7 @@ when `audit_report: disabled` (still append the log line).
 
 ```
 🩺 Quality Inspector weekly audit — <date> · 🟢 N ok · 🟡 N warn · 🔴 N fail
-Week in numbers: issues tested N (verified a · failed b · inconclusive c · blocked d) · env failures N · cache replay x %
+Week in numbers: issues tested N (verified a · failed b · inconclusive c · blocked d) · env failures N · cache replay x % · pages covered c/p
 🔴 <id> — <detail>          (every fail, never summarized away)
 🟡 <id> — <detail>
 🟢 all other checks passed (<count>)

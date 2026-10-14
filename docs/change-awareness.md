@@ -47,6 +47,19 @@ one-line expectation per impacted test: *"#101 AC-1 checks the API keys tab, whi
 map shows renamed to Access tokens; #4552 says the analytics report gets a share link"*.
 The triage ([triage.md](triage.md)) compares outcomes against these expectations.
 
+## Coverage
+
+```bash
+node "$HOME/scripts/coverage.mjs" work/inventory/<build>/inventory.json work/SUITE.md work/suite/tests/issue-*.e2e.ts --md > work/COVERAGE.md
+```
+
+Without `--md` it prints the JSON (`pages[]` with `tests` and `covered`, `uncovered[]`,
+`nav_without_golden_path[]`). A page is **covered** when a `regression`-tier test opens
+its URL or names, in a quoted string, a control that only this page shows (shared chrome
+such as navigation or a "Save" on every form counts for no page). A top-level navigation
+item of the root page whose target page is uncovered has **no golden path**. Read-only;
+the audit reports the counts, never as a fail.
+
 ## Keeping maps
 
 `work/inventory/<build>/` per regression-tested build; the audit pre-flight keeps the

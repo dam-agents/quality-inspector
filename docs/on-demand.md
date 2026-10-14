@@ -15,6 +15,9 @@ scheduled ([persistence.md](persistence.md) → **Scheduled or direct session**)
   `assert_hash` from `bash "$HOME/scripts/check-asserts.sh" --hash <file>`,
   `promoted_utc` now ([regression.md](regression.md) → Tiers). Re-promoting a drifted
   file is the same command and needs the same yes.
+- **"promote all pending"** — the same for every `promotable` row at once: show each
+  file side by side with its criteria, then one yes promotes them all (the operator may
+  drop files first).
 - **"promote #N --with-explorations"** — not available in this version: explorations are
   never replayed nightly ([explorations.md](explorations.md)); say so, then "promote #N".
 - **"demote #N"** — tier back to `exploratory`, `promoted_utc` `-`.
@@ -22,7 +25,10 @@ scheduled ([persistence.md](persistence.md) → **Scheduled or direct session**)
   run: accept = apply the repair, re-hash, log in `work/HEALS.md` with basis
   `operator`; reject = file it as a regression in the next report.
 - **"what changed since <build>?"** — the context of [change-awareness.md](change-awareness.md)
-  for that build pair, without running tests.
+  for that build pair, without running tests; rewrite `work/COVERAGE.md` from the new map.
+- **"suggest scenarios for uncovered pages"** — from `coverage.mjs` ([change-awareness.md](change-awareness.md) →
+  Coverage), propose one scenario per uncovered page and nav item; proposals only — no
+  test is written without a yes.
 - **"reset the environment"** — `env.sh lock operator`, `env.sh reset`, optionally `up
   <version>`, `env.sh unlock operator`.
 - **"run the regression now"** — the regression run procedure with the current candidate,

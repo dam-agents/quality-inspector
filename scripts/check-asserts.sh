@@ -11,9 +11,12 @@
 # `// EX-<k> begin|end` blocks (docs/explorations.md) are hashed apart and never count
 # toward the AC hash, so explorations may evolve without drifting a promoted test.
 #
-#   check-asserts.sh --hash <test-file>     -> prints the file's AC assert hash (none without AC blocks)
-#   check-asserts.sh --ex-hash <test-file>  -> prints the file's EX block hash (none without EX blocks)
-#   check-asserts.sh --json                 -> {"drift":[...], "unmarked":[...]} for regression rows
+#   check-asserts.sh --hash <test-file>          -> prints the file's AC assert hash (none without AC blocks)
+#   check-asserts.sh --ex-hash <test-file>       -> prints the file's EX block hash (none without EX blocks)
+#   check-asserts.sh --json                      -> {"drift":[...], "unmarked":[...]} for regression rows
+#                                                   (exploratory, promotable, retired, quarantined: never)
+#   check-asserts.sh --agent-asserts <test-file> -> the AC ids whose block calls agent.assert, one per
+#                                                   line; empty = promotable (docs/regression.md → Tiers)
 #
 # Read-only. Exit 0 unless the arguments are wrong.
 
@@ -49,6 +52,9 @@ case "${1:-}" in
   --ex-hash)
     [ -f "${2:-}" ] || { echo "usage: $0 --ex-hash <test-file>" >&2; exit 2; }
     file_hash "$2" EX ;;
+  --agent-asserts)
+    [ -f "${2:-}" ] || { echo "usage: $0 --agent-asserts <test-file>" >&2; exit 2; }
+    blocks AC "$2" | awk '/^#AC-/ {id=substr($0, 2); next} /agent\.assert/ && !seen[id]++ {print id}' ;;
   --json)
     drift='[]'; unmarked='[]'
     while IFS= read -r row; do
@@ -67,5 +73,5 @@ case "${1:-}" in
       fi
     done < <(table_rows "$WORK/SUITE.md")
     jq -nc --argjson d "$drift" --argjson u "$unmarked" '{drift:$d, unmarked:$u}' ;;
-  *) echo "usage: $0 --hash <test-file> | --ex-hash <test-file> | --json" >&2; exit 2 ;;
+  *) echo "usage: $0 --hash <test-file> | --ex-hash <test-file> | --agent-asserts <test-file> | --json" >&2; exit 2 ;;
 esac

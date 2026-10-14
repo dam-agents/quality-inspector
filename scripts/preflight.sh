@@ -145,6 +145,7 @@ mode_issues() {
 # ======================================================== REGRESSION MODE ====
 mode_regression() {
   local tests last versions candidate drift
+  # Only the `regression` tier replays; exploratory, promotable, retired and quarantined never do.
   tests="$(table_rows "$WORK/SUITE.md" | awk -F'|' '{t=$2; tier=$4; gsub(/[ \t]/,"",t); gsub(/[ \t]/,"",tier)} tier=="regression" {print t}' \
            | jq -R . | jq -sc .)"
   if [ "$(printf '%s' "$tests" | jq length)" = 0 ]; then
@@ -241,6 +242,22 @@ mode_audit() {
   elif [ "$drift" = '[]' ]; then check assert_drift ok "regression assertions match their promoted hashes"
   else check assert_drift fail "assertion blocks changed without promotion: $drift"; fi
 
+  # coverage of the newest UI map by regression-tier tests — informational, never a fail
+  local map cov=null
+  map="$(ls -1t "$WORK"/inventory/*/inventory.json 2>/dev/null | head -1)"
+  if [ -n "$map" ]; then
+    cov="$(find "$WORK/suite/tests" -name 'issue-*.e2e.ts' 2>/dev/null | sort \
+           | xargs node "$SCRIPT_DIR/coverage.mjs" "$map" "$WORK/SUITE.md" 2>/dev/null \
+           | jq -c '{pages:(.pages|length), covered:([.pages[]|select(.covered)]|length), uncovered:(.uncovered|length), nav_without_golden_path:(.nav_without_golden_path|length)}' 2>/dev/null)"
+    [ -n "$cov" ] || cov=null
+  fi
+  if [ "$cov" = null ]; then
+    [ -n "$map" ] && check coverage warn "coverage.mjs failed on $map" || check coverage ok "not measured — no UI map yet"
+  else
+    local cdet; cdet="$(jq -r '"pages \(.pages) · covered \(.covered) · uncovered \(.uncovered) · nav items without a golden path \(.nav_without_golden_path)"' <<<"$cov")"
+    [ "$(jq -r .uncovered <<<"$cov")" = 0 ] && check coverage ok "$cdet" || check coverage warn "$cdet"
+  fi
+
   # cadence: the issues pre-flight logs every call, declined ones included
   local last_iso; last_iso="$(tail -1 "$WORK/ISSUES.log" 2>/dev/null | cut -d' ' -f1)"
   if [ -z "$last_iso" ]; then check issues_cadence warn "ISSUES.log empty"
@@ -297,8 +314,9 @@ mode_audit() {
   stats="$(jq -nc --argjson v "$stats" --arg runs "$(count_lines '' "$WORK/ISSUES.log")" \
     --arg reg "$(count_lines 'ran candidate=' "$WORK/REGRESSION.log")" \
     --arg heals "$(count_lines '^| 20' "$WORK/HEALS.md")" --argjson sw "$sigweeks" \
+    --argjson cov "$cov" \
     '{verdicts_7d:$v, issues_preflights_total:($runs|tonumber), regression_runs_total:($reg|tonumber), heals_total:($heals|tonumber),
-      signals_by_week:$sw}')"
+      signals_by_week:$sw, coverage:$cov}')"
 
   runlog AUDIT_PREFLIGHT "checks=$(printf '%s' "$CHECKS" | jq length)"
   jq -nc --argjson c "$CHECKS" --argjson f "$failures" --argjson s "$stats" --argjson logs "$(logs_json)" \

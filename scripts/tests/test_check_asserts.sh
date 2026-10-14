@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-asserts.sh: only AC blocks count, whitespace does not; EX blocks hash apart.
+# check-asserts.sh: only AC blocks count, whitespace does not; EX blocks hash apart; agent.assert inside an AC block is named.
 . "$(dirname "$0")/lib.sh"
 f="$SANDBOX/t.e2e.ts"
 printf 'await agent.act("a");\n// AC-1 begin\nawait expect(x).toBeVisible();\n// AC-1 end\n' > "$f"
@@ -10,6 +10,8 @@ assert_eq "steps and indentation do not change the hash" "$h1" "$h2"
 printf '// AC-1 begin\nawait expect(x).toHaveText("b");\n// AC-1 end\n' > "$f"
 h3="$(bash "$SCRIPTS/check-asserts.sh" --hash "$f")"
 [ "$h1" != "$h3" ] || { echo "  a changed assertion must change the hash"; FAILED=1; }
+printf '// AC-1 begin\nawait expect(x).toBeVisible();\n// AC-1 end\nawait agent.assert("setup");\n// AC-2 begin\nawait agent.assert("y");\nawait agent.assert("z");\n// AC-2 end\n' > "$f"
+assert_eq "agent.assert only counts inside AC blocks, once per AC" AC-2 "$(bash "$SCRIPTS/check-asserts.sh" --agent-asserts "$f")"
 printf 'no blocks\n' > "$f"
 assert_eq "a file without blocks hashes to none" none "$(bash "$SCRIPTS/check-asserts.sh" --hash "$f")"
 # EX blocks (docs/explorations.md) never change the AC hash, and hash on their own.

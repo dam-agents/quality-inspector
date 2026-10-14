@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# preflight.sh regression: no tests, same candidate, new candidate with drift.
+# preflight.sh regression: no tests, same candidate, new candidate with drift; promotable never replays.
 . "$(dirname "$0")/lib.sh"
 seed_work
-out="$(bash "$SCRIPTS/preflight.sh" regression)"
-assert "no regression tests -> idle" '.nothing_to_do==true' "$out"
-
 mkdir -p "$WORK_DIR/suite/tests"
+# A promotable file is queued for the operator: not replayed, its hash not drift-checked.
+printf '// AC-1 begin\nawait agent.assert("x");\n// AC-1 end\n' > "$WORK_DIR/suite/tests/issue-8.e2e.ts"
+echo "| tests/issue-8.e2e.ts | 8 | promotable | 000000000000 | - |" >> "$WORK_DIR/SUITE.md"
+out="$(bash "$SCRIPTS/preflight.sh" regression)"
+assert "no regression tests (promotable only) -> idle" '.nothing_to_do==true' "$out"
+
 cat > "$WORK_DIR/suite/tests/issue-7.e2e.ts" <<'T'
 // AC-1 begin
 await expect(x).toBeVisible();
@@ -24,5 +27,6 @@ echo "2026-10-01T03:00:00Z ran candidate=0.0.0-main.aaa1111 passed=1 failed=0" >
 sed -i.bak 's/toBeVisible()/toBeHidden()/' "$WORK_DIR/suite/tests/issue-7.e2e.ts"
 out="$(bash "$SCRIPTS/preflight.sh" regression)"
 assert "changed AC block is drift" '.assert_drift | length == 1 and .[0].test=="tests/issue-7.e2e.ts"' "$out"
+assert "promotable is never replayed" '.tests == ["tests/issue-7.e2e.ts"]' "$out"
 assert "previous candidate is the last one tested" '.previous_candidate == "0.0.0-main.aaa1111"' "$out"
 exit $FAILED
