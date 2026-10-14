@@ -7,12 +7,21 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.14.0 — 2026-10-14
+
+**Upgrade:**
+1. **operator-only, with `profile_source_path` set:** first make sure the platform carries
+   dam-agents/dam#4909 (README → Runtime requirements) — before it, the profile allow
+   opens the repository through `<path>/..`. Then run the commands
+   `bash "$HOME/scripts/egress-rules.sh"` prints, skipping the rules the agent already
+   has: the new `GET /repos/<T>` and `GET /repos/<T>/git/refs/heads/*` allows, which the
+   platform's scan of a private source needs ([docs/black-box.md](docs/black-box.md) →
+   **Egress rules**).
+2. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every `fix:`.
+
 ## 2.13.0 — 2026-10-14
 
 **Upgrade:**
-0. **operator-only, a precondition for a profile inside the target repository:** the
-   platform carries dam-agents/dam#4909 (README → Runtime requirements). Before it, the
-   profile allow opens the repository through `<path>/..`, and step 3 fails on it.
 1. Add `- profile_source_path: <path>` to `work/CONFIG.md` unless present: the skill
    source's path when the profile's source is `target_repo` (for DAM: source
    `dam-agents/dam`, path `qa`), else empty.
