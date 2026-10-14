@@ -51,16 +51,18 @@ cmd() { # <verdict> <method> <host> <path pattern> [why]
   printf '%s --yes%s\n' "$c" "${5:+  # $5}"
 }
 
-# kit.yaml's egressRules as "<verdict> <method> <host> <path pattern>" lines.
+# kit.yaml's egressRules as "<verdict> <method> <host> <path pattern>" lines; a key counts
+# on the item's "- " line too, quoted or not, before a trailing comment — as the
+# validator's kit check reads it.
 kit_rules() {
   sed -n '/^egressRules:/,/^[a-z]/p' "$SCRIPT_DIR/../kit.yaml" 2>/dev/null | awk '
-    function val(s) { sub(/^[^:]*:[[:space:]]*/, "", s); gsub(/["\047]/, "", s); return s }
+    function val(s) { sub(/^[^:]*:[[:space:]]*/, "", s); sub(/[[:space:]]+#.*$/, "", s); gsub(/["\047]/, "", s); sub(/[[:space:]]+$/, "", s); return s }
     function emit() { if (h != "") print v, m, h, p }
     /^  - / { emit(); h = ""; m = "*"; p = "*"; v = "allow" }
-    /^  - host:|^    host:/ { h = val($0) }
-    /^    method:/ { m = val($0) }
-    /^    pathPattern:/ { p = val($0) }
-    /^    verdict:/ { v = val($0) }
+    /^(  - |    )host:/ { h = val($0) }
+    /^(  - |    )method:/ { m = val($0) }
+    /^(  - |    )pathPattern:/ { p = val($0) }
+    /^(  - |    )verdict:/ { v = val($0) }
     END { emit() }'
 }
 
@@ -68,6 +70,8 @@ echo ': "${AGENT:?set AGENT to this agent'"'"'s name}"'
 if [ "$KIT" = 1 ]; then
   echo "# The kit's rules (kit.yaml) — already on an agent created from kit 2.11.0 or newer."
   while read -r v m h p; do cmd "$v" "$m" "$h" "$p"; done < <(kit_rules)
+else
+  echo "# The kit's rules (kit.yaml) are left out: an agent created by hand or from a kit before 2.11.0 lacks them — run with --kit."
 fi
 echo "# The target $T (docs/black-box.md → Egress rules)."
 while read -r v m h p; do cmd "$v" "$m" "$h" "$p"; done < <(boundary_rules "$T" ${SOURCES[@]+"${SOURCES[@]}"})
@@ -75,7 +79,12 @@ _bb_definition >/dev/null || echo "# This definition's origin is unreadable: whe
 if dir="$(profile_dir)" && [ -f "$dir/profile.json" ]; then
   echo "# The profile's egress ($(jq -r '.product // "profile"' "$dir/profile.json"))."
   jq -r '.egress[]? | [(.verdict // "allow"), (.method // "*"), .host, (.pathPattern // .path // "*"), (.why // "")] | @tsv' \
-    "$dir/profile.json" | while IFS="$(printf '\t')" read -r v m h p why; do cmd "$v" "$m" "$h" "$p" "$why"; done
+    "$dir/profile.json" | while IFS="$(printf '\t')" read -r v m h p why; do
+      # The operator runs these lines in a shell: a value that could expand there is skipped.
+      case "$v$m$h$p" in (*[!A-Za-z0-9._~*/%:?=\&+@,-]*)
+        echo "# Skipped: the profile's egress entry for ${h//[!A-Za-z0-9.*-]/?} holds a shell character — check profile.json."; continue;; esac
+      cmd "$v" "$m" "$h" "$p" "$why"
+    done
 else
   echo "# No profile installed — add its egress (profile.json) once it is."
 fi

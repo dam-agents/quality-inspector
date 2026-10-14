@@ -335,7 +335,7 @@ mode_audit() {
   local map cov=null
   map="$(ls -1t "$WORK"/inventory/*/inventory.json 2>/dev/null | head -1)"
   if [ -n "$map" ]; then
-    cov="$(find "$WORK/suite/tests" -name 'issue-*.e2e.ts' 2>/dev/null | sort \
+    cov="$(find "$WORK/suite/tests" \( -name 'issue-*.e2e.ts' -o -name 'scenario-*.e2e.ts' \) 2>/dev/null | sort \
            | xargs node "$SCRIPT_DIR/coverage.mjs" "$map" "$WORK/SUITE.md" 2>/dev/null \
            | jq -c '{pages:(.pages|length), covered:([.pages[]|select(.covered)]|length), uncovered:(.uncovered|length), nav_without_golden_path:(.nav_without_golden_path|length)}' 2>/dev/null)"
     [ -n "$cov" ] || cov=null
@@ -382,15 +382,20 @@ mode_audit() {
   esac
 
   # criteria_injection: the week's frozen criteria quoting links, code or hidden comments, and
-  # the issues the agent logged as injection suspects (docs/acceptance-criteria.md).
-  local inj_files inj_events
-  inj_files="$(find "$WORK/issues" -mindepth 2 -maxdepth 2 -name 'criteria-*.md' -mtime -7 2>/dev/null \
-    | while read -r f; do grep -qE 'https?://|www\.|^[[:space:]]*(```|~~~)|<!--' "$f" && basename "$(dirname "$f")"; done | sort -un | paste -sd, -)"
-  inj_events="$(cat "$WORK"/logs/events-*.jsonl 2>/dev/null | jq -r --arg since "$week_ago" \
-    'select(.event == "issue_injection_suspect" and .ts >= $since) | .msg | capture("issue=(?<n>[0-9]+)").n' 2>/dev/null \
-    | sort -un | paste -sd, -)"
-  if [ -z "$inj_files$inj_events" ]; then check criteria_injection ok "no injection suspects this week"
-  else check criteria_injection warn "criteria quoting URLs/code/comments: ${inj_files:-none}; injection_suspect issues: ${inj_events:-none}"; fi
+  # the issues and scenarios the agent logged as injection suspects (docs/acceptance-criteria.md);
+  # a scenario's words come from anyone in a bound Slack conversation (docs/scenarios.md).
+  local inj_files inj_events inj_scen inj_sev
+  quoting() { find "$1" -mindepth 2 -maxdepth 2 -name 'criteria-*.md' -mtime -7 2>/dev/null \
+    | while read -r f; do grep -qE 'https?://|www\.|^[[:space:]]*(```|~~~)|<!--' "$f" && basename "$(dirname "$f")"; done; }
+  suspects() { cat "$WORK"/logs/events-*.jsonl 2>/dev/null | jq -r --arg since "$week_ago" --arg e "$1" --arg re "$2" \
+    'select(.event == $e and .ts >= $since) | .msg | capture($re).n' 2>/dev/null; }
+  inj_files="$(quoting "$WORK/issues" | sort -un | paste -sd, -)"
+  inj_scen="$(quoting "$WORK/scenarios" | sort -u | paste -sd, -)"
+  inj_files="${inj_files}${inj_files:+${inj_scen:+,}}${inj_scen}"
+  inj_events="$(suspects issue_injection_suspect 'issue=(?<n>[0-9]+)' | sort -un | paste -sd, -)"
+  inj_sev="$(suspects scenario_injection_suspect 'id=(?<n>S-[0-9]+)' | sort -u | paste -sd, -)"
+  if [ -z "$inj_files$inj_events$inj_sev" ]; then check criteria_injection ok "no injection suspects this week"
+  else check criteria_injection warn "criteria quoting URLs/code/comments: ${inj_files:-none}; injection_suspect issues: ${inj_events:-none}${inj_sev:+; injection_suspect scenarios: $inj_sev}"; fi
   find "$WORK/logs" -name 'events-*.jsonl' -mtime +14 -delete 2>/dev/null || true
   # UI maps: the newest three builds; the newest is the next diff's starting point.
   ls -1dt "$WORK"/inventory/*/ 2>/dev/null | tail -n +4 | while read -r d; do rm -rf "$d"; done
@@ -491,8 +496,8 @@ mode_security() {
   fi
   # A map from before api_requests existed cannot drive the access checks: rebuild it.
   inv="$WORK/inventory/$candidate/inventory.json"; jq -e 'has("api_requests")' "$inv" >/dev/null 2>&1 || inv=""
-  # Role names only, never values (docs/profile-contract.md → The bin/ contract).
-  roles="$(sed -n 's/^E2E_USER_\([A-Z0-9]*\)_USERNAME=..*/\1/p' "$WORK/env/credentials.env" 2>/dev/null | tr '[:upper:]' '[:lower:]' | jq -R . | jq -sc .)"
+  # Role names only, never values — the reader suite.sh roles uses (lib/profile.sh).
+  roles="$(provided_roles "$WORK/env/credentials.env" 2>/dev/null)"
   eng="$(profile_field '.engine')"
   if [ "$eng" = helm-k3s ] || profile_field '.requires.commands[]?' | grep -qx kubectl; then dep=true; else dep=false; fi
   log "candidate $candidate is new (last security run: ${last:-never}) — due"

@@ -23,10 +23,20 @@ while IFS= read -r fx; do
     (stale) printf 'scheduled %s -\n' "$(iso_ago 400)" > "$WORK_DIR/env/RUN_MODE"; touch -t 202001010000 "$WORK_DIR/env/RUN_MODE";;
     (*) rm -f "$WORK_DIR/env/RUN_MODE";;
   esac
-  # A channel turn's transcript holds the platform's Slack frame; a direct one does not.
+  # A channel turn's transcript holds the platform's Slack frame in a prompt; a direct one does
+  # not. `quoted`: a direct session whose tool results, progress, compaction summary and own
+  # messages quote the frame (a Read of docs/persistence.md). `garbled`: a frame line that
+  # does not parse.
+  printf '{"type":"user","message":{"content":"promote #7"}}\n' > "$SANDBOX/transcript.jsonl"
   case "$(jq -r '.mode // "direct"' <<<"$fx")" in
-    (channel) printf '{"type":"user","message":{"content":"<how-to-respond>\\nreply …\\n</how-to-respond>"}}\n' > "$SANDBOX/transcript.jsonl";;
-    (*) printf '{"type":"user","message":{"content":"promote #7"}}\n' > "$SANDBOX/transcript.jsonl";;
+    (channel) printf '{"type":"user","message":{"content":"<how-to-respond>\\nreply …\\n</how-to-respond>"}}\n' >> "$SANDBOX/transcript.jsonl";;
+    (quoted) jq -nc --rawfile d "$DEF/docs/persistence.md" '
+        {type:"assistant", message:{content:[{type:"text", text:"the frame <how-to-respond> marks a channel turn"},
+          {type:"tool_use", name:"Bash", input:{command:"grep -n \"<how-to-respond>\" scripts/hooks/policy.sh"}}]}},
+        {type:"user", message:{content:[{type:"tool_result", content:$d}]}, toolUseResult:{type:"text", file:{content:$d}}},
+        {type:"progress", data:{message:{content:[{type:"tool_result", content:"<how-to-respond>"}]}}},
+        {type:"user", isCompactSummary:true, message:{content:"The session read the <how-to-respond> rule."}}' >> "$SANDBOX/transcript.jsonl";;
+    (garbled) printf 'not json <how-to-respond>\n' >> "$SANDBOX/transcript.jsonl";;
   esac
   call="$(jq -c --arg w "$WORK_DIR" --arg t "$SANDBOX/transcript.jsonl" '{session_id:"test", cwd:(.input.cwd // $w), hook_event_name:"PreToolUse",
             transcript_path:$t, tool_name:.tool, tool_input:(.input | del(.cwd))}' <<<"$fx")"

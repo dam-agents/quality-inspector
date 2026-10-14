@@ -1,7 +1,7 @@
-# Explorations — scenarios beyond the criteria
+# Explorations — checks beyond the criteria
 
 The criteria file holds only what the issue states ([acceptance-criteria.md](acceptance-criteria.md)).
-Explorations are the scenarios you design around each AC to test the feature harder: a
+Explorations are the checks you design around each AC to test the feature harder: a
 second layer with its own frozen oracle, its own tests and its own report section.
 `explorations: disabled` turns the layer off; `max_explorations_per_ac` (default `3`,
 `0` = none) caps it. A missing or invalid value → its default.
@@ -52,7 +52,7 @@ The only allowed sources; each EX names exactly one, by its name in the first co
   copy the issue does not state — the AC rules of [acceptance-criteria.md](acceptance-criteria.md) apply.
 - **Selection:** per testable AC, derive candidates and keep them in the order
   `roles-isolation` → `persistence` → `negative-path` → the rest in table order, at most
-  `max_explorations_per_ac`; at most 3 × the testable ACs per issue; a scenario two ACs
+  `max_explorations_per_ac`; at most 3 × the testable ACs per issue; a check two ACs
   share is one EX. Number EX-1… in AC order.
 
 ## Identities
@@ -84,6 +84,8 @@ test('#42 EX-1: a viewer cannot rename the agent', { session: 'viewer', tags: ['
 - **Tag `issue-<n>-ex`, never `issue-<n>`.** Tags match exactly, and every AC run (red-green,
   confirmation, heal, regression) selects `--tag issue-<n>` — so explorations never run on
   the baseline or nightly. Explorations are not replayed nightly in this version.
+  `check-asserts.sh --lint <file>` lists in `ex_with_issue_tag` every EX block whose test
+  carries `issue-<n>`; issue-qa step 5 retags each one before red-green.
 - `check-asserts.sh --ex-hash <file>` hashes the EX blocks alone (`none` without any);
   `--hash` and `work/SUITE.md` cover AC blocks only, so EX blocks may evolve without drift.
 
