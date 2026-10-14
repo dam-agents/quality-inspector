@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 2.18.0 — 2026-10-15
+## 2.18.0 — 2026-10-14
 
 **Upgrade:**
 1. Nothing to migrate for the environment lock: `work/env/LOCK` lines written before this
