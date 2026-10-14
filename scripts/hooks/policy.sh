@@ -30,7 +30,7 @@
 #   source-map       Bash WebFetch Read Glob Grep  a *.map URL; a *.map file under work/ or /tmp/quality-inspector-*
 #   product-package  Bash Read Glob Grep   node_modules/<entry> for each profile boundary.packages entry
 #   chart-template   Bash Read Glob Grep   templates/ under work/env/, anything under /tmp/quality-inspector-chart-*,
-#                                          helm pull|fetch|template|get manifest|get all
+#                                          helm pull|fetch|template|get manifest|get all|show values|show all
 #   git-clean        Bash                  git clean, anywhere
 #   container-fs     Bash                  kubectl (k3s too) exec|cp|debug|attach, ctr, crictl,
 #                                          docker|podman|nerdctl exec|cp|export|save|run|create
@@ -252,7 +252,7 @@ check_simple() { # <one simple command>
     (docker|podman|nerdctl)
       case "$rest" in (*" exec "*|*" cp "*|*" export "*|*" save "*|*" run "*|*" create "*) deny container-fs "" "container and image filesystems are off limits";; esac;;
     (helm)
-      case "$rest" in (*" pull "*|*" fetch "*|*" template "*|*" get manifest "*|*" get all "*) deny chart-template "" "deployment templates are off limits";; esac;;
+      case "$rest" in (*" pull "*|*" fetch "*|*" template "*|*" get manifest "*|*" get all "*|*" show values "*|*" show all "*) deny chart-template "" "chart templates and default values are off limits";; esac;;
     (gh)
       unq "${w[$i]:-}"; sub="$U"
       case "$sub" in

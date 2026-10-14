@@ -31,6 +31,7 @@
 {"name":"chart template read","expect":"deny","rule":"chart-template","tool":"Read","input":{"file_path":"@WORK@/env/chart/templates/deployment.yaml"}}
 {"name":"pulled chart listing","expect":"deny","rule":"chart-template","tool":"Bash","input":{"command":"ls /tmp/quality-inspector-chart-1.2.3/app/templates"}}
 {"name":"helm get manifest","expect":"deny","rule":"chart-template","tool":"Bash","input":{"command":"helm -n app get manifest app | head"}}
+{"name":"helm show values","expect":"deny","rule":"chart-template","tool":"Bash","input":{"command":"helm show values oci://registry.example.com/charts/app --version 1.2.3"}}
 {"name":"helm status","expect":"allow","tool":"Bash","input":{"command":"helm -n app status app"}}
 {"name":"kubectl logs","expect":"allow","tool":"Bash","input":{"command":"k3s kubectl -n app logs deploy/web --tail 50"}}
 {"name":"run-dir source map","expect":"deny","rule":"source-map","tool":"Read","input":{"file_path":"@WORK@/suite/.e2e/runs/issue-7-candidate/main.js.map"}}
