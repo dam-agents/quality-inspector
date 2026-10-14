@@ -4,7 +4,10 @@
 // once, the target's labelled issues (GET, for labels and state); writes work/catalog/ only.
 //
 //   node catalog.mjs   -> {"html", "bytes", "items", "images", "dropped_images", "thumbnails",
-//                          "hash", "changed"}
+//                          "notes", "hash", "changed"}
+//
+// `notes` names every source that could not be read (the issues listing, the drift check, the
+// coverage of the UI map): the page is still built, without what that source gives.
 //
 // Test-related content only — the page may be shared: never a scenario's request text, its
 // requester or thread, a verdict's notes, a triage explanation, LESSONS.md, the operator
@@ -16,7 +19,7 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -26,6 +29,8 @@ const runsRoot = process.env.QI_RUNS_ROOT ?? join(work, 'suite', '.e2e', 'runs')
 const outDir = join(work, 'catalog');
 const thumbsDir = join(outDir, 'thumbs');
 const IMG_BUDGET = Number(process.env.QI_CATALOG_IMG_BUDGET ?? 6 * 1024 * 1024); // base64 bytes
+const PAGE_MAX = 9 * 1024 * 1024; // the platform renders a page up to 10 MiB; images give way first
+const notes = [];
 const THUMB_W = 360;
 const HISTORY_MAX = 30; // newest history entries per item: the page stays a few MB at a year of nights
 
@@ -53,7 +58,7 @@ const collections = rows(join(work, 'CATALOG.md')).map(([name, members]) =>
 let drift = [];
 try {
   drift = JSON.parse(execFileSync('bash', [join(HERE, 'check-asserts.sh'), '--json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })).drift ?? [];
-} catch { /* not measured */ }
+} catch { notes.push('drift not measured (check-asserts.sh --json failed)'); }
 const drifted = (file) => drift.some((d) => String(d.test ?? d.file ?? d).endsWith(file));
 
 // --------------------------------------------------------------------- criteria
@@ -186,7 +191,7 @@ if (target && process.env.QI_CATALOG_OFFLINE !== '1') {
         if (i?.number != null) issueMeta.set(String(i.number), { title: i.title ?? null, labels: (i.labels ?? []).map((l) => l?.name ?? l), state: i.state ?? null });
       }
     }
-  } catch { /* labels and state stay unknown */ }
+  } catch { notes.push('issue labels and state unavailable (the issues listing failed)'); }
 }
 
 // ------------------------------------------------------------------------- items
@@ -275,7 +280,7 @@ if (newestMap) {
         shot: null, golden_path: !noGolden.has(p.pattern), _shot: inv?.routes?.[p.pattern]?.shot ?? null,
       };
     });
-  } catch { /* coverage unavailable */ }
+  } catch { notes.push(`coverage unavailable (coverage.mjs failed on ${maps.at(-1)})`); }
 }
 
 // ---------------------------------------------------------------------- stills
@@ -348,14 +353,22 @@ async function renderThumbs(list) {
 }
 const thumbnails = await renderThumbs(jobs);
 
-// Embed within the budget: regression items first, then promotable, exploratory, the rest,
-// newest verdict first; then page shots.
+// Thumbnails of items and pages that no longer exist are a stale cache: removed one by one.
+const wanted = new Set([...items, ...pages].map((x) => x._thumb));
+for (const f of ls(thumbsDir).filter((x) => x.endsWith('.jpg'))) if (!wanted.has(join(thumbsDir, f))) { try { rmSync(join(thumbsDir, f)); } catch { /* next run */ } }
+
+// Embed within the budget — what the data leaves of PAGE_MAX, at most IMG_BUDGET: regression
+// items first, then promotable, exploratory, the rest, newest verdict first; then page shots.
 const images = {};
 let used = 0; let dropped = 0; let seq = 0;
+const base = Buffer.byteLength(JSON.stringify({ items, pages, nights }, (k, v) => (k.startsWith('_') ? undefined : v)))
+  + Buffer.byteLength(read(join(HERE, 'catalog', 'viewer.html')) ?? '');
+const budget = Math.max(0, Math.min(IMG_BUDGET, PAGE_MAX - base));
+if (budget < IMG_BUDGET) notes.push(`image budget cut to ${Math.round(budget / 1024)} KiB by the size of the data`);
 const embed = (path) => {
   if (!existsSync(path)) return null;
   const uri = `data:image/jpeg;base64,${readFileSync(path).toString('base64')}`;
-  if (used + uri.length > IMG_BUDGET) { dropped++; return null; }
+  if (used + uri.length > budget) { dropped++; return null; }
   used += uri.length; const id = `i${seq++}`; images[id] = uri; return id;
 };
 const RANK = { regression: 0, promotable: 1, exploratory: 2 };
@@ -390,4 +403,4 @@ const html = template.replace('__QI_CATALOG_DATA__', () => JSON.stringify(data).
 writeFileSync(join(outDir, 'index.html.tmp'), html); renameSync(join(outDir, 'index.html.tmp'), join(outDir, 'index.html'));
 const published = (read(join(outDir, 'published.hash')) ?? '').trim();
 console.log(JSON.stringify({ html: join(outDir, 'index.html'), bytes: Buffer.byteLength(html), items: items.length,
-  images: Object.keys(images).length, dropped_images: dropped, thumbnails, hash, changed: hash !== published }));
+  images: Object.keys(images).length, dropped_images: dropped, thumbnails, notes, hash, changed: hash !== published }));

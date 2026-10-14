@@ -51,15 +51,18 @@ regression run and a scenario delivery, and after an operator's promote, demote 
 change:
 
 1. `node "$HOME/scripts/catalog.mjs"` → `{html, bytes, items, images, dropped_images,
-   thumbnails, hash, changed}`. `changed: false` → done.
+   thumbnails, notes, hash, changed}`. `changed: false` → done. Each `notes` entry is a source it
+   could not read: log it as a `warn` and publish anyway.
 2. Publish `work/catalog/index.html` as [reporting.md](reporting.md) → Delivery step 1 — artifact
    only, through an upload URL (it exceeds the inline limit); the reference lives in
-   `work/catalog/artifact.id`, a revision when it exists. Never change its sharing: private,
+   `work/catalog/artifact.id`, a revision when it exists — refused as not found, a new artifact
+   whose reference replaces it. Never change its sharing: private,
    restricted or public is the operator's choice in the app. Ledger: surface `artifact`,
    `issue=-`, key `catalog@<hash>`.
 3. Write `<hash>` to `work/catalog/published.hash`. A failure is logged; the next run retries.
 
 Images are the AC stills and the UI map's page shots, as 360-px JPEGs in
 `work/catalog/thumbs/` (rendered by the suite's `playwright-core`; without it there are none) —
-backed up, unlike the page. The page embeds them within 6 MiB, regression tier first, and
-stays under the platform's 10 MiB render limit.
+backed up, unlike the page; one whose item or page is gone is removed. The page embeds them
+within 6 MiB — less when the data is large (a `notes` entry says so) — regression tier first,
+so it stays under the platform's 10 MiB render limit.

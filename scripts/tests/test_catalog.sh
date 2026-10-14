@@ -91,9 +91,11 @@ mkdir -p "$W/inventory/c3"
 echo '{"routes":{"/":{"title":"Home","navigates":{"Projects":"/projects","Files":"/files"}},"/projects":{"title":"Projects","buttons":["Rename"]},"/files":{"title":"Files"}}}' > "$W/inventory/c3/inventory.json"
 echo '[{"number":42,"title":"Rename <b>projects</b>","state":"closed","labels":[{"name":"area:projects"}]}]' > "$STUB_DIR/issues.json"
 
+mkdir -p "$W/catalog/thumbs"; echo old > "$W/catalog/thumbs/issue-99-ac-1.jpg"
 out="$(node "$SCRIPTS/catalog.mjs")"; rc=$?
 assert_eq "catalog exits 0" 0 "$rc"
-assert "summary" '.items == 4 and .changed == true and (.hash | test("^[0-9a-f]{12}$")) and (.thumbnails | test("none due|unavailable"))' "$out"
+assert "summary" '.items == 4 and .changed == true and (.hash | test("^[0-9a-f]{12}$")) and (.thumbnails | test("none due|unavailable")) and .notes == []' "$out"
+[ -e "$W/catalog/thumbs/issue-99-ac-1.jpg" ] && { echo "  a thumbnail of a gone item was kept"; FAILED=1; }
 html="$(cat "$W/catalog/index.html")"
 data="$(node -e 'const h=require("fs").readFileSync(process.argv[1],"utf8");const m=h.match(/<script type="application\/json" id="qi-catalog-data">([\s\S]*?)<\/script>/);process.stdout.write(m[1])' "$W/catalog/index.html")"
 assert "schema and header" '.schema == "qi-catalog/v1" and .agent.display_name == "QA Bot" and .target == "acme/widgets" and .issue_url == "https://github.com/acme/widgets/issues/{n}"' "$data"
@@ -121,6 +123,7 @@ case "$html" in (*'<b>projects'*|*'<i>large'*) echo "  data not escaped inside t
 h1="$(jq -r .hash <<<"$out")"; echo "$h1" > "$W/catalog/published.hash"
 out2="$(node "$SCRIPTS/catalog.mjs")"
 assert "same data, same hash, unchanged" '.hash == "'"$h1"'" and .changed == false' "$out2"
+assert "a failed issues listing is a note, not a failure" '.notes | any(test("issue labels and state unavailable"))' "$(STUB_GH_FAIL=1 node "$SCRIPTS/catalog.mjs")"
 printf '| Smoke | #42 AC-1 |\n' >> "$W/CATALOG.md"
 assert "a collection change changes the hash" '.changed == true' "$(node "$SCRIPTS/catalog.mjs")"
 exit $FAILED
