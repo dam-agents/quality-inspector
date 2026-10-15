@@ -51,7 +51,8 @@ The schedules are **held** until Step 7 marks onboarding complete.
 ## Step 0 — Prerequisites
 
 1. `gh api user --jq .login` — fails → the GitHub connection is not granted; stop and
-   tell the operator.
+   tell the operator. `403 Resource not accessible by integration` is a GitHub App token:
+   ask for the app's bot login (`<slug>[bot]`) and write it as `- github_login:` in Step 3.
 2. `git -C /home/agent remote get-url origin` names the definition repo (kit path). No
    checkout → on the kit path the seed failed: say so and stop; by hand, derive the repo
    from the URL of this runbook the operator gave you.
@@ -242,6 +243,7 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - target_repo: acme/widgets
 - profile_source_path:
 - work_repo: acme/widgets-qa-backup
+- github_login:
 - display_name: Quality Inspector
 - qa_label: qa:ready
 - retest_label: qa:retest

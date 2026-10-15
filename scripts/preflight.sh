@@ -275,9 +275,10 @@ mode_audit() {
   local login week_ago
   week_ago="$(epoch2iso $((NOW_EPOCH - 7*86400)))"
   # connectivity & identity
-  login="$(gh api ${GH_HOST_ARGS[@]+"${GH_HOST_ARGS[@]}"} user --jq .login 2>/dev/null)"
-  if [ -n "$login" ]; then check github_auth ok "token resolves an identity"
-  else check github_auth fail "gh api user failed — the GitHub connection is not injected"; fi
+  login="$(agent_login ${GH_HOST_ARGS[@]+"${GH_HOST_ARGS[@]}"})"
+  if [ -n "$(cfg github_login)" ]; then check github_auth ok "identity from github_login"
+  elif [ -n "$login" ]; then check github_auth ok "token resolves an identity"
+  else check github_auth fail "gh api user failed — the GitHub connection is not injected (a GitHub App token: set github_login)"; fi
   if [ -n "$TARGET" ]; then
     if probe_gh "repos/$REPO_PATH/issues?per_page=1"; then check issues_read ok "issues endpoint reachable"
     else check issues_read fail "cannot list issues of the target repository"; fi

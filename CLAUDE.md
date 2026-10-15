@@ -59,8 +59,9 @@ stripped. Every script reads it through `scripts/lib/config.sh`, so the verifier
 
 - `profile` — the product profile skill; required (missing or not installed → every mode fails).
   `profile.<key>` — its own keys, defaults in its `profile.json`; an unknown one fails verification.
-- `target_repo` — `[<host>/]<owner>/<repo>` whose issues are tested; required, no default (missing →
-  every mode fails). `QI_TARGET_REPO` wins. `profile_source_path` — the profile's path in it, else empty.
+- `target_repo` — `[<host>/]<owner>/<repo>` whose issues are tested; required, no default (missing → every mode fails).
+  `QI_TARGET_REPO` wins. `profile_source_path` — the profile's path in it, else empty. `github_login` — the agent's own
+  login when `gh api user` cannot answer (a GitHub App: `<slug>[bot]`); empty = `gh api user`.
 - `marker_prefix` (`quality-inspector`) — **immutable once a comment exists** (it would
   orphan past verdicts). `issue_comments` opt-in (`disabled`), `artifact_reports` (`enabled`), `test_catalog` (`enabled`; [docs/catalog.md](docs/catalog.md)).
 - `qa_label` (`qa:ready`), `retest_label` (`qa:retest`) — the gates; `candidate_channel`, `baseline_channel`
@@ -69,8 +70,7 @@ stripped. Every script reads it through `scripts/lib/config.sh`, so the verifier
   join the AC freeze; opt-in suggested "Done when" comment. `auto_promote` (`disabled` |
   `verified`): the issues run promotes qualifying tests itself ([docs/regression.md](docs/regression.md) → Tiers).
 - `max_issues_per_run` (`1`), `lock_ttl_min` (`180`; the lock's fallback — [docs/nested-env.md](docs/nested-env.md)), `display_name` (cosmetic),
-  `e2e_version` (`0.17.0`), `e2e_web_version` (`0.12.0`), `e2e_model` (`claude-sonnet-5`)
-  — [docs/test-authoring.md](docs/test-authoring.md).
+  `e2e_version` (`0.17.0`), `e2e_web_version` (`0.12.0`), `e2e_model` (`claude-sonnet-5`) — [docs/test-authoring.md](docs/test-authoring.md).
 - `confirm_regressions` (`disabled`; one more install, 15–25 min, per night with a regression),
   `bisect_max_steps` (`0` = off; up to that many more) — [docs/triage.md](docs/triage.md) → **Order of work**.
 - `audit_report` (`enabled`), `log_level` (`info` | `debug`), `media_retention_days` (`14`; undelivered

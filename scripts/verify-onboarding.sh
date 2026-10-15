@@ -61,7 +61,7 @@ e2e_version e2e_web_version e2e_model audit_report log_level media_retention_day
 explorations max_explorations_per_ac auto_promote security_checks security_failed_logins
 confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi
 scenario_discovery scenario_channel max_scenarios_per_run max_scenarios_per_day work_repo test_catalog
-lend_model live_browser slack_channel slack_tests_per_day"
+lend_model live_browser slack_channel slack_tests_per_day github_login"
 
 if [ "$STRUCTURE" = 1 ]; then
   # ------------------------------------------------------------- definition
@@ -214,8 +214,9 @@ fi
 if [ "$LIVE" = 1 ]; then
   T="${QI_TARGET_REPO:-$(cfg target_repo)}"; HA=(); RP="$T"
   if [ "$(printf '%s' "$T" | tr -cd '/' | wc -c | tr -d ' ')" = 2 ]; then HA=(--hostname "${T%%/*}"); RP="${T#*/}"; fi
-  login="$(gh api ${HA[@]+"${HA[@]}"} user --jq .login 2>/dev/null)"
-  [ -n "$login" ] && ok github_identity "acting as $login" || fail github_identity "gh api user failed" "grant the GitHub connection to this agent (README → Setup)"
+  GL="$(cfg github_login)"; login="$(agent_login ${HA[@]+"${HA[@]}"})"
+  [ -n "$login" ] && ok github_identity "acting as $login${GL:+ (github_login)}" \
+    || fail github_identity "gh api user failed" "grant the GitHub connection to this agent (README → Setup); a GitHub App token: set github_login to its <slug>[bot]"
   timeout 20 gh api ${HA[@]+"${HA[@]}"} "repos/$RP/issues?per_page=1" >/dev/null 2>&1 \
     && ok issues_read "target issues readable" || fail issues_read "cannot list target issues" "check target_repo and the connection's repository access"
   while read -r status id detail; do
