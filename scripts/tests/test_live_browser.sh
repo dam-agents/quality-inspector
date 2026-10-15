@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # lib/config.sh → live_cdp: the live browser only in a direct session whose transcript is
-# found and holds no Slack frame, with no fresh run marker, and only while it answers.
+# found and holds no Slack frame, with no fresh run marker, and only while it answers; live_link
+# gives the panel button for an http(s) url only then.
 . "$(dirname "$0")/lib.sh"
 export HOME="$SANDBOX/home" CLAUDE_CONFIG_DIR="$SANDBOX/claude"
 mkdir -p "$HOME" "$WORK_DIR/env" "$CLAUDE_CONFIG_DIR/projects/p" "$SANDBOX/cbin"
@@ -12,6 +13,12 @@ printf '{"type":"user","message":{"content":"explore #7"}}\n' > "$T"
 cdp() { ( . "$SCRIPTS/lib/config.sh"; live_cdp 2>/dev/null ); }
 
 assert_eq "direct session: attaches" "http://127.0.0.1:9222" "$(CLAUDE_CODE_SESSION_ID=sess-1 cdp)"
+link() { ( . "$SCRIPTS/lib/config.sh"; live_link "$1" 2>/dev/null ); }
+case "$(CLAUDE_CODE_SESSION_ID=sess-1 link 'http://localhost:4444/a b')" in
+  '[Watch the test](platform://browser?url=http%3A%2F%2Flocalhost%3A4444%2Fa%20b&at='[0-9]*')') ;;
+  *) echo "  live_link: no panel button for an encoded url"; FAILED=1;; esac
+assert_eq "live_link: no button for a non-http url" "" "$(CLAUDE_CODE_SESSION_ID=sess-1 link 'javascript:alert(1)')"
+assert_eq "live_link: no button when headless" "" "$(CLAUDE_CODE_SESSION_ID= link 'http://localhost:4444/')"
 assert_eq "no session id: headless" "" "$(CLAUDE_CODE_SESSION_ID= cdp)"
 assert_eq "no transcript for the session: headless" "" "$(CLAUDE_CODE_SESSION_ID=sess-2 cdp)"
 assert_eq "the browser does not answer: headless" "" "$(STUB_CURL_RC=7 CLAUDE_CODE_SESSION_ID=sess-1 cdp)"

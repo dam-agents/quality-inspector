@@ -65,9 +65,9 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
    backup (`work_repo`), add Contents read & write on that one private repository, and
    protect its `main` so only this account pushes (a private repository needs a paid GitHub
    plan for that; without it, the next persist logs and reverts a foreign commit).
-3. **Create the agent on the vm backend** when the profile requires root (most nested
-   products do). The kit asks for 8 CPU, 16 Gi and 80 Gi; the profile's README says what
-   its product needs.
+3. **The agent runs on the vm backend**: the kit says so, and is hidden on an install
+   without virtualization. It asks for 8 CPU, 12 Gi and 80 Gi; the profile's README says
+   what its product needs.
 4. **Assign the product profile**: add its skill source (Skills → Sources) and assign the
    profile skill to the agent — for DAM, repository `https://github.com/dam-agents/dam`
    with path `qa`, skill `qi-profile-dam` (in the target repository, so onboarding sets

@@ -89,7 +89,9 @@ With `live_browser` set to the CDP endpoint of the platform's shared browser on 
 operator watches you explore in the Browser Panel. Only in a direct session, only while it
 answers (`scripts/lib/config.sh` → `live_cdp`); scheduled and Slack turns, a session whose
 transcript the shell cannot find (`CLAUDE_CODE_SESSION_ID`), and every `--evidence full` run
-stay headless, so evidence never depends on it.
+stay headless, so evidence never depends on it. When you start exploring live, paste the
+line `bash "$HOME/scripts/env.sh" watch` prints into your reply, once and unchanged: the
+chat shows it as a button that opens the panel on the product.
 
 ## CLI and API criteria
 

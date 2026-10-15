@@ -179,14 +179,22 @@ egressRules:
     pathPattern: "/*"
     verdict: deny
 
+# A nested product runs a container runtime or a whole cluster (engines/helm-k3s needs
+# root), which an agent container cannot host: a kit that names no backend is created
+# as a container. On an install without virtualization the catalog hides the kit.
+backend: vm
+
 resources:
   cpu: "8"
-  memory: 16Gi
+  memory: 12Gi
   storage: 80Gi
   note: >-
-    Sized for a full product stack nested in the VM plus Chromium, with room for two
-    builds (candidate and baseline) and the e2e evidence; the profile's README states
-    what its product needs. Create the agent on the vm backend when the profile
-    requires root.
+    A full product stack nested in the VM plus Chromium, with disk for two builds
+    (candidate and baseline, installed one at a time) and the e2e evidence; the
+    profile's README states what its product needs. Memory is no more than a profile
+    measures (`requires.memory_gi`) on purpose: on a laptop host runner it is the
+    machine's size, and a VM filling spare memory with file cache pushes the host into
+    swap until the runner restarts it. A cluster runner sizes the machine from the
+    owner's pool instead.
 
 harnesses: [claude-code]

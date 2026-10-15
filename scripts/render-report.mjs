@@ -281,6 +281,8 @@ const acHtml = acs.map((ac) => `
     : sideHtml(`Baseline ${v.baseline ?? ''}`, ac.base)}</div>`}
 </article>`).join('');
 
+// An AC is tested when its verdict was judged; blocked, flaky and not-testable never count.
+const coverage = `${acs.filter((ac) => ['verified', 'failed', 'inconclusive'].includes(ac.verdict)).length} of ${acs.length} criteria tested`;
 const summaryRows = acs.map((ac) => `<tr><td><a href="#${esc(slug(key(ac)))}">${regression ? `${esc(owner(ac).name)} ` : ''}${esc(ac.id)}</a></td><td>${esc(ac.name)}</td><td>${stateBadge(ac.cand?.state ?? 'not-run')}</td>${regression ? '' : `<td>${stateBadge(ac.base?.state ?? 'not-run')}</td>`}<td>${badge(ac.verdict)}</td></tr>`).join('');
 
 const html = `<!doctype html>
@@ -298,7 +300,7 @@ ${regression ? `<div class="hero"><h1>Regression run — ${esc(v.candidate)}</h1
 <p class="dim">Each step of the scenario was tested on the build. A failure that held on a re-run was also run on the last release: failing only on the build is a <b>regression</b>, failing on both is <b>failed</b>. An independent judge read the evidence of every criterion. Watch the videos and screenshots to check the result yourself.</p>
 <table><thead><tr><th>AC</th><th>Criterion</th><th>Build</th><th>Last release</th><th>Verdict</th></tr></thead><tbody>${summaryRows}</tbody></table>`
 : `<div class="hero"><h1>#${esc(v.issue)} — ${esc(v.title)}</h1>${badge(v.verdict)}</div>
-<p class="meta">candidate <code>${esc(v.candidate ?? '–')}</code> · baseline <code>${esc(v.baseline ?? '–')}</code> · criteria <code>ac=${esc(v.ac_hash)}</code> (source: ${esc(v.criteria_source ?? 'done-when')}) · ${esc(v.generated_utc ?? '')}</p>
+<p class="meta">candidate <code>${esc(v.candidate ?? '–')}</code> · baseline <code>${esc(v.baseline ?? '–')}</code> · criteria <code>ac=${esc(v.ac_hash)}</code> (source: ${esc(v.criteria_source ?? 'done-when')}) · ${esc(coverage)} · ${esc(v.generated_utc ?? '')}</p>
 <p class="dim">Each criterion was tested on the candidate build and on the baseline release. <b>Verified</b> means it fails on the baseline and passes on the candidate. Watch the videos and screenshots to check the result yourself.</p>
 <table><thead><tr><th>AC</th><th>Criterion</th><th>Candidate</th><th>Baseline</th><th>Verdict</th></tr></thead><tbody>${summaryRows}</tbody></table>`}
 ${acHtml}
@@ -317,7 +319,7 @@ const comment = scenario ? [
   'Evidence (videos, screenshots, steps): EVIDENCE_LINK',
 ].join('\n') : [
   `## ${v.display_name ?? 'Quality Inspector'} — #${v.issue} verdict: ${(VERDICT[v.verdict] ?? [v.verdict])[0]}`,
-  `candidate \`${v.candidate ?? '–'}\` · baseline \`${v.baseline ?? '–'}\` · criteria ac=${v.ac_hash}`,
+  `candidate \`${v.candidate ?? '–'}\` · baseline \`${v.baseline ?? '–'}\` · criteria ac=${v.ac_hash} · ${coverage}`,
   '',
   '| AC | criterion | candidate | baseline | verdict |',
   '| --- | --- | --- | --- | --- |',
