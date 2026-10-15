@@ -93,6 +93,21 @@ stay headless, so evidence never depends on it. When you start exploring live, p
 line `bash "$HOME/scripts/env.sh" watch` prints into your reply, once and unchanged: the
 chat shows it as a button that opens the panel on the product.
 
+## Model access
+
+Agent steps call the agent's own model connection through the gateway. The gateway
+injects a credential only into a request that carries the connection's placeholder
+(`platform:conn:<id>`; kit.yaml → `requireConnectionAddress`), so the suite sends the
+variables the platform gives this harness, never a literal key: `scripts/suite.sh` and
+`scripts/e2e-mcp.sh` export them (`scripts/lib/profile.sh` → `model_auth`), and
+`work/suite/e2e.config.ts` picks the header from which one is set —
+`ANTHROPIC_AUTH_TOKEN` as `Authorization: Bearer` (a LiteLLM-style proxy at
+`ANTHROPIC_BASE_URL`), else `ANTHROPIC_API_KEY` as `x-api-key`, else
+`CLAUDE_CODE_OAUTH_TOKEN` as `Authorization: Bearer`. `ANTHROPIC_BASE_URL` is a base
+without `/v1`, as Claude Code reads it. `verify-onboarding.sh --live` sends one step the
+same way (`model_provider`). Never set a credential variable yourself: a value that is not
+the placeholder goes out unchanged and the provider refuses it.
+
 ## CLI and API criteria
 
 Same file, same AC blocks; there is no browser video for these, so print the command

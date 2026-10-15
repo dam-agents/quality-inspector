@@ -234,12 +234,16 @@ if [ "$LIVE" = 1 ]; then
   fi
   cv="$(profile_run versions 2>&1)" && printf '%s' "$cv" | jq -e '.candidate' >/dev/null 2>&1 \
     && ok builds "$cv" || fail builds "$cv" "fix the profile's bin/versions or its egress (profile README)"
-  code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 https://api.anthropic.com/v1/models \
-          -H 'x-api-key: injected-by-gateway' -H 'anthropic-version: 2023-06-01' 2>/dev/null)"
+  IFS='|' read -r code mbase mvn mmodel merr <<<"$(model_probe)"
   case "$code" in
-    (200) ok model_provider "Anthropic reachable with the gateway-injected credential";;
-    (401|403) warn model_provider "Anthropic answered $code — the gateway does not inject a key for agent steps; set one per README → Setup";;
-    (*) fail model_provider "Anthropic unreachable (HTTP $code)" "allow api.anthropic.com in the egress rules";;
+    (none) fail model_provider "no model connection: none of $MODEL_AUTH_VARS is set" \
+      "give this agent an Anthropic-compatible model connection in its settings (README → Setup)";;
+    (200) ok model_provider "$mmodel answers at $mbase with $mvn";;
+    (401|403) fail model_provider "$mbase answered $code to $mvn${merr:+: $merr}" \
+      "the gateway swaps only the connection's placeholder, in the header that connection uses: check that this agent's model connection is granted and that $mvn holds its placeholder (platform:conn:<id>)";;
+    (400|404) fail model_provider "$mbase refused model $mmodel (HTTP $code)${merr:+: $merr}" \
+      "set e2e_model in work/CONFIG.md to a model this provider serves";;
+    (*) fail model_provider "$mbase unreachable (HTTP $code)" "allow the provider's host in the egress rules";;
   esac
   # The environment lock frees a dead holder at once only when the runtime answers (lib/lock.sh).
   session_running "${CLAUDE_CODE_SESSION_ID:-}"

@@ -57,6 +57,56 @@ model_env() {
   printf 'platform:conn:%s|%s|%s\n' "$PLATFORM_PROVIDER" "$kind" "$base"
 }
 
+# The agent's own model connection for the suite's agent steps (docs/test-authoring.md →
+# Model access), as `<variable>=<value>` lines to export: the Anthropic variables the platform
+# gives this harness. Their credential values are the connection's placeholder, which the
+# gateway swaps for the key on the way out — on an agent that injects only addressed
+# requests (kit.yaml → requireConnectionAddress) a request without one gets no credential.
+# From the environment, else from the runtime env of PLATFORM_PROVIDER; nothing when this
+# agent has no Anthropic-compatible connection.
+MODEL_AUTH_VARS="ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN"
+model_auth() {
+  local v f="$HOME/.platform/runtime-env.json"
+  for v in $MODEL_AUTH_VARS; do
+    [ -n "${!v:-}" ] || continue
+    for v in ANTHROPIC_BASE_URL $MODEL_AUTH_VARS; do [ -n "${!v:-}" ] && printf '%s=%s\n' "$v" "${!v}"; done
+    return 0
+  done
+  [ -n "${PLATFORM_PROVIDER:-}" ] && [ -f "$f" ] || return 0
+  jq -r --arg id "$PLATFORM_PROVIDER" --arg vars "ANTHROPIC_BASE_URL $MODEL_AUTH_VARS" '
+    ($vars | split(" ")) as $want
+    | .providers[]? | select(.id == $id) | .env // {} | to_entries[]
+    | select((.key | IN($want[])) and (.value | type == "string") and .value != "") | "\(.key)=\(.value)"' "$f" 2>/dev/null
+}
+
+# One agent step's model call, sent as work/suite/e2e.config.ts sends it — the same
+# endpoint, credential header and e2e_model (verify-onboarding.sh → model_provider). Prints
+# `<http code|none>|<base>|<variable>|<model>|<provider's error message>`; `none` =
+# no model connection, nothing sent.
+model_probe() {
+  local ma base var="" model out code err v h=()
+  ma="$(model_auth)"
+  _ma() { printf '%s\n' "$ma" | sed -n "s/^$1=//p" | head -1; }
+  base="$(_ma ANTHROPIC_BASE_URL)"; base="${base%/}"; base="${base:-https://api.anthropic.com}"
+  case "$base" in (*/v1) ;; (*) base="$base/v1";; esac
+  model="$(cfg e2e_model)"; model="${model:-claude-sonnet-5}"
+  for v in $MODEL_AUTH_VARS; do [ -n "$(_ma "$v")" ] && { var="$v"; break; }; done
+  case "$var" in
+    (ANTHROPIC_AUTH_TOKEN) h=(-H "Authorization: Bearer $(_ma "$var")");;
+    (ANTHROPIC_API_KEY) h=(-H "x-api-key: $(_ma "$var")");;
+    (CLAUDE_CODE_OAUTH_TOKEN) h=(-H "Authorization: Bearer $(_ma "$var")" -H 'anthropic-beta: oauth-2025-04-20');;
+    (*) printf 'none|%s||%s|\n' "$base" "$model"; return 0;;
+  esac
+  out="$(mktemp "${TMPDIR:-/tmp}/quality-inspector-model.XXXXXX")" \
+    || { printf '000|%s|%s|%s|cannot create a temporary file\n' "$base" "$var" "$model"; return 0; }
+  code="$(curl -s -o "$out" -w '%{http_code}' --max-time 60 "$base/messages" "${h[@]}" \
+          -H 'anthropic-version: 2023-06-01' -H 'content-type: application/json' \
+          -d "$(jq -cn --arg m "$model" '{model: $m, max_tokens: 1, messages: [{role: "user", content: "ping"}]}')" 2>/dev/null)"
+  err="$(jq -r '.error.message? // .error? // empty | tostring | gsub("\\s+"; " ")' "$out" 2>/dev/null | head -c 160)"
+  rm -f "$out"
+  printf '%s|%s|%s|%s|%s\n' "${code:-000}" "$base" "$var" "$model" "$err"
+}
+
 # Run a profile command with the contract's environment. Its exit code is returned.
 profile_run() { # <bin> [args…]
   local dir exe bin="$1" mk mkind mbase; shift

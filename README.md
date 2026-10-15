@@ -73,8 +73,10 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
    with path `qa`, skill `qi-profile-dam` (in the target repository, so onboarding sets
    `profile_source_path: qa`). Onboarding checks it. A product without a profile gets one
    from its team with the [`qi-profile-creator`](skills/qi-profile-creator/SKILL.md) skill.
-5. **Make sure agent steps can reach Anthropic** through the gateway with an injected
-   credential (the agent's provider connection). Onboarding checks it.
+5. **Give the agent a model connection** (Anthropic API key, OAuth token, or a proxy such
+   as LiteLLM). Agent steps send its placeholder, which the gateway swaps for the
+   credential; *Inject only into addressed requests* stays on (the kit sets it). Onboarding
+   checks it with one model call made the way the tests make it.
 6. **Apply the egress rules** (Black-box boundary below), then answer the onboarding
    dialog. Schedules are held until onboarding completes, which includes a smoke test of
    the nested product.

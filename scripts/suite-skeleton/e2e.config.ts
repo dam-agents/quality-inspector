@@ -1,8 +1,25 @@
 import type { E2EConfig } from 'e2e';
 import { web } from '@e2e-dev/web';
-import { anthropic } from '@ai-sdk/anthropic';
+import { createAnthropic } from '@ai-sdk/anthropic';
 
-const model = anthropic(process.env.E2E_MODEL ?? 'claude-sonnet-5');
+// The agent's model connection (docs/test-authoring.md → Model access): scripts/suite.sh and
+// scripts/e2e-mcp.sh export the platform's variables, whose credential is the connection's
+// placeholder — the gateway swaps it for the key only in the header that connection uses, so
+// the header follows the variable. ANTHROPIC_BASE_URL is a base without `/v1`, as for Claude Code.
+const env = process.env;
+const base = env.ANTHROPIC_BASE_URL?.replace(/\/+$/, '');
+const auth = env.ANTHROPIC_AUTH_TOKEN
+  ? { authToken: env.ANTHROPIC_AUTH_TOKEN }
+  : env.ANTHROPIC_API_KEY
+    ? { apiKey: env.ANTHROPIC_API_KEY }
+    : env.CLAUDE_CODE_OAUTH_TOKEN
+      ? { authToken: env.CLAUDE_CODE_OAUTH_TOKEN, headers: { 'anthropic-beta': 'oauth-2025-04-20' } }
+      : {};
+const provider = createAnthropic({
+  ...(base ? { baseURL: base.endsWith('/v1') ? base : `${base}/v1` } : {}),
+  ...auth,
+});
+const model = provider(env.E2E_MODEL ?? 'claude-sonnet-5');
 // live_browser: the platform's shared browser, attached over CDP so the operator watches the
 // run in the Browser Panel; scripts/suite.sh and scripts/e2e-mcp.sh set it (docs/test-authoring.md).
 const cdp = process.env.E2E_CDP_ENDPOINT;
