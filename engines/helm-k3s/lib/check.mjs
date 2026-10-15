@@ -7,9 +7,9 @@
 // placeholders are filled by render.mjs with throw-away credentials. An overlay's `when` is
 // a profile config key or "@model" (on while the agent lends its model, QI_MODEL_KEY).
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -114,7 +114,7 @@ const secrets = cr.secrets ?? [];
 if (!Array.isArray(secrets) || secrets.some((s) => !NAME.test(String(s)))) fail('credentials.secrets must be a list of [a-z0-9_] names');
 
 // Prerequisites.
-const NEED = { manifest: ['url'], helm: ['repo', 'chart', 'version', 'namespace'], 'adopt-crds': ['crds', 'release', 'namespace'] };
+const NEED = { manifest: [], helm: ['repo', 'chart', 'version', 'namespace'], 'adopt-crds': ['crds', 'release', 'namespace'] };
 const pre = cfg.prerequisites ?? [];
 if (!Array.isArray(pre)) fail('prerequisites must be a list');
 const seen = new Set();
@@ -125,6 +125,15 @@ for (const [i, p] of (Array.isArray(pre) ? pre : []).entries()) {
   else if (seen.has(p.name)) fail(`${id}: name used twice`);
   else seen.add(p.name);
   for (const f of NEED[p.kind]) if (p[f] === undefined || p[f] === '') fail(`${id}: ${p.kind} needs ${f}`);
+  if (p.kind === 'manifest') {
+    if ((p.url !== undefined) === (p.file !== undefined)) fail(`${id}: manifest needs exactly one of url and file`);
+    else if (p.file !== undefined && !str(p.file)) fail(`${id}: file must be a non-empty string`);
+    else if (p.url !== undefined && !str(p.url)) fail(`${id}: url must be a non-empty string`);
+    else if (str(p.file)) {
+      if (isAbsolute(p.file) || p.file.split('/').includes('..')) fail(`${id}: file must be a path inside the profile directory`);
+      else if (process.env.QI_PROFILE_DIR && !existsSync(join(process.env.QI_PROFILE_DIR, p.file))) fail(`${id}: file ${p.file} is not in the profile`);
+    }
+  }
   if (p.kind === 'adopt-crds' && !Array.isArray(p.crds)) fail(`${id}: crds must be a list`);
   if (p.wait !== undefined && (!obj(p.wait) || !str(p.wait.namespace))) fail(`${id}: wait needs a namespace`);
 }

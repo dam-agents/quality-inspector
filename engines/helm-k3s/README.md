@@ -38,7 +38,7 @@ and returns the tags of the channel both builds match, in that channel's order.
 
 | `kind` | Fields | Does |
 | --- | --- | --- |
-| `manifest` | `name`, `url`, `unless` (a `kind/name` that means "already there"), `wait` | `kubectl apply -f <url>` |
+| `manifest` | `name`, `url` or `file` (a path inside the profile directory), `unless` (a `kind/name` that means "already there"), `wait` | `kubectl apply -f <url>`, or the file from `QI_PROFILE_DIR` |
 | `helm` | `name`, `repo`, `chart`, `version`, `namespace`, `set` (`{key: value}`), `wait` | `helm install` once |
 | `adopt-crds` | `name`, `crds`, `release`, `namespace` | stamps Helm ownership so a cluster-bundled release (e.g. k3s' `traefik-crd`) adopts CRDs installed out of band |
 
@@ -61,7 +61,7 @@ values (`$QI_ENV_DIR/values.json`) are mode 600 and never printed.
 ## Check
 
 `bin/check` validates `engine_config` offline, for the profile checker: the keys above,
-the channels and their defaults, the owner account, each prerequisite's fields, `app_port`
+the channels and their defaults, the owner account, each prerequisite's fields (a manifest `file` must exist in the profile), `app_port`
 against the profile's `app.url`, and every placeholder rendered with throw-away
 credentials — once with the config defaults and no lent model, once with every overlay
 switched on. An overlay's `when` must be a profile config key or `"@model"`; the second
