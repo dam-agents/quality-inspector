@@ -50,6 +50,9 @@ operator-only steps, and tick each with `complete_onboarding_step` as it is sett
 
 The schedules are **held** until Step 7 marks onboarding complete.
 
+**Chat forms on** → ask the operator through forms, not free text ([docs/persistence.md](docs/persistence.md)
+→ **Chat forms in Kit Onboarding and Kit Update**).
+
 ## Step 0 — Prerequisites
 
 1. `bash "$HOME/scripts/github.sh" whoami` — fails → the GitHub connection is not granted; stop and

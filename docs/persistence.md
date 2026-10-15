@@ -119,6 +119,24 @@ Whenever an upgrade changes what onboarding produces, its **Upgrade** block runs
 same verification onboarding ends with, and the only thing that keeps a long-deployed
 instance the same shape as a fresh one.
 
+## Chat forms in Kit Onboarding and Kit Update
+
+The platform's chat forms (experimental, A2UI) let the operator answer with a click. They are
+**on** when this session's platform MCP server offers `check_chat_form` or a prompt carries an
+`<a2ui-capabilities>` block (both appear only while the owner has the feature on). The
+`platform-chat-forms` skill alone is no sign — every image ships it.
+
+- **On**, in Kit Onboarding ([ONBOARDING.md](../ONBOARDING.md)) and Kit Update (above): ask
+  every question that takes a choice or a value as a form, built per the `platform-chat-forms`
+  skill and passed through `check_chat_form` before you send it — an on/off key as a switch,
+  a fixed set (`issue_comments`, `scenario_discovery`, the upstream changes to take, the
+  features migration step 2 offers) as a choice with the documented default preselected and
+  marked `(Recommended)`, a free value (`target_repo`, `work_repo`, a profile `ask` key) as a
+  text field. Where a step asks "once, in one message", that is one form.
+- A form's answer is the operator's own text: validate it exactly as a typed one.
+- Never a form for a secret; credentials go through the platform's connections.
+- **Off**, a channel turn, a scheduled run, or the third failed check → ask in plain text.
+
 ## Scheduled or direct session
 
 Only a schedule runs a Precheck before the agent wakes. Every `scripts/precheck.sh` exit
