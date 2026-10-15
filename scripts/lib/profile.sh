@@ -97,7 +97,8 @@ model_probe() {
     (CLAUDE_CODE_OAUTH_TOKEN) h=(-H "Authorization: Bearer $(_ma "$var")" -H 'anthropic-beta: oauth-2025-04-20');;
     (*) printf 'none|%s||%s|\n' "$base" "$model"; return 0;;
   esac
-  out="$(mktemp "${TMPDIR:-/tmp}/quality-inspector-model.XXXXXX")"
+  out="$(mktemp "${TMPDIR:-/tmp}/quality-inspector-model.XXXXXX")" \
+    || { printf '000|%s|%s|%s|cannot create a temporary file\n' "$base" "$var" "$model"; return 0; }
   code="$(curl -s -o "$out" -w '%{http_code}' --max-time 60 "$base/messages" "${h[@]}" \
           -H 'anthropic-version: 2023-06-01' -H 'content-type: application/json' \
           -d "$(jq -cn --arg m "$model" '{model: $m, max_tokens: 1, messages: [{role: "user", content: "ping"}]}')" 2>/dev/null)"
