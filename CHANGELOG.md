@@ -7,6 +7,23 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.22.0 — 2026-10-15
+
+**Upgrade:**
+1. Agent steps now send the model connection's placeholder instead of a literal key
+   ([docs/test-authoring.md](docs/test-authoring.md) → Model access). When
+   `grep -q createAnthropic "$HOME/work/suite/e2e.config.ts"` fails, keep the old file and
+   take the new one:
+   `cp "$HOME/work/suite/e2e.config.ts" "$HOME/work/suite/e2e.config.ts.pre-2.22"` and
+   `cp "$HOME/scripts/suite-skeleton/e2e.config.ts" "$HOME/work/suite/e2e.config.ts"`, then
+   `diff` the two and carry over any operator change to `system`/`context`. Until then
+   `suite.sh run` refuses with a pointer here.
+2. **Operator-only:** in the agent's setup, *Inject only into addressed requests* stays on
+   (`requireConnectionAddress: true` in `kit.yaml` reaches new agents only). On an agent
+   where it is off, turn it on; the platform restarts the agent's gateway.
+3. `bash "$HOME/scripts/verify-onboarding.sh" --live` — `model_provider` now makes one model
+   call the way the tests do; apply its `fix:` when it fails.
+
 ## 2.21.0 — 2026-10-15
 
 **Upgrade:**

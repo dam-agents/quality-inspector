@@ -39,6 +39,13 @@ connections:
       the backup of work/ to that private repository. Egress rules must confine it to
       the issues endpoints of the target (README → Black-box boundary).
 
+# The gateway injects a connection's credential only into a request that carries its
+# placeholder. The nested product's own traffic (image pulls, its installers, a lent model)
+# leaves through the same gateway, and with injection into every request it would go out
+# as this agent's GitHub and model accounts; the Browser Panel (live_browser) needs it too.
+# The agent's own calls send the placeholders the platform gives it (lib/profile.sh → model_auth).
+requireConnectionAddress: true
+
 # Optional. Bound, the channel carries two kinds of request (docs/slack.md, docs/scenarios.md);
 # onboarding records it as `slack_channel` when people there may order "test #N".
 channels:

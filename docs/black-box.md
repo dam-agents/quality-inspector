@@ -99,7 +99,7 @@ GraphQL. `<D>` is this definition's repository (from `origin`), `<S>` each `--so
 | `api.github.com`, `github.com` (`work_repo`) | the private work backup: `GET /repos/<W>` (its metadata), `/<W>.git/*` (fetch and push) — longer than the deny-by-default `/*` ([persistence.md](persistence.md) → **Backup & restore**) | — |
 | `raw.githubusercontent.com`, gists, GitLab, Bitbucket, Codeberg, Gitea, Azure DevOps, Sourcegraph, SourceHut (kit) | — | `/*` |
 | `registry.npmjs.org` (kit) | `GET` (the `e2e` framework) | — |
-| `api.anthropic.com` (kit) | model calls for agent steps | — |
+| `api.anthropic.com` (kit) | model calls for agent steps (a proxy connection's `ANTHROPIC_BASE_URL` host instead, allowed by that connection) | — |
 | `cdn.playwright.dev`, `playwright.download.prss.microsoft.com` | `GET`, only when `e2e`'s Playwright differs from the image's | — |
 
 A target on GitHub Enterprise gets the same rules on its own host — the API under

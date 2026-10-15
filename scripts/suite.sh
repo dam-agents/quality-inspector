@@ -128,6 +128,9 @@ cmd_run() {
   esac
   [ -d "$SUITE/node_modules/e2e" ] || die "suite not initialized — run: bash \"\$HOME/scripts/suite.sh\" init"
   [ -f "$CRED" ] || die "work/env/credentials.env missing — run: bash \"\$HOME/scripts/env.sh\" init"
+  # A config from before 2.22.0 sends a key the gateway never swaps (CHANGELOG.md → 2.22.0).
+  [ ! -f "$SUITE/e2e.config.ts" ] || grep -q 'createAnthropic' "$SUITE/e2e.config.ts" \
+    || die "work/suite/e2e.config.ts predates 2.22.0 and sends no model credential — apply CHANGELOG.md → 2.22.0"
   local out=".e2e/runs/$label" cdp=""
   [ "$evidence" = failures ] && cdp="$(live_cdp)"
   (
@@ -135,8 +138,9 @@ cmd_run() {
     [ -n "$cdp" ] && export E2E_CDP_ENDPOINT="$cdp"
     set -a; . "$CRED"; set +a
     export APP_URL E2E_MODEL E2E_TELEMETRY_DISABLED=1 NODE_USE_ENV_PROXY=1 QI_STRICT="$strict"
-    # Model calls leave through the gateway, which injects the provider credential.
-    export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-injected-by-gateway}"
+    # Model calls leave through the gateway with the connection's placeholder, which it swaps
+    # for the credential (lib/profile.sh → model_auth); e2e.config.ts picks the header.
+    while IFS='=' read -r k v; do [ -n "$k" ] && export "$k=$v"; done < <(model_auth)
     PLAYWRIGHT_BROWSERS_PATH="$(cat .browsers-path 2>/dev/null || echo "${PLAYWRIGHT_BROWSERS_PATH:-/opt/ms-playwright}")"
     export PLAYWRIGHT_BROWSERS_PATH
     npx e2e run "$@" --output "$out" --reporter list --trace="$rec" --video="$rec" \

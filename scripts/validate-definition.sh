@@ -89,6 +89,10 @@ else
     && pass "kit.yaml asks for the vm backend" \
     || fail "kit.yaml must declare 'backend: vm' — a kit without it is created as a container, which cannot host the nested product"
 
+  grep -qE '^requireConnectionAddress:[[:space:]]*true[[:space:]]*(#.*)?$' kit.yaml \
+    && pass "kit.yaml injects credentials only into addressed requests" \
+    || fail "kit.yaml must declare 'requireConnectionAddress: true' — otherwise the gateway puts this agent's credentials into the nested product's requests"
+
   if grep -qE '^seed:' kit.yaml; then
     seed_block="$(sed -n '/^seed:/,/^[a-z]/p' kit.yaml)"
     printf '%s' "$seed_block" | grep -qE '^[[:space:]]+self:[[:space:]]*true' \

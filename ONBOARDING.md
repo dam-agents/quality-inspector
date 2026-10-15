@@ -41,7 +41,8 @@ operator-only steps, and tick each with `complete_onboarding_step` as it is sett
    with `--kit` on the by-hand path).
 5. *Issue comments* — enable or keep disabled.
 6. *Profile settings* — a value for every profile key it marks `ask`.
-7. *Model credential* — confirm agent steps reach Anthropic through the gateway.
+7. *Model credential* — confirm agent steps reach the agent's model connection through the
+   gateway (`model_provider` in `verify-onboarding.sh --live`).
 8. *Work backup* — a private repository for `work/` (or local-only): the connection's account
    may push to it, its `main` is protected for that account where the GitHub plan allows it, its
    egress rules are applied.
@@ -336,8 +337,9 @@ bash "$HOME/scripts/env.sh" unlock operator
   to what the nested sign-in really shows (keep its final checks), re-run.
 - The injection canary fails or is skipped → [docs/nested-env.md](docs/nested-env.md) → Failures.
 - An `agent.act` step fails with a model or provider error → checklist item 7: the
-  gateway does not inject an Anthropic credential for this agent; the operator fixes the
-  connection. Tick item 7 once a smoke run passes.
+  `model_provider` line of `verify-onboarding.sh --live` names the cause
+  ([docs/test-authoring.md](docs/test-authoring.md) → Model access); the operator fixes the
+  connection or `e2e_model`. Tick item 7 once a smoke run passes.
 
 ## Step 7 — Version, sentinel, verify, release, report
 
