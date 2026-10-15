@@ -35,7 +35,7 @@ operator-only steps, and tick each with `complete_onboarding_step` as it is sett
    repository `https://github.com/dam-agents/dam`, path `qa`) and assign the profile
    skill to this agent (e.g. `qi-profile-dam`).
 2. *Backend* — the agent runs on the backend and size the profile's README asks for
-   (vm backend when it requires root).
+   (the kit creates it on the vm backend; by hand, choose vm when the profile requires root).
 3. *Target repository* — the `target_repo` whose issues are tested.
 4. *Egress rules* — run the commands `scripts/egress-rules.sh` prints (Step 3 shows them,
    with `--kit` on the by-hand path).

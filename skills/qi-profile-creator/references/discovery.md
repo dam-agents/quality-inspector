@@ -141,5 +141,5 @@ implementation for this product:
 `root: true` when the runtime needs it (k3s, docker); `commands` the agent's image must
 have (`k3s`, `curl`, `jq`, `node`, the runtime your scripts call); `memory_gi` measured on
 a fresh install with both builds' images present, plus about 2 GiB for the browser. The
-kit's default VM is 8 CPU, 16 GiB, 80 GiB of disk; a product that needs more says so in
+kit's default VM is 8 CPU, 12 GiB, 80 GiB of disk; a product that needs more says so in
 its README.

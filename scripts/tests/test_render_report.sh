@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# render-report.mjs: every tested AC gets its video and captioned screenshot; the setup test never appears;
+# render-report.mjs: every tested AC gets its video and captioned screenshot, and the header counts how
+# many were tested; the setup test never appears;
 # explorations render apart from the verdict, and a verdicts file without them renders as before;
 # noticed-in-passing items are listed outside the verdict; a baseline blocked reason and a
 # regression's build interval are shown; a scenario's evidence is found by its own tag and
@@ -38,6 +39,8 @@ case "$h" in *'Rename &lt;b&gt;'*) ;; *) echo "  title not escaped"; FAILED=1;; 
 case "$h" in *ASSERTION_FAILED*) ;; *) echo "  baseline error missing"; FAILED=1;; esac
 [ "$(ls "$SANDBOX/out/media" | wc -l | tr -d ' ')" = 4 ] || { echo "  expected exactly the two AC-1 videos and screenshots (setup test must not be published)"; FAILED=1; }
 grep -q '| AC-1 | renamed | passed | failed | verified |' "$SANDBOX/out/comment.md" || { echo "  comment row missing"; FAILED=1; }
+grep -q 'criteria ac=abc · 1 of 2 criteria tested$' "$SANDBOX/out/comment.md" || { echo "  comment: tested count missing (a not-testable AC is not tested)"; FAILED=1; }
+case "$h" in *'1 of 2 criteria tested'*) ;; *) echo "  page: tested count missing"; FAILED=1;; esac
 case "$h" in *'feature is absent there'*) ;; *) echo "  baseline blocked reason not rendered"; FAILED=1;; esac
 # Backward compatibility: no "explorations" field → no section, no comment line, no new output keys.
 assert "no exploration keys without explorations" 'has("explorations") | not' "$out"

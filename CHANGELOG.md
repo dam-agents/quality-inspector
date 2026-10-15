@@ -7,6 +7,18 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.19.0 — 2026-10-15
+
+**Upgrade:**
+1. Nothing to migrate for `kit.yaml` (`backend: vm`, memory 12Gi): it reaches new agents
+   only. An agent the kit created before as a container cannot run a nested product that
+   needs root — `verify-onboarding.sh --live` reports `vm_root`; recreating it on the vm
+   backend is **operator-only**. On a laptop host runner, lowering a larger agent's memory
+   to 12Gi in its settings is **operator-only** too.
+2. Nothing to install for the Browser Panel button: with `live_browser` set, a direct
+   session pastes what `scripts/env.sh watch` prints ([docs/test-authoring.md](docs/test-authoring.md) → Watching live).
+   Reports and issue comments say "N of M criteria tested" from the next render.
+
 ## 2.18.1 — 2026-10-15
 
 **Upgrade:**

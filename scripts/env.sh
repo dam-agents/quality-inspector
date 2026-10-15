@@ -12,6 +12,8 @@
 #                                (default 540 s, under the harness's 10-minute tool limit): exit 0
 #                                it succeeded, 3 it still runs (call again), 1 it failed, died, or
 #                                no such install was started
+#   env.sh watch                 the Browser Panel button for the product's UI when live_browser
+#                                attaches (lib/config.sh → live_link); prints nothing, exit 1, otherwise
 #   env.sh between <from> <to>   read-only: the profile's `bin/versions --between` — a JSON
 #                                array of builds between the two, oldest first; exit 2 when
 #                                the profile does not implement it (no array), 1 when it
@@ -141,5 +143,6 @@ case "${1:-}" in
   init|reset|status|down) delegate "$1" ;;
   up)     [ -n "${2:-}" ] || { echo "usage: $0 up <build>" >&2; exit 2; }; cmd_up "$2" ;;
   wait)   [ -n "${2:-}" ] || { echo "usage: $0 wait <build> [<seconds>]" >&2; exit 2; }; cmd_wait "$2" "${3:-}" ;;
-  *) echo "usage: $0 lock <owner>|unlock <owner>|init|up <build>|wait <build> [<seconds>]|reset|status|down|between <from> <to>" >&2; exit 2 ;;
+  watch)  live_link "$(profile_field '.app.url')" ;;
+  *) echo "usage: $0 lock <owner>|unlock <owner>|init|up <build>|wait <build> [<seconds>]|reset|status|down|between <from> <to>|watch" >&2; exit 2 ;;
 esac

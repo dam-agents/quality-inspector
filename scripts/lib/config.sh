@@ -41,3 +41,13 @@ live_cdp() {
     || { echo "live_browser $u does not answer — running headless" >&2; return 1; }
   printf '%s\n' "${u%/}"
 }
+
+# live_link <url>: the chat button that opens the Browser Panel on <url> (the platform's
+# `platform://browser` link; one made in the last two minutes opens the panel by itself),
+# only when live_cdp attaches. Prints it, or nothing (exit 1).
+live_link() {
+  case "${1:-}" in (http://*|https://*) ;; (*) return 1;; esac
+  live_cdp >/dev/null || return 1
+  printf '[Watch the test](platform://browser?url=%s&at=%s)\n' \
+    "$(jq -rn --arg u "$1" '$u|@uri')" "$(( $(date +%s) * 1000 ))"
+}

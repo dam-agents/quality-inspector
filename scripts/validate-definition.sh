@@ -85,6 +85,10 @@ else
     pass "kit.yaml leaves 'onboarding' absent (platform-composed briefing → ONBOARDING.md)"
   fi
 
+  grep -qE '^backend:[[:space:]]*vm[[:space:]]*$' kit.yaml \
+    && pass "kit.yaml asks for the vm backend" \
+    || fail "kit.yaml must declare 'backend: vm' — a kit without it is created as a container, which cannot host the nested product"
+
   if grep -qE '^seed:' kit.yaml; then
     seed_block="$(sed -n '/^seed:/,/^[a-z]/p' kit.yaml)"
     printf '%s' "$seed_block" | grep -qE '^[[:space:]]+self:[[:space:]]*true' \

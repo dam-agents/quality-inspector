@@ -64,7 +64,8 @@ internal state, the operator conversation.
 
 `node "$HOME/scripts/render-report.mjs" <verdicts.json> <dir>` writes:
 
-- `index.html` — one self-contained page: the issue verdict, a summary table, and per AC
+- `index.html` — one self-contained page: the issue verdict, "N of M criteria tested" (an
+  AC judged `verified`, `failed` or `inconclusive`; `comment.md` carries it too), a summary table, and per AC
   the frozen criterion, then candidate and baseline side by side, each with the **video
   of the whole test**, the screenshots captioned by their step (the `AC-<k>` still first),
   the step list with durations and replay-cache use, the assertion error, and the trace
