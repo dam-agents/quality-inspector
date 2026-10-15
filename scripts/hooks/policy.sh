@@ -41,8 +41,10 @@
 #   scheduled-def    Write Edit … (sched.) work/CONFIG.md
 #   scheduled-git    Bash (scheduled)      git commit
 #   policy-tamper    Bash (scheduled)      any command naming RUN_MODE, scripts/hooks/ or .claude/settings
-#   channel-write    Bash (channel turn)   `github.sh comment|unlabel` — except the delivery of a
-#                                          Slack-ordered "test #N" (docs/slack.md): <n> written out, while
+#   channel-write    Bash (channel turn)   `github.sh comment|unlabel`, a `github.sh` whose subcommand is not
+#                                          written out, an expansion followed by `comment|unlabel` — except
+#                                          the delivery of a Slack-ordered "test #N" (docs/slack.md): the
+#                                          script path, the subcommand and <n> written out, while
 #                                          RUN_MODE is a fresh `slack <ISO> - <n> <session>` (precheck.sh
 #                                          slack <n>; <session> this one, or -) and the work/QA.md row of
 #                                          <n> is report_pending
@@ -287,14 +289,29 @@ check_simple() { # <one simple command>
 }
 
 # In a channel turn, every `github.sh comment|unlabel <n>` must be the delivery of the
-# Slack-ordered "test #N" (slack_test_issue): <n> written out, never a variable.
+# Slack-ordered "test #N" (slack_test_issue): <n> written out, never a variable. So must the
+# subcommand after every `github.sh` (RE_GH_SUB), and no expansion — a script path in a
+# variable — may stand before `comment|unlabel` (RE_VAR_WRITE).
 RE_GH_WRITE='github\.sh["'"'"']?[[:space:]]+["'"'"']?(comment|unlabel)["'"'"']?([[:space:]]+([^[:space:];&|)]*))?'
+RE_GH_SUB='github\.sh["'"'"']?([[:space:]]+["'"'"']?[a-z][a-z-]*["'"'"']?([[:space:];&|)]|$))?'
+RE_VAR_WRITE='([^[:space:];&|(]*[$`][^[:space:];&|]*)[[:space:]]+["'"'"']?(comment|unlabel)["'"'"']?([[:space:];&|)]|$)'
 check_channel_writes() {
   local s="$1" m nn
+  local why="a channel turn writes to GitHub only a Slack-ordered test's comment and retest label on its issue (docs/slack.md)"
+  while [[ "$s" =~ $RE_GH_SUB ]]; do
+    [ -n "${BASH_REMATCH[1]}" ] || deny channel-write "" "$why"
+    m="${BASH_REMATCH[0]}"; s="${s#*"$m"}"
+  done
+  s="$1"
+  while [[ "$s" =~ $RE_VAR_WRITE ]]; do
+    m="${BASH_REMATCH[0]}"; s="${s#*"$m"}"
+    [[ "${BASH_REMATCH[1]}" =~ github\.sh[\"\']?$ ]] || deny channel-write "" "$why"
+  done
+  s="$1"
   while [[ "$s" =~ $RE_GH_WRITE ]]; do
     m="${BASH_REMATCH[0]}"; nn="${BASH_REMATCH[3]}"; s="${s#*"$m"}"; unq "$nn"; nn="$U"
     [[ "$nn" =~ ^[0-9]+$ ]] && slack_test_issue "$nn" && continue
-    deny channel-write "" "a channel turn writes to GitHub only a Slack-ordered test's comment and retest label on its issue (docs/slack.md)"
+    deny channel-write "" "$why"
   done
   return 0
 }
@@ -324,7 +341,7 @@ check_bash() {
   case "$CMD" in (*work-backup.sh*) scheduled && deny backup-direct "" "a scheduled run or a channel turn never backs up by hand — the Stop hook does";; esac
   case "$CMD" in (*QI_TARGET_REPO*) deny github "QI_TARGET_REPO" "the target comes from work/CONFIG.md alone";; esac
   case "$CMD" in (*'<<'*) strip_heredocs "$CMD"; CMD="$X";; esac
-  case "$CMD" in (*github.sh*) channel_turn && check_channel_writes "$CMD";; esac
+  case "$CMD" in (*github.sh*|*comment*|*unlabel*) channel_turn && check_channel_writes "$CMD";; esac
   while IFS= read -r seg; do check_simple "$seg"; done <<<"$(printf '%s\n' "$CMD" | tr ';&|()' '\n\n\n\n\n')"
   case "$CMD" in (*node_modules/*)
     load_profile
