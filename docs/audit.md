@@ -24,7 +24,7 @@ when `audit_report: disabled` (still append the log line).
    seconds ([logging.md](logging.md)) — name the median issue in the report.
    - `ledger_reconcile` ([logging.md](logging.md) → **Ledger of external writes**): for
      the newest 20 `reported` QA rows of the week, one `GET …/issues/<n>/comments?since=`
-     each; every comment of the agent's login (`gh api user`) created this week (and after
+     each; every comment of the agent's login (`agent_login`) created this week (and after
      the newest `ledger_start` event) that carries `<!-- <marker_prefix>` needs a `done`
      entry with its surface and key —
      missing → `fail` (unrecorded external write). An `intent` of the week older than

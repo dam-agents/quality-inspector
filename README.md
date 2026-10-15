@@ -163,6 +163,7 @@ configuration.
 | `target_repo` | asked | Repository whose issues are tested. `QI_TARGET_REPO` overrides. |
 | `profile_source_path` | asked when the profile lives in `target_repo` | Its skill source's path there (DAM: `qa`) — the one directory the egress opens. |
 | `work_repo` | asked, default unset (local-only) | A private repository the Stop hook backs `work/` up to after every turn; a fresh volume or another pod restores from it ([docs/persistence.md](docs/persistence.md) → Backup & restore). |
+| `github_login` | asked for a GitHub App connection, default empty | The agent's own login (`<slug>[bot]`) when `gh api user` cannot answer; it identifies the agent's own comments. |
 | `issue_comments` | asked, default `disabled` | Opt-in: post verdicts on the issue. |
 | `spec_feedback` | asked, default `disabled` | Opt-in: suggest an observable "Done when" on issues with nothing testable. |
 | `scenario_discovery`, `scenario_channel` | asked, default `disabled` / empty | Opt-in: weekly scenario proposals (`propose`), also tested (`run`); the Slack conversation for their digest. |
