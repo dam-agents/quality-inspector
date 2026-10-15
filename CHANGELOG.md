@@ -10,8 +10,9 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 ## 3.1.1 — 2026-10-15
 
 **Upgrade:**
-Nothing — the policy hook runs from the checkout. In a channel turn it now also refuses a
-`github.sh` path or subcommand held in a variable (rule `channel-write`).
+Nothing — the policy hook runs from the checkout. In a channel turn it now refuses
+`comment|unlabel` after anything but a literal `github.sh` path, and a `github.sh` subcommand
+held in a variable (rule `channel-write`).
 
 ## 3.1.0 — 2026-10-15
 

@@ -42,7 +42,7 @@
 #   scheduled-git    Bash (scheduled)      git commit
 #   policy-tamper    Bash (scheduled)      any command naming RUN_MODE, scripts/hooks/ or .claude/settings
 #   channel-write    Bash (channel turn)   `github.sh comment|unlabel`, a `github.sh` whose subcommand is not
-#                                          written out, an expansion followed by `comment|unlabel` — except
+#                                          written out, any other word followed by `comment|unlabel` — except
 #                                          the delivery of a Slack-ordered "test #N" (docs/slack.md): the
 #                                          script path, the subcommand and <n> written out, while
 #                                          RUN_MODE is a fresh `slack <ISO> - <n> <session>` (precheck.sh
@@ -290,11 +290,11 @@ check_simple() { # <one simple command>
 
 # In a channel turn, every `github.sh comment|unlabel <n>` must be the delivery of the
 # Slack-ordered "test #N" (slack_test_issue): <n> written out, never a variable. So must the
-# subcommand after every `github.sh` (RE_GH_SUB), and no expansion — a script path in a
-# variable — may stand before `comment|unlabel` (RE_VAR_WRITE).
+# subcommand after every `github.sh` (RE_GH_SUB), and only a literal `github.sh` path may
+# stand before `comment|unlabel` — not a variable, a glob, a split name or a copy (RE_VAR_WRITE).
 RE_GH_WRITE='github\.sh["'"'"']?[[:space:]]+["'"'"']?(comment|unlabel)["'"'"']?([[:space:]]+([^[:space:];&|)]*))?'
 RE_GH_SUB='github\.sh["'"'"']?([[:space:]]+["'"'"']?[a-z][a-z-]*["'"'"']?([[:space:];&|)]|$))?'
-RE_VAR_WRITE='([^[:space:];&|(]*[$`][^[:space:];&|]*)[[:space:]]+["'"'"']?(comment|unlabel)["'"'"']?([[:space:];&|)]|$)'
+RE_VAR_WRITE='([^[:space:];&|(]+)[[:space:]]+["'"'"']?(comment|unlabel)["'"'"']?([[:space:];&|)]|$)'
 check_channel_writes() {
   local s="$1" m nn
   local why="a channel turn writes to GitHub only a Slack-ordered test's comment and retest label on its issue (docs/slack.md)"
