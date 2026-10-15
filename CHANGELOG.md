@@ -7,6 +7,12 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.20.0 — 2026-10-15
+
+**Upgrade:**
+Nothing — a `helm-k3s` prerequisite of kind `manifest` may now name a `file` of the
+profile instead of a `url`; profiles that use `url` work as before.
+
 ## 2.19.0 — 2026-10-15
 
 **Upgrade:**

@@ -101,6 +101,14 @@ step_wait() { # <step json>
   [ -z "$r" ] || kc -n "$ns" rollout status "$r" --timeout=300s >/dev/null || die "$(jq -r .name <<<"$1"): $r not rolled out"
 }
 
+# A manifest's source: its `url`, or its `file` inside the profile directory.
+manifest_src() {
+  local f; f="$(jq -r '.file // empty' <<<"$1")"
+  if [ -z "$f" ]; then jq -r .url <<<"$1"; return; fi
+  [ -n "${QI_PROFILE_DIR:-}" ] || die "$(jq -r .name <<<"$1"): a manifest file needs QI_PROFILE_DIR"
+  printf '%s/%s\n' "$QI_PROFILE_DIR" "$f"
+}
+
 # Prerequisites are installed once, in order, and never upgraded by `up`.
 prerequisites() {
   local step kind name unless
@@ -110,7 +118,7 @@ prerequisites() {
       manifest)
         unless="$(jq -r '.unless // empty' <<<"$step")"
         if [ -n "$unless" ] && kc get "$unless" >/dev/null 2>&1; then :; else
-          say "installing $name"; kc apply -f "$(jq -r .url <<<"$step")" >/dev/null || die "$name: manifest apply failed"
+          say "installing $name"; kc apply -f "$(manifest_src "$step")" >/dev/null || die "$name: manifest apply failed"
         fi ;;
       helm)
         if ! helm -n "$(jq -r .namespace <<<"$step")" status "$name" >/dev/null 2>&1; then

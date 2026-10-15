@@ -112,6 +112,12 @@ chmod +x "$U"/*
 up() { PATH="$U:$PATH" HOME="$SANDBOX/home" QI_ENV_DIR="$E" QI_ENGINE_CONFIG="$(cfg oci)" QI_PROFILE_CONFIG="$1" \
        bash "$ENG/bin/env" up 1.0.0 2>"$SANDBOX/uperr" >/dev/null; echo $?; }
 assert_eq "a first install runs (and its stubbed upgrade fails)" 1 "$(up '{"img":"x","mock":""}')"
+printf '#!/usr/bin/env bash\necho "$*" >> "%s/k3s.log"\n' "$SANDBOX" > "$U/k3s"
+PATH="$U:$PATH" HOME="$SANDBOX/home" QI_ENV_DIR="$SANDBOX/envf" QI_PROFILE_DIR="$SANDBOX/pd" QI_PROFILE_CONFIG='{"img":"x","mock":""}' \
+  QI_ENGINE_CONFIG="$(cfg oci | jq -c '.prerequisites = [{kind:"manifest", name:"m", file:"marker.yaml"}]')" \
+  bash "$ENG/bin/env" up 1.0.0 >/dev/null 2>&1
+grep -qx "kubectl apply -f $SANDBOX/pd/marker.yaml" "$SANDBOX/k3s.log" || { echo "  up: a manifest file is applied from the profile directory"; FAILED=1; }
+printf '#!/usr/bin/env bash\nexit 0\n' > "$U/k3s"
 grep -q 'helm upgrade to 1.0.0 failed' "$SANDBOX/uperr" || { echo "  no upgrade failure: $(cat "$SANDBOX/uperr")"; FAILED=1; }
 [ -f "$E/STATE.json" ] && { echo "  a failed upgrade left a build recorded"; FAILED=1; }
 h="$( (sha256sum || shasum -a 256) < "$E/values.json" 2>/dev/null | cut -c1-12)"
@@ -145,4 +151,12 @@ c "$(cfg oci | jq -c '.channels.main.order = "time"')" | grep -q "^FAIL channel 
   || { echo "  check: order time needs quay"; FAILED=1; }
 c "$(cfg oci | jq -c '.credentials.users = {}')" | grep -q '^FAIL credentials.users.owner' \
   || { echo "  check: the owner account is required"; FAILED=1; }
+touch "$SANDBOX/pd/marker.yaml"
+mf() { cfg oci | jq -c --argjson m "$1" '.prerequisites = [{kind:"manifest", name:"m"} + $m]'; }
+out="$(c "$(mf '{"file":"marker.yaml"}')")"; rc=$?
+assert_eq "check: a manifest file of the profile passes" "0 " "$rc $(grep '^FAIL' <<<"$out")"
+c "$(mf '{"file":"../marker.yaml"}')" | grep -q '^FAIL prerequisite 1 (m): file must be a path inside the profile directory' \
+  || { echo "  check: a manifest file outside the profile must fail"; FAILED=1; }
+c "$(mf '{"file":"marker.yaml","url":"https://x.example/m.yaml"}')" | grep -q '^FAIL prerequisite 1 (m): manifest needs exactly one of url and file' \
+  || { echo "  check: a manifest with both url and file must fail"; FAILED=1; }
 exit $FAILED
