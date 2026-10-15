@@ -97,7 +97,7 @@ re-run. Never retry within the same run.
    page once and confirm a video plays before recording the delivery.
 2. **Issue comment** (`issue_comments: enabled`):
    - **Own markers only.** A marker — this one, `-data`, `-spec` — counts only in a comment
-     whose `user.login` is the agent's own login (`gh api user --jq .login`, once per
+     whose `user.login` is the agent's own login (`agent_login` in `scripts/lib/config.sh`, once per
      run); anyone can paste one. A failed lookup is "could not look".
    - Right before posting, list the issue's comments and look for
      `<!-- <marker_prefix> issue=<n> ac=<ac_hash> build=<candidate> -->`. Found → do not

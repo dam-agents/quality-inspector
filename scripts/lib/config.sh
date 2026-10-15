@@ -17,6 +17,16 @@ cfg() { sed -n "s/^- $1:[[:space:]]*//p" "$CONFIG" 2>/dev/null | head -1 \
         | sed -e 's/[[:space:]]*#.*$//' -e 's/[[:space:]]*$//' \
               -e 's/^[`"'"'"']//' -e 's/[`"'"'"']$//'; }
 
+# agent_login [gh host args…]: the agent's own GitHub login — `github_login` when set (a
+# GitHub App installation token gets 403 from `gh api user`; its comments are `<slug>[bot]`),
+# else `gh api user`. Prints it, or nothing (exit 1).
+agent_login() {
+  local l; l="$(cfg github_login)"
+  # gh prints an HTTP error's body to stdout and exits 1: trust the exit status, not the output.
+  [ -n "$l" ] || l="$(gh api "$@" user --jq .login 2>/dev/null)" || l=""
+  [ -n "$l" ] && printf '%s\n' "$l"
+}
+
 # Rows of a `## <heading>` config table, bounded at the NEXT `## ` heading —
 # an unbounded range would swallow every later table in the file.
 cfg_table() { sed -n "/^## $1\$/,/^## /p" "$CONFIG" 2>/dev/null \

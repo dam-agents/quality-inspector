@@ -7,11 +7,20 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 2.20.0 — 2026-10-15
+## 2.21.0 — 2026-10-15
 
 **Upgrade:**
 Nothing — a `helm-k3s` prerequisite of kind `manifest` may now name a `file` of the
 profile instead of a `url`; profiles that use `url` work as before.
+
+## 2.20.0 — 2026-10-15
+
+**Upgrade:**
+1. Nothing to migrate: the new `github_login` key is empty by default and `gh api user` stays
+   the identity. An agent whose GitHub connection is a GitHub App (`gh api user` answers
+   `403 Resource not accessible by integration`) asks the operator for the app's bot login
+   (`<slug>[bot]`), writes `- github_login: <login>` into `work/CONFIG.md`, then re-runs
+   `scripts/verify-onboarding.sh --live`.
 
 ## 2.19.0 — 2026-10-15
 
