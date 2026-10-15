@@ -11,12 +11,13 @@ sign in, what is off limits, and what a tester should know about it.
 
 A skill, assigned to the agent by the operator from a skill source on the platform (the
 agent does not install it), which lands in the agent's skill path
-(`$HOME/.agents/skills/<name>/`, also seen as `$HOME/.claude/skills/<name>/`). It usually
-lives **in the product's own repository** — a source on that repository with `path` set
-to the profile's parent directory — so the product team versions it with the product.
-In the target repository, that path is `profile_source_path`: of its files the egress
-allows only that directory, so the platform fetches only it
-([black-box.md](black-box.md) → **Egress rules**); keep symlinks and submodules out of it.
+(`$HOME/.agents/skills/<name>/`, also seen as `$HOME/.claude/skills/<name>/`). It lives in
+**`.quality-inspector/<profile>/`** of a GitHub repository — usually the product's own, so
+the product team versions it with the product — added as a skill source with `path`
+`.quality-inspector`. That directory, in any repository, is the one path of a repository
+the kit's egress opens, so the platform fetches only it and no instance needs a rule for it
+([black-box.md](black-box.md) → **Egress rules**); a profile anywhere else cannot be
+installed. Keep symlinks and submodules out of it.
 `scripts/lib/profile.sh` resolves it; `QI_PROFILE_DIR` overrides the lookup (tests,
 local development). The core never edits a profile; changes go to its own repository.
 

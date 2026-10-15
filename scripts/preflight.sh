@@ -553,6 +553,38 @@ mode_slack() {
       tests_today:$n, max_tests_per_day:$max, quota_left:([$max - $n, 0] | max), logs:$logs}'
 }
 
+# ======================================================== BLACK-BOX GATE ====
+# docs/black-box.md → The gate: the boundary probes, once a day and after a definition or
+# target change, cached in work/env/boundary.json. A probe that reaches a source surface
+# stops every mode but the audit — no product is tested while the egress would let the
+# code through. The run that first finds a breach (or a different one) wakes the agent to
+# report it (`boundary_breach`); later ones decline until the probes pass, except a Slack
+# turn, where a person waits for the answer.
+BOUNDARY_TTL_S=86400
+boundary_gate() {
+  local f="$WORK/env/boundary.json" v fails prev="" reported=false
+  [ -n "$TARGET" ] || return 0
+  v="$(head -1 "$SCRIPT_DIR/../VERSION" 2>/dev/null)"
+  if jq -e --arg v "$v" --arg t "$TARGET" --argjson now "$NOW_EPOCH" --argjson ttl "$BOUNDARY_TTL_S" \
+       '.version == $v and .target == $t and ($now - .checked_epoch) < $ttl' "$f" >/dev/null 2>&1; then
+    fails="$(jq -c '.fails // []' "$f")"; reported=true
+  else
+    prev="$(jq -c '.fails // []' "$f" 2>/dev/null)"
+    fails="$(boundary_probe "$TARGET" 2>/dev/null | sed -n 's/^fail //p' | jq -R . | jq -sc '[.[] | select(length > 0)]')"
+    mkdir -p "$WORK/env" && jq -nc --arg v "$v" --arg t "$TARGET" --arg at "$NOW_ISO" --argjson e "$NOW_EPOCH" --argjson f "$fails" \
+      '{version:$v, target:$t, checked_utc:$at, checked_epoch:$e, fails:$f}' > "$f.tmp" && mv "$f.tmp" "$f"
+    [ "$prev" = "$fails" ] && reported=true
+  fi
+  [ "$fails" = '[]' ] && return 0
+  [ "$MODE" = slack ] && reported=false
+  log "black-box gate: $(jq length <<<"$fails") source surface(s) reachable — no product is tested until the probes pass (work/env/boundary.json)"
+  jq -nc --arg mode "$MODE" --argjson r "$reported" --argjson f "$fails" --argjson logs "$(logs_json)" \
+    '{mode:$mode, nothing_to_do:$r, boundary_breach:$f, logs:$logs}'
+  return 1
+}
+
+case "$MODE" in (slack|benchmark|security|issues|regression|discovery) boundary_gate || exit 0;; esac
+
 case "$MODE" in
   slack)      mode_slack ;;
   benchmark)  mode_benchmark ;;

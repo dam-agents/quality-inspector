@@ -48,6 +48,14 @@ CFG
   printf '| issue | ac_hash | candidate | baseline | verdict | status | updated_utc |\n| --- | --- | --- | --- | --- | --- | --- |\n' > "$WORK_DIR/QA.md"
   printf '| test | issue | tier | assert_hash | promoted_utc |\n| --- | --- | --- | --- | --- |\n' > "$WORK_DIR/SUITE.md"
   stub_profile
+  seed_gate
+}
+# A fresh, passed black-box gate (scripts/preflight.sh → boundary_gate) for acme/widgets, so a
+# test probes the boundary only when it means to.
+seed_gate() {
+  mkdir -p "$WORK_DIR/env"
+  jq -nc --arg v "$(head -1 "$SCRIPTS/../VERSION")" --argjson e "$(date -u +%s)" \
+    '{version:$v, target:"acme/widgets", checked_utc:"-", checked_epoch:$e, fails:[]}' > "$WORK_DIR/env/boundary.json"
 }
 iso_ago() { date -u -d "@$(( $(date -u +%s) - $1 * 60 ))" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
             || date -u -r $(( $(date -u +%s) - $1 * 60 )) +%Y-%m-%dT%H:%M:%SZ; }

@@ -124,6 +124,25 @@ else
     [ -z "$bad_denies" ] \
       && pass "kit.yaml egress denies each name a path" \
       || fail "kit.yaml egress denies without a path collide with the preset's and connections' allows and fail the apply — give each a pathPattern (\"/*\" for the whole host): $(echo $bad_denies)"
+    # The black-box boundary is the kit's alone (docs/black-box.md → Egress rules): every rule
+    # of github_rules for github.com and the repository docsUrl names must be in the kit as is.
+    if [ -f scripts/lib/boundary.sh ]; then
+      kit_lines="$(sed -n '/^egressRules:/,/^[a-z]/p' kit.yaml | awk '
+        function val(s) { sub(/^[^:]*:[[:space:]]*/, "", s); sub(/[[:space:]]+#.*$/, "", s); gsub(/["\047]/, "", s); sub(/[[:space:]]+$/, "", s); return s }
+        function emit() { if (h != "") print v, m, h, p }
+        /^  - / { emit(); h = ""; m = "*"; p = "*"; v = "allow" }
+        /^(  - |    )host:/ { h = val($0) }
+        /^(  - |    )method:/ { m = val($0) }
+        /^(  - |    )pathPattern:/ { p = val($0) }
+        /^(  - |    )verdict:/ { v = val($0) }
+        END { emit() }')"
+      kit_def="$(sed -n 's|^docsUrl:[[:space:]]*https://github.com/\([^/[:space:]]*/[^/[:space:]]*\).*|\1|p' kit.yaml | head -1)"
+      missing="$( ( CONFIG=/dev/null; . scripts/lib/config.sh; . scripts/lib/boundary.sh; github_rules github.com $kit_def ) \
+        | while IFS= read -r l; do printf '%s\n' "$kit_lines" | grep -qxF -- "$l" || printf '%s; ' "$l"; done)"
+      if [ -z "$kit_def" ]; then fail "kit.yaml docsUrl names no github.com repository — the kit's git fetch allow for this definition has no source"
+      elif [ -z "$missing" ]; then pass "kit.yaml carries the shared GitHub rules (github_rules github.com $kit_def)"
+      else fail "kit.yaml lacks shared GitHub rules — regenerate its github_rules block: $missing"; fi
+    fi
   fi
 
   # id, the sentinel and the schedule prefix all name the same agent; a mismatch means

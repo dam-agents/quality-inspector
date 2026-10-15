@@ -9,28 +9,22 @@
 # unparsable input → deny. It matches command TEXT — it stops mistakes and injected
 # instructions; the egress rules stay the boundary against a deliberate bypass.
 #
-# <T> = target_repo (QI_TARGET_REPO wins); a parameter expansion in its place ($T, ${T},
-# $OWNER/$REPO) counts as <T> in gh-api-path, gh-search, gh-cli, codeload and repo-web, a
-# command substitution $(…) does not (docs/persistence.md opens the definition PR with
-# one). "scheduled" = a fresh work/env/RUN_MODE, or a channel turn — a session whose
+# The agent reaches GitHub only through scripts/github.sh, which requests the target's issues
+# endpoints alone; the kit's egress allows nothing else there (docs/black-box.md → GitHub).
+# "scheduled" = a fresh work/env/RUN_MODE, or a channel turn — a session whose
 # transcript holds the platform's Slack frame `<how-to-respond>` in a prompt, not in a
 # tool's output (lib/channel.sh; docs/persistence.md → Scheduled or direct session). Every
 # rule id below has a deny fixture in scripts/tests/policy-fixtures.jsonl; the validator
 # fails without one.
 #
 #   rule             tools                 denies
-#   gh-api-path      Bash                  a GitHub API path under /repos/<T>/ other than issues, issues/<n>,
-#                                          issues/<n>/comments, issues/<n>/labels/<l> — so contents (the
-#                                          profile dir included), pulls, commits, git/, compare, branches,
-#                                          actions, releases, issue timeline and events; via `gh api` or a
-#                                          URL on the API host. An owner/repo given as a variable counts as <T>;
-#                                          with no target configured every repository does.
-#   gh-graphql       Bash                  `gh api graphql` (the issues REST endpoints are the only reads)
-#   gh-search        Bash                  `gh api search/code|commits` naming <T>
-#   gh-cli           Bash                  `gh pr|repo|release|run|workflow|browse|gist|search|cache|…` naming <T>
-#   raw-host         Bash WebFetch WebSearch  raw.githubusercontent.com
-#   codeload         Bash WebFetch WebSearch  codeload.<github host>/<T>
-#   repo-web         Bash WebFetch WebSearch  <github host>/<T> — web pages, git clone/fetch over https or ssh
+#   github           Bash WebFetch WebSearch  any road to GitHub but scripts/github.sh: every `gh` command;
+#                                          git clone|pull|push|ls-remote|submodule|archive --remote, a remote
+#                                          other than get-url/-v, and a fetch other than `git fetch origin` in
+#                                          a direct session (Kit Update); a URL, or with a fetch tool a bare
+#                                          name, of a GitHub host (github.com, *.github.com,
+#                                          *.githubusercontent.com, the target's host); a command setting
+#                                          QI_TARGET_REPO (the target comes from work/CONFIG.md alone)
 #   profile-url      Bash WebFetch WebSearch  a URL under the profile's boundary.urls
 #   source-map       Bash WebFetch Read Glob Grep  a *.map URL; a *.map file under work/ or /tmp/quality-inspector-*
 #   product-package  Bash Read Glob Grep   node_modules/<entry> for each profile boundary.packages entry
@@ -40,22 +34,18 @@
 #   git-clean        Bash                  git clean, anywhere
 #   container-fs     Bash                  kubectl (k3s too) exec|cp|debug|attach, ctr, crictl,
 #                                          docker|podman|nerdctl exec|cp|export|save|run|create
-#   write-outside    Write Edit MultiEdit NotebookEdit  a path outside work/, /tmp/quality-inspector-*
-#                                          and — in a direct session — the definition's .gitignore allowlist
+#   write-outside    Write Edit MultiEdit NotebookEdit  a path outside work/ and /tmp/quality-inspector-* —
+#                                          the live definition included: a change to it is a patch
+#                                          (docs/self-modification.md §8)
 #   run-mode         Write Edit …          work/env/RUN_MODE (only the Precheck writes it)
-#   scheduled-def    Write Edit … (sched.) definition files and work/CONFIG.md
-#   scheduled-git    Bash (scheduled)      git commit, git push, gh pr create|merge, and a `gh api` write
-#                                          (a method other than GET, or a field or --input) whose endpoint
-#                                          is not under the target's issues — so a pull request over REST too
+#   scheduled-def    Write Edit … (sched.) work/CONFIG.md
+#   scheduled-git    Bash (scheduled)      git commit
 #   policy-tamper    Bash (scheduled)      any command naming RUN_MODE, scripts/hooks/ or .claude/settings
-#   channel-write    Bash (channel turn)   any `gh api` write, issues paths included, and `gh issue|pr`
-#                                          comment|create|edit|close|merge|review|… — except the
-#                                          delivery of a Slack-ordered "test #N" (docs/slack.md): a POST
-#                                          to repos/<T>/issues/<n>/comments or a DELETE of
-#                                          repos/<T>/issues/<n>/labels/<retest_label>, <T> and <n> written
-#                                          out, while RUN_MODE is a fresh `slack <ISO> - <n> <session>`
-#                                          (precheck.sh slack <n>; <session> this one, or -) and the
-#                                          work/QA.md row of <n> is report_pending
+#   channel-write    Bash (channel turn)   `github.sh comment|unlabel` — except the delivery of a
+#                                          Slack-ordered "test #N" (docs/slack.md): <n> written out, while
+#                                          RUN_MODE is a fresh `slack <ISO> - <n> <session>` (precheck.sh
+#                                          slack <n>; <session> this one, or -) and the work/QA.md row of
+#                                          <n> is report_pending
 #   backup-override  Bash                  a command naming QI_WORK_BACKUP_ (the offline tests' remote and clone
 #                                          overrides): the backup's destination is work_repo alone
 #   backup-direct    Bash (scheduled)      scripts/work-backup.sh — there the Stop hook alone backs up
@@ -106,7 +96,6 @@ eval "$VARS"
 TARGET="${QI_TARGET_REPO:-$(cfg target_repo)}"; GH_HOST=github.com; T="$TARGET"
 slashes="${TARGET//[^\/]/}"
 if [ "${#slashes}" = 2 ]; then GH_HOST="${TARGET%%/*}"; T="${TARGET#*/}"; fi
-[ "$GH_HOST" = github.com ] && API_HOST=api.github.com || API_HOST="$GH_HOST"
 
 PROFILE_LOADED=0; P_URLS=""; P_PKGS=""
 load_profile() { # lazily: only a rule that needs the profile's boundary reads it
@@ -188,60 +177,17 @@ check_read_path() { # <normalized path or path/glob>
 }
 
 # --------------------------------------------------------------- URL rules ----
-repo_is_target() { # <owner> <repo>
-  [ -z "$T" ] && return 0
-  [[ "$1/$2" == "$T" ]] && return 0
-  case "$1$2" in (*'$'*|*'{'*|*'*'*) return 0;; esac
+# A GitHub host: github.com and its subdomains, githubusercontent.com and its subdomains,
+# and the target's own host (GitHub Enterprise).
+is_github_host() { # <host>
+  case "$1" in (github.com|*.github.com|githubusercontent.com|*.githubusercontent.com|"$GH_HOST"|*."$GH_HOST") return 0;; esac
   return 1
 }
-# A parameter expansion ($NAME, ${NAME}) where <T> would stand; `$(` is a command substitution.
-is_var() { case "$1" in (*'$'[A-Za-z_{]*) return 0;; esac; return 1; }
-path_repo_var() { # <path>: its leading /<owner>/<repo> given as a variable
-  local s="${1#/}" r=""; s="${s%%[?#]*}"
-  case "$s" in (*/*) r="${s#*/}"; r="${r%%/*}";; esac
-  is_var "${s%%/*}/$r"
-}
-RE_ISSUES='^issues(/[^/]+(/comments|/labels/[^/]+)?)?$'
-rest_allowed() { # <path after owner/repo>
-  local r="${1%%[?#]*}"; r="${r%/}"; r="${r#/}"
-  case "/$r/" in (*/timeline/*|*/events/*) return 1;; esac
-  [[ "$r" =~ $RE_ISSUES ]]
-}
-# Every `repos/<a>/<b>[/rest]` in a text addressed to the GitHub API.
-RE_REPOS='repos/([^/[:space:]"'"'"'?#]+)/([^/[:space:]"'"'"'?#]+)(/[^[:space:]"'"'"'#]*)?'
-check_repo_paths() { # <text>
-  local s="$1" a b rest m
-  while [[ "$s" =~ $RE_REPOS ]]; do
-    m="${BASH_REMATCH[0]}"; a="${BASH_REMATCH[1]}"; b="${BASH_REMATCH[2]}"; rest="${BASH_REMATCH[3]}"
-    s="${s#*"$m"}"
-    # `repos/$T/issues/…` — one variable holding owner/repo
-    case "$a" in (*'$'*|*'{'*) rest_allowed "$b$rest" && continue;; esac
-    repo_is_target "$a" "$b" || continue
-    rest_allowed "$rest" || deny gh-api-path "$API_HOST/repos/$a/$b$rest" "only the target's issues endpoints may be requested"
-  done
-  return 0
-}
+GH_DENY="the agent never reaches GitHub itself — the target's issues come through scripts/github.sh"
 check_url() { # <host> <path> <url without scheme>
   local h="$1" p="$2" u
   h="${h##*@}"; h="${h%%:*}"
-  case "$h" in (raw.githubusercontent.com) deny raw-host "$h$p" "raw.githubusercontent.com is off limits";; esac
-  case "$h" in (codeload.github.com|codeload."$GH_HOST")
-    [ -z "$T" ] && deny codeload "$h$p" "codeload is off limits without a configured target"
-    case "$p" in (/"$T"|/"$T"/*) deny codeload "$h$p" "the target's archives are off limits";; esac
-    path_repo_var "$p" && deny codeload "$h$p" "the target's archives are off limits";; esac
-  if [[ "$h" == "$API_HOST" || "$h" == api.github.com ]]; then
-    check_repo_paths "$p"
-    case "$p" in (/search/code*|/search/commits*|/api/v3/search/code*|/api/v3/search/commits*)
-      if { [ -n "$T" ] && [[ "$3" == *"$T"* ]]; } || is_var "$3"; then
-        deny gh-search "$h${p%%\?*}" "searching the target's code or commits is off limits"
-      fi;; esac
-  fi
-  if [[ "$h" == "$GH_HOST" ]]; then
-    if [ -n "$T" ]; then
-      case "$p" in (/"$T"|/"$T"/*|/"$T".git*|/"$T"\?*|/"$T"#*) deny repo-web "$h/$T" "the target's web pages and git remote are off limits";; esac
-    fi
-    path_repo_var "$p" && deny repo-web "$h${p%%[?#]*}" "the target's web pages and git remote are off limits"
-  fi
+  is_github_host "$h" && deny github "$h${p%%[?#]*}" "$GH_DENY"
   case "${p%%[?#]*}" in (*.map) deny source-map "$h${p%%[?#]*}" "source maps are off limits";; esac
   load_profile
   for u in $P_URLS; do
@@ -249,23 +195,19 @@ check_url() { # <host> <path> <url without scheme>
   done
   return 0
 }
-# All URLs in a text: scheme URLs, plus bare and ssh mentions of the GitHub hosts.
+# All URLs in a text: scheme URLs, plus — with <bare> — bare and scp-style mentions of the
+# GitHub hosts.
 RE_URL='(https?|git|ssh)://([^/[:space:]"'"'"'<>`)]+)(/[^[:space:]"'"'"'<>`)]*)?'
-GH_HOSTS='raw\.githubusercontent\.com|codeload\.github\.com|api\.github\.com|github\.com'
+GH_HOSTS='([a-z0-9-]+\.)*(github\.com|githubusercontent\.com)'
 [ "$GH_HOST" = github.com ] || GH_HOSTS="$GH_HOSTS|${GH_HOST//./\\.}"
-RE_BARE='(^|[^a-z0-9.-])('"$GH_HOSTS"')([:/][^[:space:]"'"'"'<>`)]*)'
-check_urls() { # <text>
-  local s="$1" m path
+RE_BARE='(^|[^a-z0-9.-])('"$GH_HOSTS"')([:/][^[:space:]"'"'"'<>`)]*|[[:space:]"'"'"']|$)'
+check_urls() { # <text> [bare]
+  local s="$1" m
   while [[ "$s" =~ $RE_URL ]]; do
     m="${BASH_REMATCH[0]}"; s="${s#*"$m"}"
     check_url "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${m#*://}"
   done
-  s="$1"
-  while [[ "$s" =~ $RE_BARE ]]; do
-    m="${BASH_REMATCH[0]}"; s="${s#*"$m"}"
-    path="${BASH_REMATCH[3]}"; path="/${path#[:/]}"
-    check_url "${BASH_REMATCH[2]}" "$path" "${BASH_REMATCH[2]}$path"
-  done
+  [ -n "${2:-}" ] && [[ "$1" =~ $RE_BARE ]] && deny github "${BASH_REMATCH[2]}" "$GH_DENY"
   return 0
 }
 
@@ -278,82 +220,22 @@ RE_MAP='[a-z0-9_*-]\.map([[:space:]"'"'"'?#;|&)]|$)'
 FETCHES=0
 unq() { U="${1#[\"\']}"; U="${U%[\"\']}"; }
 
-# Advance j past the word that closes a quote w[j] opens (j, w and n are the caller's):
-# the words are split at blanks, so a quoted value can span several.
-skip_quoted() {
-  local d="${w[$j]//[^\"]/}" q='"'
-  [ $(( ${#d} % 2 )) = 1 ] || { d="${w[$j]//[^\']/}"; q="'"; }
-  [ $(( ${#d} % 2 )) = 1 ] || return 0
-  while [ $((j+1)) -lt "$n" ]; do
-    j=$((j+1)); d="${w[$j]//[^$q]/}"; [ $(( ${#d} % 2 )) = 1 ] && return 0
-  done
-}
-# `gh api` from word <k> on (check_simple's w and n): GH_EP = the endpoint, the first word
-# that is neither a flag nor a flag's value; GH_M = the method (a field or --input without
-# one is POST). True when the call writes: a method other than GET or HEAD.
-gh_api_write() { # <k>
-  local j="$1" m="" f=0
-  GH_EP=""; GH_M=GET
+# `git fetch` from word <k> on (check_simple's w and n) names the remote origin alone — its
+# first operand, or none — with no URL, no other remote and no upload-pack of its own: the
+# platform's seed and Kit Update fetch this definition so (docs/persistence.md).
+fetch_origin() { # <k>
+  local j="$1" pos=0
   while [ "$j" -lt "$n" ]; do
     unq "${w[$j]}"
     case "$U" in
-      (-X|--method) j=$((j+1)); unq "${w[$j]:-}"; m="$U";;
-      (-X?*) m="${U#-X}";;
-      (--method=*) m="${U#--method=}";;
-      (-f|-F|--field|--raw-field|--input) f=1; j=$((j+1)); skip_quoted;;
-      (-[fF]?*|--field=*|--raw-field=*|--input=*) f=1; skip_quoted;;
-      (-H|--header|--hostname|-q|--jq|-t|--template|-p|--preview|--cache) j=$((j+1)); skip_quoted;;
-      (-*) skip_quoted;;
-      (*) [ -n "$GH_EP" ] || GH_EP="$U"; skip_quoted;;
+      (--all|--multiple|--upload-pack*|--recurse-submodules*|-u) return 1;;
+      (-*) ;;
+      (*://*|*@*|*:*/*) return 1;;
+      (*) [ "$pos" = 0 ] && [ "$U" != origin ] && return 1; pos=$((pos+1));;
     esac
     j=$((j+1))
   done
-  [ -z "$m" ] && [ "$f" = 1 ] && m=POST
-  GH_M="$(printf '%s' "${m:-GET}" | tr '[:lower:]' '[:upper:]')"
-  case "$GH_M" in (GET|HEAD) return 1;; (*) return 0;; esac
-}
-# The delivery a Slack-ordered "test #N" may make in a channel turn (docs/slack.md): a POST to
-# repos/<T>/issues/<n>/comments, or a DELETE of repos/<T>/issues/<n>/labels/<retest_label>
-# (URL-encoded or not) — <T> and <n> written out, never a variable — for slack_test_issue <n>.
-RE_SLACK_EP='^/?(api/v3/)?repos/([^/$]+)/([^/?#$]+)/issues/([0-9]+)/(comments|labels/([^/?#$]+))$'
-slack_test_write() { # <endpoint> <method>
-  local e="$1" own rp n what lab rl
-  case "$e" in (http://*|https://*) e="${e#*://}"; e="/${e#*/}";; esac
-  [[ "$e" =~ $RE_SLACK_EP ]] || return 1
-  own="${BASH_REMATCH[2]}"; rp="${BASH_REMATCH[3]}"; n="${BASH_REMATCH[4]}"; what="${BASH_REMATCH[5]}"; lab="${BASH_REMATCH[6]}"
-  [ -n "$T" ] && [[ "$own/$rp" == "$T" ]] || return 1
-  case "$what" in
-    (comments) [ "$2" = POST ] || return 1;;
-    (*) [ "$2" = DELETE ] || return 1
-        rl="$(cfg retest_label)"; rl="${rl:-qa:retest}"
-        [[ "$lab" == "$rl" || "$lab" == "$(jq -rn --arg l "$rl" '$l | @uri')" ]] || return 1;;
-  esac
-  slack_test_issue "$n"
-}
-# An endpoint under the target's issues: repos/<T>/issues…, with or without a leading /,
-# /api/v3 or scheme and host; an owner/repo given as a variable counts as <T>.
-RE_ISSUES_EP='^/?(api/v3/)?repos/([^/]+)/([^/?#]+)/issues([/?#]|$)'
-RE_ISSUES_EP_VAR='^/?(api/v3/)?repos/(\$[A-Za-z_][A-Za-z0-9_]*|\$\{[^}/]+\})/issues([/?#]|$)'
-issues_endpoint() { # <endpoint>
-  local e="$1"
-  case "$e" in (http://*|https://*) e="${e#*://}"; e="/${e#*/}";; esac
-  [[ "$e" =~ $RE_ISSUES_EP_VAR ]] && return 0
-  [[ "$e" =~ $RE_ISSUES_EP ]] && repo_is_target "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
-}
-# Within check_simple (its w and n): the repository a gh subcommand at word <i> names — a
-# -R/--repo value, a `repo:` search qualifier, or `gh repo <verb> <repo>` — is a variable.
-# `[ = ]` compares exactly: under nocasematch, -R would also match -r (--reviewer, --ref).
-gh_repo_var() { # <i>
-  local j=$(( $1 + 1 )) prev="" v
-  while [ "$j" -lt "$n" ]; do
-    unq "${w[$j]}"; v="$U"
-    if [ "$prev" = -R ] || [ "$prev" = --repo ]; then is_var "$v" && return 0; fi
-    case "$v" in (--repo=*) is_var "${v#*=}" && return 0;; (repo:*) is_var "${v#repo:}" && return 0;; esac
-    if [ "${v:0:2}" = -R ] && [ "${#v}" -gt 2 ]; then is_var "${v:2}" && return 0; fi
-    prev="$v"; j=$((j + 1))
-  done
-  unq "${w[$1]:-}"; [ "$U" = repo ] || return 1
-  unq "${w[$(( $1 + 2 ))]:-}"; is_var "$U"
+  return 0
 }
 
 check_simple() { # <one simple command>
@@ -373,14 +255,22 @@ check_simple() { # <one simple command>
   if [ "$cmd" = k3s ]; then unq "${w[$i]:-}"; cmd="$U"; i=$((i+1)); fi
   for x in ${w[@]+"${w[@]:$i}"}; do unq "$x"; rest="$rest$U "; done
   case "$cmd" in
+    (gh) deny github "gh" "$GH_DENY";;
     (git)
       FETCHES=1
       while [ "$i" -lt "$n" ]; do unq "${w[$i]}"
         case "$U" in (-C|-c|--git-dir|--work-tree|--namespace) i=$((i+2));; (-*) i=$((i+1));; (*) break;; esac
       done
-      unq "${w[$i]:-}"; sub="$U"
+      unq "${w[$i]:-}"; sub="$U"; unq "${w[$((i+1))]:-}"
       [ "$sub" = clean ] && deny git-clean "" "git clean is never run (it would wipe \$HOME)"
-      case "$sub" in (commit|push) scheduled && deny scheduled-git "" "a scheduled run never commits or pushes";; esac;;
+      case "$sub" in
+        (fetch) { fetch_origin "$((i+1))" && ! scheduled; } \
+                  || deny github "git fetch" "only \`git fetch origin\` of this definition, in a direct session (Kit Update)";;
+        (clone|pull|push|ls-remote|submodule|request-pull) deny github "git $sub" "$GH_DENY";;
+        (remote) case "$U" in (''|-v|--verbose|get-url) ;; (*) deny github "git remote" "$GH_DENY";; esac;;
+        (archive) case "$rest" in (*" --remote"*) deny github "git archive" "$GH_DENY";; esac;;
+        (commit) scheduled && deny scheduled-git "" "a scheduled run never commits";;
+      esac;;
     (kubectl)
       case "$rest" in (*" exec "*|*" cp "*|*" debug "*|*" attach "*) deny container-fs "" "container filesystems are off limits; use the profile's read-only diagnosis";; esac;;
     (ctr|crictl) deny container-fs "" "image filesystems are off limits";;
@@ -391,30 +281,21 @@ check_simple() { # <one simple command>
       # the computed values hold the chart's defaults; a dry run prints the rendered templates
       case "$rest" in (*" get values"*" -a "*|*" get values"*" --all"*|*" install"*" --dry-run"*|*" upgrade"*" --dry-run"*|*" --dry-run"*" install"*|*" --dry-run"*" upgrade"*)
         deny chart-template "" "chart templates and default values are off limits";; esac;;
-    (gh)
-      unq "${w[$i]:-}"; sub="$U"
-      case "$sub" in
-        (api)
-          case "$rest" in (*" graphql "*|*" /graphql "*) deny gh-graphql "$API_HOST/graphql" "GraphQL is off limits; use the issues REST endpoints";; esac
-          check_repo_paths "$rest"
-          if [ -n "$T" ]; then case "$rest" in (*search/code*"$T"*|*search/commits*"$T"*) deny gh-search "$API_HOST/search" "searching the target's code or commits is off limits";; esac; fi
-          case "$rest" in (*search/code*\$[A-Za-z_{]*|*search/commits*\$[A-Za-z_{]*) deny gh-search "$API_HOST/search" "searching the target's code or commits is off limits";; esac
-          if gh_api_write "$((i+1))"; then
-            channel_turn && { slack_test_write "$GH_EP" "$GH_M" || deny channel-write "" \
-              "a channel turn writes to GitHub only a Slack-ordered test's comment and retest label on its issue (docs/slack.md)"; }
-            issues_endpoint "$GH_EP" || { scheduled \
-              && deny scheduled-git "" "a scheduled run writes only the target's issue comments and labels"; }
-          fi;;
-        (pr) case "$rest" in (" pr create "*|" pr merge "*) scheduled && deny scheduled-git "" "a scheduled run never opens or merges a PR";; esac;;
-      esac
-      case "$sub" in (issue|pr)
-        case "${rest# "$sub" }" in (comment\ *|create\ *|edit\ *|close\ *|reopen\ *|delete\ *|lock\ *|unlock\ *|transfer\ *|pin\ *|unpin\ *|develop\ *|merge\ *|review\ *|ready\ *)
-          channel_turn && deny channel-write "" "a channel turn writes to GitHub only through gh api, and only a Slack-ordered test's delivery (docs/slack.md)";; esac;; esac
-      case "$sub" in (pr|repo|release|run|workflow|browse|gist|search|cache|attestation|codespace|ruleset|project)
-        if [ -n "$T" ]; then case "$rest" in (*"$T"*) deny gh-cli "$GH_HOST/$T" "only the target's issues may be read";; esac; fi
-        gh_repo_var "$i" && deny gh-cli "$GH_HOST/<variable>" "only the target's issues may be read";; esac;;
-    (curl|wget|http|https|xh|aria2c|lynx|w3m) FETCHES=1;;
+    (curl|wget|http|https|xh|aria2c|lynx|w3m|node|python|python3|perl|ruby|php|deno|bun) FETCHES=1;;
   esac
+  return 0
+}
+
+# In a channel turn, every `github.sh comment|unlabel <n>` must be the delivery of the
+# Slack-ordered "test #N" (slack_test_issue): <n> written out, never a variable.
+RE_GH_WRITE='github\.sh["'"'"']?[[:space:]]+["'"'"']?(comment|unlabel)["'"'"']?([[:space:]]+([^[:space:];&|)]*))?'
+check_channel_writes() {
+  local s="$1" m nn
+  while [[ "$s" =~ $RE_GH_WRITE ]]; do
+    m="${BASH_REMATCH[0]}"; nn="${BASH_REMATCH[3]}"; s="${s#*"$m"}"; unq "$nn"; nn="$U"
+    [[ "$nn" =~ ^[0-9]+$ ]] && slack_test_issue "$nn" && continue
+    deny channel-write "" "a channel turn writes to GitHub only a Slack-ordered test's comment and retest label on its issue (docs/slack.md)"
+  done
   return 0
 }
 
@@ -441,7 +322,9 @@ check_bash() {
     scheduled && deny policy-tamper "" "a scheduled run never touches the policy or its run marker";; esac
   case "$CMD" in (*QI_WORK_BACKUP_*) deny backup-override "" "the backup's destination comes from work_repo alone";; esac
   case "$CMD" in (*work-backup.sh*) scheduled && deny backup-direct "" "a scheduled run or a channel turn never backs up by hand — the Stop hook does";; esac
+  case "$CMD" in (*QI_TARGET_REPO*) deny github "QI_TARGET_REPO" "the target comes from work/CONFIG.md alone";; esac
   case "$CMD" in (*'<<'*) strip_heredocs "$CMD"; CMD="$X";; esac
+  case "$CMD" in (*github.sh*) channel_turn && check_channel_writes "$CMD";; esac
   while IFS= read -r seg; do check_simple "$seg"; done <<<"$(printf '%s\n' "$CMD" | tr ';&|()' '\n\n\n\n\n')"
   case "$CMD" in (*node_modules/*)
     load_profile
@@ -452,20 +335,11 @@ check_bash() {
   case "$CMD" in (*quality-inspector-chart-*) deny chart-template "/tmp/quality-inspector-chart-*" "the pulled chart is off limits";; esac
   case "$CMD" in (*env/*templates*) [[ "$CMD" =~ $RE_ENV_TPL ]] && deny chart-template "work/env/…/templates" "deployment templates are off limits";; esac
   case "$CMD" in (*.map*) [[ "$CMD" =~ $RE_MAP ]] && deny source-map "*.map" "source maps are off limits";; esac
-  [ "$FETCHES" = 1 ] && check_urls "$CMD"
+  check_urls "$CMD" $([ "$FETCHES" = 1 ] && echo bare)
   return 0
 }
 
 # ------------------------------------------------------------- write rules ----
-def_allowlisted() { # <normalized path> — a path the definition's .gitignore re-includes
-  local e
-  while IFS= read -r e; do
-    case "$e" in ('!/'*) ;; (*) continue;; esac
-    e="${e#!/}"
-    case "$e" in (*/) under "$1" "$DEF_ROOT/${e%/}" && return 0;; (*) [ "$1" = "$DEF_ROOT/$e" ] && return 0;; esac
-  done < "$DEF_ROOT/.gitignore"
-  return 1
-}
 check_write() {
   norm "$FPATH"; local p="$N"
   [ "$p" = "$WORK/env/RUN_MODE" ] && deny run-mode "$p" "only the schedule's Precheck writes the run marker"
@@ -474,11 +348,7 @@ check_write() {
     return 0
   fi
   in_tmp_qi "$p" && return 0
-  if [ -f "$DEF_ROOT/.gitignore" ] && def_allowlisted "$p"; then
-    scheduled && deny scheduled-def "$p" "a scheduled run never edits the definition"
-    return 0
-  fi
-  deny write-outside "$p" "writes go to work/ or /tmp/quality-inspector-* only"
+  deny write-outside "$p" "writes go to work/ or /tmp/quality-inspector-* only; a definition change is a patch (docs/self-modification.md §8)"
 }
 
 # ------------------------------------------------------------------ dispatch ----
@@ -489,7 +359,7 @@ case "$TOOL" in
   Glob) norm "${GPATH:-.}"; b="$N"; check_read_path "$b"; [ -n "$GPAT" ] && { norm "$b/$GPAT"; check_read_path "$N"; } ;;
   Grep) norm "${GPATH:-.}"; b="$N"; check_read_path "$b"; [ -n "$GGLOB" ] && { norm "$b/$GGLOB"; check_read_path "$N"; } ;;
   Write|Edit|MultiEdit|NotebookEdit) check_write ;;
-  WebFetch) check_urls "$URL" ;;
-  WebSearch) check_urls "$QUERY" ;;
+  WebFetch) check_urls "$URL" bare ;;
+  WebSearch) check_urls "$QUERY" bare ;;
 esac
 exit 0

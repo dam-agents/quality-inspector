@@ -82,19 +82,19 @@ commit on the definition's branch, shows the operator an **Update** button, and 
 session whose briefing says exactly how to move the checkout: the operator picks which
 upstream changes to take, their local changes are set aside and put back (never
 committed, never pushed), and every conflict is theirs to decide. Follow that briefing
-for the git half; never `git reset`, `git clean` or commit local changes on your own.
-Outside such a session, a version check only reports:
+for the git half; its `git fetch origin` is the one GitHub request the agent makes itself
+(read-only, this definition's repository alone — the kit's egress and the policy hook allow
+nothing more). Never `git reset`, `git clean` or commit local changes on your own. Outside
+such a session a version check fetches nothing — whether a newer version exists is the
+**Update** button's to say:
 
 ```bash
-git -C /home/agent fetch -q origin main
-git -C /home/agent show origin/main:VERSION 2>/dev/null | head -1   # latest
 head -1 /home/agent/VERSION                                         # checked out
 head -1 /home/agent/work/VERSION 2>/dev/null                        # adopted
 ```
 
-Checked-out < latest → **tell the operator the agent is not up to date** (state both
-versions) and point them at the **Update** button. Adopted ≠ checked-out → migrate now.
-All equal → report "up to date".
+Adopted ≠ checked-out → migrate now. Equal → report "up to date with the checkout; the
+platform's **Update** button shows a newer version".
 
 **Migration** (`from` = adopted, `to` = checked-out):
 
@@ -128,10 +128,9 @@ Slack-ordered "test #N" writes `slack <ISO> - <n> <session>` through `precheck.s
 ([slack.md](slack.md)). The policy
 hook ([black-box.md](black-box.md) → **Enforcement layers**) reads a marker younger than
 `lock_ttl_min` — by its timestamp or its mtime, whichever is newer — as a **scheduled
-run**: `git commit`/`push`, `gh pr create`/`merge`, a `gh api` write outside the
-target's issues, edits of definition files and of `work/CONFIG.md`, and any command
-naming the marker, `scripts/hooks/` or `.claude/settings` are refused. No fresh marker is
-a **direct session**.
+run**: `git commit`, the Kit Update's `git fetch origin`, edits of `work/CONFIG.md`, and any
+command naming the marker, `scripts/hooks/` or `.claude/settings` are refused. No fresh
+marker is a **direct session**.
 
 - It fails closed: a direct session opened within `lock_ttl_min` of a scheduled turn
   counts as scheduled until the marker ages out (its timestamp says since when).
@@ -141,36 +140,15 @@ a **direct session**.
   frame (`<how-to-respond>`) in a prompt is never direct, whoever sent the message — a session
   continued from the UI included; a definition change needs a fresh direct session. The frame
   in a tool's output (this file, an issue body) does not count. A channel turn writes to GitHub
-  only the delivery of a Slack-ordered "test #N": its issue comment and its retest-label
-  removal, on that one issue, while the `slack` marker names it and its `work/QA.md` row is
-  `report_pending` (rule `channel-write`; [slack.md](slack.md)). Every other write is refused.
+  only the delivery of a Slack-ordered "test #N": `scripts/github.sh comment|unlabel` on that one
+  issue, while the `slack` marker names it and its `work/QA.md` row is `report_pending` (rule
+  `channel-write`; [slack.md](slack.md)). Every other write is refused.
 
 ## Evolving the agent definition (outer repo)
 
 **First read [self-modification.md](self-modification.md)** — it defines the rules every
-definition change must obey.
-
-Definition changes go through **branch + PR on the definition repository — never a direct push
-to `main`, never auto-merge**, and only when deliberately asked — never as part of a
-scheduled run:
-
-```bash
-git -C /home/agent fetch origin main
-git -C /home/agent checkout -b "fix/<short-slug>" origin/main
-git -C /home/agent add -- kit.yaml CLAUDE.md AGENTS.md ONBOARDING.md README.md VERSION CHANGELOG.md .gitignore LICENSE docs scripts engines skills
-git -C /home/agent commit -m "<describe the change>"
-git -C /home/agent push -u origin "fix/<short-slug>"
-o="$(git -C /home/agent remote get-url origin)"; o="${o#https://}"; o="${o%.git}"; pulls="repos/${o#*/}/pulls"
-gh api --hostname "${o%%/*}" "$pulls" -f base=main -f head="fix/<short-slug>" \
-  -f title="<title>" -f body="<what and why>" --jq .html_url
-```
-
-The agent's job ends at "PR opened". Use fresh descriptive branch names; runtime state
-never goes to this repo.
-
-The definition repository may sit on a different GitHub host than the target: the PR
-call takes the host from `origin`; plain `git fetch`/`push` need only the allows
-`egress-rules.sh` prints for this repository when it shares the target's host. It is
-REST on purpose — `gh pr create` speaks GraphQL, which the egress denies
-([black-box.md](black-box.md) → **Egress rules**); the path sits in a variable because the
-policy hook reads `repos/<variable>/…` as the target's.
+definition change must obey, and §8 the only way one leaves the agent: a patch in
+`work/patches/` the operator downloads, applies upstream, and brings back through the Kit
+Update. The live checkout is never edited (the policy hook refuses it), never committed to,
+never pushed; the agent opens no branch and no pull request, and never as part of a
+scheduled run. Runtime state never goes into a patch.

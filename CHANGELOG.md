@@ -7,6 +7,27 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.0.0 — 2026-10-15
+
+**Upgrade:**
+1. **Operator-only — the egress.** A kit never updates an existing agent's rules: recreate the
+   agent from the kit, or apply what `bash "$HOME/scripts/egress-rules.sh" --kit` prints and
+   delete the rules 2.x printed for this instance (`dam network list "$AGENT"`): the allows on
+   `/repos/<target>/…`, `/repos/<definition>/*`, `github.com/<definition>/*`, the profile path
+   and every `--source`. Until the probes pass, the black-box gate stops every run
+   ([docs/black-box.md](docs/black-box.md) → The gate).
+2. **Operator-only — the profile's home.** It moves to `.quality-inspector/<profile>/` of its
+   repository (DAM: `qa/qi-profile-dam` → `.quality-inspector/qi-profile-dam` in
+   `dam-agents/dam`), and its skill source's `path` becomes `.quality-inspector`
+   ([docs/profile-contract.md](docs/profile-contract.md) → Where it lives).
+3. Delete the `- profile_source_path:` line from `work/CONFIG.md` when present (obsolete).
+4. `bash "$HOME/scripts/hooks/install.sh"` — the `github` rule and the wider deny list; they
+   apply from the next session.
+5. `bash "$HOME/scripts/verify-onboarding.sh"` and apply every `FAIL` line's `fix:`.
+6. Local edits in the checkout (`git -C /home/agent status --porcelain`): turn them into a
+   patch per [docs/self-modification.md](docs/self-modification.md) §8 and show it to the
+   operator — the live definition is no longer edited.
+
 ## 2.22.0 — 2026-10-15
 
 **Upgrade:**

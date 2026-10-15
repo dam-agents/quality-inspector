@@ -30,8 +30,9 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    this run's `ac_hash`, `candidate`, `baseline`, verdict `-`, now — the claim time the
    budgets count from. Remember the previous row — an abort restores it. Log `issue_start issue=<n> kind=<kind>`
    ([logging.md](logging.md)).
-2. **Re-check at action time.** `gh api repos/$T/issues/<n>` (host flag per CLAUDE.md
-   when `T` names one). The issue must still carry `qa_label` (or `retest_label`). Gone →
+2. **Re-check at action time.** `bash "$HOME/scripts/github.sh" issue <n>` — its text, labels and
+   author; with `include_comments: enabled`, `github.sh comments <n>` too (never `gh` or a URL:
+   [black-box.md](black-box.md) → **GitHub**). The issue must still carry `qa_label` (or `retest_label`). Gone →
    restore the previous row, unlock, log `issue_abort`, next entry. Recompute nothing by
    hand: the pre-flight's `ac_hash` is authoritative for this run. Then start
    `bash "$HOME/scripts/env.sh" up <candidate>` as a harness background task and go on —
