@@ -7,6 +7,11 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 2.18.1 — 2026-10-15
+
+**Upgrade:**
+Nothing — `kit.yaml` is read before create only; the change is its schema line and `docsUrl`.
+
 ## 2.18.0 — 2026-10-14
 
 **Upgrade:**
