@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/dam-agents/dam-starter-kits/main/kit.schema.json
 # kit.yaml — the platform's Starter Kit for quality-inspector.
 #
 # This repository IS the kit: the platform reads this file out of git, creates the
@@ -22,6 +23,7 @@ description: >-
 category: software
 tagline: Tests issues through the UI against a nested build, without reading the code.
 icon: flask
+docsUrl: https://github.com/dam-agents/quality-inspector
 
 seed:
   self: true
