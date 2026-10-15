@@ -159,4 +159,6 @@ c "$(mf '{"file":"../marker.yaml"}')" | grep -q '^FAIL prerequisite 1 (m): file 
   || { echo "  check: a manifest file outside the profile must fail"; FAILED=1; }
 c "$(mf '{"file":"marker.yaml","url":"https://x.example/m.yaml"}')" | grep -q '^FAIL prerequisite 1 (m): manifest needs exactly one of url and file' \
   || { echo "  check: a manifest with both url and file must fail"; FAILED=1; }
+c "$(mf '{"url":"https://x.example/m.yaml","file":5}')" | grep -q '^FAIL prerequisite 1 (m): manifest needs exactly one of url and file' \
+  || { echo "  check: a non-string file beside a url must fail"; FAILED=1; }
 exit $FAILED

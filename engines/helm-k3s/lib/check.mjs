@@ -126,7 +126,9 @@ for (const [i, p] of (Array.isArray(pre) ? pre : []).entries()) {
   else seen.add(p.name);
   for (const f of NEED[p.kind]) if (p[f] === undefined || p[f] === '') fail(`${id}: ${p.kind} needs ${f}`);
   if (p.kind === 'manifest') {
-    if (str(p.url) === str(p.file)) fail(`${id}: manifest needs exactly one of url and file`);
+    if ((p.url !== undefined) === (p.file !== undefined)) fail(`${id}: manifest needs exactly one of url and file`);
+    else if (p.file !== undefined && !str(p.file)) fail(`${id}: file must be a non-empty string`);
+    else if (p.url !== undefined && !str(p.url)) fail(`${id}: url must be a non-empty string`);
     else if (str(p.file)) {
       if (isAbsolute(p.file) || p.file.split('/').includes('..')) fail(`${id}: file must be a path inside the profile directory`);
       else if (process.env.QI_PROFILE_DIR && !existsSync(join(process.env.QI_PROFILE_DIR, p.file))) fail(`${id}: file ${p.file} is not in the profile`);
