@@ -66,7 +66,8 @@ model_env() {
 # agent has no Anthropic-compatible connection.
 MODEL_AUTH_VARS="ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN"
 model_auth() {
-  local v f="$HOME/.platform/runtime-env.json"
+  # Callers run it under `IFS='|' read … <<<"$(…)"`, whose IFS reaches the substitution.
+  local IFS=$' \t\n' v f="$HOME/.platform/runtime-env.json"
   for v in $MODEL_AUTH_VARS; do
     [ -n "${!v:-}" ] || continue
     for v in ANTHROPIC_BASE_URL $MODEL_AUTH_VARS; do [ -n "${!v:-}" ] && printf '%s=%s\n' "$v" "${!v}"; done
@@ -79,32 +80,49 @@ model_auth() {
     | select((.key | IN($want[])) and (.value | type == "string") and .value != "") | "\(.key)=\(.value)"' "$f" 2>/dev/null
 }
 
-# One agent step's model call, sent as work/suite/e2e.config.ts sends it — the same
-# endpoint, credential header and e2e_model (verify-onboarding.sh → model_provider). Prints
-# `<http code|none>|<base>|<variable>|<model>|<provider's error message>`; `none` =
-# no model connection, nothing sent.
-model_probe() {
-  local ma base var="" model out code err v h=()
+# The connection's endpoint and credential header, as e2e.config.ts sends them: sets
+# _MP_BASE (with /v1), _MP_VAR (the credential variable, empty = no connection) and _MP_H.
+_model_conn() {
+  local IFS=$' \t\n' ma v
   ma="$(model_auth)"
   _ma() { printf '%s\n' "$ma" | sed -n "s/^$1=//p" | head -1; }
-  base="$(_ma ANTHROPIC_BASE_URL)"; base="${base%/}"; base="${base:-https://api.anthropic.com}"
-  case "$base" in (*/v1) ;; (*) base="$base/v1";; esac
-  model="$(cfg e2e_model)"; model="${model:-claude-sonnet-5}"
-  for v in $MODEL_AUTH_VARS; do [ -n "$(_ma "$v")" ] && { var="$v"; break; }; done
-  case "$var" in
-    (ANTHROPIC_AUTH_TOKEN) h=(-H "Authorization: Bearer $(_ma "$var")");;
-    (ANTHROPIC_API_KEY) h=(-H "x-api-key: $(_ma "$var")");;
-    (CLAUDE_CODE_OAUTH_TOKEN) h=(-H "Authorization: Bearer $(_ma "$var")" -H 'anthropic-beta: oauth-2025-04-20');;
-    (*) printf 'none|%s||%s|\n' "$base" "$model"; return 0;;
+  _MP_BASE="$(_ma ANTHROPIC_BASE_URL)"; _MP_BASE="${_MP_BASE%/}"; _MP_BASE="${_MP_BASE:-https://api.anthropic.com}"
+  case "$_MP_BASE" in (*/v1) ;; (*) _MP_BASE="$_MP_BASE/v1";; esac
+  _MP_VAR=""; _MP_H=()
+  for v in $MODEL_AUTH_VARS; do [ -n "$(_ma "$v")" ] && { _MP_VAR="$v"; break; }; done
+  case "$_MP_VAR" in
+    (ANTHROPIC_AUTH_TOKEN) _MP_H=(-H "Authorization: Bearer $(_ma "$_MP_VAR")");;
+    (ANTHROPIC_API_KEY) _MP_H=(-H "x-api-key: $(_ma "$_MP_VAR")");;
+    (CLAUDE_CODE_OAUTH_TOKEN) _MP_H=(-H "Authorization: Bearer $(_ma "$_MP_VAR")" -H 'anthropic-beta: oauth-2025-04-20');;
   esac
+}
+
+# One agent step's model call, sent as work/suite/e2e.config.ts sends it — the same
+# endpoint, credential header and e2e_model, or [model] (verify-onboarding.sh →
+# model_provider). Prints `<http code|none>|<base>|<variable>|<model>|<provider's error
+# message>`; `none` = no model connection, nothing sent.
+model_probe() { # [model]
+  local model out code err
+  _model_conn
+  model="${1:-$(cfg e2e_model)}"; model="${model:-claude-sonnet-5}"
+  [ -n "$_MP_VAR" ] || { printf 'none|%s||%s|\n' "$_MP_BASE" "$model"; return 0; }
   out="$(mktemp "${TMPDIR:-/tmp}/quality-inspector-model.XXXXXX")" \
-    || { printf '000|%s|%s|%s|cannot create a temporary file\n' "$base" "$var" "$model"; return 0; }
-  code="$(curl -s -o "$out" -w '%{http_code}' --max-time 60 "$base/messages" "${h[@]}" \
+    || { printf '000|%s|%s|%s|cannot create a temporary file\n' "$_MP_BASE" "$_MP_VAR" "$model"; return 0; }
+  code="$(curl -s -o "$out" -w '%{http_code}' --max-time 60 "$_MP_BASE/messages" "${_MP_H[@]}" \
           -H 'anthropic-version: 2023-06-01' -H 'content-type: application/json' \
           -d "$(jq -cn --arg m "$model" '{model: $m, max_tokens: 1, messages: [{role: "user", content: "ping"}]}')" 2>/dev/null)"
   err="$(jq -r '.error.message? // .error? // empty | tostring | gsub("\\s+"; " ")' "$out" 2>/dev/null | head -c 160)"
   rm -f "$out"
-  printf '%s|%s|%s|%s|%s\n' "${code:-000}" "$base" "$var" "$model" "$err"
+  printf '%s|%s|%s|%s|%s\n' "${code:-000}" "$_MP_BASE" "$_MP_VAR" "$model" "$err"
+}
+
+# The models the connection lists (`GET <base>/models`, one id per line, at most 20), for
+# picking an e2e_model that answers (verify-onboarding.sh --models). Nothing when it lists none.
+model_list() {
+  _model_conn
+  [ -n "$_MP_VAR" ] || return 0
+  curl -s --max-time 30 "$_MP_BASE/models?limit=100" "${_MP_H[@]}" -H 'anthropic-version: 2023-06-01' 2>/dev/null \
+    | jq -r '.data[]?.id // empty' 2>/dev/null | head -20
 }
 
 # Run a profile command with the contract's environment. Its exit code is returned.

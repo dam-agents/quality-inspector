@@ -42,6 +42,10 @@ and returns the tags of the channel both builds match, in that channel's order.
 | `helm` | `name`, `repo`, `chart`, `version`, `namespace`, `set` (`{key: value}`), `wait` | `helm install` once |
 | `adopt-crds` | `name`, `crds`, `release`, `namespace` | stamps Helm ownership so a cluster-bundled release (e.g. k3s' `traefik-crd`) adopts CRDs installed out of band |
 
+The kit already opens cert-manager's `cert-manager.yaml` and Gateway API's `standard-install.yaml`
+release files on `github.com` (any `v*` tag), so a `manifest` from either needs no `egress` entry;
+any other `url` does.
+
 `wait`: `{namespace, deployments: true}` waits for every deployment to be Available;
 `{namespace, rollout: "ds/<name>"}` for one rollout.
 

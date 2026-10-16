@@ -105,7 +105,9 @@ variables the platform gives this harness, never a literal key: `scripts/suite.s
 `ANTHROPIC_BASE_URL`), else `ANTHROPIC_API_KEY` as `x-api-key`, else
 `CLAUDE_CODE_OAUTH_TOKEN` as `Authorization: Bearer`. `ANTHROPIC_BASE_URL` is a base
 without `/v1`, as Claude Code reads it. `verify-onboarding.sh --live` sends one step the
-same way (`model_provider`). Never set a credential variable yourself: a value that is not
+same way (`model_provider`; a 429 is the provider's rate limit or quota, never egress), and
+`--models` probes every model the connection lists, to pick an `e2e_model` that answers.
+Never set a credential variable yourself: a value that is not
 the placeholder goes out unchanged and the provider refuses it.
 
 ## CLI and API criteria

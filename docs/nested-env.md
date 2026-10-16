@@ -71,9 +71,11 @@ has less than `min_free_disk_gi` free. Before giving up on the entry:
 page and expects the judge to reject an assertion about absent text. Its failure, `judge
 swayed by page content`, is an environment failure of the **model**, not the product: no
 judged result of that run counts, `env.sh reset` does not fix it, and it goes to the
-operator (the `e2e_model`, or the `system`/`context` of `work/suite/e2e.config.ts`). A
-skipped canary (the product has nothing to create with a name and a description) is not
-a failure; its reason stays in the run's report.
+operator (the `e2e_model`, or the `system`/`context` of `work/suite/e2e.config.ts`). It creates what the
+profile's `canary` names ([profile-contract.md](profile-contract.md)), exactly one object, and
+deletes every object whose name starts with `qa-canary-` afterwards. A skipped canary (the
+profile's `canary.none`, or nothing to create with a name and a free-text field) is not a
+failure; its reason stays in the run's report.
 
 Never "fix" the product inside the environment (its files, its database, its
 configuration beyond what the profile sets) to make a test pass — that tests your patch,

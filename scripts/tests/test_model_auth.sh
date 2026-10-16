@@ -57,4 +57,25 @@ case "$err" in *"predates 2.22.0"*) ;; *) echo "  a stale e2e.config.ts was not 
 grep -q 'createAnthropic' "$SCRIPTS/suite-skeleton/e2e.config.ts" || { echo "  the skeleton lacks the 2.22.0 marker"; FAILED=1; }
 grep -q 'injected-by-gateway' "$SCRIPTS/suite.sh" "$SCRIPTS/e2e-mcp.sh" "$SCRIPTS/verify-onboarding.sh" \
   && { echo "  a literal key is still sent somewhere"; FAILED=1; }
+# --models: the configured model first, then those the connection lists; a 429 is no answer.
+mkdir -p "$SANDBOX/mbin"
+cat > "$SANDBOX/mbin/curl" <<'S'
+#!/usr/bin/env bash
+out=; url=; body=; while [ $# -gt 0 ]; do
+  case "$1" in (-o) out="$2"; shift;; (-d) body="$2"; shift;; (-H|-w|--max-time) shift;; (https://*) url="$1";; esac; shift; done
+case "$url" in
+  (*/models*) echo '{"data":[{"id":"claude/aws/claude-sonnet-5-5"},{"id":"claude-opus-5"}]}';;
+  (*) case "$body" in (*claude/aws/*) code=200;; (*) code=429;; esac
+      printf '{"error":{"message":"slow down"}}' > "$out"; printf '%s' "$code";;
+esac
+S
+chmod +x "$SANDBOX/mbin/curl"
+printf -- '- target_repo: acme/widgets\n' > "$WORK_DIR/CONFIG.md"
+m="$(ANTHROPIC_AUTH_TOKEN=platform:conn:c1 PATH="$SANDBOX/mbin:$PATH" bash "$SCRIPTS/verify-onboarding.sh" --models)"; rc=$?
+assert_eq "--models probes each, the configured one first" "fails   claude-sonnet-5 — HTTP 429: slow down
+answers claude/aws/claude-sonnet-5-5
+fails   claude-opus-5 — HTTP 429: slow down" "$m"
+assert_eq "--models exits 0 when one answers" 0 "$rc"
+grep -q 'not an egress problem' "$SCRIPTS/verify-onboarding.sh" \
+  || { echo "  a 429 is still read as egress"; FAILED=1; }
 exit $FAILED

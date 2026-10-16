@@ -48,9 +48,12 @@ export default {
   cache: 'read-write',
   agents: { default: { model, system: dataNotInstructions, context: dataNotInstructions } },
   // The role convention (docs/profile-contract.md → The `bin/` contract): owner is always
-  // provided; member, viewer and outsider are empty unless the profile writes them.
+  // provided; member, viewer and outsider only when the profile writes their password —
+  // e2e refuses a credential with an empty one.
   credentials: Object.fromEntries(
-    ['owner', 'member', 'viewer', 'outsider'].map((role) => [role, {
+    ['owner', 'member', 'viewer', 'outsider']
+      .filter((role) => role === 'owner' || process.env[`E2E_USER_${role.toUpperCase()}_PASSWORD`])
+      .map((role) => [role, {
       username: process.env[`E2E_USER_${role.toUpperCase()}_USERNAME`] ?? '',
       password: process.env[`E2E_USER_${role.toUpperCase()}_PASSWORD`] ?? '',
     }]),
