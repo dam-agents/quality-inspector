@@ -302,7 +302,8 @@ RE_GH_WRITE='github\.sh[[:space:]]+(comment|unlabel)([[:space:]]+([^[:space:];&|
 RE_GH_SUB='github\.sh([[:space:]]+[a-z][a-z-]*([[:space:];&|)]|$))?'
 CHAN_WHY="a channel turn writes to GitHub only a Slack-ordered test's comment and retest label on its issue (docs/slack.md)"
 CHAN_SEP=';&|(){}`'
-CHAN_REDIR='s/[0-9]*(&>>?|>>?&?|<&|<>|<)[[:space:]]*[^[:space:];|&<>()]*/ /g'
+# a redirection and its target — a run of "…", '…', \x and plain characters — on the raw command
+CHAN_REDIR="s/[0-9]*(&>>?|>>?[&|]?|<&|<>|<)[[:space:]]*(\"[^\"]*\"|'[^']*'|\\\\.|[^[:space:];|&<>()\"'\\\\])*/ /g"
 chan_runnable() { [[ "$1" == */* || "$1" == *.sh || "$1" == *[\$\`*?[]* ]]; }
 chan_simple() { # <simple command, unquoted>
   local w=() i=0 x
@@ -317,8 +318,8 @@ chan_simple() { # <simple command, unquoted>
   return 0
 }
 check_channel_writes() {
-  local c="${1//[\"\'\\]/}" s m nn seg w=() k
-  c="$(printf '%s\n' "$c" | sed -E "$CHAN_REDIR")"
+  local c s m nn seg w=() k
+  c="$(printf '%s\n' "$1" | sed -E "$CHAN_REDIR")"; c="${c//[\"\'\\]/}"
   s="$c"
   while [[ "$s" =~ $RE_GH_SUB ]]; do
     [ -n "${BASH_REMATCH[1]}" ] || deny channel-write "" "$CHAN_WHY"
