@@ -69,6 +69,8 @@ for a in "$@"; do case "$a" in
   (https://held.example/*) printf 000; exit 28;;
   (https://refused.example/*) printf 403; exit 0;;
   (https://open.example/a/qi-egress-check) printf 404; exit 0;;
+  (https://typo.example/*) printf 000; exit 6;;
+  (https://badcert.example/*) printf 000; exit 60;;
 esac; done
 printf 000; exit 7
 S
@@ -79,7 +81,9 @@ cat > "$QI_PROFILE_DIR/profile.json" <<'J'
            {"host":"held.example","method":"GET","why":"charts"},
            {"host":"refused.example","method":"GET","path":"/r/*","why":"manifests"},
            {"host":"*.layers.example","method":"GET","why":"layers"},
-           {"host":"up.example","method":"POST","why":"uploads"}]}
+           {"host":"up.example","method":"POST","why":"uploads"},
+           {"host":"typo.example","method":"GET","why":"dns"},
+           {"host":"badcert.example","method":"GET","why":"tls"}]}
 J
 eg="$(PATH="$SANDBOX/egress-bin:$PATH" bash "$SCRIPTS/verify-onboarding.sh" --egress 2>/dev/null | grep ' egress:')"
 printf '%s\n' "$eg" | grep -q '^ok   egress:open.example — GET /a/\* passes (HTTP 404)$' || { echo "  assertion failed: an answered request passes"; FAILED=1; }
@@ -88,5 +92,8 @@ printf '%s\n' "$eg" | grep -q '^FAIL egress:refused.example — GET /r/\* refuse
   || { echo "  assertion failed: a refused request fails with the rule to add"; FAILED=1; }
 printf '%s\n' "$eg" | grep -q '^warn egress:\*.layers.example — a wildcard host is not probed' || { echo "  assertion failed: a wildcard host is skipped"; FAILED=1; }
 printf '%s\n' "$eg" | grep -q '^warn egress:up.example — POST \* is not probed' || { echo "  assertion failed: a non-GET rule is skipped"; FAILED=1; }
+printf '%s\n' "$eg" | grep -q '^FAIL egress:typo.example — the host does not resolve (DNS) — fix: check the host name' || { echo "  assertion failed: a DNS failure is not an egress rule"; FAILED=1; }
+printf '%s\n' "$eg" | grep -q '^FAIL egress:badcert.example — TLS to the host failed (curl exit 60) — fix: check the host name and its certificate' || { echo "  assertion failed: a TLS failure is not an egress rule"; FAILED=1; }
+printf '%s\n' "$eg" | grep -E 'egress:(typo|badcert)\.example.*add an allow rule' && { echo "  assertion failed: no allow rule for a DNS or TLS failure"; FAILED=1; }
 
 exit $FAILED

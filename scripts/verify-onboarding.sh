@@ -245,6 +245,9 @@ if [ "$EGRESS" = 1 ]; then
     code="$(curl -s -o /dev/null -r 0-0 --max-filesize 1048576 -w '%{http_code}' --max-time 25 "https://$h$path" </dev/null 2>/dev/null)"; rc=$?
     case "$code:$rc" in
       (000:28) warn "egress:$h" "held for approval — approve its prompt (Allow permanently), then re-run: GET $p ($why)";;
+      (000:6) fail "egress:$h" "the host does not resolve (DNS)" "check the host name in the profile's egress (a typo is a profile defect: report it to the profile's repository)";;
+      (000:35|000:51|000:60) fail "egress:$h" "TLS to the host failed (curl exit $rc)" \
+        "check the host name and its certificate — not an egress rule; a gateway that intercepts TLS needs its CA in this VM's trust store";;
       (403:*|000:*) fail "egress:$h" "GET $p refused at once${how:+ ($how)}" \
         "add an allow rule in the agent's network settings: host $h, method GET, path $p — no prompt appears for a request under a deny (a prompt answered Deny forever left a deny rule: delete it)";;
       (*) ok "egress:$h" "GET $p passes (HTTP $code)";;
