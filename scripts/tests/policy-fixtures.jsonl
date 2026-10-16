@@ -101,6 +101,11 @@
 {"name": "rg running a preprocessor, channel turn", "expect": "deny", "mode": "channel", "rule": "channel-write", "tool": "Bash", "input": {"command": "rg --pre /tmp/g unlabel docs"}, "marker": "slack @NOW@ - 12 test", "qa": "report_pending"}
 {"name": "read-only grep piped on, channel turn", "expect": "deny", "mode": "channel", "rule": "channel-write", "tool": "Bash", "input": {"command": "grep -rn comment docs/slack.md | head -3"}}
 {"name": "script file naming github.sh written, channel turn", "expect": "deny", "mode": "channel", "rule": "channel-write", "tool": "Write", "input": {"file_path": "/tmp/quality-inspector-c/a.sh", "content": "bash \"$HOME/scripts/github.sh\" comment 13 /tmp/quality-inspector-c/comment.md"}, "marker": "slack @NOW@ - 12 test", "qa": "report_pending"}
+{"name": "git grep pager option abbreviated, channel turn", "expect": "deny", "mode": "channel", "rule": "channel-write", "tool": "Bash", "input": {"command": "git grep --op=sh comment"}}
+{"name": "git grep pager option in quotes, channel turn", "expect": "deny", "mode": "channel", "rule": "channel-write", "tool": "Bash", "input": {"command": "git grep \"--op=sh -c x\" comment"}}
+{"name": "git grep pager option split by quotes, channel turn", "expect": "deny", "mode": "channel", "rule": "channel-write", "tool": "Bash", "input": {"command": "git grep -\"\"-op=sh comment"}}
+{"name": "rg hostname program, channel turn", "expect": "deny", "mode": "channel", "rule": "channel-write", "tool": "Bash", "input": {"command": "rg --hostname-bin=/tmp/g comment docs"}}
+{"name": "git log writing a file, channel turn", "expect": "deny", "mode": "channel", "rule": "channel-write", "tool": "Bash", "input": {"command": "git log --output=/home/agent/scripts/github.sh --grep unlabel"}}
 {"name": "rg for unlabel, channel turn", "expect": "allow", "mode": "channel", "tool": "Bash", "input": {"command": "rg unlabel docs"}}
 {"name": "grep for a quoted word, channel turn", "expect": "allow", "mode": "channel", "tool": "Bash", "input": {"command": "grep -rn \"comment\" docs/slack.md"}}
 {"name": "github.sh comments read, channel turn", "expect": "allow", "mode": "channel", "tool": "Bash", "input": {"command": "bash \"$HOME/scripts/github.sh\" comments 12"}}
