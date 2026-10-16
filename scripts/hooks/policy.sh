@@ -44,7 +44,7 @@
 #   channel-write    Bash (channel turn)   `github.sh comment|unlabel`, a `github.sh` whose subcommand is not
 #                                          written out, `comment|unlabel` after any other path, *.sh,
 #                                          expansion or glob, an expansion after the path a command runs
-#                                          (quotes and backslashes dropped first) — except
+#                                          (quotes, backslashes and redirections dropped first) — except
 #                                          the delivery of a Slack-ordered "test #N" (docs/slack.md): the
 #                                          script path, the subcommand and <n> written out, while
 #                                          RUN_MODE is a fresh `slack <ISO> - <n> <session>` (precheck.sh
@@ -296,11 +296,13 @@ check_simple() { # <one simple command>
 # after a runnable word — a path, a *.sh, an expansion or a glob — needs that word to be a
 # literal `github.sh` path; and the runnable word a simple command executes (past
 # assignments, keywords, wrappers and shells) is never followed by an expansion
-# (chan_simple). Quotes and backslashes are dropped first: `comm''ent` is `comment` to bash.
+# (chan_simple). Quotes, backslashes and redirections are dropped first: bash runs
+# `/tmp/g.sh >out comm''ent` as `/tmp/g.sh comment`.
 RE_GH_WRITE='github\.sh[[:space:]]+(comment|unlabel)([[:space:]]+([^[:space:];&|)]*))?'
 RE_GH_SUB='github\.sh([[:space:]]+[a-z][a-z-]*([[:space:];&|)]|$))?'
 CHAN_WHY="a channel turn writes to GitHub only a Slack-ordered test's comment and retest label on its issue (docs/slack.md)"
 CHAN_SEP=';&|(){}`'
+CHAN_REDIR='s/[0-9]*(&>>?|>>?&?|<&|<>|<)[[:space:]]*[^[:space:];|&<>()]*/ /g'
 chan_runnable() { [[ "$1" == */* || "$1" == *.sh || "$1" == *[\$\`*?[]* ]]; }
 chan_simple() { # <simple command, unquoted>
   local w=() i=0 x
@@ -316,6 +318,7 @@ chan_simple() { # <simple command, unquoted>
 }
 check_channel_writes() {
   local c="${1//[\"\'\\]/}" s m nn seg w=() k
+  c="$(printf '%s\n' "$c" | sed -E "$CHAN_REDIR")"
   s="$c"
   while [[ "$s" =~ $RE_GH_SUB ]]; do
     [ -n "${BASH_REMATCH[1]}" ] || deny channel-write "" "$CHAN_WHY"
