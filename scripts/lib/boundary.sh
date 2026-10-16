@@ -159,7 +159,7 @@ boundary_probe() { # <target>
 boundary_fix() { # <detail>
   case "$1" in
     (*' — '*) printf '%s\n' "${1#* — }";;
-    (*) echo "the agent's egress lacks the kit's GitHub rules: recreate it from the kit, or have the operator apply what bash scripts/egress-rules.sh --kit prints (docs/black-box.md → Egress rules)";;
+    (*) echo "the agent's egress lacks the kit's GitHub rules: recreate it from the kit, or have the operator add what bash scripts/egress-rules.sh --kit lists in the agent's network settings (docs/black-box.md → Egress rules)";;
   esac
 }
 

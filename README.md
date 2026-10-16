@@ -106,10 +106,12 @@ injects it; the VM holds a placeholder): GitHub is deny-by-default, and only the
 endpoints, the `.quality-inspector/` profile directory, a repository's metadata and the
 read-only fetch of this definition open — for every repository alike, each allow fenced by
 two longer denies against wildcard tricks. Every other code host is denied. What stays the
-operator's, printed by `bash scripts/egress-rules.sh` as `dam network create` commands: the
-profile's `egress`, the `work_repo` backup, a GitHub Enterprise target (`--kit` adds the
-kit's rules for an agent created by hand or from a kit before 3.0.0 — a kit never updates an
-existing agent's rules). A rule counts only once a probe proves it: before each day's work
+operator's, listed by `bash scripts/egress-rules.sh` as host, method, path and why — never as
+commands: the profile's `egress`, the `work_repo` backup, a GitHub Enterprise target (`--kit`
+adds the kit's rules for an agent created by hand or from a kit before 3.0.0 — a kit never
+updates an existing agent's rules). A host no kit rule covers lands through its approval prompt
+(`verify-onboarding.sh --egress` asks for each); a rule under a kit deny the operator adds by
+hand, since no prompt ever appears for it. A rule counts only once a probe proves it: before each day's work
 the pre-flight's **black-box gate** requests each forbidden surface and stops every run while
 one answers; `verify-onboarding.sh --live` and the weekly audit report the same probes.
 Approve no held request on the deny side.

@@ -17,6 +17,10 @@ cfg() { sed -n "s/^- $1:[[:space:]]*//p" "$CONFIG" 2>/dev/null | head -1 \
         | sed -e 's/[[:space:]]*#.*$//' -e 's/[[:space:]]*$//' \
               -e 's/^[`"'"'"']//' -e 's/[`"'"'"']$//'; }
 
+# Keys a version dropped: a restore deletes their lines (work-backup.sh), the verifier warns
+# about one left behind. Space-separated.
+CONFIG_OBSOLETE_KEYS="profile_source_path"
+
 # agent_login [gh host args…]: the agent's own GitHub login — `github_login` when set (a
 # GitHub App installation token gets 403 from `gh api user`; its comments are `<slug>[bot]`),
 # else `gh api user`. Prints it, or nothing (exit 1).

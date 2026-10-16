@@ -108,11 +108,14 @@ needed), a `path` where the host is shared (e.g. `github.com` release downloads)
 `pkg-containers.githubusercontent.com`; Docker Hub → `registry-1.docker.io`,
 `auth.docker.io`, `production.cloudflare.docker.com`; GitHub release downloads →
 `objects.githubusercontent.com`, `release-assets.githubusercontent.com`. The helm-k3s
-engine also needs `get.helm.sh`. The operator applies these entries with the rules
-`scripts/egress-rules.sh` prints (the core's `docs/black-box.md` → Egress rules). GitHub
+engine also needs `get.helm.sh`. `scripts/egress-rules.sh` lists these entries for the operator (the core's
+`docs/black-box.md` → Egress rules): a host no kit rule covers lands through its approval
+prompt, one under a kit deny (any `github.com` path) only by hand — keep those few. GitHub
 is deny-by-default for every repository there, so an install that downloads from the
 target repository's own releases cannot work — such builds must come from a registry; a
-third-party release download needs an entry with its exact path.
+third-party release download needs an entry with its exact path. The kit already opens
+cert-manager's `cert-manager.yaml` and Gateway API's `standard-install.yaml` release files,
+and the `trusted` preset the hosts GitHub redirects downloads to — leave those out.
 
 ## Boundary
 

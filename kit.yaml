@@ -242,6 +242,15 @@ egressRules:
     pathPattern: "/*"
     verdict: deny
   # <<< github_rules
+  # Cluster prerequisites a helm-k3s profile applies (engines/helm-k3s → Prerequisites): one
+  # release file each, through the github.com deny above; the download redirects to
+  # release-assets.githubusercontent.com, which the trusted preset allows.
+  - host: github.com
+    method: GET
+    pathPattern: "/cert-manager/cert-manager/releases/download/v*/cert-manager.yaml"
+  - host: github.com
+    method: GET
+    pathPattern: "/kubernetes-sigs/gateway-api/releases/download/v*/standard-install.yaml"
   # Code hosts this agent never needs.
   - host: raw.githubusercontent.com
     pathPattern: "/*"

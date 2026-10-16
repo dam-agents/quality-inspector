@@ -175,3 +175,7 @@
 {"name": "restore, channel turn", "mode": "channel", "expect": "deny", "rule": "backup-direct", "tool": "Bash", "input": {"command": "bash \"$HOME/scripts/work-backup.sh\" restore --force"}}
 {"name": "backup by hand, direct", "expect": "allow", "tool": "Bash", "input": {"command": "bash \"$HOME/scripts/work-backup.sh\" persist"}}
 {"name": "restore, direct", "expect": "allow", "tool": "Bash", "input": {"command": "LOG_JOB=session bash \"$HOME/scripts/work-backup.sh\" restore"}}
+{"name": "operator notes, direct", "expect": "allow", "tool": "Write", "input": {"file_path": "@WORK@/OPERATOR.md"}}
+{"name": "operator notes, scheduled", "mode": "scheduled", "expect": "deny", "rule": "scheduled-def", "tool": "Edit", "input": {"file_path": "@WORK@/OPERATOR.md"}}
+{"name": "operator notes, channel turn", "mode": "channel", "expect": "deny", "rule": "scheduled-def", "tool": "Write", "input": {"file_path": "@WORK@/OPERATOR.md"}}
+{"name": "harness memory", "expect": "deny", "rule": "write-outside", "tool": "Write", "input": {"file_path": "@HOME@/.claude/projects/-home-agent/memory/egress.md"}}

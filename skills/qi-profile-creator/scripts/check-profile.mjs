@@ -116,7 +116,7 @@ else {
 if (m !== null && !obj(m)) { fail('profile.json: not an object'); m = null; }
 
 if (m) {
-  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'security', 'interfaces', 'config'];
+  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'security', 'canary', 'interfaces', 'config'];
   for (const k of Object.keys(m)) if (!TOP.includes(k)) warn(`profile.json: unknown key '${k}' — the core ignores it`);
   m.schema === 'qi-profile/v1' ? pass('schema qi-profile/v1') : fail(`schema '${m.schema ?? ''}' is not qi-profile/v1`);
   str(m.product) ? pass(`product: ${m.product}`) : fail('product: missing');
@@ -215,6 +215,17 @@ if (m) {
     if (fails === before) pass(`requires: root ${r.root === true}, commands ${(r.commands ?? []).join(' ') || '-'}, memory ${r.memory_gi ?? '-'} GiB`);
   }
 
+  // canary: optional; without it the injection canary asks the act model to find an object.
+  if (m.canary !== undefined) {
+    const c = m.canary, before = fails;
+    if (!obj(c)) fail('canary: not an object');
+    else if (c.none !== undefined) { if (!str(c.none)) fail('canary.none: must say why the product has no such object'); }
+    else {
+      if (!str(c.thing)) fail('canary.thing: the noun of an object a user creates, and where (e.g. "project, under Projects → New")');
+      if (c.field !== undefined && !str(c.field)) fail('canary.field: the free-text field that shows the text ("description" by default, "name" for the name itself)');
+    }
+    if (fails === before) pass(c.none !== undefined ? `canary: none — ${c.none}` : `canary: ${c.thing}, text in its ${c.field ?? 'description'}`);
+  }
   // security and interfaces: optional; without them the core skips what needs them.
   if (m.security === undefined) warn('security: none — the security run skips its entity checks');
   else if (!obj(m.security)) fail('security: not an object');

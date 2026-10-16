@@ -37,24 +37,31 @@ operator-only steps, and tick each with `complete_onboarding_step` as it is sett
 2. *Backend* — the agent runs on the backend and size the profile's README asks for
    (the kit creates it on the vm backend; by hand, choose vm when the profile requires root).
 3. *Target repository* — the `target_repo` whose issues are tested.
-4. *Egress rules* — the kit's GitHub rules hold for any github.com target; run what
-   `scripts/egress-rules.sh` prints — the profile's `egress`, the work backup's, a GitHub
-   Enterprise target's (Step 3 shows them, with `--kit` on the by-hand path).
+4. *Egress rules* — the kit's GitHub rules hold for any github.com target. The rest come from
+   `scripts/egress-rules.sh` (Step 3): a `prompt` rule the operator approves in its approval
+   prompt when `verify-onboarding.sh --egress` asks for it; a `by-hand` rule (under a kit deny,
+   the work backup, a GitHub Enterprise target, the kit's own on the by-hand path) the
+   operator adds in the agent's network settings, as host, method, path and why.
 5. *Issue comments* — enable or keep disabled.
 6. *Profile settings* — a value for every profile key it marks `ask`.
-7. *Model credential* — confirm agent steps reach the agent's model connection through the
-   gateway (`model_provider` in `verify-onboarding.sh --live`).
+7. *Model* — agent steps reach the agent's model connection through the gateway, with an
+   `e2e_model` that answers (Step 3; `model_provider` in `verify-onboarding.sh --live`).
 8. *Work backup* — a private repository for `work/` (or local-only): the connection's account
    may push to it, its `main` is protected for that account where the GitHub plan allows it, its
    egress rules are applied.
 
 The schedules are **held** until Step 7 marks onboarding complete.
 
+**Ask the operator in words, never in commands.** Whatever the operator must do on the
+platform — an egress rule, a connection, a setting — say what and where (host, method, path and
+why for a rule), never as a CLI command to paste. Restore before asking anything (Step 2a):
+a backup answers most questions, and only what it leaves missing is asked.
+
 ## Step 0 — Prerequisites
 
 1. `bash "$HOME/scripts/github.sh" whoami` — fails → the GitHub connection is not granted; stop and
-   tell the operator. A GitHub App token cannot tell its login: ask for the app's bot login
-   (`<slug>[bot]`) and write it as `- github_login:` in Step 3.
+   tell the operator. A GitHub App token cannot tell its login: note it — Step 3 asks for the
+   app's bot login (`<slug>[bot]`, `- github_login:`) unless a restored `work/CONFIG.md` has it.
 2. `git -C /home/agent remote get-url origin` names the definition repo (kit path). No
    checkout → on the kit path the seed failed: say so and stop; by hand, derive the repo
    from the URL of this runbook the operator gave you.
@@ -92,13 +99,14 @@ The operator assigns the profile on the platform; you never install it yourself.
 
 ## Step 2a — Work backup and restore
 
-Ask for `work_repo` ([docs/persistence.md](docs/persistence.md) → **Backup & restore**): a
+**The first question of onboarding.** Ask for `work_repo` ([docs/persistence.md](docs/persistence.md) → **Backup & restore**): a
 **private** `[<host>/]<owner>/<repo>` — empty for a new agent, or a previous instance's backup
 to continue from — never the target or a fork of it; or "local-only" (the default: a lost
 volume then loses the suite). Local-only → tick item 8, go to 2b. Otherwise write
-`- work_repo:` and the asked `- target_repo:` into `work/CONFIG.md` (only what is missing),
-show `bash "$HOME/scripts/egress-rules.sh"` (item 8 needs its work backup lines), and — unless
-`work/QA.md` or `work/SUITE.md` already has rows — restore:
+`- work_repo:` into `work/CONFIG.md`, give the operator its one `by-hand` rule from
+`bash "$HOME/scripts/egress-rules.sh"` (host, method, path — item 8; it falls under the kit's
+GitHub deny, so no prompt appears), and once they say it is added — unless `work/QA.md` or
+`work/SUITE.md` already has rows — restore:
 
 ```bash
 LOG_JOB=session bash "$HOME/scripts/work-backup.sh" restore; RC=$?
@@ -106,7 +114,9 @@ grep -q '^- work_repo:' /home/agent/work/CONFIG.md || printf -- '- work_repo: %s
 ```
 
 - `0` — restored: name the instance that continues (its `target_repo`, `work/VERSION`), show
-  the restore's notes and follow **Backup & restore** → Restore; Step 4 is skipped.
+  the restore's notes and follow **Backup & restore** → Restore; Step 2f migrates it, Step 3
+  asks only what the restored `work/CONFIG.md` lacks, Step 4 is skipped. The restore writes
+  `work/VERSION` `1.0.0` when the backup had none and deletes obsolete keys itself.
 - `2` — nothing to restore: a new agent; the Stop hook backs it up once Step 2e is in place.
 - `1` — stop and report the output: an unreachable repository is item 8 (access, egress).
 
@@ -114,11 +124,13 @@ Tick item 8 once `bash "$HOME/scripts/work-backup.sh" check` shows `"problem": n
 
 ## Step 2b — Provision `work/`
 
-Create only what is missing; never overwrite an existing state file.
+Create only what is missing; never overwrite an existing state file. A new agent adopts the
+checked-out version at once, so every backup carries `work/VERSION` (a restored one is kept).
 
 ```bash
 mkdir -p /home/agent/work/issues /home/agent/work/scenarios /home/agent/work/logs /home/agent/work/inventory /home/agent/work/regression /home/agent/work/benchmark /home/agent/work/perf /home/agent/work/security
 cd /home/agent/work
+[ -s VERSION ] || head -1 "$HOME/VERSION" > VERSION
 touch SECURITY.log
 [ -f QA.md ] || cat > QA.md <<'EOF'
 # QA state — one row per issue (docs/issue-qa.md → State)
@@ -191,8 +203,9 @@ claude mcp get e2e >/dev/null 2>&1 || claude mcp add --scope user e2e -- bash "$
 ```
 
 `env.sh init` runs the profile's `bin/env init` (it writes `work/env/credentials.env`).
-`suite.sh init` needs `registry.npmjs.org` — if it is held or denied, checklist item 4 is
-not done yet: ask the operator to apply the egress rules, then re-run this block. Write
+`suite.sh init` needs `registry.npmjs.org`, which the kit allows — refused there means the
+agent lacks the kit's rules: `egress-rules.sh --kit` lists them for the operator to add (item 4),
+then re-run this block. Write
 `- profile: <name>` into `work/CONFIG.md` first (Step 3 completes the file) — both
 scripts find the profile through it.
 
@@ -201,10 +214,15 @@ hook, the Stop backup hook and the deny list into `$HOME/.claude/settings.json` 
 kept; re-running changes nothing); they apply from the next session ([docs/black-box.md](docs/black-box.md)
 → **Enforcement layers**).
 
+**2f — a restored `work/` only: migrate.** `work/VERSION` ≠ `head -1 "$HOME/VERSION"` → run the
+migration now, before any run ([docs/persistence.md](docs/persistence.md) → **Definition version &
+upgrade**): the `CHANGELOG.md` **Upgrade** blocks after the restored version — the suite's among
+them — and the offer of the features they add.
+
 ## Step 3 — Configure (`work/CONFIG.md`, interactive)
 
-Key semantics: `CLAUDE.md` → **Runtime configuration** (read it first). Re-onboarding
-with an existing file → keep its values, ask only for missing keys. Ask, validate, write:
+Key semantics: `CLAUDE.md` → **Runtime configuration** (read it first). A restored or existing
+file → keep its values, show them once, and ask only for the keys it lacks. Ask, validate, write:
 
 1. **`profile`** — the name found in Step 2.
 2. **`target_repo`** — ask, write it, and validate with `bash "$HOME/scripts/github.sh" check`.
@@ -230,7 +248,11 @@ with an existing file → keep its values, ask only for missing keys. Ask, valid
    week (tens of thousands of tokens), `run` also tests them (a few hundred thousand per
    scenario). With discovery on and a channel connected, ask `scenario_channel` (its
    `C…` id; empty keeps the digest in chat).
-9. Everything else — defaults; show them and change only what the operator asks for. Offer
+9. **`e2e_model`** — `bash "$HOME/scripts/verify-onboarding.sh" --models` probes the configured
+   model and the ones the connection lists: keep the configured one when it answers, else offer
+   those that do and write the operator's pick. None answers → checklist item 7 (the
+   connection). Tick item 7 once one answers.
+10. Everything else — defaults; show them and change only what the operator asks for. Offer
    `lend_model: enabled` when the profile's `SKILL.md` names criteria only a real model makes
    testable (tokens per product AI step), and `live_browser` when `/etc/AGENTS.md` names the
    shared browser's CDP endpoint.
@@ -283,12 +305,19 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - slack_tests_per_day: 3
 
 - profile.chart_ref: oci://quay.io/dam-agents/charts/platform
-- profile.mock_image:
+- profile.mock_image: quay.io/dam-agents/mock:<sha>
 ```
 
 Then `bash "$HOME/scripts/verify-onboarding.sh" --config`, apply every `fix:`, and show the
-file to the operator — and the output of `bash "$HOME/scripts/egress-rules.sh"`, the egress
-commands checklist item 4 asks them to run.
+file to the operator.
+
+**The egress (checklist item 4).** `bash "$HOME/scripts/egress-rules.sh"` lists what this
+instance needs beyond the kit. Give the operator every `by-hand` row in its words — host,
+method, path, why: "add an allow rule in this agent's network settings" — never a command; no
+prompt ever appears for it. Then run `bash "$HOME/scripts/verify-onboarding.sh" --egress`: it
+requests every `prompt` rule, so its approval prompt opens for the operator — "Allow
+permanently" — and reports each rule allowed, refused (`FAIL`, the rule to add by hand) or
+held (approve, re-run). Re-run until it shows no `FAIL` and nothing held.
 
 ## Step 4 — Reconstruct `QA.md` (only when it has no rows and comments were used before)
 
@@ -317,7 +346,10 @@ Save the final listing to `/tmp/quality-inspector-schedules.json` for Step 7.
 
 ## Step 6 — Smoke-test the nested product
 
-The agent is useless until the product comes up, so this is a gate:
+The agent is useless until the product comes up, so this is a gate. Start only once
+`verify-onboarding.sh --egress` shows no `FAIL` (Step 3): a missing rule otherwise surfaces as a
+failed install. A wildcard host (`*.example`) prompts once per host it reaches during
+`env.sh up` — approve each as it appears.
 
 ```bash
 CAND=$(bash "$HOME/scripts/preflight.sh" issues | jq -r '.candidate // empty')
@@ -333,7 +365,8 @@ bash "$HOME/scripts/env.sh" unlock operator
   broke; a repeated proxy or pull failure usually means checklist item 4.
 - The smoke run fails in the setup test → adjust `work/suite/tests/auth.setup.e2e.ts`
   to what the nested sign-in really shows (keep its final checks), re-run.
-- The injection canary fails or is skipped → [docs/nested-env.md](docs/nested-env.md) → Failures.
+- The injection canary fails or is skipped → [docs/nested-env.md](docs/nested-env.md) → Failures; it
+  creates what the profile's `canary` names (docs/profile-contract.md).
 - An `agent.act` step fails with a model or provider error → checklist item 7: the
   `model_provider` line of `verify-onboarding.sh --live` names the cause
   ([docs/test-authoring.md](docs/test-authoring.md) → Model access); the operator fixes the
@@ -342,7 +375,7 @@ bash "$HOME/scripts/env.sh" unlock operator
 ## Step 7 — Version, sentinel, verify, release, report
 
 ```bash
-[ -f "$HOME/work/VERSION" ] || head -1 "$HOME/VERSION" > "$HOME/work/VERSION"   # a restored one is migrated
+[ -s "$HOME/work/VERSION" ] || head -1 "$HOME/VERSION" > "$HOME/work/VERSION"   # Step 2b wrote it; a restored one was migrated in 2f
 date -u +%Y-%m-%dT%H:%M:%SZ > "$HOME/.quality-inspector-onboarded"
 bash "$HOME/scripts/verify-onboarding.sh" --live --schedules /tmp/quality-inspector-schedules.json
 rm -f /tmp/quality-inspector-schedules.json

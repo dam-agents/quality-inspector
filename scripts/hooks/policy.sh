@@ -38,7 +38,7 @@
 #                                          the live definition included: a change to it is a patch
 #                                          (docs/self-modification.md §8)
 #   run-mode         Write Edit …          work/env/RUN_MODE (only the Precheck writes it)
-#   scheduled-def    Write Edit … (sched.) work/CONFIG.md
+#   scheduled-def    Write Edit … (sched.) work/CONFIG.md, work/OPERATOR.md (the operator's standing preferences)
 #   scheduled-git    Bash (scheduled)      git commit
 #   policy-tamper    Bash (scheduled)      any command naming RUN_MODE, scripts/hooks/ or .claude/settings
 #   channel-write    Bash (channel turn)   a command naming github.sh, comment or unlabel in any spelling
@@ -409,10 +409,13 @@ check_write() {
     && deny channel-write "$p" "a channel turn writes no file that names github.sh (docs/slack.md)"
   [ "$p" = "$WORK/env/RUN_MODE" ] && deny run-mode "$p" "only the schedule's Precheck writes the run marker"
   if under "$p" "$WORK"; then
-    [ "$p" = "$WORK/CONFIG.md" ] && scheduled && deny scheduled-def "$p" "a scheduled run never changes the configuration"
+    case "$p" in ("$WORK/CONFIG.md"|"$WORK/OPERATOR.md")
+      scheduled && deny scheduled-def "$p" "a scheduled run or a channel turn never changes the configuration or the operator's preferences";; esac
     return 0
   fi
   in_tmp_qi "$p" && return 0
+  case "$p" in ("$HOME"/.claude/projects/*/memory/*)
+    deny write-outside "$p" "the harness memory is outside work/ and never backed up: an operator preference goes to work/OPERATOR.md (docs/persistence.md → Operator preferences)";; esac
   deny write-outside "$p" "writes go to work/ or /tmp/quality-inspector-* only; a definition change is a patch (docs/self-modification.md §8)"
 }
 
