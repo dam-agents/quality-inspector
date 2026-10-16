@@ -7,6 +7,14 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.0.2 — 2026-10-16
+
+**Upgrade:**
+Nothing — the policy hook runs from the checkout. In a channel turn the `channel-write` rule
+is now a closed set: a command naming `github.sh`, `comment` or `unlabel` passes only as one
+plain `github.sh` call or one plain read-only command, and no file naming `github.sh` is
+written ([docs/slack.md](docs/slack.md)).
+
 ## 3.0.1 — 2026-10-16
 
 **Upgrade:**

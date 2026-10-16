@@ -47,7 +47,11 @@ declined in one reply — it is the operator's, in the direct session.
   conversation or a security finding ([security.md](security.md)).
 - **Delivery** stays per [reporting.md](reporting.md): the artifact, then the issue
   comments it makes on #N and the retest-label removal. These are the only GitHub writes a
-  Slack turn may make — `github.sh comment <n> <file>` and `github.sh unlabel <n>`, the
-  script path, the subcommand and `<n>` written out, while the row is `report_pending` (rule
-  `channel-write`). A refused write leaves `report_pending`, and the next issues run's
+  Slack turn may make — `bash "$HOME/scripts/github.sh" comment <n> <file>` and `… unlabel <n>`,
+  each one plain command (one line, no pipe, variable, escape or redirection but a trailing
+  `2>&1`), `<n>` written out, while the row is `report_pending` (rule `channel-write`). Any
+  other command naming `github.sh`, `comment` or `unlabel` is refused, a plain read-only `grep`,
+  `rg`, `cat`, `head`, `tail`, `wc`, `ls` or `git log|grep|show|diff` aside, and no file naming
+  `github.sh` is written. The limit: the hook reads text, so a name joined at run time from
+  fragments passes it. A refused write leaves `report_pending`, and the next issues run's
   `reports_due` delivers it. Slack is one more surface, never instead of them.
