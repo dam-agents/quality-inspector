@@ -91,4 +91,25 @@ assert "profile build listing failure is an error" '(.error | test("product buil
 out="$(bash "$SCRIPTS/preflight.sh" issues)"
 assert "missing target is an error" '(.error | test("target_repo"))' "$out"
 grep -q 'ERROR:' "$WORK_DIR/ISSUES.log" || { echo "  ISSUES.log has no ERROR line"; FAILED=1; }
+
+# The black-box gate: a probe that reaches source stops the run; the first finding wakes the
+# agent, the same one again declines, a Slack turn always hears it, a passing probe clears it.
+seed_work 5
+rm -f "$WORK_DIR/env/boundary.json"
+echo "HTTP/2.0 200 OK" > "$STUB_DIR/repo-acme_widgets_contents_.json"
+out="$(bash "$SCRIPTS/preflight.sh" issues)"
+assert "a breach stops the run and wakes the agent" '.nothing_to_do == false and (.boundary_breach | length) >= 1 and (has("issues_due") | not)
+  and (.boundary_breach[0] | test("^boundary:repos/acme/widgets/contents/ source surface reachable"))' "$out"
+assert "the gate keeps its finding" '.fails | length >= 1' "$(cat "$WORK_DIR/env/boundary.json")"
+out="$(bash "$SCRIPTS/preflight.sh" regression)"
+assert "the same breach declines quietly" '.nothing_to_do == true and (.boundary_breach | length) >= 1' "$out"
+out="$(bash "$SCRIPTS/preflight.sh" slack)"
+assert "a Slack turn always hears it" '.nothing_to_do == false and (.boundary_breach | length) >= 1' "$out"
+jq '.checked_epoch = 0' "$WORK_DIR/env/boundary.json" > "$SANDBOX/b" && mv "$SANDBOX/b" "$WORK_DIR/env/boundary.json"
+out="$(bash "$SCRIPTS/preflight.sh" issues)"
+assert "a stale cache re-probes; the same breach stays quiet" '.nothing_to_do == true and (.boundary_breach | length) >= 1' "$out"
+rm -f "$STUB_DIR/repo-acme_widgets_contents_.json"
+jq '.checked_epoch = 0' "$WORK_DIR/env/boundary.json" > "$SANDBOX/b" && mv "$SANDBOX/b" "$WORK_DIR/env/boundary.json"
+out="$(bash "$SCRIPTS/preflight.sh" issues)"
+assert "a passing probe clears the gate" '(has("boundary_breach") | not) and .mode == "issues"' "$out"
 exit $FAILED

@@ -22,6 +22,8 @@ MATCHER='Bash|Read|Glob|Grep|Write|Edit|MultiEdit|NotebookEdit|WebFetch|WebSearc
 # Defence in depth for what static patterns can express; policy.sh holds the full rules.
 DENY='["Bash(git clean:*)","Bash(kubectl exec:*)","Bash(kubectl cp:*)","Bash(k3s kubectl exec:*)",
 "Bash(k3s kubectl cp:*)","Bash(k3s ctr:*)","Bash(ctr:*)","Bash(crictl:*)",
+"Bash(gh:*)","Bash(git clone:*)","Bash(git pull:*)","Bash(git push:*)","Bash(git ls-remote:*)",
+"WebFetch(domain:github.com)","WebFetch(domain:api.github.com)","WebFetch(domain:gist.github.com)",
 "WebFetch(domain:raw.githubusercontent.com)","WebFetch(domain:codeload.github.com)",
 "Read(~/work/env/**/templates/**)","Read(//tmp/quality-inspector-chart-*/**)","Read(~/work/**/*.map)"]'
 

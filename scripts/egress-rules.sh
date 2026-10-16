@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# egress-rules.sh — print the `dam network create` commands this instance's black-box
-# boundary needs (docs/black-box.md → Egress rules): the target's rules, the work backup
-# repository's (`work_repo`) and the profile's `egress`. --kit adds the kit's own rules, which
-# an agent created from a kit older than 2.11.0 (or by hand) lacks; --source allows one more
-# skill source's repository on the target's GitHub host, which is otherwise deny-by-default.
-# Prints only — the operator runs them, with AGENT set to this agent's name; the probes of
-# `verify-onboarding.sh --live` then prove them.
+# egress-rules.sh — print the `dam network create` commands this instance needs beyond the
+# kit's (docs/black-box.md → Egress rules): the profile's `egress`, the work backup
+# repository's (`work_repo`), and — for a target on GitHub Enterprise — the shared GitHub
+# rules on that host. A github.com target needs nothing here: the kit's rules hold for every
+# target. --kit adds the kit's own rules, for an agent created by hand or from a kit before
+# 3.0.0. Prints only — the operator runs them, with AGENT set to this agent's name; the
+# black-box gate (scripts/preflight.sh) and `verify-onboarding.sh --live` then prove them.
 #
-#   egress-rules.sh [--kit] [--source <owner>/<repo>]…
+#   egress-rules.sh [--kit]
 
 set -u
 export LC_ALL=C
@@ -20,27 +20,14 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/profile.sh" || { echo "cannot source lib/profile.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/boundary.sh" || { echo "cannot source lib/boundary.sh" >&2; exit 1; }
 
-usage() { echo "usage: egress-rules.sh [--kit] [--source <owner>/<repo>]…" >&2; exit 2; }
-KIT=0; SOURCES=()
+usage() { echo "usage: egress-rules.sh [--kit]" >&2; exit 2; }
+KIT=0
 while [ $# -gt 0 ]; do
-  case "$1" in
-    (--kit) KIT=1;;
-    (--source) [ $# -ge 2 ] || usage
-      printf '%s' "$2" | grep -qE '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$' || usage
-      SOURCES+=("$2"); shift;;
-    (*) usage;;
-  esac
+  case "$1" in (--kit) KIT=1;; (*) usage;; esac
   shift
 done
 T="${QI_TARGET_REPO:-$(cfg target_repo)}"
 [ -n "$T" ] || { echo "target_repo is not configured (work/CONFIG.md)" >&2; exit 1; }
-for s in ${SOURCES[@]+"${SOURCES[@]}"}; do
-  [ "$(_bb_lower "$s")" = "$(_bb_lower "$(_bb_repo "$T")")" ] && {
-    echo "--source $s is the target: a profile there takes profile_source_path, never the whole repository" >&2; exit 2; }
-done
-PP="$(_bb_profile_path)"
-[ -z "$PP" ] || _bb_profile_path_ok "$PP" || {
-  echo "profile_source_path '$PP' is not a plain directory path (no * % ?, no . or .. segment): its allow would open more than the profile's directory" >&2; exit 2; }
 W="$(cfg work_repo)"
 [ -n "$W" ] && [ "$(_bb_host "$W")/$(_bb_repo "$W" | tr 'A-Z' 'a-z')" = "$(_bb_host "$T")/$(_bb_repo "$T" | tr 'A-Z' 'a-z')" ] \
   && { echo "work_repo is the target repository — refused (docs/persistence.md → Backup & restore)" >&2; exit 1; }
@@ -71,14 +58,19 @@ kit_rules() {
 
 echo ': "${AGENT:?set AGENT to this agent'"'"'s name}"'
 if [ "$KIT" = 1 ]; then
-  echo "# The kit's rules (kit.yaml) — already on an agent created from kit 2.11.0 or newer."
+  echo "# The kit's rules (kit.yaml) — already on an agent created from kit 3.0.0 or newer."
   while read -r v m h p; do cmd "$v" "$m" "$h" "$p"; done < <(kit_rules)
 else
-  echo "# The kit's rules (kit.yaml) are left out: an agent created by hand or from a kit before 2.11.0 lacks them — run with --kit."
+  echo "# The kit's rules (kit.yaml) are left out: an agent created by hand or from a kit before 3.0.0 lacks them — run with --kit."
 fi
-echo "# The target $T (docs/black-box.md → Egress rules)."
-while read -r v m h p; do cmd "$v" "$m" "$h" "$p"; done < <(boundary_rules "$T" ${SOURCES[@]+"${SOURCES[@]}"})
-_bb_definition >/dev/null || echo "# This definition's origin is unreadable: when it is on the target's host, allow its repository by hand (docs/black-box.md → Egress rules)."
+H="$(_bb_host "$T")"
+if [ "$H" = github.com ]; then
+  echo "# The target $T is on github.com: the kit's GitHub rules hold for it — nothing to add."
+else
+  echo "# The target $T is on $H: the shared GitHub rules on that host (docs/black-box.md → Egress rules)."
+  d=""; read -r dh dr < <(_bb_definition) && [ "$dh" = "$H" ] && d="$dr"
+  while read -r v m h p; do cmd "$v" "$m" "$h" "$p"; done < <(github_rules "$H" $d)
+fi
 if [ -n "$W" ]; then
   echo "# The work backup $W (docs/persistence.md → Backup & restore)."
   while read -r v m h p; do cmd "$v" "$m" "$h" "$p"; done < <(work_repo_rules)

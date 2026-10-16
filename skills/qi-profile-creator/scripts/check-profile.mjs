@@ -77,6 +77,10 @@ else warn('no core given (--core or QI_CORE) — engine and suite checks are ski
 dir = resolve(dir);
 if (!existsSync(dir) || !statSync(dir).isDirectory()) { fail(`no such profile directory: ${dir}`); finish(); }
 const name = basename(dir);
+// The kit's egress opens one directory of a repository, whichever: .quality-inspector/
+// (docs/profile-contract.md → Where it lives). A profile anywhere else cannot be installed.
+if (basename(dirname(dir)) === '.quality-inspector') pass(`location: .quality-inspector/${name}`);
+else warn(`location: ${basename(dirname(dir))}/${name} — the platform installs a profile only from .quality-inspector/<profile>/ of its repository`);
 const files = [];
 const rel = (f) => relative(dir, f);
 // A profile is fetched by directory: plain files only, so a symlink or a submodule fails.

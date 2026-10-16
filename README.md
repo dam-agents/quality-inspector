@@ -70,14 +70,15 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
    what its product needs.
 4. **Assign the product profile**: add its skill source (Skills → Sources) and assign the
    profile skill to the agent — for DAM, repository `https://github.com/dam-agents/dam`
-   with path `qa`, skill `qi-profile-dam` (in the target repository, so onboarding sets
-   `profile_source_path: qa`). Onboarding checks it. A product without a profile gets one
+   with path `.quality-inspector`, skill `qi-profile-dam`. A profile lives under
+   `.quality-inspector/` of its repository, the one directory the kit's egress opens.
+   Onboarding checks it. A product without a profile gets one
    from its team with the [`qi-profile-creator`](skills/qi-profile-creator/SKILL.md) skill.
 5. **Give the agent a model connection** (Anthropic API key, OAuth token, or a proxy such
    as LiteLLM). Agent steps send its placeholder, which the gateway swaps for the
    credential; *Inject only into addressed requests* stays on (the kit sets it). Onboarding
    checks it with one model call made the way the tests make it.
-6. **Apply the egress rules** (Black-box boundary below), then answer the onboarding
+6. **Apply the profile's egress rules** (Black-box boundary below), then answer the onboarding
    dialog. Schedules are held until onboarding completes, which includes a smoke test of
    the nested product.
 7. *Optional:* **connect a Slack channel** to the agent for scenario requests.
@@ -98,27 +99,28 @@ Create a vm-backend agent by hand, grant the GitHub connection, then send it:
 
 ## Black-box boundary
 
-The agent must not be able to read the target's source. Its rules say so
-([docs/black-box.md](docs/black-box.md)); the egress rules make it true. The kit seeds
-the ones every deployment shares: denies for GraphQL, code search and every code host
-the agent never needs (raw.githubusercontent.com, GitLab, Bitbucket, …). The target's
-rules depend on the instance, so onboarding prints them — `bash scripts/egress-rules.sh`
-— as `dam network create` commands, with the profile's `egress`; set `AGENT` to the
-agent's name and run them (`--kit` adds the kit's rules for an agent created by hand or
-from a kit before 2.11.0). They make the target's GitHub hosts deny-by-default, so a
-skill from another GitHub repository needs `--source <owner>/<repo>`; a profile inside the
-target gets no file outside its directory (`profile_source_path`). A rule counts only once
-a probe proves it:
-`verify-onboarding.sh --live` and the weekly audit request each forbidden surface and
-fail when one answers. Approve no held request on the deny side.
+The agent must not be able to read the target's source, and it has **no GitHub access of its
+own** ([docs/black-box.md](docs/black-box.md)). The kit's egress makes it true for every
+target, with no operator step and whatever the connection's token may read (the gateway
+injects it; the VM holds a placeholder): GitHub is deny-by-default, and only the issues
+endpoints, the `.quality-inspector/` profile directory, a repository's metadata and the
+read-only fetch of this definition open — for every repository alike, each allow fenced by
+two longer denies against wildcard tricks. Every other code host is denied. What stays the
+operator's, printed by `bash scripts/egress-rules.sh` as `dam network create` commands: the
+profile's `egress`, the `work_repo` backup, a GitHub Enterprise target (`--kit` adds the
+kit's rules for an agent created by hand or from a kit before 3.0.0 — a kit never updates an
+existing agent's rules). A rule counts only once a probe proves it: before each day's work
+the pre-flight's **black-box gate** requests each forbidden surface and stops every run while
+one answers; `verify-onboarding.sh --live` and the weekly audit report the same probes.
+Approve no held request on the deny side.
 
 Inside the VM, a Claude Code `PreToolUse` hook and a `permissions.deny` list, merged into
-`~/.claude/settings.json` at onboarding, refuse the same surfaces before a tool call runs
-(a repository by number, gists, a search that does not name the target and the other code
-hosts excepted: only the egress rules hold those) — plus `git clean`, container
-filesystems, writes outside `work/`, commits or definition edits from a scheduled run or a
-Slack turn, and any GitHub write from a Slack turn except a Slack-ordered "test #N"'s
-comment and retest-label removal on that issue
+`~/.claude/settings.json` at onboarding, refuse any road to GitHub but `scripts/github.sh`
+(the target's issues only) — no `gh`, no `git clone|fetch|push`, no GitHub URL; the
+platform's Kit Update `git fetch origin` excepted — plus `git clean`, container
+filesystems, writes outside `work/` (the agent proposes changes to itself as patches in
+`work/patches/`), commits from a scheduled run or a Slack turn, and any GitHub write from a
+Slack turn except a Slack-ordered "test #N"'s comment and retest-label removal on that issue
 ([docs/black-box.md](docs/black-box.md) → Enforcement layers).
 
 ## What a report looks like
@@ -163,7 +165,7 @@ configuration.
 | `profile` | chosen and installed | The product profile skill, e.g. `qi-profile-dam`. |
 | `profile.<key>` | asked or defaulted, per the profile | The profile's own settings ([docs/profile-contract.md](docs/profile-contract.md)). |
 | `target_repo` | asked | Repository whose issues are tested. `QI_TARGET_REPO` overrides. |
-| `profile_source_path` | asked when the profile lives in `target_repo` | Its skill source's path there (DAM: `qa`) — the one directory the egress opens. |
+| `github_login` | asked for a GitHub App connection, default empty | The agent's own login (`<slug>[bot]`) when the token cannot tell; it identifies the agent's own comments. |
 | `work_repo` | asked, default unset (local-only) | A private repository the Stop hook backs `work/` up to after every turn; a fresh volume or another pod restores from it ([docs/persistence.md](docs/persistence.md) → Backup & restore). |
 | `github_login` | asked for a GitHub App connection, default empty | The agent's own login (`<slug>[bot]`) when `gh api user` cannot answer; it identifies the agent's own comments. |
 | `issue_comments` | asked, default `disabled` | Opt-in: post verdicts on the issue. |

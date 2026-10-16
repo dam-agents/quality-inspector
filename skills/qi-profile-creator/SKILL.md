@@ -62,12 +62,13 @@ Phases in order. Write no profile files before the person approves the Phase 1 b
    when it holds `docs/profile-contract.md` (the skill ships inside the definition);
    else ask for the definition's repository and `git clone --depth 1` it into a scratch
    directory. Read `docs/profile-contract.md`, list `engines/*/README.md`, note `VERSION`.
-3. **Find the product and the profile's home.** Default: the current repository, profile
-   at `qa/qi-profile-<product-slug>/` — the directory name is the skill name. Ask when the
-   working directory is not the product's repository, or when the profile belongs
-   elsewhere (a product the team does not own → a separate profiles repository). Inside
-   the target repository the agent fetches only that directory: plain directory names in
-   its path, no symlink or submodule in it (`docs/profile-contract.md` → Where it lives).
+3. **Find the product and the profile's home.** Always `.quality-inspector/qi-profile-<product-slug>/`
+   — the directory name is the skill name, and `.quality-inspector/` is the one directory of
+   a repository the agent's egress opens, so a profile anywhere else cannot be installed.
+   Default: the current repository. Ask when the working directory is not the product's
+   repository, or when the profile belongs elsewhere (a product the team does not own → a
+   separate profiles repository, same `.quality-inspector/` directory). No symlink or
+   submodule in it (`docs/profile-contract.md` → Where it lives).
 4. **An existing profile → update mode.** Read all of it, run the checker (Phase 4) to see
    where it stands, and change only what was asked. Keep `config` key names stable: an
    instance's `work/CONFIG.md` holds `profile.<key>` bullets, and a renamed key is unknown
@@ -150,12 +151,11 @@ agent's onboarding smoke test is their first real run — say so.
    repository does; never push without asking.
 2. Give the person the operator's steps, pointing at the core's `README.md` → Setup and
    → Black-box boundary instead of restating them:
-   - add a skill source — this repository, `path` = the profile's parent directory — and
-     assign the profile skill to the agent;
+   - add a skill source — this repository, `path` `.quality-inspector` — and assign the
+     profile skill to the agent; the kit's egress already opens that directory, so the
+     profile needs no rule of its own;
    - the egress rules that `scripts/egress-rules.sh` prints (`docs/black-box.md` → Egress
-     rules): in the **target** repository, with that `path` as `profile_source_path` in
-     `work/CONFIG.md`; in a separate profiles repository, with
-     `--source <owner>/<repo>`. They include every `egress` entry of `profile.json`;
+     rules) — every `egress` entry of `profile.json`;
    - a deny for every `boundary.urls` entry;
    - the `profile.<key>` values onboarding will ask for.
 3. Say in three lines what the QA agent will treat as untestable (the "cannot do" list),

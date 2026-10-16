@@ -117,34 +117,131 @@ schedules:
       Weekly self-audit. Run `bash "$HOME/scripts/preflight.sh" audit`, then follow
       CLAUDE.md → "Audit run": read docs/audit.md and report.
 
-# Rules every deployment shares; the target-specific ones are the operator's
-# (`bash scripts/egress-rules.sh` prints them), because the target is an instance value.
-# The `trusted` preset and the GitHub connection allow github.com, api.github.com,
+# The black-box boundary, the same for every target (docs/black-box.md → Egress rules): GitHub
+# is deny-by-default, and what opens opens for every repository alike — the issues endpoints,
+# the profile directory `.quality-inspector/`, a repository's metadata and head ref, and the
+# read-only git fetch of this definition (seed and Kit Update). No rule names the target, so
+# no operator step is needed; the black-box gate in scripts/preflight.sh proves them before
+# every day's work. The block between the markers is `github_rules github.com
+# dam-agents/quality-inspector` of scripts/lib/boundary.sh, verbatim (validate-definition.sh
+# compares). The `trusted` preset and the GitHub connection allow github.com, api.github.com,
 # codeload, raw, gitlab.com and codeberg.org host-wide (method and path "*") before these
-# rules are written, and a kit rule that contradicts a rule already there fails the
-# apply. So every deny names a path — "/*" for a whole host — which also outranks their
-# "*" (docs/black-box.md → Egress rules).
+# rules are written, and a kit rule that contradicts a rule already there fails the apply.
+# So every deny names a path — "/*" for a whole host — which also outranks their "*".
 egressPreset: trusted
 egressRules:
   - host: registry.npmjs.org
     method: GET
   - host: api.anthropic.com
-  # Read any repository's code, whatever the target.
+  # >>> github_rules
   - host: api.github.com
-    pathPattern: "/graphql*"
+    pathPattern: "/*"
     verdict: deny
   - host: api.github.com
-    pathPattern: "/search/code*"
+    method: GET
+    pathPattern: "/user"
+  - host: api.github.com
+    method: GET
+    pathPattern: "/repos/*/*"
+  - host: api.github.com
+    method: GET
+    pathPattern: "/repos/*/*/*"
     verdict: deny
   - host: api.github.com
-    pathPattern: "/search/commits*"
+    method: GET
+    pathPattern: "/repos/*_2F*"
     verdict: deny
   - host: api.github.com
-    pathPattern: "/repositories/*"
+    method: GET
+    pathPattern: "/repos/*/*/issues*"
+  - host: api.github.com
+    method: GET
+    pathPattern: "/repos/*/*/*/issues*"
     verdict: deny
   - host: api.github.com
-    pathPattern: "/gists*"
+    method: GET
+    pathPattern: "/repos/*_2F*/issues*"
     verdict: deny
+  - host: api.github.com
+    method: POST
+    pathPattern: "/repos/*/*/issues/*/comments"
+  - host: api.github.com
+    method: POST
+    pathPattern: "/repos/*/*/*/issues/*/comments"
+    verdict: deny
+  - host: api.github.com
+    method: POST
+    pathPattern: "/repos/*_2F*/issues/*/comments"
+    verdict: deny
+  - host: api.github.com
+    method: DELETE
+    pathPattern: "/repos/*/*/issues/*/labels/*"
+  - host: api.github.com
+    method: DELETE
+    pathPattern: "/repos/*/*/*/issues/*/labels/*"
+    verdict: deny
+  - host: api.github.com
+    method: DELETE
+    pathPattern: "/repos/*_2F*/issues/*/labels/*"
+    verdict: deny
+  - host: api.github.com
+    method: GET
+    pathPattern: "/repos/*/*/contents/.quality-inspector/*"
+  - host: api.github.com
+    method: GET
+    pathPattern: "/repos/*/*/*/contents/.quality-inspector/*"
+    verdict: deny
+  - host: api.github.com
+    method: GET
+    pathPattern: "/repos/*_2F*/contents/.quality-inspector/*"
+    verdict: deny
+  - host: api.github.com
+    method: GET
+    pathPattern: "/repos/*/*/contents/.quality-inspector?*"
+  - host: api.github.com
+    method: GET
+    pathPattern: "/repos/*/*/*/contents/.quality-inspector?*"
+    verdict: deny
+  - host: api.github.com
+    method: GET
+    pathPattern: "/repos/*_2F*/contents/.quality-inspector?*"
+    verdict: deny
+  - host: api.github.com
+    method: GET
+    pathPattern: "/repos/*/*/git/refs/heads/*"
+  - host: api.github.com
+    method: GET
+    pathPattern: "/repos/*/*/*/git/refs/heads/*"
+    verdict: deny
+  - host: api.github.com
+    method: GET
+    pathPattern: "/repos/*_2F*/git/refs/heads/*"
+    verdict: deny
+  - host: api.github.com
+    method: GET
+    pathPattern: "/repos/*/*/issues/*/timeline*"
+    verdict: deny
+  - host: api.github.com
+    method: GET
+    pathPattern: "/repos/*/*/issues/*/events*"
+    verdict: deny
+  - host: api.github.com
+    method: GET
+    pathPattern: "/repos/*/*/issues/events*"
+    verdict: deny
+  - host: github.com
+    pathPattern: "/*"
+    verdict: deny
+  - host: github.com
+    method: GET
+    pathPattern: "/dam-agents/quality-inspector*/info/refs?service=git-upload-pack"
+  - host: github.com
+    method: POST
+    pathPattern: "/dam-agents/quality-inspector*/git-upload-pack"
+  - host: codeload.github.com
+    pathPattern: "/*"
+    verdict: deny
+  # <<< github_rules
   # Code hosts this agent never needs.
   - host: raw.githubusercontent.com
     pathPattern: "/*"

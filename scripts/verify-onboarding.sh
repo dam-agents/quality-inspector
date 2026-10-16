@@ -145,10 +145,10 @@ if [ -f "$CONFIG" ]; then
   t="$(cfg target_repo)"
   printf '%s' "$t" | grep -qE '^([A-Za-z0-9.-]+/)?[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' \
     && ok cfg:target_repo "set" || fail cfg:target_repo "missing or not [host/]owner/repo" "ask the operator (ONBOARDING.md Step 3)"
-  v="$(_bb_profile_path)"
-  if [ -z "$v" ]; then ok cfg:profile_source_path "empty — the profile lives outside target_repo"
-  elif _bb_profile_path_ok "$v"; then ok cfg:profile_source_path "$v"
-  else fail cfg:profile_source_path "'$v' is not a plain directory path" "set the skill source's path in target_repo (no * % ?, no . or .. segment), or leave it empty"; fi
+  # Obsolete since 3.0.0: a profile lives under .quality-inspector/ in any repository, opened by the kit.
+  if [ -n "$(cfg profile_source_path)" ]; then
+    warn cfg:profile_source_path "obsolete since 3.0.0 — the profile lives under $PROFILE_SOURCE_DIR/ (docs/profile-contract.md → Where it lives); delete the line"
+  fi
   w="$(cfg work_repo)"
   if [ -z "$w" ]; then ok cfg:work_repo "unset — work/ is local-only"
   elif ! printf '%s' "$w" | grep -qE '^([A-Za-z0-9.-]+/)?[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'; then
@@ -212,13 +212,12 @@ fi
 
 # --------------------------------------------------------------------- live
 if [ "$LIVE" = 1 ]; then
-  T="${QI_TARGET_REPO:-$(cfg target_repo)}"; HA=(); RP="$T"
-  if [ "$(printf '%s' "$T" | tr -cd '/' | wc -c | tr -d ' ')" = 2 ]; then HA=(--hostname "${T%%/*}"); RP="${T#*/}"; fi
-  GL="$(cfg github_login)"; login="$(agent_login ${HA[@]+"${HA[@]}"})"
+  T="${QI_TARGET_REPO:-$(cfg target_repo)}"
+  GL="$(cfg github_login)"; login="$(bash "$SCRIPT_DIR/github.sh" whoami 2>/dev/null)"
   [ -n "$login" ] && ok github_identity "acting as $login${GL:+ (github_login)}" \
-    || fail github_identity "gh api user failed" "grant the GitHub connection to this agent (README → Setup); a GitHub App token: set github_login to its <slug>[bot]"
-  timeout 20 gh api ${HA[@]+"${HA[@]}"} "repos/$RP/issues?per_page=1" >/dev/null 2>&1 \
-    && ok issues_read "target issues readable" || fail issues_read "cannot list target issues" "check target_repo and the connection's repository access"
+    || fail github_identity "github.sh whoami failed" "grant the GitHub connection to this agent (README → Setup); a GitHub App token: set github_login to its <slug>[bot]"
+  bash "$SCRIPT_DIR/github.sh" check >/dev/null 2>&1 \
+    && ok issues_read "target issues readable" || fail issues_read "cannot list target issues" "check target_repo, the connection's repository access and the kit's egress (bash scripts/egress-rules.sh --kit)"
   while read -r status id detail; do
     case "$status" in
       (fail) fail "$id" "${detail%% — *}" "$(boundary_fix "$detail")";;

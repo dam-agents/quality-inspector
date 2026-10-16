@@ -10,8 +10,8 @@ TODO(profile): a bullet for `bin/` and any file it ships, or delete this line.
 
 ## Delivery
 
-The inspector's operator adds this repository as a skill source with path `<fill: the profile's parent directory>` and assigns `<fill: profile name>`.
-When this repository is also the inspector's target, that path is the instance's `profile_source_path`; otherwise the operator runs quality-inspector `scripts/egress-rules.sh --source <fill: owner/repo>`. Either way the rules are the ones `scripts/egress-rules.sh` prints (quality-inspector `docs/black-box.md` → Egress rules). Keep symlinks and submodules out of this directory.
+The inspector's operator adds this repository as a skill source with path `.quality-inspector` and assigns `<fill: profile name>`.
+The profile stays in `.quality-inspector/`: the one directory of a repository the inspector's egress opens, so it needs no rule of its own (quality-inspector `docs/black-box.md` → Egress rules). Keep symlinks and submodules out of this directory.
 
 ## Channels
 

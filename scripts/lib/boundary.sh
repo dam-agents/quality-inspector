@@ -13,12 +13,9 @@ _bb_lower() { printf '%s' "$1" | tr 'A-Z' 'a-z'; }
 # The target's owner and name in the other case: GitHub resolves them case-insensitively,
 # and only a gateway with case-blind GitHub denies (dam-agents/dam#4909) refuses each form.
 _bb_swapcase() { printf '%s' "$1" | tr 'a-zA-Z' 'A-Za-z'; }
-# profile_source_path, without leading or trailing slashes; empty = the profile lives
-# outside the target repository.
-_bb_profile_path() { cfg profile_source_path | sed -e 's|^/*||' -e 's|/*$||'; }
-# A plain directory path: a pattern character (* % ? …) or a . or .. segment in an allow
-# rule opens more than the profile's directory.
-_bb_profile_path_ok() { printf '%s' "$1" | grep -qE '^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$' && ! printf '/%s/' "$1" | grep -qE '/\.\.?/'; }
+# The directory a profile lives in, in whichever repository (docs/profile-contract.md →
+# Where it lives): the one path of a repository the egress opens, for the platform's install.
+PROFILE_SOURCE_DIR=.quality-inspector
 # This definition's repository as "<host> <owner>/<repo>", from the checkout's origin
 # (https or scp-style); QI_DEFINITION_REPO (<host>/<owner>/<repo>) overrides.
 _bb_definition() {
@@ -29,79 +26,76 @@ _bb_definition() {
   printf '%s %s\n' "${u%%/*}" "${u#*/}"
 }
 
-# The target's egress rules, one "<verdict> <method> <host> <path pattern>" per line; the
-# label rule names the retest label only, URL-encoded. Rules are matched most specific
-# first: the exact host, then a named method over '*', then a path over '*', then the
-# longer path — so every deny that must beat a GET allow is a GET rule itself.
-# The target's GitHub hosts are deny-by-default: the connection allows every repository
-# the token — or anyone, for a public target — can read, forks and other-case spellings
-# of the target included, so only an allowlist holds. Allowed: the target's issues, the
-# profile's directory (profile_source_path), this definition's repository and the other
-# skill sources named.
-boundary_rules() { # <target> [<owner>/<repo> of another skill source…]
-  local h r api p l pp dh dr s
-  h="$(_bb_host "$1")"; r="$(_bb_repo "$1")"; shift
-  api="$(_bb_api_host "$h")"; p="$(_bb_api_prefix "$h")"; pp="$(_bb_profile_path)"
-  l="$(cfg retest_label)"; l="$(jq -rn --arg l "${l:-qa:retest}" '$l | @uri')"
-  cat <<EOF
-allow GET $api $p/user
-allow GET $api $p/repos/$r/issues*
-allow POST $api $p/repos/$r/issues/*/comments*
-allow DELETE $api $p/repos/$r/issues/*/labels/$l
-deny GET $api $p/repos/$r/issues/*/timeline*
-deny GET $api $p/repos/$r/issues/*/events*
-deny GET $api $p/repos/$r/issues/events*
-EOF
-  # The platform fetches a skill by directory when the archive is denied and this path
-  # is not: `contents/<path>?ref=…`, then everything below `<path>/`. Its scan of a
-  # private source reads the head from the default branch's ref (repository metadata,
-  # then one SHA), never from the head commit, whose diff shows files outside the path.
-  [ -n "$pp" ] && _bb_profile_path_ok "$pp" && printf 'allow GET %s %s\n' \
-    "$api" "$p/repos/$r/contents/$pp/*" "$api" "$p/repos/$r/contents/$pp?*" \
-    "$api" "$p/repos/$r" "$api" "$p/repos/$r/git/refs/heads/*"
-  if read -r dh dr < <(_bb_definition) && [ "$dh" = "$h" ] && [ "$(_bb_lower "$dr")" != "$(_bb_lower "$r")" ]; then
-    printf 'allow * %s %s\nallow * %s %s\nallow * %s %s\n' "$api" "$p/repos/$dr/*" "$h" "/$dr/*" "$h" "/$dr.git/*"
-  fi
-  for s in "$@"; do
-    [ "$(_bb_lower "$s")" = "$(_bb_lower "$r")" ] && continue
-    echo "allow GET $api $p/repos/$s/*"
-    if [ "$h" = github.com ]; then echo "allow GET codeload.github.com /$s/*"
-    else printf 'allow GET %s %s\nallow GET %s %s\n' "$h" "/_codeload/$s/*" "codeload.$h" "/$s/*"; fi
-  done
+# The GitHub egress every deployment shares, one "<verdict> <method> <host> <path pattern>"
+# per line, on one GitHub host: the kit carries it for github.com (validate-definition.sh
+# compares), egress-rules.sh prints it for a GitHub Enterprise target. No rule names the
+# target — the host is deny-by-default, and what opens opens for every repository alike: the
+# issues endpoints, the profile directory and a repository's metadata and head ref (the
+# platform's install and scan). The platform matches by the exact host, then a named method
+# over '*', then the longer path, with '*' as SQL LIKE '%', which spans '/' and the query
+# string. So every allow `/repos/*/*<rest>` gets two denies two characters longer, which
+# leave it only the request it is for: `/repos/*/*/*<rest>` (<rest> after a third segment —
+# a code path carrying <rest> in its query) and `/repos/*_2F*<rest>` (an encoded slash in
+# owner or repo). Two rules of equal length have no order, hence never +1. A <definition>
+# adds the read-only git fetch of this definition's repository: the platform's seed and Kit
+# Update run `git fetch origin` in the agent (docs/persistence.md → Definition version).
+github_rules() { # <host> [<owner>/<repo> of this definition]
+  local h="$1" d="${2:-}" api p m rest
+  api="$(_bb_api_host "$h")"; p="$(_bb_api_prefix "$h")"
   echo "deny * $api /*"
+  echo "allow GET $api $p/user"
+  while read -r m rest; do
+    printf '%s %s %s %s\n' allow "$m" "$api" "$p/repos/*/*$rest" \
+      deny "$m" "$api" "$p/repos/*/*/*$rest" deny "$m" "$api" "$p/repos/*_2F*$rest"
+  done <<EOF
+GET
+GET /issues*
+POST /issues/*/comments
+DELETE /issues/*/labels/*
+GET /contents/$PROFILE_SOURCE_DIR/*
+GET /contents/$PROFILE_SOURCE_DIR?*
+GET /git/refs/heads/*
+EOF
+  # Issue timelines and events name the commits that closed them.
+  printf 'deny GET %s %s\n' "$api" "$p/repos/*/*/issues/*/timeline*" "$api" "$p/repos/*/*/issues/*/events*" \
+    "$api" "$p/repos/*/*/issues/events*"
   [ "$api" = "$h" ] || echo "deny * $h /*"
+  [ -n "$d" ] && printf 'allow GET %s %s\nallow POST %s %s\n' \
+    "$h" "/$d*/info/refs?service=git-upload-pack" "$h" "/$d*/git-upload-pack"
   if [ "$h" = github.com ]; then echo "deny * codeload.github.com /*"
   else printf 'deny * raw.%s /*\ndeny * codeload.%s /*\n' "$h" "$h"; fi
 }
 
 # The rules of the work backup repository (work_repo; docs/persistence.md → Backup & restore),
 # same line format; nothing when it is unset. Only what work-backup.sh requests: the
-# repository's metadata and the git fetch and push. Their paths are longer than the
-# deny-by-default `/*` of the target's GitHub hosts, so they win; the git rule's method `*`
-# loses to no GET deny there.
+# repository's metadata and the git fetch and push. The metadata allow is the shared one;
+# the git rule is longer than the host's deny-by-default `/*`.
 work_repo_rules() {
-  local w h r api p
+  local w h r
   w="$(cfg work_repo)"; [ -n "$w" ] || return 0
-  h="$(_bb_host "$w")"; r="$(_bb_repo "$w")"; api="$(_bb_api_host "$h")"; p="$(_bb_api_prefix "$h")"
-  printf 'allow GET %s %s\nallow * %s %s\n' "$api" "$p/repos/$r" "$h" "/$r.git/*"
+  h="$(_bb_host "$w")"; r="$(_bb_repo "$w")"
+  printf 'allow * %s %s\n' "$h" "/$r.git/*"
 }
 
 # The probes, one "<kind> <target>" per line: gh <api path> (GET), gql (a GraphQL call),
-# url <url>. {issue} stands for a real issue number, {id} for repository number 1.
+# url <url>. {issue} stands for a real issue number, {id} for repository number 1. Besides
+# each surface, the shapes that would slip a code path past the shared allows: <rest> of an
+# allow in a query string, an encoded slash, a dot segment out of the profile directory.
 boundary_targets() { # <target>
-  local h r R pp dir p
-  h="$(_bb_host "$1")"; r="$(_bb_repo "$1")"; R="$(_bb_swapcase "$r")"; pp="$(_bb_profile_path)"
+  local h r R pd="$PROFILE_SOURCE_DIR" dir p
+  h="$(_bb_host "$1")"; r="$(_bb_repo "$1")"; R="$(_bb_swapcase "$r")"
   printf '%s\n' "gh repos/$r/contents/" "gh repos/$R/contents/" "gh repos/$r/pulls?per_page=1" \
-    "gh repos/$r/commits?per_page=1" "gh repos/$r/git/refs/heads" "gh repos/$r/issues/{issue}/timeline" \
-    "gh repos/$r/issues/{issue}/TIMELINE" \
+    "gh repos/$r/commits?per_page=1" "gh repos/$r/git/refs/heads" "gh repos/$r/tarball/HEAD" \
+    "gh repos/$r/issues/{issue}/timeline" "gh repos/$r/issues/{issue}/TIMELINE" \
     "gh repos/$r/issues/{issue}/events" "gh repos/$r/issues/events?per_page=1" \
+    "gh repos/$r/contents/README.md?x=/issues" "gh repos/$r/contents/README.md?x=/contents/$pd/x" \
+    "gh repos/${r%%/*}%2F${r#*/}%2Fcontents%2FREADME.md" "gh repos/$r/contents/$pd/.." "gh repos/$r/contents/$pd/%2e%2e" \
     "gh search/code?q=repo:$r+a&per_page=1" "gh repositories/{id}/contents/" "gql graphql" \
     "url https://$h/$r/archive/HEAD.tar.gz" "url https://$h/$R/archive/HEAD.tar.gz" \
+    "url https://$h/$r.git/info/refs?service=git-upload-pack" \
     "url https://gitlab.com/" "url https://codeberg.org/"
   [ "$h" = github.com ] && printf '%s\n' "url https://raw.githubusercontent.com/$r/HEAD/README.md" \
     "url https://codeload.github.com/$r/tar.gz/HEAD" "url https://codeload.github.com/$R/tar.gz/HEAD"
-  # Out of the profile's directory by a dot segment, which the contents API resolves.
-  [ -n "$pp" ] && _bb_profile_path_ok "$pp" && printf '%s\n' "gh repos/$r/contents/$pp/.." "gh repos/$r/contents/$pp/%2e%2e"
   dir="$(profile_dir)" && [ -f "$dir/profile.json" ] || return 0
   jq -r '.boundary.github_paths[]? // empty' "$dir/profile.json" | while read -r p; do printf 'gh repos/%s/%s\n' "$r" "${p#/}"; done
   jq -r '.boundary.urls[]? // empty' "$dir/profile.json" | sed "s|{repo}|$r|g; s|^|url |"
@@ -114,10 +108,11 @@ boundary_probe() { # <target>
   h="$(_bb_host "$1")"; r="$(_bb_repo "$1")"
   [ "$h" = github.com ] || ha=(--hostname "$h")
   issue="$(_bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} "repos/$r/issues?state=all&per_page=1" --jq '.[0].number // empty' 2>/dev/null)"
+  case "$issue" in (''|*[!0-9]*) issue=1;; esac
   # {id} is repository 1, public on github.com: the /repositories/* deny is host-wide, and
   # the target's own id needs GET /repos/<T>, which is not an issues endpoint.
   while read -r kind target; do
-    target="$(printf '%s' "$target" | sed "s/{issue}/${issue:-1}/g; s/{id}/1/g")"
+    target="$(printf '%s' "$target" | sed "s/{issue}/$issue/g; s/{id}/1/g")"
     case "$kind" in
       (gh)  out="$({ _bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} -i "$target" </dev/null 2>/dev/null; echo "rc=$?"; } | sed -n '1p;$p')" ;;
       (gql) out="$({ _bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} -i graphql -f query='{viewer{login}}' </dev/null 2>/dev/null; echo "rc=$?"; } | sed -n '1p;$p')"
@@ -129,7 +124,7 @@ boundary_probe() { # <target>
     case "$code" in (''|000) case "$rc" in (124|28) code=held;; (*) code=000;; esac;; esac
     label="boundary:${target%%\?*}"
     case "$code:$target" in
-      (2??:*/..|2??:*%2e%2e) echo "fail $label source surface reachable (HTTP $code): the gateway does not deny dot segments (dam-agents/dam#4909), so the profile allows open the whole repository — empty profile_source_path, delete the profile allows, and report the gateway to the platform";;
+      (2??:*/..|2??:*%2e%2e) echo "fail $label source surface reachable (HTTP $code): the gateway does not deny dot segments (dam-agents/dam#4909), so the profile directory allow opens the whole repository — report the gateway to the platform";;
       (2??:*/TIMELINE) echo "fail $label source surface reachable (HTTP $code): the gateway matches a GitHub deny only in exact case — report the gateway to the platform (dam-agents/dam#4909)";;
       (2??:*|3??:*) echo "fail $label source surface reachable (HTTP $code)";;
       (403:*|000:*) echo "ok $label refused";;
@@ -137,27 +132,26 @@ boundary_probe() { # <target>
       (*)       echo "warn $label answered HTTP $code, not the gateway's refusal — the deny is unproven";;
     esac
   done < <(boundary_targets "$1")
-  # The one read the platform needs in the target: the profile's directory, requested as the
-  # platform requests it — `<path>?ref=…`; the rules allow `<path>?*`, not `<path>` alone.
-  local pp; pp="$(_bb_profile_path)"; [ -n "$pp" ] || return 0
-  _bb_profile_path_ok "$pp" || { echo "fail profile_source profile_source_path '$pp' is not a plain directory path — set the skill source's path in target_repo (no * % ?, no . or .. segment), or leave it empty"; return 0; }
-  code="$(_bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} -i "repos/$r/contents/$pp?ref=HEAD" </dev/null 2>/dev/null | awk '/^HTTP\//{print $2; exit}')"
+  # The target's profile directory, when it has one, must serve only its own files: the
+  # contents API answers a symlink with its target.
+  code="$(_bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} -i "repos/$r/contents/$PROFILE_SOURCE_DIR?ref=HEAD" </dev/null 2>/dev/null | awk '/^HTTP\//{print $2; exit}')"
   case "$code" in
     (2??) ;;
-    (*) echo "fail profile_source repos/$r/contents/$pp?ref=HEAD not readable (HTTP ${code:-none}), so the platform cannot (re)install the profile — apply the profile allows bash scripts/egress-rules.sh prints, and check profile_source_path against the skill source's path"; return 0;;
+    (404) echo "ok profile_source the target holds no $PROFILE_SOURCE_DIR directory"; return 0;;
+    (*) echo "warn profile_source repos/$r/contents/$PROFILE_SOURCE_DIR?ref=HEAD answered HTTP ${code:-none} — the platform cannot install a profile from the target"; return 0;;
   esac
   local scan foreign unread
-  scan="$(_bb_foreign_files "$r" "$pp")"
+  scan="$(_bb_foreign_files "$r" "$PROFILE_SOURCE_DIR")"
   foreign="$(printf '%s\n' "$scan" | sed -n 's/^foreign //p' | tr '\n' ' ')"
   unread="$(printf '%s\n' "$scan" | sed -n 's/^unreadable //p' | tr '\n' ' ')"
   if [ -n "$foreign" ]; then
-    echo "fail profile_source $pp serves content from elsewhere in the repository (the contents API answers a symlink with its target): ${foreign% } — remove those symlinks and submodules in the profile's repository"
+    echo "fail profile_source $PROFILE_SOURCE_DIR serves content from elsewhere in the repository (the contents API answers a symlink with its target): ${foreign% } — remove those symlinks and submodules in the target repository"
   elif [ -n "$unread" ]; then
     echo "warn profile_source could not list or read ${unread% } — symlinks there are unchecked"
   elif printf '%s\n' "$scan" | grep -qx truncated; then
-    echo "warn profile_source $pp is too large to check for symlinks"
+    echo "warn profile_source $PROFILE_SOURCE_DIR is too large to check for symlinks"
   else
-    echo "ok profile_source repos/$r/contents/$pp?ref=HEAD readable, every file its own — the platform fetches only this directory"
+    echo "ok profile_source repos/$r/contents/$PROFILE_SOURCE_DIR?ref=HEAD every file its own"
   fi
 }
 
@@ -165,7 +159,7 @@ boundary_probe() { # <target>
 boundary_fix() { # <detail>
   case "$1" in
     (*' — '*) printf '%s\n' "${1#* — }";;
-    (*) echo "the operator applies the rules bash scripts/egress-rules.sh prints (docs/black-box.md → Egress rules)";;
+    (*) echo "the agent's egress lacks the kit's GitHub rules: recreate it from the kit, or have the operator apply what bash scripts/egress-rules.sh --kit prints (docs/black-box.md → Egress rules)";;
   esac
 }
 

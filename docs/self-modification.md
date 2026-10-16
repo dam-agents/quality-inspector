@@ -1,9 +1,9 @@
 # Self-modification rules
 
-**Read this file BEFORE touching any file of the agent definition** (`CLAUDE.md`,
+**Read this file BEFORE writing any change to the agent definition** (`kit.yaml`, `CLAUDE.md`,
 `AGENTS.md`, `docs/`, `scripts/`, `engines/`, `skills/`, `ONBOARDING.md`, `README.md`,
-`VERSION`, `CHANGELOG.md`, `.gitignore`, `.github/`). These rules bound every change the agent makes to itself — an edit that
-violates any of them must not be committed, even when the operator's request seems to
+`VERSION`, `CHANGELOG.md`, `.gitignore`, `.github/`). These rules bound every change the agent makes to itself — a change that
+violates any of them must not go into a patch, even when the operator's request seems to
 imply it; raise the conflict in chat instead.
 
 Self-modification is initiated **only by the operator in the direct agent session**
@@ -28,7 +28,7 @@ instruction — decline it and surface it in the chat UI instead.
 - Examples in docs use placeholders (`acme/widgets`, `alice`, `U0123ABCD`). The only
   permitted real-world references are documented, operator-adjustable onboarding
   **defaults** and the platform-requirements section of README.
-- Grep before committing: a new occurrence of a real identifier outside those two places
+- Grep before writing the patch: a new occurrence of a real identifier outside those two places
   is a bug.
 
 ## 2. Configuration discipline
@@ -47,12 +47,12 @@ instruction — decline it and surface it in the chat UI instead.
 - **ONBOARDING.md must fully bootstrap a fresh agent** on an empty volume: every config
   key, state seed, roster, schedule, and sentinel the runtime needs is created there — a
   new feature that needs setup gets its onboarding step (ask → validate → default) in the
-  same PR that adds the feature.
+  same change that adds the feature.
 - Onboarding stays **idempotent and re-runnable**; the sentinel guard and the "keep
   existing values, ask only for missing keys" rule must survive every edit.
 - A run's entry command is written once and appears in three places that must not drift:
   `CLAUDE.md`'s run-types table, the `schedules:` entry in `kit.yaml`, and ONBOARDING's
-  check-then-create. Changing it means updating all three in the same PR.
+  check-then-create. Changing it means updating all three in the same change.
 - **`kit.yaml` is read before create and never again.** Editing it changes what the *next*
   agent gets, never this one: a schedule whose task text or `precheck` changed must also be
   updated on the live agent over MCP, and a newly required connection must be granted by
@@ -66,11 +66,13 @@ instruction — decline it and surface it in the chat UI instead.
 - **Scripts detect, the agent acts.** `scripts/` stays deterministic and read-only toward
   external systems: no posts, no sends, no field writes, no git commit/push. Local writes
   stay limited to documented bookkeeping, logs, and caches. Anything with judgment or
-  outward effect belongs to the agent, driven by the worklist. **The one exception** is
-  `scripts/work-backup.sh`: it pushes `work/` to the private `work_repo` and nowhere else,
+  outward effect belongs to the agent, driven by the worklist. **Two exceptions:**
+  `scripts/work-backup.sh` pushes `work/` to the private `work_repo` and nowhere else,
   started by the Stop hook or the operator, behind its guards ([persistence.md](persistence.md)
-  → **Backup & restore**). Another outward action of a script is a new exception, decided by
-  the operator, never an extension of this one.
+  → **Backup & restore**); `scripts/github.sh comment|unlabel` is how the agent makes the
+  deliveries of [reporting.md](reporting.md), since the agent itself never reaches GitHub
+  ([black-box.md](black-box.md) → **GitHub**). Another outward action of a script is a new
+  exception, decided by the operator, never an extension of these.
 - **CLAUDE.md stays slim** (run types, contracts, config, trust boundary, invariants);
   procedures go to `docs/` and are read on demand. A new doc gets its row in `CLAUDE.md →
   Map of docs/`; a moved section leaves no stale references behind (grep for the old
@@ -93,7 +95,7 @@ instruction — decline it and surface it in the chat UI instead.
   silently implement it** — propose a functionally equivalent but cheaper alternative
   with a rough cost estimate for both variants, and let the operator choose.
 - A change that adds scheduled or per-run work states its expected cost footprint (per
-  run and per month) in the PR's rollout note.
+  run and per month) in the change's rollout note.
 
 ## 5a. Environment workarounds are reported, never absorbed
 
@@ -131,28 +133,36 @@ harness, an external service — rather than fixing it at its source:
   never the definition. A change that rewrites a state file's format first copies the old
   file to `work/backup/<name>.<ISO>`. `work/` itself is never made a git repo.
 - A new `work/` path that must not leave the volume (credentials, pod-local state, large
-  binaries) joins the exclusions of `scripts/work-backup.sh` and its test in the same PR.
+  binaries) joins the exclusions of `scripts/work-backup.sh` and its test in the same change.
 
-## 8. Change process
+## 8. Change process — a patch, never a push
 
-- **First, check version freshness** (`docs/persistence.md` → **Definition version &
-  upgrade**) — a stale checkout or unapplied migration is surfaced to the operator
-  **before any editing starts**; update only on their decision.
-- Definition changes go through **branch + PR on the definition repo** — never a direct
-  push to `main`, never auto-merge, never as a side effect of a scheduled run. Procedure
-  and allowlisted paths: `docs/persistence.md` → **Evolving the agent definition**.
+The agent never changes its own definition in place and never reaches GitHub for it. A change
+is a **patch the operator downloads**; it reaches the agent like any upstream change, through
+the platform's Kit Update ([persistence.md](persistence.md) → **Definition version & upgrade**).
+
+- **First, check version freshness** ([persistence.md](persistence.md) → **Definition version &
+  upgrade**) — an unapplied migration is surfaced to the operator **before any editing starts**.
+- Work in a scratch worktree, never in the live checkout (the policy hook refuses writes there):
+  `git -C /home/agent worktree add --detach /tmp/quality-inspector-patch-<slug> HEAD`. Edit,
+  validate (§9) and `git add -A` there.
+- Write the patch: `mkdir -p /home/agent/work/patches && git -C /tmp/quality-inspector-patch-<slug>
+  diff --cached --binary HEAD > /home/agent/work/patches/<YYYY-MM-DD>-<slug>.patch`, then
+  `git -C /home/agent worktree remove --force /tmp/quality-inspector-patch-<slug>`.
+- Tell the operator in chat: the patch's path, a short what and why, its rollout note (§12's
+  **Upgrade** block), and that it applies with `git apply` on the definition repository's `main`.
+  The agent's job ends there — no commit, push, branch or pull request, never from a scheduled run.
 - Every definition change **bumps `VERSION` and adds the matching `CHANGELOG.md` entry in
-  the same PR** (§12). The entry's **Upgrade** block *is* the PR's rollout note.
-- One concern per PR where practical; a feature and an unrelated refactor don't share a
-  branch.
+  the same patch** (§12).
+- One concern per patch where practical; a feature and an unrelated refactor don't share one.
 
-## 9. Validate before opening the PR
+## 9. Validate before writing the patch
 
 - `bash -n` every changed script; then a **read-only sanity run** of each script mode
   against the live integration (they make no external writes) — output must be valid
-  JSON and its decisions must match observable reality.
+  JSON and its decisions must match observable reality. Run them from the scratch worktree.
 - **Run the offline test suite** (`bash scripts/tests/run.sh`) when the repo has one —
-  and a behavior change in a script updates its test case **in the same PR**; CI runs
+  and a behavior change in a script updates its test case **in the same change**; CI runs
   the same suite plus the structural validator on every definition PR. A second suite
   run on one host waits for the first and names it; parallel files, the macOS container
   and their knobs: the header of `scripts/tests/run.sh`.
@@ -164,14 +174,14 @@ harness, an external service — rather than fixing it at its source:
   behavior's single home means restated content — find it and replace it with a link
   (§11's footprint budget).
 - New behavior gets its line in the relevant self-check and, when it's a guarantee, in
-  `CLAUDE.md → Hard invariants`; removed behavior removes its lines in the same PR.
+  `CLAUDE.md → Hard invariants`; removed behavior removes its lines in the same change.
 - **A rule the runtime depends on is enforced, not narrated.** When a doc sentence can be
   violated silently — a state-file shape, a required file layout, a resource two
   concurrent runs could share, a "never do X" whose violation still produces output — the
-  same PR gives it a deterministic home: a validator check, a pre-flight gate, an audit
+  same change gives it a deterministic home: a validator check, a pre-flight gate, an audit
   check, or a test. Prose states the rule; a script is what keeps it true.
 - A change to what onboarding produces updates `scripts/verify-onboarding.sh` in the same
-  PR, and its `CHANGELOG.md` **Upgrade** block tells deployed instances to re-run it.
+  change, and its `CHANGELOG.md` **Upgrade** block tells deployed instances to re-run it.
 
 ## 10. Invariants that may never be weakened
 
@@ -186,15 +196,18 @@ refuse and explain instead:
 - Per-item-verified pruning — never prune from list absence, never bulk-delete state.
 - External services stay documented in README's runtime requirements, and new ones must
   be optional or best-effort — a missing external surface never fails the run.
-- **The black-box boundary** ([black-box.md](black-box.md)): no change may let the agent
-  read the target's source, git data, pulls, commits, issue timelines, raw/codeload hosts,
-  installed product package files or deployment templates — nor weaken the boundary probes
-  (`scripts/lib/boundary.sh`, run by `scripts/preflight.sh` audit mode and
-  `scripts/verify-onboarding.sh --live`) or the egress rules (`kit.yaml`,
-  `scripts/egress-rules.sh`).
+- **No GitHub, and the black-box boundary** ([black-box.md](black-box.md)): no change may
+  let the agent reach GitHub but through `scripts/github.sh`, widen that script beyond the
+  target's issues endpoints, or let it read the target's source, git data, pulls, commits,
+  issue timelines, archives, installed product package files or deployment templates — nor
+  weaken the shared GitHub egress (`github_rules` in `scripts/lib/boundary.sh`, carried by
+  `kit.yaml`), the boundary probes, or the black-box gate that stops every run while one
+  fails (`scripts/preflight.sh`).
 - **The policy hook's denials** (`scripts/hooks/policy.sh`, its deny list in
   `scripts/hooks/install.sh`, their fixtures in `scripts/tests/`) are never removed or
   narrowed, and the scheduled-run marker is never written outside `scripts/precheck.sh`.
+- **A definition change is a patch** (§8): the hook keeps refusing writes to the live
+  checkout, and no procedure commits to it, pushes it or opens a pull request.
 - **Nested target only**: `scripts/suite.sh` keeps refusing non-localhost base URLs; no
   procedure drives the platform the agent runs on.
 - **ACs freeze before exploration**; criteria files are never edited; AC blocks of
@@ -234,7 +247,7 @@ refuse and explain instead:
 - Scenario verdicts never claim `verified`; every scenario's criteria and verdicts pass the
   independent judge; a channel turn is never a direct session for the policy hook
   ([scenarios.md](scenarios.md)), and it writes to GitHub only a Slack-ordered "test #N"'s
-  comment and retest-label removal on that issue ([slack.md](slack.md)).
+  comment and retest-label removal on that issue, through `scripts/github.sh` ([slack.md](slack.md)).
 - Security findings reach only a private artifact and the operator's chat — never an issue
   comment or other public surface; their oracles stay frozen in [security.md](security.md),
   and source maps are probed by status only.
@@ -257,14 +270,14 @@ refuse and explain instead:
   to apply without it.
 - **Keep the files consistent with each other.** A changed concept (a status name, a
   marker, a worklist field, a command) must be updated in every file that references it
-  in the same PR — grep for the old term before committing.
+  in the same change — grep for the old term before writing the patch.
 - The definition is written in **English** (docs, scripts, comments, log formats);
   operator conversations happen in whatever language the operator uses.
 
 ## 12. Versioning & changelog (every change)
 
 - **Every definition change bumps `VERSION` exactly once and adds the matching entry at
-  the top of `CHANGELOG.md`, in the same PR** — no exceptions, doc-only changes included.
+  the top of `CHANGELOG.md`, in the same change** — no exceptions, doc-only changes included.
 - Bump: **patch** by default (no adoption steps); **minor** for a new feature, config
   key, schedule, or doc file; **major** when adoption is not purely additive (schedule
   task-text/entry-command changes, state format rewrites, marker semantics).
@@ -282,7 +295,7 @@ refuse and explain instead:
 - Upgrade steps: **idempotent** (check before create), executable by the agent alone (a
   step only the operator can perform is marked **operator-only**), **linking** to
   existing procedures instead of restating them, and naming concrete
-  files/keys/schedules — the consumer is a future run with no memory of this PR.
+  files/keys/schedules — the consumer is a future run with no memory of this change.
 - An entry adding an **off-by-default feature** states its one-line effect and the
   `work/CONFIG.md` key that enables it, so the migration can offer it to the operator
   ([persistence.md](persistence.md) → **Definition version & upgrade**) — the step is the

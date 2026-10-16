@@ -47,8 +47,7 @@ declined in one reply — it is the operator's, in the direct session.
   conversation or a security finding ([security.md](security.md)).
 - **Delivery** stays per [reporting.md](reporting.md): the artifact, then the issue
   comments it makes on #N and the retest-label removal. These are the only GitHub writes a
-  Slack turn may make — a POST to `repos/<T>/issues/<n>/comments` and a DELETE of
-  `repos/<T>/issues/<n>/labels/<retest_label>`, `<T>` and `<n>` written out, through
-  `gh api`, while the row is `report_pending` (rule `channel-write`). A refused write leaves
-  `report_pending`, and the next issues run's `reports_due` delivers it. Slack is one more
-  surface, never instead of them.
+  Slack turn may make — `github.sh comment <n> <file>` and `github.sh unlabel <n>`, the
+  script path, the subcommand and `<n>` written out, while the row is `report_pending` (rule
+  `channel-write`). A refused write leaves `report_pending`, and the next issues run's
+  `reports_due` delivers it. Slack is one more surface, never instead of them.

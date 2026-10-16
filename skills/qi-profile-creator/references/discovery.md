@@ -109,9 +109,10 @@ needed), a `path` where the host is shared (e.g. `github.com` release downloads)
 `auth.docker.io`, `production.cloudflare.docker.com`; GitHub release downloads →
 `objects.githubusercontent.com`, `release-assets.githubusercontent.com`. The helm-k3s
 engine also needs `get.helm.sh`. The operator applies these entries with the rules
-`scripts/egress-rules.sh` prints (the core's `docs/black-box.md` → Egress rules). The
-target's GitHub hosts are deny-by-default there, so an install that downloads from the
-target repository's own releases cannot work — such builds must come from a registry.
+`scripts/egress-rules.sh` prints (the core's `docs/black-box.md` → Egress rules). GitHub
+is deny-by-default for every repository there, so an install that downloads from the
+target repository's own releases cannot work — such builds must come from a registry; a
+third-party release download needs an entry with its exact path.
 
 ## Boundary
 

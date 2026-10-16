@@ -5,7 +5,7 @@ sentinel; all steps are idempotent, so a failed run is safe to re-run from the t
 
 | Path | Repo | Purpose |
 | --- | --- | --- |
-| `/home/agent` | the **definition repo** (`origin`) | Agent definition, evolved via PRs. |
+| `/home/agent` | the **definition repo** (`origin`) | Agent definition, evolved upstream; the agent proposes changes as patches. |
 | `/home/agent/work` | **plain data directory** (not a repo), backed up to `work_repo` when set | Runtime state, the test suite, the product environment's state. |
 | `$HOME/.agents/skills/<profile>` | the **product profile** skill, installed from its source | How to run and know the product ([docs/profile-contract.md](docs/profile-contract.md)). |
 
@@ -32,13 +32,14 @@ Tell the two apart by what is already there; never assume.
 operator-only steps, and tick each with `complete_onboarding_step` as it is settled:
 
 1. *Product profile* — add the skill source that holds it (Skills → Sources; for DAM:
-   repository `https://github.com/dam-agents/dam`, path `qa`) and assign the profile
-   skill to this agent (e.g. `qi-profile-dam`).
+   repository `https://github.com/dam-agents/dam`, path `.quality-inspector`) and assign the
+   profile skill to this agent (e.g. `qi-profile-dam`).
 2. *Backend* — the agent runs on the backend and size the profile's README asks for
    (the kit creates it on the vm backend; by hand, choose vm when the profile requires root).
 3. *Target repository* — the `target_repo` whose issues are tested.
-4. *Egress rules* — run the commands `scripts/egress-rules.sh` prints (Step 3 shows them,
-   with `--kit` on the by-hand path).
+4. *Egress rules* — the kit's GitHub rules hold for any github.com target; run what
+   `scripts/egress-rules.sh` prints — the profile's `egress`, the work backup's, a GitHub
+   Enterprise target's (Step 3 shows them, with `--kit` on the by-hand path).
 5. *Issue comments* — enable or keep disabled.
 6. *Profile settings* — a value for every profile key it marks `ask`.
 7. *Model credential* — confirm agent steps reach the agent's model connection through the
@@ -51,18 +52,18 @@ The schedules are **held** until Step 7 marks onboarding complete.
 
 ## Step 0 — Prerequisites
 
-1. `gh api user --jq .login` — fails → the GitHub connection is not granted; stop and
-   tell the operator. `403 Resource not accessible by integration` is a GitHub App token:
-   ask for the app's bot login (`<slug>[bot]`) and write it as `- github_login:` in Step 3.
+1. `bash "$HOME/scripts/github.sh" whoami` — fails → the GitHub connection is not granted; stop and
+   tell the operator. A GitHub App token cannot tell its login: ask for the app's bot login
+   (`<slug>[bot]`) and write it as `- github_login:` in Step 3.
 2. `git -C /home/agent remote get-url origin` names the definition repo (kit path). No
    checkout → on the kit path the seed failed: say so and stop; by hand, derive the repo
    from the URL of this runbook the operator gave you.
-3. `gh auth setup-git`.
 
 ## Step 1 — Make `/home/agent` the definition repo
 
-**Kit path: already done — skip to the leak check.** By hand (init + fetch + reset; never
-`git clone` into `$HOME`, never `git clean`):
+**Kit path: already done — skip to the leak check.** By hand, the way the platform's seed does
+it (init + fetch of this definition — the one GitHub request the agent makes itself — + reset;
+never `git clone` into `$HOME`, never `git clean`):
 
 ```bash
 cd /home/agent
@@ -206,9 +207,8 @@ Key semantics: `CLAUDE.md` → **Runtime configuration** (read it first). Re-onb
 with an existing file → keep its values, ask only for missing keys. Ask, validate, write:
 
 1. **`profile`** — the name found in Step 2.
-2. **`target_repo`** — ask. Validate with `gh api repos/<owner>/<repo>/issues?per_page=1`
-   (host flag for a three-segment ref). Tick item 3. When the profile's skill source is
-   this repository, write its path as **`profile_source_path`** (DAM: `qa`); else empty.
+2. **`target_repo`** — ask, write it, and validate with `bash "$HOME/scripts/github.sh" check`.
+   Tick item 3.
 3. **`issue_comments`** — ask, default `disabled`. State the consequence: comments are
    posted publicly on the target's issues as the connection's account, and the
    connection then needs write access to issues. Tick item 5.
@@ -242,7 +242,6 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 
 - profile: qi-profile-dam
 - target_repo: acme/widgets
-- profile_source_path:
 - work_repo: acme/widgets-qa-backup
 - github_login:
 - display_name: Quality Inspector
@@ -288,14 +287,13 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 ```
 
 Then `bash "$HOME/scripts/verify-onboarding.sh" --config`, apply every `fix:`, and show the
-file to the operator — and the output of `bash "$HOME/scripts/egress-rules.sh"` (with
-`--source <owner>/<repo>` per other GitHub skill source the operator names), the egress
+file to the operator — and the output of `bash "$HOME/scripts/egress-rules.sh"`, the egress
 commands checklist item 4 asks them to run.
 
 ## Step 4 — Reconstruct `QA.md` (only when it has no rows and comments were used before)
 
 When the operator says this target already has comments from a previous quality-inspector: list the
-issues with `qa_label`, read their comments, and for each `<!-- <marker_prefix> issue=… ac=…
+issues with `qa_label` (`github.sh list`), read their comments (`github.sh comments <n>`), and for each `<!-- <marker_prefix> issue=… ac=…
 build=… -->` (newest per issue, own comments only — [docs/reporting.md](docs/reporting.md) →
 **Delivery**; a login the operator names as the previous instance's counts too) write one row — `ac_hash` and `candidate` from the marker,
 `baseline` from the `-data` copy or `-`, the verdict from the `-data` copy, `status:

@@ -97,20 +97,20 @@ re-run. Never retry within the same run.
    page once and confirm a video plays before recording the delivery.
 2. **Issue comment** (`issue_comments: enabled`):
    - **Own markers only.** A marker — this one, `-data`, `-spec` — counts only in a comment
-     whose `user.login` is the agent's own login (`agent_login` in `scripts/lib/config.sh`, once per
-     run); anyone can paste one. A failed lookup is "could not look".
-   - Right before posting, list the issue's comments and look for
+     whose `user` is the agent's own login (`github.sh whoami` — `github_login` when set —
+     once per run); anyone can paste one. A failed lookup is "could not look".
+   - Right before posting, list the issue's comments (`github.sh comments <n>`) and look for
      `<!-- <marker_prefix> issue=<n> ac=<ac_hash> build=<candidate> -->`. Found → do not
      post; record as delivered. A failed listing is "could not look" → do not post, log,
      leave `report_pending`.
-   - Post `comment.md` (with `EVIDENCE_LINK` replaced by the artifact's share link, or by
+   - Post `comment.md` with `github.sh comment <n> <file>` (with `EVIDENCE_LINK` replaced by the artifact's share link, or by
      "evidence kept by the agent" when artifacts are disabled) with that marker and one
      machine copy next to it:
      `<!-- <marker_prefix>-data {"issue":42,"ac":"…","build":"…","verdicts":{"AC-1":"verified"}} -->`.
    - When the worklist entry had `retest_label_present`, remove that label after a
-     successful post (`DELETE …/issues/<n>/labels/<retest_label, URL-encoded>`).
+     successful post (`github.sh unlabel <n>`).
 3. **Spec feedback comment** (`spec_feedback: enabled`, independent of
-   `issue_comments`): when `spec-feedback-<ac_hash>.md` exists, post it once per
+   `issue_comments`): when `spec-feedback-<ac_hash>.md` exists, post it (`github.sh comment`) once per
    `ac_hash` with the marker `<!-- <marker_prefix>-spec issue=<n> ac=<ac_hash> -->`,
    checked the same way right before posting. Tone: a short, specific suggestion to the
    author; no verdict language.

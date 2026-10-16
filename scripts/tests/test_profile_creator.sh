@@ -8,9 +8,9 @@ CORE="$(cd "$SCRIPTS/.." && pwd)"
 SKILL="$CORE/skills/qi-profile-creator"
 CHECK="$SKILL/scripts/check-profile.mjs"
 
-# A complete helm-k3s profile at $SANDBOX/<n>/qi-profile-acme.
+# A complete helm-k3s profile at $SANDBOX/<n>/.quality-inspector/qi-profile-acme.
 helm_profile() {
-  local d="$SANDBOX/$1/qi-profile-acme"; mkdir -p "$d"
+  local d="$SANDBOX/$1/.quality-inspector/qi-profile-acme"; mkdir -p "$d"
   cat > "$d/profile.json" <<'J'
 {"schema":"qi-profile/v1","product":"Acme","app":{"url":"http://localhost:8080"},"issues":{"provider":"github"},
  "engine":"helm-k3s",
@@ -38,6 +38,10 @@ P="$(helm_profile ok)"
 out="$(check "$P")"; rc=$?
 assert_eq "complete profile passes" 0 "$rc"
 assert_eq "complete profile: no FAIL" "" "$(grep '^FAIL' <<<"$out")"
+grep -q '^PASS  location: .quality-inspector/qi-profile-acme$' <<<"$out" || { echo "  the profile's location must pass"; FAILED=1; }
+mkdir -p "$SANDBOX/qa" && cp -R "$P" "$SANDBOX/qa/"
+check "$SANDBOX/qa/qi-profile-acme" | grep -q '^WARN  location: qa/qi-profile-acme — the platform installs a profile only from .quality-inspector/' \
+  || { echo "  a profile outside .quality-inspector/ must warn"; FAILED=1; }
 assert_eq "complete profile: engine check ran" 1 "$(grep -c "helm-k3s's check is clean" <<<"$out")"
 assert_eq "complete profile: no black-box hint" "" "$(grep -E 'source paths|code host' <<<"$out")"
 
