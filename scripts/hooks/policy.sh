@@ -42,8 +42,8 @@
 #   scheduled-git    Bash (scheduled)      git commit
 #   policy-tamper    Bash (scheduled)      any command naming RUN_MODE, scripts/hooks/ or .claude/settings
 #   channel-write    Bash (channel turn)   `github.sh comment|unlabel`, a `github.sh` whose subcommand is not
-#                                          written out, `comment|unlabel` as the first operand of any other
-#                                          command or script, an expansion as a *.sh script's first operand
+#                                          written out, `comment|unlabel` after any other path, *.sh,
+#                                          expansion or glob, an expansion after the path a command runs
 #                                          (quotes and backslashes dropped first) — except
 #                                          the delivery of a Slack-ordered "test #N" (docs/slack.md): the
 #                                          script path, the subcommand and <n> written out, while
@@ -292,32 +292,41 @@ check_simple() { # <one simple command>
 
 # In a channel turn, every `github.sh comment|unlabel <n>` must be the delivery of the
 # Slack-ordered "test #N" (slack_test_issue): <n> written out, never a variable. So must the
-# subcommand after every `github.sh` (RE_GH_SUB). A simple command — or the script a shell
-# runs — whose first operand is `comment|unlabel` must be a literal `github.sh` path, and a
-# `*.sh` script's first operand is never an expansion (chan_simple). Quotes and backslashes
-# are dropped first: `comm''ent` is `comment` to bash.
+# subcommand after every `github.sh` (RE_GH_SUB). Anywhere in the command, `comment|unlabel`
+# after a runnable word — a path, a *.sh, an expansion or a glob — needs that word to be a
+# literal `github.sh` path; and the runnable word a simple command executes (past
+# assignments, keywords, wrappers and shells) is never followed by an expansion
+# (chan_simple). Quotes and backslashes are dropped first: `comm''ent` is `comment` to bash.
 RE_GH_WRITE='github\.sh[[:space:]]+(comment|unlabel)([[:space:]]+([^[:space:];&|)]*))?'
 RE_GH_SUB='github\.sh([[:space:]]+[a-z][a-z-]*([[:space:];&|)]|$))?'
 CHAN_WHY="a channel turn writes to GitHub only a Slack-ordered test's comment and retest label on its issue (docs/slack.md)"
+CHAN_SEP=';&|(){}`'
+chan_runnable() { [[ "$1" == */* || "$1" == *.sh || "$1" == *[\$\`*?[]* ]]; }
 chan_simple() { # <simple command, unquoted>
-  local w=() k=0 sc sub
+  local w=() i=0 x
   read -ra w <<<"$1"
-  while [[ "${w[$k]:-}" =~ ^[A-Za-z_][A-Za-z0-9_]*= || "${w[$k]:-}" =~ ^(env|exec|command|nohup|time)$ ]]; do k=$((k+1)); done
-  case "${w[$k]:-}" in (bash|sh|zsh|dash|ksh|source|.)
-    k=$((k+1)); while [[ "${w[$k]:-}" == -* ]]; do k=$((k+1)); done;; esac
-  sc="${w[$k]:-}"; sub="${w[$((k+1))]:-}"
-  case "$sub" in (comment|unlabel) [[ "$sc" =~ github\.sh$ ]] || deny channel-write "" "$CHAN_WHY";; esac
-  case "$sc" in (*.sh) case "$sub" in (*'$'*|*'`'*) deny channel-write "" "$CHAN_WHY";; esac;; esac
+  while [[ "${w[$i]:-}" =~ ^[A-Za-z_][A-Za-z0-9_]*= || "${w[$i]:-}" =~ ^(if|then|elif|else|do|while|until|!|time)$ ]]; do i=$((i+1)); done
+  if [[ "${w[$i]:-}" =~ ^(env|exec|command|nohup|timeout|nice|xargs|sudo|stdbuf|setsid|bash|sh|zsh|dash|ksh|source|\.)$ ]]; then
+    i=$((i+1)); while [ -n "${w[$i]:-}" ] && ! chan_runnable "${w[$i]}"; do i=$((i+1)); done
+  fi
+  x="${w[$i]:-}"
+  [ -n "$x" ] && chan_runnable "$x" && [[ ! "$x" =~ github\.sh$ ]] \
+    && case "${w[$((i+1))]:-}" in (*'$'*|*'`'*) deny channel-write "" "$CHAN_WHY";; esac
   return 0
 }
 check_channel_writes() {
-  local c="${1//[\"\'\\]/}" s m nn seg
+  local c="${1//[\"\'\\]/}" s m nn seg w=() k
   s="$c"
   while [[ "$s" =~ $RE_GH_SUB ]]; do
     [ -n "${BASH_REMATCH[1]}" ] || deny channel-write "" "$CHAN_WHY"
     m="${BASH_REMATCH[0]}"; s="${s#*"$m"}"
   done
-  while IFS= read -r seg; do chan_simple "$seg"; done <<<"$(printf '%s\n' "$c" | tr ';&|()' '\n\n\n\n\n')"
+  read -ra w <<<"$(printf '%s\n' "$c" | tr "$CHAN_SEP"$'\n' '         ')"
+  for ((k = 1; k < ${#w[@]}; k++)); do
+    case "${w[$k]}" in (comment|unlabel)
+      chan_runnable "${w[$((k-1))]}" && [[ ! "${w[$((k-1))]}" =~ github\.sh$ ]] && deny channel-write "" "$CHAN_WHY";; esac
+  done
+  while IFS= read -r seg; do chan_simple "$seg"; done <<<"$(printf '%s\n' "$c" | tr "$CHAN_SEP" '\n\n\n\n\n\n\n\n')"
   s="$c"
   while [[ "$s" =~ $RE_GH_WRITE ]]; do
     m="${BASH_REMATCH[0]}"; nn="${BASH_REMATCH[3]}"; s="${s#*"$m"}"

@@ -11,8 +11,8 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
 **Upgrade:**
 Nothing — the policy hook runs from the checkout. In a channel turn it now refuses
-`comment|unlabel` as the first operand of anything but a literal `github.sh` path, and a
-variable as a script's subcommand, after dropping quotes (rule `channel-write`).
+`comment|unlabel` after any path, script, expansion or glob but a literal `github.sh` path,
+and an expansion after the path a command runs, after dropping quotes (rule `channel-write`).
 
 ## 3.0.0 — 2026-10-15
 
