@@ -41,15 +41,15 @@
 #   scheduled-def    Write Edit … (sched.) work/CONFIG.md
 #   scheduled-git    Bash (scheduled)      git commit
 #   policy-tamper    Bash (scheduled)      any command naming RUN_MODE, scripts/hooks/ or .claude/settings
-#   channel-write    Bash (channel turn)   `github.sh comment|unlabel`, a `github.sh` whose subcommand is not
-#                                          written out, `comment|unlabel` after any other path, *.sh,
-#                                          expansion or glob, an expansion after the path a command runs
-#                                          (quotes, backslashes and redirections dropped first) — except
-#                                          the delivery of a Slack-ordered "test #N" (docs/slack.md): the
-#                                          script path, the subcommand and <n> written out, while
-#                                          RUN_MODE is a fresh `slack <ISO> - <n> <session>` (precheck.sh
-#                                          slack <n>; <session> this one, or -) and the work/QA.md row of
-#                                          <n> is report_pending
+#   channel-write    Bash (channel turn)   a command naming github.sh, comment or unlabel in any spelling
+#                                          bash reads literally (quotes, escapes, $"…", globs, braces,
+#                                          heredoc bodies) — unless it is one plain `github.sh <sub> <args>`
+#                                          (`comment|unlabel`: the delivery of a Slack-ordered "test #N",
+#                                          docs/slack.md: <n> written out, while RUN_MODE is a fresh
+#                                          `slack <ISO> - <n> <session>` (precheck.sh slack <n>; <session>
+#                                          this one, or -) and the work/QA.md row of <n> is report_pending)
+#                                          or one plain read-only grep|rg|cat|head|tail|wc|ls|git log…
+#                    Write Edit … (channel turn)  content naming github.sh
 #   backup-override  Bash                  a command naming QI_WORK_BACKUP_ (the offline tests' remote and clone
 #                                          overrides): the backup's destination is work_repo alone
 #   backup-direct    Bash (scheduled)      scripts/work-backup.sh — there the Stop hook alone backs up
@@ -85,7 +85,9 @@ VARS="$(jq -r '
   "CMD=\(.tool_input.command | s) FPATH=\((.tool_input.file_path // .tool_input.notebook_path) | s)",
   "GPATH=\(.tool_input.path | s) GPAT=\(.tool_input.pattern | s) GGLOB=\(.tool_input.glob | s)",
   "URL=\(.tool_input.url | s) QUERY=\(((.tool_input.query // "") + " " + ((.tool_input.allowed_domains // []) | join(" "))) | s)",
-  "TRANSCRIPT=\(.transcript_path | s)"' 2>/dev/null)" \
+  "TRANSCRIPT=\(.transcript_path | s)",
+  "CONTENT=\([.tool_input.content, .tool_input.new_string, .tool_input.new_source,
+    (.tool_input.edits // [] | map(.new_string) | join("\n"))] | map(select(. != null)) | join("\n") | s)"' 2>/dev/null)" \
   || deny bad-input "" "the tool call could not be parsed"
 eval "$VARS"
 [ -n "$CWD" ] || CWD="$PWD"
@@ -290,55 +292,73 @@ check_simple() { # <one simple command>
   return 0
 }
 
-# In a channel turn, every `github.sh comment|unlabel <n>` must be the delivery of the
-# Slack-ordered "test #N" (slack_test_issue): <n> written out, never a variable. So must the
-# subcommand after every `github.sh` (RE_GH_SUB). Anywhere in the command, `comment|unlabel`
-# after a runnable word — a path, a *.sh, an expansion or a glob — needs that word to be a
-# literal `github.sh` path; and the runnable word a simple command executes (past
-# assignments, keywords, wrappers and shells) is never followed by an expansion
-# (chan_simple). Quotes, backslashes and redirections are dropped first: bash runs
-# `/tmp/g.sh >out comm''ent` as `/tmp/g.sh comment`.
-RE_GH_WRITE='github\.sh[[:space:]]+(comment|unlabel)([[:space:]]+([^[:space:];&|)]*))?'
-RE_GH_SUB='github\.sh([[:space:]]+[a-z][a-z-]*([[:space:];&|)]|$))?'
+# channel-write — in a channel turn a closed set, not a parse of the shell's syntax. Every
+# command that names github.sh, `comment` or `unlabel` (chan_names) is refused unless the
+# whole command is one of two plain shapes; "plain" = one line, no shell operator,
+# expansion, escape or redirection but a trailing `2>&1`, so no spelling bash accepts adds
+# a second command, a copy or a hidden subcommand:
+#   GH_PLAIN  `[bash] "$HOME/scripts/github.sh" <subcommand> <args>` (${HOME}, ~ or /home/agent
+#             for $HOME); `comment|unlabel` names <n> written out and passes slack_test_issue
+#   RO_PLAIN  grep|egrep|fgrep|rg|cat|head|tail|wc|ls|git log|grep|show|diff, with no option that
+#             runs a program or writes a file — rg --pre, --hostname-bin; git -O in any short-option
+#             cluster (-3O), --open-files-in-pager,
+#             --output, as any prefix git accepts — read with the quotes dropped
+# Out of reach of text: a name joined at run time (a variable, a substitution, arithmetic) or a
+# program that builds one — the limit docs/slack.md states.
+RE_CH_W='([^][:space:];&|<>(){}$`!\\"'"'"'*?]|"[^"$`\\]*"|'"'"'[^'"'"']*'"'"')+'
+RE_CH_RW='([^][:space:];&|<>(){}$`!\\"'"'"']|"[^"$`\\]*"|'"'"'[^'"'"']*'"'"')+'
+RE_GH_PLAIN='^[ 	]*(bash[ 	]+)?("?(\$HOME|\$\{HOME\}|/home/agent)/scripts/github\.sh"?|~/scripts/github\.sh)[ 	]+(whoami|check|list|issue|comments|comment|unlabel)(([ 	]+'"$RE_CH_W"')*)([ 	]+2>&1)?[ 	]*$'
+RE_RO_PLAIN='^[ 	]*(grep|egrep|fgrep|rg|cat|head|tail|wc|ls|git[ 	]+(log|grep|show|diff))([ 	]+'"$RE_CH_RW"')*[ 	]*$'
+RE_RO_RUNS='[ 	](--pre|--hostname|--op|--ou|-[^- 	][^ 	]*O|-O)'
 CHAN_WHY="a channel turn writes to GitHub only a Slack-ordered test's comment and retest label on its issue (docs/slack.md)"
-CHAN_SEP=';&|(){}`'
-# a redirection and its target — a run of "…", '…', \x and plain characters — on the raw
-# command; a quoted span ("…" and $'…' with \x pairs, '…') or an escape is copied
-# through, so a quoted > or < starts nothing
-CHAN_REDIR="s/(\"([^\"\\\\]|\\\\.)*\"|\\$'([^'\\\\]|\\\\.)*'|'[^']*'|\\\\.)|[0-9]*(&>>?|>>?[&|]?|<&|<>|<)[[:space:]]*(\"([^\"\\\\]|\\\\.)*\"|\\$'([^'\\\\]|\\\\.)*'|'[^']*'|\\\\.|[^[:space:];|&<>()\"'\\\\])*/\\1/g"
-chan_runnable() { [[ "$1" == */* || "$1" == *.sh || "$1" == *[\$\`*?[]* ]]; }
-chan_simple() { # <simple command, unquoted>
-  local w=() i=0 x
-  read -ra w <<<"$1"
-  while [[ "${w[$i]:-}" =~ ^[A-Za-z_][A-Za-z0-9_]*= || "${w[$i]:-}" =~ ^(if|then|elif|else|do|while|until|!|time)$ ]]; do i=$((i+1)); done
-  if [[ "${w[$i]:-}" =~ ^(env|exec|command|nohup|timeout|nice|xargs|sudo|stdbuf|setsid|bash|sh|zsh|dash|ksh|source|\.)$ ]]; then
-    i=$((i+1)); while [ -n "${w[$i]:-}" ] && ! chan_runnable "${w[$i]}"; do i=$((i+1)); done
-  fi
-  x="${w[$i]:-}"
-  [ -n "$x" ] && chan_runnable "$x" && [[ ! "$x" =~ github\.sh$ ]] \
-    && case "${w[$((i+1))]:-}" in (*'$'*|*'`'*) deny channel-write "" "$CHAN_WHY";; esac
-  return 0
+# The words bash reads literally from $1 (line continuations joined, $"…" as "…", quotes and
+# backslashes dropped, split on blanks, operators and `=`) name github.sh, comment(s) or
+# unlabel — a glob or brace word that can expand to one, or any $'…', counts. Returns 0 when
+# one does; with a second argument only github.sh counts.
+glob_ere() { # <glob or brace word> → $ERE matching every word it can expand to; an
+  # unbalanced [ ] { } stays literal, as in bash
+  local w="$1" i ch d=0 br=0; ERE=""
+  while [[ "$w" =~ \{[^{}]*\.\.[^{}]*\} ]]; do w="${w/"${BASH_REMATCH[0]}"/*}"; done
+  for ((i = 0; i < ${#w}; i++)); do
+    ch="${w:i:1}"
+    case "$ch" in
+      ('*') ERE="$ERE.*";; ('?') ERE="$ERE.";;
+      ('[') case "${w:i+1}" in (*']'*) ERE="$ERE["; br=1;; (*) ERE="$ERE\\[";; esac;;
+      (']') [ "$br" = 1 ] && { ERE="$ERE]"; br=0; } || ERE="$ERE\\]";;
+      ('{') case "${w:i+1}" in (*'}'*) ERE="$ERE("; d=$((d+1));; (*) ERE="$ERE\\{";; esac;;
+      ('}') [ "$d" -gt 0 ] && { ERE="$ERE)"; d=$((d-1)); } || ERE="$ERE\\}";;
+      (',') [ "$d" -gt 0 ] && ERE="$ERE|" || ERE="$ERE,";;
+      ([.^\$+\(\)\|]) ERE="$ERE\\$ch";; (*) ERE="$ERE$ch";;
+    esac
+  done
 }
-check_channel_writes() {
-  local c s m nn seg w=() k
-  c="$(printf '%s\n' "$1" | sed -E "$CHAN_REDIR")"; c="${c//[\"\'\\]/}"
-  s="$c"
-  while [[ "$s" =~ $RE_GH_SUB ]]; do
-    [ -n "${BASH_REMATCH[1]}" ] || deny channel-write "" "$CHAN_WHY"
-    m="${BASH_REMATCH[0]}"; s="${s#*"$m"}"
+chan_names() { # <text> [github-only]
+  local bsnl=$'\\\n' t="$1" w ch ws=()
+  case "$t" in (*"\$'"*) return 0;; esac # $'\143…' spells a name in escapes
+  t="${t//"$bsnl"/}"; t="${t//\$\"/\"}"; t="${t//[\"\'\\]/}"
+  read -ra ws <<<"$(printf '%s' "$t" | tr ';&|()<>`=\n\t' '           ')"
+  for w in ${ws[@]+"${ws[@]}"}; do
+    case "${w##*/}" in (github.sh) return 0;; esac
+    [ -n "${2:-}" ] || case "$w" in (comment|comments|unlabel) return 0;; esac
+    case "$w" in (*[*?[{]*) ;; (*) continue;; esac
+    glob_ere "${w##*/}"; [[ "github.sh" =~ ^($ERE)$ ]]; [ $? = 1 ] || return 0
+    [ -n "${2:-}" ] && continue
+    glob_ere "$w"; for ch in comment comments unlabel; do [[ "$ch" =~ ^($ERE)$ ]]; [ $? = 1 ] || return 0; done
   done
-  read -ra w <<<"$(printf '%s\n' "$c" | tr "$CHAN_SEP"$'\n' '         ')"
-  for ((k = 1; k < ${#w[@]}; k++)); do
-    case "${w[$k]}" in (comment|unlabel)
-      chan_runnable "${w[$((k-1))]}" && [[ ! "${w[$((k-1))]}" =~ github\.sh$ ]] && deny channel-write "" "$CHAN_WHY";; esac
-  done
-  while IFS= read -r seg; do chan_simple "$seg"; done <<<"$(printf '%s\n' "$c" | tr "$CHAN_SEP" '\n\n\n\n\n\n\n\n')"
-  s="$c"
-  while [[ "$s" =~ $RE_GH_WRITE ]]; do
-    m="${BASH_REMATCH[0]}"; nn="${BASH_REMATCH[3]}"; s="${s#*"$m"}"
-    [[ "$nn" =~ ^[0-9]+$ ]] && slack_test_issue "$nn" && continue
-    deny channel-write "" "$CHAN_WHY"
-  done
+  return 1
+}
+check_channel_writes() { # <raw command, heredoc bodies included> — it names one (chan_names)
+  local c="$1" ok=0 a=()
+  shopt -u nocasematch # an allowlist: case-folding would only widen it
+  if [[ "$c" =~ $RE_GH_PLAIN ]]; then
+    ok=1
+    case "${BASH_REMATCH[4]}" in (comment|unlabel)
+      read -ra a <<<"${BASH_REMATCH[5]}"
+      [[ "${a[0]:-}" =~ ^[0-9]+$ ]] && slack_test_issue "${a[0]}" || ok=0;; esac
+  elif [[ "$c" =~ $RE_RO_PLAIN ]] && ! [[ "${c//[\"\']/}" =~ $RE_RO_RUNS ]]; then ok=1
+  fi
+  shopt -s nocasematch
+  [ "$ok" = 1 ] || deny channel-write "" "$CHAN_WHY"
   return 0
 }
 
@@ -366,8 +386,8 @@ check_bash() {
   case "$CMD" in (*QI_WORK_BACKUP_*) deny backup-override "" "the backup's destination comes from work_repo alone";; esac
   case "$CMD" in (*work-backup.sh*) scheduled && deny backup-direct "" "a scheduled run or a channel turn never backs up by hand — the Stop hook does";; esac
   case "$CMD" in (*QI_TARGET_REPO*) deny github "QI_TARGET_REPO" "the target comes from work/CONFIG.md alone";; esac
+  chan_names "$CMD" && channel_turn && check_channel_writes "$CMD"
   case "$CMD" in (*'<<'*) strip_heredocs "$CMD"; CMD="$X";; esac
-  case "${CMD//[\"\'\\]/}" in (*github.sh*|*comment*|*unlabel*) channel_turn && check_channel_writes "$CMD";; esac
   while IFS= read -r seg; do check_simple "$seg"; done <<<"$(printf '%s\n' "$CMD" | tr ';&|()' '\n\n\n\n\n')"
   case "$CMD" in (*node_modules/*)
     load_profile
@@ -385,6 +405,8 @@ check_bash() {
 # ------------------------------------------------------------- write rules ----
 check_write() {
   norm "$FPATH"; local p="$N"
+  [ -n "$CONTENT" ] && chan_names "$CONTENT" github && channel_turn \
+    && deny channel-write "$p" "a channel turn writes no file that names github.sh (docs/slack.md)"
   [ "$p" = "$WORK/env/RUN_MODE" ] && deny run-mode "$p" "only the schedule's Precheck writes the run marker"
   if under "$p" "$WORK"; then
     [ "$p" = "$WORK/CONFIG.md" ] && scheduled && deny scheduled-def "$p" "a scheduled run never changes the configuration"
