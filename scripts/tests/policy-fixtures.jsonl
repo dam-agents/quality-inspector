@@ -106,6 +106,8 @@
 {"name": "git grep pager option split by quotes, channel turn", "expect": "deny", "mode": "channel", "rule": "channel-write", "tool": "Bash", "input": {"command": "git grep -\"\"-op=sh comment"}}
 {"name": "rg hostname program, channel turn", "expect": "deny", "mode": "channel", "rule": "channel-write", "tool": "Bash", "input": {"command": "rg --hostname-bin=/tmp/g comment docs"}}
 {"name": "git log writing a file, channel turn", "expect": "deny", "mode": "channel", "rule": "channel-write", "tool": "Bash", "input": {"command": "git log --output=/home/agent/scripts/github.sh --grep unlabel"}}
+{"name": "git grep -O after a digit in a cluster, channel turn", "expect": "deny", "mode": "channel", "rule": "channel-write", "tool": "Bash", "input": {"command": "git grep -3O/tmp/g comment"}}
+{"name": "git grep -O after a letter in a cluster, channel turn", "expect": "deny", "mode": "channel", "rule": "channel-write", "tool": "Bash", "input": {"command": "git grep -inO/tmp/g comment"}}
 {"name": "rg for unlabel, channel turn", "expect": "allow", "mode": "channel", "tool": "Bash", "input": {"command": "rg unlabel docs"}}
 {"name": "grep for a quoted word, channel turn", "expect": "allow", "mode": "channel", "tool": "Bash", "input": {"command": "grep -rn \"comment\" docs/slack.md"}}
 {"name": "github.sh comments read, channel turn", "expect": "allow", "mode": "channel", "tool": "Bash", "input": {"command": "bash \"$HOME/scripts/github.sh\" comments 12"}}

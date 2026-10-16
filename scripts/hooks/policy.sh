@@ -300,7 +300,8 @@ check_simple() { # <one simple command>
 #   GH_PLAIN  `[bash] "$HOME/scripts/github.sh" <subcommand> <args>` (${HOME}, ~ or /home/agent
 #             for $HOME); `comment|unlabel` names <n> written out and passes slack_test_issue
 #   RO_PLAIN  grep|egrep|fgrep|rg|cat|head|tail|wc|ls|git log|grep|show|diff, with no option that
-#             runs a program or writes a file — rg --pre, --hostname-bin; git -O, --open-files-in-pager,
+#             runs a program or writes a file — rg --pre, --hostname-bin; git -O in any short-option
+#             cluster (-3O), --open-files-in-pager,
 #             --output, as any prefix git accepts — read with the quotes dropped
 # Out of reach of text: a name joined at run time (a variable, a substitution, arithmetic) or a
 # program that builds one — the limit docs/slack.md states.
@@ -308,7 +309,7 @@ RE_CH_W='([^][:space:];&|<>(){}$`!\\"'"'"'*?]|"[^"$`\\]*"|'"'"'[^'"'"']*'"'"')+'
 RE_CH_RW='([^][:space:];&|<>(){}$`!\\"'"'"']|"[^"$`\\]*"|'"'"'[^'"'"']*'"'"')+'
 RE_GH_PLAIN='^[ 	]*(bash[ 	]+)?("?(\$HOME|\$\{HOME\}|/home/agent)/scripts/github\.sh"?|~/scripts/github\.sh)[ 	]+(whoami|check|list|issue|comments|comment|unlabel)(([ 	]+'"$RE_CH_W"')*)([ 	]+2>&1)?[ 	]*$'
 RE_RO_PLAIN='^[ 	]*(grep|egrep|fgrep|rg|cat|head|tail|wc|ls|git[ 	]+(log|grep|show|diff))([ 	]+'"$RE_CH_RW"')*[ 	]*$'
-RE_RO_RUNS='[ 	](--pre|--hostname|--op|--ou|-[A-Za-z]*O)'
+RE_RO_RUNS='[ 	](--pre|--hostname|--op|--ou|-[^- 	][^ 	]*O|-O)'
 CHAN_WHY="a channel turn writes to GitHub only a Slack-ordered test's comment and retest label on its issue (docs/slack.md)"
 # The words bash reads literally from $1 (line continuations joined, $"…" as "…", quotes and
 # backslashes dropped, split on blanks, operators and `=`) name github.sh, comment(s) or
