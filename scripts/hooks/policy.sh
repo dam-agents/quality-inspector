@@ -302,8 +302,9 @@ RE_GH_WRITE='github\.sh[[:space:]]+(comment|unlabel)([[:space:]]+([^[:space:];&|
 RE_GH_SUB='github\.sh([[:space:]]+[a-z][a-z-]*([[:space:];&|)]|$))?'
 CHAN_WHY="a channel turn writes to GitHub only a Slack-ordered test's comment and retest label on its issue (docs/slack.md)"
 CHAN_SEP=';&|(){}`'
-# a redirection and its target — a run of "…", '…', \x and plain characters — on the raw command
-CHAN_REDIR="s/[0-9]*(&>>?|>>?[&|]?|<&|<>|<)[[:space:]]*(\"[^\"]*\"|'[^']*'|\\\\.|[^[:space:];|&<>()\"'\\\\])*/ /g"
+# a redirection and its target — a run of "…", '…', \x and plain characters — on the raw
+# command; a quoted span or an escape is copied through, so a quoted > or < starts nothing
+CHAN_REDIR="s/(\"[^\"]*\"|'[^']*'|\\\\.)|[0-9]*(&>>?|>>?[&|]?|<&|<>|<)[[:space:]]*(\"[^\"]*\"|'[^']*'|\\\\.|[^[:space:];|&<>()\"'\\\\])*/\\1/g"
 chan_runnable() { [[ "$1" == */* || "$1" == *.sh || "$1" == *[\$\`*?[]* ]]; }
 chan_simple() { # <simple command, unquoted>
   local w=() i=0 x
