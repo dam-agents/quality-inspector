@@ -28,7 +28,7 @@ starves the agent's own runtime. `up` of the build already recorded in
 | `credentials` | `users: {name: {username}}` — passwords are generated into `credentials.env` as `E2E_USER_<NAME>_*`; `secrets: [name]` — generated as `QI_SECRET_<NAME>` |
 | `prerequisites` | ordered, installed once, never upgraded by `up` — see below |
 | `values` | the Helm values, as JSON, with placeholders |
-| `overlays` | `[{when: <config key>, values: {…}}]` — merged into `values` when that profile key is set; `when: "@model"` — while the agent lends its model |
+| `overlays` | `[{when: <config key>, values: {…}}]` — merged into `values` when that profile key is set; `when: "@model"` — while the agent lends its model; `when: "@sandbox:<id>"` — while every `E2E_SANDBOX_<ID>_*` line of `credentials.env` is filled |
 | `max_pages` | quay pages to read at most (default 30) |
 
 `bin/versions --between <from> <to>` (bisection) reads the same tag listing — tags only —
@@ -54,7 +54,8 @@ any other `url` does.
 In any string of `engine_config`: `{{config:<key>}}` — a profile config key;
 `{{config_repo:<key>}}` / `{{config_tag:<key>}}` — the repository and tag of an image ref
 held in that key. In `values` only: `{{user:<name>.username|password}}`,
-`{{secret:<name>}}`, `{{app_port}}` — filled at `up` from `credentials.env`;
+`{{secret:<name>}}`, `{{sandbox:<id>.<NAME>}}` (a sandbox account's `E2E_SANDBOX_<ID>_<NAME>`,
+[docs/profile-contract.md](../../docs/profile-contract.md) → `sandbox`), `{{app_port}}` — filled at `up` from `credentials.env`;
 `{{model:key|kind|base_url}}` — the lent model ([docs/profile-contract.md](../../docs/profile-contract.md)
 → The `bin/` contract), empty when not lent; `{{proxy:https|http|no}}` — the gateway proxy
 for pods that must reach the outside (the lent model's host), `no` with the cluster's own
@@ -68,9 +69,10 @@ values (`$QI_ENV_DIR/values.json`) are mode 600 and never printed.
 the channels and their defaults, the owner account, each prerequisite's fields (a manifest `file` must exist in the profile), `app_port`
 against the profile's `app.url`, and every placeholder rendered with throw-away
 credentials — once with the config defaults and no lent model, once with every overlay
-switched on. An overlay's `when` must be a profile config key or `"@model"`; the second
-render sets a throw-away `QI_MODEL_KEY`, so a `"@model"` overlay and its `{{model:*}}`
-placeholders are rendered too.
+switched on. An overlay's `when` must be a profile config key, `"@model"` or
+`"@sandbox:<id>"`; the second render sets a throw-away `QI_MODEL_KEY` and sandbox
+credentials, so those overlays and their `{{model:*}}` and `{{sandbox:*}}` placeholders are
+rendered too.
 
 ## Diagnosis (read-only)
 

@@ -131,10 +131,35 @@ lands: `prompt` — no kit rule covers the host, so its first request in a direc
 and the operator approves the prompt (`verify-onboarding.sh --egress` makes those requests);
 `by-hand` — under a kit deny a request is refused at once and no prompt ever appears, and a deny
 or a set that must land whole is never left to prompts: the operator adds it in the agent's
-network settings; `kit` — already allowed. A held request in a scheduled run is refused.
+network settings; `kit` — already allowed; `refused` — never added: a profile allow outside the
+sandbox shapes on a GitHub host, or a `{profile.<key>}` with no plain value (**Sandbox
+accounts**, below). A held request in a scheduled run is refused.
 Missing ones fail the gate, never open the code: any host no rule matches is **held** for
 approval on the operator's Home — approve nothing on the deny side; a held probe shows as
 `warn` until it is an explicit deny.
+
+### Sandbox accounts
+
+A profile's sandbox accounts ([profile-contract.md](profile-contract.md) → `sandbox`) are
+throwaway accounts the nested product connects to — a GitHub organization of its own, a
+Slack workspace. Their egress is the profile's, landed by the operator, and on a GitHub host
+`egress-rules.sh` passes a profile allow only in a closed set, on the API host alone:
+`/repos/<owner>/<repo>/<rest>` with owner and repository literal `[A-Za-z0-9.-]` (no `*`;
+`_` is a pattern wildcard, so a sandbox name never holds one), the owner never the target's
+or the work backup's, `<rest>` not empty — a repository the nested product writes to with a
+token scoped to it (a fine-grained token; `GET /user`, its identity, the kit already allows).
+A GitHub App's endpoints (`/app/…`, `/installation/…`) are not in it. Anything else on `github.com`, `*.github.com`,
+`*.githubusercontent.com` or the target's host is `refused` — a profile defect,
+`verify-onboarding.sh` fails on it. Each such allow is longer than the kit's denies, so it
+opens that sandbox repository and nothing beside it; the black-box probes, which request the
+target's surfaces, prove the rest unchanged. A shape a new product needs (an OAuth sign-in
+on `github.com`) joins this set in the kit, never in a profile.
+
+The agent itself still requests nothing there: the policy hook's `github` rule holds, the
+nested product and the profile's own helpers make those requests, and a test reaches a
+sandbox only through the profile's `suite/` helpers. Its credentials live in
+`work/env/credentials.env` as `E2E_SANDBOX_*` lines, masked in every run artefact and never in
+the `work_repo` backup.
 
 **A profile inside the target repository** lives under `.quality-inspector/`. The platform
 fetches only that directory through the contents API when the archive is denied — every

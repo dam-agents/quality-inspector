@@ -60,6 +60,48 @@ bash "$DEF/scripts/egress-rules.sh" | grep -E '(^| )(dam|curl|gh) ' && { echo " 
 bash "$DEF/scripts/egress-rules.sh" | grep -qF '| prompt | allow | GET | `cdn.example.com` | `/a/*` | assets $(x) |' \
   || { echo "  assertion failed: the table row of a prompt rule"; FAILED=1; }
 
+# Sandbox accounts (docs/black-box.md → Sandbox accounts): {profile.<key>} takes the
+# instance's value; an unset or odd value refuses the rule; on a GitHub host only the
+# closed set passes — a literal owner/repo, never the target's or the backup's; a GitHub
+# App's endpoints are not in it. Under the kit's deny, an accepted one lands by hand.
+kit '  - host: api.github.com' '    pathPattern: "/*"' '    verdict: deny'
+cat > "$QI_PROFILE_DIR/profile.json" <<'J'
+{"schema":"qi-profile/v1","product":"Stub","app":{"url":"http://localhost:8080"},
+ "config":{"sb_repo":{"default":""},"sb_odd":{"default":"a/../b"},"sb_target":{"default":"ACME/x"}},
+ "egress":[{"host":"api.github.com","method":"POST","path":"/repos/{profile.sb_repo}/issues","why":"sandbox issue"},
+           {"host":"api.github.com","method":"PATCH","path":"/repos/{profile.sb_repo}/issues/*","why":"close it"},
+           {"host":"api.github.com","method":"POST","path":"/app/installations/*/access_tokens","why":"an App's token"},
+           {"host":"api.github.com","method":"POST","path":"/repos/{profile.sb_odd}/issues","why":"dot segment"},
+           {"host":"api.github.com","method":"POST","path":"/repos/{profile.sb_target}/issues","why":"the target's owner"},
+           {"host":"api.github.com","method":"POST","path":"/repos/*/qa/issues","why":"wildcard owner"},
+           {"host":"api.github.com","method":"POST","path":"/repos/my_org/qa/issues","why":"underscore"},
+           {"host":"api.github.com","method":"POST","path":"/repos/sb/qa","why":"no rest"},
+           {"host":"github.com","method":"GET","path":"/sb/qa/*","why":"not the API"},
+           {"host":"raw.githubusercontent.com","method":"GET","path":"/sb/qa/*","why":"raw"},
+           {"host":"slack.com","method":"POST","path":"/api/*","why":"slack"}]}
+J
+printf -- '- profile.sb_repo: qa-sandbox/e2e-playground\n- work_repo: backup-org/qa-backup\n' >> "$WORK_DIR/CONFIG.md"
+sb="$(bash "$DEF/scripts/egress-rules.sh" --json | jq -r '.rules[] | select(.source == "profile") | "\(.how) \(.method) \(.host) \(.path)"')"
+assert_eq "sandbox rules: placeholders and the GitHub closed set" "by-hand POST api.github.com /repos/qa-sandbox/e2e-playground/issues
+by-hand PATCH api.github.com /repos/qa-sandbox/e2e-playground/issues/*
+refused POST api.github.com /app/installations/*/access_tokens
+refused POST api.github.com /repos/{profile.sb_odd}/issues
+refused POST api.github.com /repos/ACME/x/issues
+refused POST api.github.com /repos/*/qa/issues
+refused POST api.github.com /repos/my_org/qa/issues
+refused POST api.github.com /repos/sb/qa
+refused GET github.com /sb/qa/*
+refused GET raw.githubusercontent.com /sb/qa/*
+prompt POST slack.com /api/*" "$sb"
+why="$(bash "$DEF/scripts/egress-rules.sh" --json | jq -r '.rules[] | select(.source == "profile" and .how == "refused") | .why' | head -3)"
+printf '%s\n' "$why" | grep -q '^not /repos/<owner>/<repo>/<rest> — a profile defect' || { echo "  assertion failed: the refusal says why"; FAILED=1; }
+printf '%s\n' "$why" | grep -q '^profile.sb_odd is unset or not a plain name' || { echo "  assertion failed: an odd placeholder value names its key"; FAILED=1; }
+# The backup's owner, in another case, is refused as well.
+sed -i.bak 's#^- profile.sb_repo: qa-sandbox/e2e-playground#- profile.sb_repo: Backup-Org/x#' "$WORK_DIR/CONFIG.md"
+assert_eq "the work backup's owner is refused" "refused" \
+  "$(bash "$DEF/scripts/egress-rules.sh" --json | jq -r '[.rules[] | select(.source == "profile" and .method == "POST" and (.path | endswith("/issues")))][0].how')"
+sed -i.bak '/^- profile.sb_repo:/d; /^- work_repo:/d' "$WORK_DIR/CONFIG.md"
+
 # verify-onboarding.sh --egress: one GET per profile rule; a held request is a warning, a
 # refused connection a FAIL naming the rule to add by hand, a 403 a warning (the gateway or
 # the host itself), any other answer a pass; wildcard hosts and odd host names are skipped.

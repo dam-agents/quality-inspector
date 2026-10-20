@@ -31,6 +31,7 @@ confirmed before writing files.
 | 16 | A published CLI or API (the command, the path of its OpenAPI JSON), its npm package, and how a user gets a token for it | `interfaces`, `boundary.packages`, `SKILL.md` → CLI and API |
 | 17 | The main object a user creates, with a name and a description (a project, a document), and where in the UI; the namespace its pods run in when no engine names one | `security.entity`, `security.namespace`, `canary.thing` (`canary.field` when the text shows in another field, `canary.none` when there is no such object) |
 | 18 | API calls the security run cannot make through the UI: create that object, mint and use an API key | `suite/lib/security-api.ts` (its exports: the core's `docs/security.md`) |
+| 19 | Main flows that leave the product (it answers in Slack, files a GitHub issue) and the throwaway accounts that would make them testable: what the product's connection asks for, the hosts, methods and paths, what the test person does there | `sandbox`, `sandbox/<name>.md`, `bin/sandbox`, `suite/` helpers, `ask` config keys, `egress` (Sandbox accounts, below) |
 
 ## Where to look
 
@@ -99,6 +100,39 @@ For each, either a stand-in exists (a mock image, a bundled mail catcher, bundle
 storage) — then it is a `config` key or a literal in the install, and `SKILL.md` says how
 a user observes it — or `SKILL.md` makes the ACs that need it `testable: no — external
 dependency`.
+
+## Sandbox accounts
+
+Some outside services are the point of a main flow — an agent that answers in Slack, files
+a GitHub issue. A stand-in cannot show those; a throwaway account can. Ask the person
+whether the flow should be testable end to end; if so, per service (the core's
+`docs/profile-contract.md` → `sandbox`):
+
+- **What the product's connection asks for** — read its configuration reference: a GitHub
+  App or a token, a Slack bot token and Socket Mode or a webhook. A webhook into the nested
+  product cannot work (it is on `localhost`), so a service it needs inbound is testable only
+  through an outbound mode (Socket Mode, polling); otherwise it stays `testable: no`.
+- **The guide** — `sandbox/<name>.md`, the operator's steps in order: create the
+  organization or workspace (never the product's own, never a company one), the narrowest
+  app or token, where each value is shown, which line of `credentials.env` it fills. A
+  manifest to paste beats a list of scopes. The operator does it once; write it for someone
+  who has never seen the service's developer pages.
+- **Credentials** — the names in `credentials` (they become `E2E_SANDBOX_<ID>_<NAME>`);
+  a key file as one base64 line named `…_B64`. Names that are no secret (an organization
+  and repository) are `ask` config keys, so the egress can name them as `{profile.<key>}`.
+- **Egress** — each request the product and the test person make, by method and path. On a
+  GitHub host only `/repos/{profile.<key>}/<rest>` passes — the core refuses anything else
+  there, a GitHub App's `/app/…` endpoints included; prefer a fine-grained token scoped to the
+  sandbox repository (`GET /user` the kit already allows).
+- **Install-time values** — a service the product configures per install (a Slack app's
+  tokens in its Helm values) takes them in the engine's values as
+  `{{sandbox:<id>.<NAME>}}`, inside an overlay `when: "@sandbox:<id>"`, so an instance
+  without the account installs as before (helm-k3s README → Placeholders).
+- **`bin/sandbox check`** — one request per account: who the token is, that the channel or
+  repository exists and is no fork; `ok`/`FAIL` lines, never a value.
+- **The test person** — helpers in `suite/` (`personSays`, `repliesTo`): the only way a test
+  writes to or reads from the service. A result the agent leaves on GitHub is checked
+  through what the product shows, never by reading GitHub.
 
 ## Egress
 

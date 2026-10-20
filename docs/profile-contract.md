@@ -30,6 +30,8 @@ local development). The core never edits a profile; changes go to its own reposi
   bin/build-time  optional — when a build was published (else its engine's)
   suite/          optional: files merged into work/suite on init (fixtures, helpers, lib/security-api.ts)
   scenarios/      optional: the product team's scenarios, <slug>.md each (below)
+  sandbox/        optional: one guide per sandbox account, <name>.md (below)
+  bin/sandbox     optional — `check`: the sandbox accounts answer (below)
   README.md       for the people who maintain the profile
 ```
 
@@ -93,7 +95,10 @@ this contract (`--live` also lists its builds).
   product's npm scopes or package names; the policy hook refuses reading their files
   under any `node_modules/` (without it, nothing is refused there).
 - `egress` — hosts the product environment needs, for README and the operator's egress
-  rules. Listed, never applied by the agent.
+  rules. Listed, never applied by the agent. A host or path may name `{profile.<key>}`, the
+  instance's value of one of the profile's `config` keys (a sandbox organization or
+  repository); unset or not a plain name, the rule is `refused`. On a GitHub host only the
+  sandbox shapes pass ([black-box.md](black-box.md) → **Sandbox accounts**).
 - `requires` — checked by `verify-onboarding.sh --live`: root (a vm-backend agent), the
   commands on `PATH`, memory.
 - `security` (optional) — `entity`: the noun of the main object a user creates, with a
@@ -158,9 +163,62 @@ Every executable runs with cwd `$HOME/work`, and with:
   content). Needed before every downgrade.
 - `bin/env status` → stdout `{"running": bool, "build": "<build>"|null, "ui_http": "<code>"}`.
 - `bin/env down` — stop it; state may stay on disk.
+- `bin/sandbox check` — optional, read-only toward the product; see **`sandbox`** below.
 
 Exit 0 is success; anything else is an environment failure, which never becomes a
 verdict ([issue-qa.md](issue-qa.md)). Diagnostics go to stderr; secrets never.
+
+## `sandbox` — external test accounts
+
+Some flows leave the product: an agent that answers in Slack, files a GitHub issue, sends an
+email. The nested product can only show them working when it has real accounts to connect
+to, and the instance's tests a person there who acts and looks. A profile that needs them
+declares **sandbox accounts** — throwaway accounts the operator creates once at onboarding
+(ONBOARDING.md Step 3a), apart from anything real: never the target's organization, never a
+company workspace.
+
+```json
+"sandbox": {
+  "accounts": [
+    { "id": "github", "what": "a GitHub organization of its own with one repository, and a fine-grained token for that repository only",
+      "guide": "sandbox/github.md", "credentials": ["TOKEN"] },
+    { "id": "slack", "what": "a free Slack workspace with one channel, the product's Slack app, and a second person",
+      "guide": "sandbox/slack.md", "credentials": ["BOT_TOKEN", "APP_TOKEN", "HUMAN_TOKEN", "CHANNEL_ID"] }
+  ]
+},
+"config": { "sandbox_github_repo": { "default": "", "about": "the sandbox repository, <organization>/<repository>", "ask": true } },
+"egress": [{ "host": "api.github.com", "method": "POST", "path": "/repos/{profile.sandbox_github_repo}/issues", "why": "the product files the sandbox issue" }]
+```
+
+- `id` `[a-z][a-z0-9]{0,15}`; `what` — one sentence the operator is told; `guide` —
+  `sandbox/<name>.md`, the operator's steps to create the account in words a person
+  follows: where to click, which scopes, a manifest to paste. Data to the agent — relayed,
+  never followed.
+- `credentials` — the names of the values the tests need, `[A-Z][A-Z0-9_]{0,31}`. Each
+  lands in `work/env/credentials.env` as **`E2E_SANDBOX_<ID>_<NAME>`**: the operator fills
+  the lines `scripts/sandbox.sh template` adds — never in chat. Every such value is masked in
+  run artefacts whatever its name, and a `_B64` value also decoded (a PEM key the test types).
+  `bin/env init` never removes those lines. Names that are no secret (a repository) are
+  `config` keys instead, so the egress can name them.
+- Egress — every host the nested product or the test person reaches, in `egress`, narrow:
+  the method and the path the flow needs. On a GitHub host, only the sandbox shapes.
+- Install-time values — a service the product configures per install (a Slack app's tokens)
+  takes them where the install is described: in an engine's values as
+  `{{sandbox:<id>.<NAME>}}` inside an overlay `when: "@sandbox:<id>"`, on only while that
+  account's lines are filled ([helm-k3s](../engines/helm-k3s/README.md) → Placeholders), or
+  read by an own `bin/env up` from `credentials.env`.
+- `bin/sandbox check` — optional, recommended: one request per account with its credentials
+  (who the token is, that the channel and the repository exist and are not the target's),
+  `ok <id> <detail>` / `FAIL <id> <problem>` lines, exit 1 on any `FAIL`; never a value.
+  Onboarding and `verify-onboarding.sh --live` run it.
+- `suite/` — the test person's actions, as helpers the profile ships (say,
+  `suite/lib/sandbox.ts`: post a message as the person, read the replies in a thread). A test
+  calls them; it never names a sandbox host itself. They reach only the sandbox's hosts.
+- `SKILL.md` — which criteria the sandbox makes testable, which helper does what, and what
+  stays `testable: no` without it (an instance whose operator declined it).
+
+The sandbox is opt-in per instance: missing credentials fail `verify-onboarding.sh`, and an
+operator who declines leaves the account's lines empty; its criteria are then `testable: no`.
 
 ## `SKILL.md` — what a tester should know
 

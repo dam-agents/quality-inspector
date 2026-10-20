@@ -30,6 +30,7 @@ TODO(profile): one bullet per further role — `member`, `viewer`, `outsider` (E
   An AC that needs any of them is `testable: no — external dependency`<fill: , unless it only checks that the UI offers or records something>.
 - <fill: one user, or the accounts above>. ACs about other users' access need a second account — `testable: no — single user`.
 TODO(profile): a bullet per further limit — email, payment, SSO, scale — or per stand-in and how a user observes it.
+TODO(profile): with `sandbox` accounts, a bullet per account — the flows it makes testable, the `suite/` helper that acts as the test person, how a result outside the product is observed — or delete this line.
 
 ## CLI and API
 

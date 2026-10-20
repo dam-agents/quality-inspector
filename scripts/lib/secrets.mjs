@@ -19,7 +19,8 @@ import { existsSync, lstatSync, readdirSync, readFileSync, renameSync, writeFile
 import { extname, join } from 'node:path';
 
 const MIN = 4;
-const KEY = /(^|_)(PASSWORD|TOKEN|SECRET)/i;
+// Every value of a sandbox account (docs/profile-contract.md → `sandbox`) counts, whatever its name.
+const KEY = /(^|_)(PASSWORD|TOKEN|SECRET)|^E2E_SANDBOX_/i;
 const TEXT = new Set(['.log', '.txt', '.md', '.json', '.jsonl', '.html']);
 const MASK = '***';
 
@@ -35,6 +36,11 @@ function values(envFile) {
     if (!v) continue;
     if (v.length < MIN) { short += 1; continue; }
     out.push(v, JSON.stringify(v).slice(1, -1), encodeURIComponent(v));
+    // A `_B64` value (a PEM key) is typed decoded: its text and each of its lines count too.
+    if (/_B64$/i.test(m[1])) {
+      const d = Buffer.from(v, 'base64').toString('utf8').trim();
+      if (d) out.push(d, JSON.stringify(d).slice(1, -1), ...d.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length >= 16));
+    }
   }
   // longest first, so a value containing another one is replaced whole
   return { forms: [...new Set(out)].sort((a, b) => b.length - a.length), short };

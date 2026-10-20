@@ -86,6 +86,20 @@ assert "no lent model, no llm values" 'has("llm") | not' "$(QI_MODEL_KEY= r '{"i
 assert "lent model fills its overlay" '.llm.key == "platform:conn:p1" and .llm.kind == "oauth" and .llm.base == "" and .llm.proxy == "http://gw:3128"
   and (.llm.no | startswith("corp.example,localhost") and contains(".cluster.local"))' \
   "$(QI_MODEL_KEY=platform:conn:p1 QI_MODEL_KIND=oauth QI_MODEL_BASE_URL= HTTPS_PROXY=http://gw:3128 NO_PROXY=corp.example r '{"img":"x","mock":""}')"
+# A sandbox account (docs/profile-contract.md → sandbox): its overlay is on only while every
+# E2E_SANDBOX_<ID>_* line of $QI_ENV_DIR/credentials.env is filled; its placeholders take the
+# values, one layer of quotes off.
+SBE="$SANDBOX/sbenv"; mkdir -p "$SBE"
+sbcfg() { cfg oci | jq -c '.overlays += [{when:"@sandbox:slack", values:{slack:{bot:"{{sandbox:slack.BOT_TOKEN}}", app:"{{sandbox:slack.APP_TOKEN}}"}}}]'; }
+rs() { QI_ENV_DIR="$SBE" QI_PROFILE_CONFIG='{"img":"x","mock":""}' node "$ENG/lib/render.mjs" config <<<"$(sbcfg)" \
+       | node "$ENG/lib/render.mjs" values "$SBE/credentials.env"; }
+cp "$SANDBOX/cred.env" "$SBE/credentials.env"
+assert "no sandbox lines, overlay off" 'has("slack") | not' "$(rs)"
+printf 'E2E_SANDBOX_SLACK_BOT_TOKEN="xoxb-1"\nE2E_SANDBOX_SLACK_APP_TOKEN=\n' >> "$SBE/credentials.env"
+assert "a sandbox line still empty, overlay off" 'has("slack") | not' "$(rs)"
+sed -i.bak 's/^E2E_SANDBOX_SLACK_APP_TOKEN=$/export E2E_SANDBOX_SLACK_APP_TOKEN=xapp-2/' "$SBE/credentials.env"
+assert "every sandbox line filled, overlay on" '.slack == {"bot":"xoxb-1","app":"xapp-2"}' "$(rs)"
+
 # model_env: off by default; on, the placeholder and the kind from the provider's variables — never a value.
 seed_work
 mkdir -p "$SANDBOX/home/.platform"
@@ -145,6 +159,16 @@ out="$(QI_MODEL_KEY=caller c "$(cfg oci | jq -c '.overlays[1].values.llm.x = "{{
 grep -q '^FAIL values with every overlay on: credentials have no QI_SECRET_MISSING' <<<"$out" \
   || { echo "  check: a @model overlay must be rendered with every overlay on"; FAILED=1; }
 grep -q '^FAIL values: ' <<<"$out" && { echo "  check: the defaults render must lend no model"; FAILED=1; }
+# A "@sandbox:<id>" overlay is valid and rendered only with every overlay on, with throw-away
+# credentials for its placeholders; another "@" word is not.
+out="$(c "$(sbcfg)")"; rc=$?
+assert_eq "check: a @sandbox overlay passes" "0 " "$rc $(grep '^FAIL' <<<"$out")"
+out="$(c "$(sbcfg | jq -c '.overlays[2].values.slack.x = "{{secret:missing}}"')")"
+grep -q '^FAIL values with every overlay on: credentials have no QI_SECRET_MISSING' <<<"$out" \
+  || { echo "  check: a @sandbox overlay must be rendered with every overlay on"; FAILED=1; }
+grep -q '^FAIL values: ' <<<"$out" && { echo "  check: the defaults render must have every sandbox off"; FAILED=1; }
+c "$(sbcfg | jq -c '.overlays[2].when = "@sandbox:Bad"')" | grep -q "^FAIL overlay when '@sandbox:Bad' is not" \
+  || { echo "  check: a bad sandbox id must fail"; FAILED=1; }
 c "$(cfg oci | jq -c '.app_port = 9090')" | grep -q '^FAIL app.url answers on port 8080, app_port is 9090' \
   || { echo "  check: app_port must match app.url"; FAILED=1; }
 c "$(cfg oci | jq -c '.channels.main.order = "time"')" | grep -q "^FAIL channel 'main': order time needs registry_api quay" \

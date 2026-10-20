@@ -225,6 +225,22 @@ if [ -f "$CONFIG" ]; then
       (*) fail profile_app_url "app.url '$(profile_field '.app.url')' is not local" "the product must run inside this VM (docs/profile-contract.md)";;
     esac
     PKEYS="$(jq -r '.config // {} | keys[]' "$pd/profile.json" 2>/dev/null | sed 's/^/profile./')"
+    # A profile egress rule egress-rules.sh refuses: a GitHub allow outside the closed set, or
+    # a {profile.<key>} with no plain value (docs/black-box.md → Sandbox accounts).
+    while IFS="$(printf '\t')" read -r h p why; do
+      fail "profile_egress:$h" "$p refused: $why" "never add this rule; set the key it names, or report the rule to the profile's repository"
+    done < <(bash "$SCRIPT_DIR/egress-rules.sh" --json 2>/dev/null | jq -r '.rules[]? | select(.source == "profile" and .how == "refused") | [.host, .path, .why] | @tsv')
+    # The sandbox accounts (docs/profile-contract.md → `sandbox`): each credential set.
+    if sb="$(bash "$SCRIPT_DIR/sandbox.sh" status 2>&1)"; then
+      if [ "$(jq -r .declared <<<"$sb")" = true ]; then
+        miss="$(jq -r '[.accounts[].credentials[] | select(.set | not) | .name] | join(" ")' <<<"$sb")"
+        [ -z "$miss" ] && ok sandbox_credentials "$(jq -r '[.accounts[].id] | join(", ")' <<<"$sb") set" \
+          || fail sandbox_credentials "not set: $miss" "the operator creates the accounts and fills these lines in work/env/credentials.env (ONBOARDING.md Step 3a) — never in chat"
+        while read -r pr; do [ -n "$pr" ] && fail sandbox "$pr" "fix the profile (docs/profile-contract.md → sandbox)"; done < <(jq -r '.problems[]' <<<"$sb")
+      fi
+    else
+      fail sandbox "$sb" "fix the profile's sandbox section (docs/profile-contract.md → sandbox)"
+    fi
   else
     fail profile "profile '$(cfg profile)' is not installed" "install it with the skill tools (ONBOARDING.md Step 3)"
     PKEYS=""
@@ -261,7 +277,7 @@ if [ "$EGRESS" = 1 ]; then
         "add an allow rule in the agent's network settings: host $h, method GET, path $p — no prompt appears for a request under a deny (a prompt answered Deny forever left a deny rule: delete it)";;
       (*) ok "egress:$h" "GET $p passes (HTTP $code)";;
     esac
-  done < <(jq -r '.rules[] | select(.source == "profile" and .verdict == "allow") | [.how, .method, .host, .path, .why] | @tsv' <<<"$er")
+  done < <(jq -r '.rules[] | select(.source == "profile" and .verdict == "allow" and .how != "refused") | [.how, .method, .host, .path, .why] | @tsv' <<<"$er")
 fi
 
 # --------------------------------------------------------------------- live
@@ -307,6 +323,15 @@ if [ "$LIVE" = 1 ]; then
   case $? in
     (0) ok lock_liveness "the runtime answers — a dead run's lock is freed at once";;
     (*) warn lock_liveness "the runtime gives no session state here — the environment lock falls back to lock_ttl_min";;
+  esac
+  sc="$(bash "$SCRIPT_DIR/sandbox.sh" check 2>&1)"; rc=$?
+  profile_dir >/dev/null || rc=skip   # the profile check above already failed
+  case "$rc" in
+    (skip) ;;
+    (0) [ "$sc" = "the profile declares no sandbox accounts" ] || ok sandbox_accounts "$(printf '%s' "$sc" | tail -1)";;
+    (3) warn sandbox_accounts "$sc";;
+    (*) fail sandbox_accounts "$(printf '%s' "$sc" | grep -m1 -E '^FAIL' || printf '%s' "$sc" | tail -1)" \
+      "the operator fixes the account or its credentials (ONBOARDING.md Step 3a); a refused request is a missing egress rule (egress-rules.sh)";;
   esac
   if [ "$(cfg lend_model)" = enabled ]; then
     IFS='|' read -r mk mkind _ <<<"$(model_env)"

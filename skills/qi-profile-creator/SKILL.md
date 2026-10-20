@@ -121,6 +121,12 @@ that remain.
   `## AC-<k> — <name>` blocks with Given/When/Then in a user's words. Offer one golden-path
   scenario per main area from the brief; the team owns and extends them, and a PR that
   changes how an area works updates its scenario. The nightly run adopts each one.
+- **`sandbox`** — only when brief row 19 has a flow: the throwaway accounts the operator
+  creates at onboarding, in the form of [profile-contract.md](../../docs/profile-contract.md)
+  → `sandbox` and [references/discovery.md](references/discovery.md) → Sandbox accounts —
+  a `sandbox/<name>.md` guide per account, the credential names, the names as `ask` config
+  keys, narrow egress naming them as `{profile.<key>}`, `bin/sandbox check`, the test
+  person's helpers in `suite/`, and the README's Sandbox accounts section.
 - **Channels** are named in the README (operators choose them), build names in
   `SKILL.md` (testers read them in reports).
 

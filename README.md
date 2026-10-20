@@ -79,7 +79,9 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
    credential; *Inject only into addressed requests* stays on (the kit sets it). Onboarding
    checks it with one model call made the way the tests make it.
 6. **Apply the profile's egress rules** (Black-box boundary below), then answer the onboarding
-   dialog. Schedules are held until onboarding completes, which includes a smoke test of
+   dialog. A profile whose flows reach outside the product (Slack, GitHub) asks for
+   throwaway **sandbox accounts** there — its guides say how to create them
+   ([docs/profile-contract.md](docs/profile-contract.md) → `sandbox`). Schedules are held until onboarding completes, which includes a smoke test of
    the nested product.
 7. *Optional:* **connect a Slack channel** to the agent for scenario requests.
 

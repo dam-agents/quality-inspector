@@ -41,6 +41,10 @@ Keep the template's order; drop a section that has nothing to say.
 - **What the nested install cannot do** — the section that decides verdicts. One bullet
   per limit: the limit, then the verdict in the core's words:
   - `testable: no — external dependency` for an outside service with no stand-in;
+  - with sandbox accounts (`sandbox`), which flows they make testable, which `suite/`
+    helper acts as the test person, how a result outside the product is observed (in the
+    product's UI or through the helper — never by reading GitHub), and that without them
+    those criteria stay `testable: no — external dependency`;
   - another reason after `testable: no —` for another cause (`single user`);
   - `blocked`, naming the `profile.<key>`, when an optional setting provides the stand-in
     — an instance without it reports such criteria blocked, not failed;

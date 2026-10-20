@@ -15,6 +15,16 @@
 #            deny (refused at once, no prompt ever appears), it is a deny, or it belongs to
 #            a set that must land whole (the kit's own, the work backup, GitHub Enterprise).
 #   kit      the kit already allows it — nothing to do.
+#   refused  never to be added: a profile allow on a GitHub host outside the closed set
+#            below, or a `{profile.<key>}` placeholder whose value is unset or not a plain
+#            name. verify-onboarding.sh fails on it; it is a profile defect.
+# A profile rule may name `{profile.<key>}` in its host or path — the instance's value of that
+# profile key (a sandbox account's organization or repository, docs/profile-contract.md →
+# `sandbox`). On a GitHub host (github.com, *.github.com, *.githubusercontent.com, the
+# target's host) a profile allow passes only on the API host and only as
+# /repos/<owner>/<repo>/<rest> — owner and repository literal [A-Za-z0-9.-], the owner never
+# the target's or the work backup's, <rest> not empty: a sandbox repository the nested product
+# writes to with a token scoped to it (docs/black-box.md → Sandbox accounts).
 # The black-box gate (scripts/preflight.sh) and `verify-onboarding.sh --live` prove them.
 #
 #   egress-rules.sh [--kit] [--json]
@@ -62,10 +72,50 @@ _host_covers() { # <rule host> <host>
     (*) return 1;;
   esac
 }
+# Is <host> one of GitHub's, or the target's?
+_github_host() { # <host>
+  local th; th="$(_bb_host "${T:-x/y}")"
+  case "$1" in
+    (github.com|*.github.com|*.githubusercontent.com|githubusercontent.com) return 0;;
+    ("$th"|"api.$th") return 0;;
+  esac
+  return 1
+}
+# Why a profile allow on a GitHub host is refused; nothing when it is in the closed set.
+_github_refusal() { # <method> <host> <path>
+  local api o r rest lo
+  api="$(_bb_api_host "$(_bb_host "${T:-x/y}")")"
+  case "$2" in (api.github.com|"$api") ;; (*) echo "a GitHub host other than its API"; return;; esac
+  case "$3" in (/repos/*/*/?*) ;; (*) echo "not /repos/<owner>/<repo>/<rest>"; return;; esac
+  rest="${3#/repos/}"; o="${rest%%/*}"; rest="${rest#*/}"; r="${rest%%/*}"
+  for lo in "$o" "$r"; do
+    case "$lo" in (''|.|..|*[!A-Za-z0-9.-]*) echo "owner and repository must be literal [A-Za-z0-9.-] names"; return;; esac
+  done
+  lo="$(_bb_lower "$o")"
+  [ -n "${T:-}" ] && [ "$lo" = "$(_bb_lower "$(_bb_repo "$T" | cut -d/ -f1)")" ] && { echo "the owner is the target's"; return; }
+  [ -n "${W:-}" ] && [ "$lo" = "$(_bb_lower "$(_bb_repo "$W" | cut -d/ -f1)")" ] && { echo "the owner is the work backup's"; return; }
+  return 0
+}
+# `{profile.<key>}` in a host or path, replaced by the instance's value; fails naming the key
+# when the value is unset or not a plain name ([A-Za-z0-9.-] segments joined by '/').
+PCFG=""
+_subst() { # <text>
+  local t="$1" k v
+  while [[ "$t" =~ \{profile\.([a-z0-9_]+)\} ]]; do
+    k="${BASH_REMATCH[1]}"
+    [ -n "$PCFG" ] || PCFG="$(profile_config)"
+    v="$(jq -r --arg k "$k" '.[$k] // ""' <<<"$PCFG")"
+    printf '%s' "$v" | grep -qE '^[A-Za-z0-9.-]+(/[A-Za-z0-9.-]+)*$' && ! printf '%s' "/$v/" | grep -qE '/\.\.?/' \
+      || { echo "profile.$k"; return 1; }
+    t="${t//\{profile.$k\}/$v}"
+  done
+  printf '%s\n' "$t"
+}
 # How a profile rule gets onto the agent, against the kit's rules.
 _how() { # <verdict> <method> <host> <path>
   local v m h p
   [ "$1" = deny ] && { echo by-hand; return; }
+  _github_host "$3" && [ -n "$(_github_refusal "$2" "$3" "$4")" ] && { echo refused; return; }
   while read -r v m h p; do
     [ "$v" = allow ] && [ "$h" = "$3" ] && { [ "$m" = "$2" ] || [ "$m" = '*' ]; } && [ "$4" != '*' ] && _covers "$p" "$4" \
       && { echo kit; return; }
@@ -112,7 +162,14 @@ if [ -n "$W" ]; then
 fi
 if dir="$(profile_dir)" && [ -f "$dir/profile.json" ]; then
   while IFS="$(printf '\t')" read -r v m h p why; do
-    row profile "$v" "$m" "$h" "$p" "$(_how "$v" "$m" "$h" "$p")" "$why"
+    k=""
+    if ! h2="$(_subst "$h")"; then k="$h2"; elif ! p2="$(_subst "$p")"; then k="$p2"; fi
+    if [ -n "$k" ]; then
+      row profile "$v" "$m" "$h" "$p" refused "$k is unset or not a plain name — set it in work/CONFIG.md (ONBOARDING.md Step 3)"; continue
+    fi
+    how="$(_how "$v" "$m" "$h2" "$p2")"
+    [ "$how" = refused ] && why="$(_github_refusal "$m" "$h2" "$p2") — a profile defect: report it to the profile's repository (docs/black-box.md → Sandbox accounts)"
+    row profile "$v" "$m" "$h2" "$p2" "$how" "$why"
   done < <(jq -r '.egress[]? | [(.verdict // "allow"), (.method // "*"), .host, (.pathPattern // .path // "*"), (.why // "")] | @tsv' "$dir/profile.json")
 else
   note "No profile installed — its egress is listed once it is."
@@ -129,4 +186,4 @@ echo "| how | verdict | method | host | path | why |"
 echo "| --- | --- | --- | --- | --- | --- |"
 printf '%s\n' "${ROWS[@]}" | jq -r '"| \(.how) | \(.verdict) | \(.method) | `\(.host)` | `\(.path)` | \(.why | gsub("\\|"; "/")) |"'
 echo
-echo "prompt: approve its prompt when it appears (verify-onboarding.sh --egress asks for each one) · by-hand: add it in the agent's network settings, no prompt will appear · kit: nothing to do."
+echo "prompt: approve its prompt when it appears (verify-onboarding.sh --egress asks for each one) · by-hand: add it in the agent's network settings, no prompt will appear · kit: nothing to do · refused: never add it (its why says what is wrong)."
