@@ -60,7 +60,7 @@ baseline_channel issue_comments artifact_reports include_comments max_issues_per
 e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback profile_source_path
 explorations max_explorations_per_ac auto_promote security_checks security_failed_logins
 confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi
-scenario_discovery scenario_channel max_scenarios_per_run max_scenarios_per_day work_repo test_catalog
+scenario_discovery scenario_channel profile_scenarios regression_channel max_scenarios_per_run max_scenarios_per_day work_repo test_catalog
 lend_model live_browser slack_channel slack_tests_per_day github_login"
 
 if [ "$STRUCTURE" = 1 ]; then
@@ -118,7 +118,7 @@ if [ "$STRUCTURE" = 1 ]; then
     && ok coverage_table "header intact" || fail coverage_table "work/COVERAGE.md missing or header changed" "re-seed per ONBOARDING.md Step 2b"
   [ "$(grep '^|' "$WORK/SCENARIOS.md" 2>/dev/null | head -1)" = "$SCENARIOS_HEADER" ] && [ -d "$WORK/scenarios" ] \
     && ok scenarios_table "header intact" || fail scenarios_table "work/SCENARIOS.md or work/scenarios/ missing, or the header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
-  bad="$(table_rows "$WORK/SCENARIOS.md" | awk -F'|' 'NF!=11 || $2 !~ /^ *S-[0-9]+ *$/ || $3 !~ /^ *(slack|operator|discovery) *$/ || $8 !~ /^ *(passed|failed|regression|needs-review|blocked|flaky|not-testable|-) *$/ || $9 !~ /^ *(proposed|queued|in_progress|report_pending|reported|rejected) *$/' | head -3)"
+  bad="$(table_rows "$WORK/SCENARIOS.md" | awk -F'|' 'NF!=11 || $2 !~ /^ *(S-[0-9]+|P-[a-z0-9][a-z0-9-]*) *$/ || $3 !~ /^ *(slack|operator|discovery|profile) *$/ || $8 !~ /^ *(passed|failed|regression|needs-review|blocked|flaky|not-testable|-) *$/ || $9 !~ /^ *(proposed|queued|in_progress|report_pending|reported|rejected|retired) *$/' | head -3)"
   [ -z "$bad" ] && ok scenarios_rows "row format" || fail scenarios_rows "malformed rows (a scenario is never verified): $bad" "fix the rows to the format in docs/scenarios.md → State"
   [ -f "$WORK/LESSONS.md" ] && ok lessons "present" || fail lessons "work/LESSONS.md missing" "ONBOARDING.md Step 2b"
   [ "$(grep '^|' "$WORK/CATALOG.md" 2>/dev/null | head -1)" = "$CATALOG_HEADER" ] \
@@ -167,6 +167,11 @@ if [ -f "$CONFIG" ]; then
   if [ -z "$v" ]; then ok cfg:scenario_channel "empty — proposals stay in the chat UI"
   elif printf '%s' "$v" | grep -qE '^[CDG][A-Z0-9]{6,}$'; then ok cfg:scenario_channel "$v"
   else fail cfg:scenario_channel "'$v' is not a Slack conversation id" "set the C…/G…/D… id of a conversation this agent is bound to, or leave it empty"; fi
+  enum profile_scenarios "enabled disabled"
+  v="$(cfg regression_channel)"
+  if [ -z "$v" ]; then ok cfg:regression_channel "empty — the nightly summary stays in the chat UI"
+  elif printf '%s' "$v" | grep -qE '^[CDG][A-Z0-9]{6,}$'; then ok cfg:regression_channel "$v"
+  else fail cfg:regression_channel "'$v' is not a Slack conversation id" "set the C…/G…/D… id of a conversation this agent is bound to, or leave it empty"; fi
   case "$(cfg slack_channel)" in ('') ok cfg:slack_channel "none — Slack orders no issue test";;
     (*) printf '%s' "$(cfg slack_channel)" | grep -qE '^[CGD][A-Z0-9]{6,}$' && ok cfg:slack_channel "$(cfg slack_channel)" \
           || fail cfg:slack_channel "'$(cfg slack_channel)' is not a Slack chat id" "use the id describe_channel lists, e.g. C0123ABCD (docs/slack.md)";; esac

@@ -116,6 +116,11 @@ that remain.
   helper, the security run's `lib/security-api.ts` — brief row 18). The core's suite
   skeleton wins on every path it already has, so never put tests, the sign-in setup or
   `e2e.config.ts` there.
+- **`scenarios/`** — the product team's flows, one `<slug>.md` each, in the form of
+  [profile-contract.md](../../docs/profile-contract.md) → `scenarios/`: a title, then
+  `## AC-<k> — <name>` blocks with Given/When/Then in a user's words. Offer one golden-path
+  scenario per main area from the brief; the team owns and extends them, and a PR that
+  changes how an area works updates its scenario. The nightly run adopts each one.
 - **Channels** are named in the README (operators choose them), build names in
   `SKILL.md` (testers read them in reports).
 

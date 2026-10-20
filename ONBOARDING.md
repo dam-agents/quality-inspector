@@ -229,7 +229,10 @@ with an existing file → keep its values, ask only for missing keys. Ask, valid
    default `disabled`: `propose` drafts up to `max_scenarios_per_run` judged proposals a
    week (tens of thousands of tokens), `run` also tests them (a few hundred thousand per
    scenario). With discovery on and a channel connected, ask `scenario_channel` (its
-   `C…` id; empty keeps the digest in chat).
+   `C…` id; empty keeps the digest in chat). When the profile has a `scenarios/` directory,
+   say that the nightly regression run adopts and replays them (`profile_scenarios`,
+   default `enabled`), and with a channel connected ask `regression_channel` for the
+   nightly summary (empty keeps it in chat).
 9. Everything else — defaults; show them and change only what the operator asks for. Offer
    `lend_model: enabled` when the profile's `SKILL.md` names criteria only a real model makes
    testable (tokens per product AI step), and `live_browser` when `/etc/AGENTS.md` names the
@@ -275,6 +278,8 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - security_failed_logins: 10
 - scenario_discovery: disabled
 - scenario_channel:
+- profile_scenarios: enabled
+- regression_channel:
 - max_scenarios_per_run: 3
 - max_scenarios_per_day: 10
 - lend_model: disabled

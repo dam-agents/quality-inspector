@@ -14,8 +14,10 @@
 // With "mode": "security" it is the security run's findings, severity-sorted, with the e2e
 // evidence of findings that carry a "tag"; it writes no comment.md — security findings never
 // go to an issue (docs/security.md). With "mode": "scenario" it is one scenario
-// (docs/scenarios.md): tests tagged scenario-<k>, the judge's reading per criterion, and
-// comment.md as the channel reply. Nothing else is read, except the previous build's
+// (docs/scenarios.md): tests tagged scenario-<k> (a profile scenario P-<slug>: profile-<slug>),
+// the request as received — "request_file", a file under work/scenarios/ read verbatim — next
+// to the criteria the agent froze from it, the judge's reading per criterion, and comment.md
+// as the channel reply. Nothing else is read, except the previous build's
 // screenshots an AC names as "before_shot", the new map's screenshots a context.signals
 // item names as "shot", and the screenshot a "noticed" item names as "shot".
 
@@ -65,10 +67,12 @@ function copyMedia(run, rel, acId) {
   return `media/${name}`;
 }
 
-// Whose criterion an AC is: an issue (#42, tag issue-42) or a scenario (S-7, tag scenario-7).
+// Whose criterion an AC is: an issue (#42, tag issue-42), a scenario (S-7, tag scenario-7) or
+// a profile scenario (P-sign-in, tag profile-sign-in).
+const scenarioTag = (s) => (/^P-/.test(String(s)) ? `profile-${String(s).slice(2)}` : `scenario-${String(s).replace(/^S-/i, '')}`);
 function owner(ac) {
   const s = ac.scenario ?? (ac.issue == null ? v.scenario : null);
-  if (s) return { tag: `scenario-${String(s).replace(/^S-/i, '')}`, name: String(s) };
+  if (s) return { tag: scenarioTag(s), name: String(s) };
   const n = ac.issue ?? v.issue;
   return { tag: `issue-${n}`, name: `#${n}` };
 }
@@ -120,6 +124,16 @@ function findTracePage(run, rel) {
   return null;
 }
 function readText(p) { try { return p ? readFileSync(p, 'utf8').slice(0, 20000) : null; } catch { return null; } }
+
+// A scenario's request as received, verbatim: request.md, or a profile scenario's
+// source-<spec_hash>.md — only from under work/scenarios/, never another path.
+function requestText() {
+  if (!v.request_file) return null;
+  const root = join(work, 'scenarios');
+  const p = join(root, String(v.request_file).replace(/^scenarios\//, ''));
+  if (!p.startsWith(`${root}/`) || p.includes('/../')) return null;
+  return readText(p);
+}
 
 const key = (ac) => (ac.tag ? `${ac.tag}-${ac.target ?? ''}` : `${owner(ac).name}-${ac.id}`);
 const regression = v.mode === 'regression';
@@ -298,7 +312,8 @@ ${regression ? `<div class="hero"><h1>Regression run — ${esc(v.candidate)}</h1
 : scenario ? `<div class="hero"><h1>${esc(v.scenario)} — ${esc(v.title)}</h1>${badge(v.verdict)}</div>
 <p class="meta">build <code>${esc(v.candidate ?? '–')}</code> · last release <code>${esc(v.baseline ?? '–')}</code> · scenario <code>spec=${esc(v.spec_hash)}</code> (source: ${esc(v.source ?? 'request')}) · ${esc(v.generated_utc ?? '')}</p>
 <p class="dim">Each step of the scenario was tested on the build. A failure that held on a re-run was also run on the last release: failing only on the build is a <b>regression</b>, failing on both is <b>failed</b>. An independent judge read the evidence of every criterion. Watch the videos and screenshots to check the result yourself.</p>
-<table><thead><tr><th>AC</th><th>Criterion</th><th>Build</th><th>Last release</th><th>Verdict</th></tr></thead><tbody>${summaryRows}</tbody></table>`
+<table><thead><tr><th>AC</th><th>Criterion</th><th>Build</th><th>Last release</th><th>Verdict</th></tr></thead><tbody>${summaryRows}</tbody></table>
+${(() => { const t = requestText(); return t == null ? '' : `<details class="request" open><summary><b>The request, verbatim</b> — the words the criteria below were frozen from</summary><pre>${esc(t)}</pre></details>`; })()}`
 : `<div class="hero"><h1>#${esc(v.issue)} — ${esc(v.title)}</h1>${badge(v.verdict)}</div>
 <p class="meta">candidate <code>${esc(v.candidate ?? '–')}</code> · baseline <code>${esc(v.baseline ?? '–')}</code> · criteria <code>ac=${esc(v.ac_hash)}</code> (source: ${esc(v.criteria_source ?? 'done-when')}) · ${esc(coverage)} · ${esc(v.generated_utc ?? '')}</p>
 <p class="dim">Each criterion was tested on the candidate build and on the baseline release. <b>Verified</b> means it fails on the baseline and passes on the candidate. Watch the videos and screenshots to check the result yourself.</p>

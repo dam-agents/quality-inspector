@@ -53,6 +53,8 @@ const suite = new Map(rows(join(work, 'SUITE.md')).map(([test, owner, tier, hash
   [test, { owner, tier, hash, promoted: promoted && promoted !== '-' ? promoted : null }]));
 const qa = new Map(rows(join(work, 'QA.md')).map(([n, acHash]) => [n, { acHash }]));
 const scen = new Map(rows(join(work, 'SCENARIOS.md')).map(([id, source, , , specHash]) => [id, { source, specHash }]));
+// A scenario's test key: S-7 -> scenario-7, a profile scenario P-sign-in -> profile-sign-in.
+const scenKey = (id) => (String(id).startsWith('P-') ? `profile-${String(id).slice(2)}` : `scenario-${String(id).replace(/^S-/i, '')}`);
 const heals = rows(join(work, 'HEALS.md')).map(([utc, test, ac, build, , , basis]) => ({ utc, test, ac, build, basis }));
 const flaky = rows(join(work, 'FLAKY.md')).map(([utc, test, ac, build, runs, passes]) => ({ utc, test, ac, build, runs: +runs || null, passes: +passes || 0 }));
 const collections = rows(join(work, 'CATALOG.md')).map(([name, members]) =>
@@ -68,7 +70,7 @@ const drifted = (file) => drift.some((d) => String(d.test ?? d.file ?? d).endsWi
 // sections with Given/When/Then (Expected) lines, surface and testable.
 function parseCriteria(text) {
   if (!text) return null;
-  const title = (text.match(/^# (?:#\d+|S-\d+) — (.*?)(?:\s{2,}\S+:.*)?$/m) ?? [])[1] ?? null;
+  const title = (text.match(/^# (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*) — (.*?)(?:\s{2,}\S+:.*)?$/m) ?? [])[1] ?? null;
   const acs = [];
   for (const sec of text.split(/^## /m).slice(1)) {
     const head = sec.split('\n')[0];
@@ -150,7 +152,7 @@ function readVerdicts(dir, okey, run) {
   if (art) evidence.set(okey, `platform://artifacts/${art}`);
 }
 for (const n of ls(join(work, 'issues')).filter((x) => /^\d+$/.test(x))) readVerdicts(join(work, 'issues', n), `issue-${n}`, 'issue');
-for (const s of ls(join(work, 'scenarios')).filter((x) => /^S-\d+$/.test(x))) readVerdicts(join(work, 'scenarios', s), `scenario-${s.slice(2)}`, 'scenario');
+for (const s of ls(join(work, 'scenarios')).filter((x) => /^(S-\d+|P-[a-z0-9][a-z0-9-]*)$/.test(x))) readVerdicts(join(work, 'scenarios', s), scenKey(s), 'scenario');
 
 // Nightly runs: REGRESSION.log `ran candidate=` lines, and per run the criteria that were not
 // unchanged (work/regression/<candidate>/verdicts.json); every other regression-tier item of
@@ -169,7 +171,7 @@ for (const c of ls(join(work, 'regression'))) {
   if (!v) continue;
   const per = new Map();
   for (const e of v.acs ?? v.entries ?? []) {
-    const okey = e.scenario ? `scenario-${String(e.scenario).replace(/^S-/i, '')}` : `issue-${e.issue}`;
+    const okey = e.scenario ? scenKey(e.scenario) : `issue-${e.issue}`;
     per.set(`${okey}/${e.id}`, e.verdict);
   }
   nightOutcomes.set(c, per);
@@ -199,17 +201,17 @@ if (target && process.env.QI_CATALOG_OFFLINE !== '1') {
 // ------------------------------------------------------------------------- items
 const perf = readJson(join(work, 'perf', 'trend.json'))?.tests ?? {};
 const items = [];
-const testFiles = ls(join(work, 'suite', 'tests')).filter((f) => /^(issue|scenario)-\d+\.e2e\.ts$/.test(f)).sort((a, b) =>
+const testFiles = ls(join(work, 'suite', 'tests')).filter((f) => /^((issue|scenario)-\d+|profile-[a-z0-9][a-z0-9-]*)\.e2e\.ts$/.test(f)).sort((a, b) =>
   a.localeCompare(b, 'en', { numeric: true }));
 const origins = new Set([...testFiles.map((f) => f.replace(/\.e2e\.ts$/, '')),
-  ...[...qa.keys()].map((n) => `issue-${n}`), ...[...scen.keys()].map((s) => `scenario-${s.slice(2)}`)]);
+  ...[...qa.keys()].map((n) => `issue-${n}`), ...[...scen.keys()].map(scenKey)]);
 
 for (const okey of [...origins].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))) {
-  const [kind, num] = okey.split('-');
+  const kind = okey.slice(0, okey.indexOf('-')), num = okey.slice(okey.indexOf('-') + 1);
   const isIssue = kind === 'issue';
   const file = `tests/${okey}.e2e.ts`;
   const row = suite.get(file);
-  const ref = isIssue ? `#${num}` : `S-${num}`;
+  const ref = isIssue ? `#${num}` : kind === 'profile' ? `P-${num}` : `S-${num}`;
   const crit = isIssue
     ? parseCriteria(read(join(work, 'issues', num, `criteria-${qa.get(num)?.acHash}.md`)))
     : parseCriteria(read(join(work, 'scenarios', ref, `criteria-${scen.get(ref)?.specHash}.md`)));

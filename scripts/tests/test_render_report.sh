@@ -130,6 +130,25 @@ case "$h" in *'S-7 — Export the usage table'*) ;; *) echo "  scenario title mi
 case "$h" in *'agrees (product-defect)'*) ;; *) echo "  judge reading missing"; FAILED=1;; esac
 grep -q '^• AC-1 csv downloads — regression$' "$SANDBOX/s-out/comment.md" || { echo "  scenario reply line missing"; FAILED=1; }
 
+# A profile scenario: evidence by its profile-<slug> tag, the request shown verbatim from its
+# source-<spec_hash>.md; a request_file outside work/scenarios/ is never read.
+mk_run p-cand passed profile-sign-in
+mkdir -p "$WORK_DIR/scenarios/P-sign-in"
+printf '# Sign-in\nWhen the owner signs in <b>now</b>\n' > "$WORK_DIR/scenarios/P-sign-in/source-abc.md"
+cat > "$SANDBOX/p.json" <<'J'
+{"mode":"scenario","scenario":"P-sign-in","title":"Sign-in","source":"profile","spec_hash":"abc","candidate":"c1",
+ "candidate_run":"p-cand","verdict":"passed","request_file":"scenarios/P-sign-in/source-abc.md",
+ "acs":[{"id":"AC-1","name":"owner signs in","then":"the dashboard shows","testable":true,"verdict":"passed"}]}
+J
+out="$(QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/p.json" "$SANDBOX/p-out")"
+assert "profile scenario: evidence found by the profile tag" '.videos == 1' "$out"
+h="$(cat "$SANDBOX/p-out/index.html")"
+case "$h" in *'The request, verbatim'*'When the owner signs in &lt;b&gt;now&lt;/b&gt;'*) ;; *) echo "  verbatim request missing or unescaped"; FAILED=1;; esac
+echo secret > "$SANDBOX/outside.md"
+jq '.request_file = "scenarios/../../outside.md"' "$SANDBOX/p.json" > "$SANDBOX/p-esc.json"
+QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/p-esc.json" "$SANDBOX/p-esc-out" >/dev/null
+case "$(cat "$SANDBOX/p-esc-out/index.html")" in *secret*|*'The request, verbatim'*) echo "  a request_file outside work/scenarios/ was read"; FAILED=1;; esac
+
 # A scenario is never verified: refused before anything is written, the earlier report kept.
 jq '.verdict = "passed" | .acs[0].verdict = "verified"' "$SANDBOX/s.json" > "$SANDBOX/s-ver.json"
 QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/s-ver.json" "$SANDBOX/s-out" >/dev/null 2>&1

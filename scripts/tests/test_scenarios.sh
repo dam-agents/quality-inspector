@@ -105,6 +105,7 @@ for k in 21 22 23 24 25 26 27 28; do bash "$S" set "S-$k" source=discovery statu
 assert_eq "concurrent writers lose no row" 9 "$(table_rows "$WORK_DIR/SCENARIOS.md" | grep -c '^| S-')"
 assert_eq "one row per id" "| S-20 | slack | U0123ABCD | C0123ABCD/1.2 | abc | c1 | passed | reported |" "$(row S-20 | sed 's/ [0-9T:Z-]* |$//')"
 [ ! -d "$WORK_DIR/scenarios/.lock" ] || { echo "  the row lock was left behind"; FAILED=1; }
+bash "$S" set P-sign-in source=profile status=retired >/dev/null
 v="$(HOME="$SANDBOX" bash "$SCRIPTS/verify-onboarding.sh" 2>/dev/null | grep ' scenarios_rows ')"
 case "$v" in (ok*) ;; (*) echo "  rows written by set fail the verifier: $v"; FAILED=1;; esac
 echo "| S-29 | slack | - | - | xyz | c1 | verified | reported | $(iso_ago 1) |" >> "$WORK_DIR/SCENARIOS.md"
