@@ -81,6 +81,8 @@ cmd_status() {
 cmd_template() {
   [ -f "$CRED" ] || die "work/env/credentials.env missing — run: bash \"\$HOME/scripts/env.sh\" init"
   local id what guide keys k n
+  # A file saved without a final newline would join its last value to the first new line.
+  [ -s "$CRED" ] && [ -n "$(tail -c1 "$CRED")" ] && echo >> "$CRED"
   while IFS="$(printf '\t')" read -r id what guide keys; do
     for k in $keys; do
       n="$(var "$id" "$k")"

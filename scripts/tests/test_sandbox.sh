@@ -30,6 +30,12 @@ printf '%s' "$st" | grep -q '42' && { echo "  assertion failed: status never pri
 assert_eq "template adds the missing lines only" "E2E_SANDBOX_GITHUB_PRIVATE_KEY_B64
 E2E_SANDBOX_SLACK_HUMAN_TOKEN" "$(SB template)"
 assert_eq "template is idempotent" "" "$(SB template)"
+# A file the operator saved without a final newline keeps its last value whole.
+cp "$CRED" "$SANDBOX/cred.bak"; grep -v '^E2E_SANDBOX_SLACK_HUMAN_TOKEN=' "$SANDBOX/cred.bak" > "$CRED"
+printf 'QI_SECRET_Y=efgh' >> "$CRED"
+assert_eq "template after a missing final newline" "E2E_SANDBOX_SLACK_HUMAN_TOKEN" "$(SB template)"
+assert_eq "the last value stays whole" "1 1" "$(grep -c '^QI_SECRET_Y=efgh$' "$CRED") $(grep -c '^E2E_SANDBOX_SLACK_HUMAN_TOKEN=$' "$CRED")"
+mv "$SANDBOX/cred.bak" "$CRED"; chmod 600 "$CRED"
 assert_eq "the file stays mode 600" 600 "$(stat -c %a "$CRED" 2>/dev/null || stat -f %Lp "$CRED")"
 assert_eq "existing lines are kept" 1 "$(grep -c '^E2E_SANDBOX_GITHUB_APP_ID="42"$' "$CRED")"
 
