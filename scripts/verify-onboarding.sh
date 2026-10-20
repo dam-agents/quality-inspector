@@ -15,8 +15,9 @@
 #
 #   --config            the CONFIG block only (mid-onboarding)
 #   --egress            the CONFIG block plus one request per profile egress rule: allowed,
-#                       refused at once (a kit deny or a denied prompt — add it by hand) or
-#                       held for the operator's approval prompt (direct session only)
+#                       refused at once (a kit deny or a denied prompt — add it by hand),
+#                       HTTP 403 (a warn: the gateway or the host itself) or held for the
+#                       operator's approval prompt (direct session only)
 #   (none)              every offline block: definition, schedules, work/, CONFIG
 #   --live              offline blocks plus integrations, the black-box boundary, the
 #                       VM, and one read-only pre-flight + Precheck per scheduled mode
@@ -233,12 +234,14 @@ fi
 
 # ------------------------------------------------------------------- egress
 # One request per profile egress rule, so a missing rule shows before env.sh up does. The
-# gateway refuses a request under a deny at once (403, or no connection) — no prompt ever
+# gateway refuses a request under a deny at once (no connection, or a 403) — no prompt ever
 # appears for it; a request no rule matches is held while the operator's approval prompt is
-# open, in a direct session only (a scheduled run is refused). Any HTTP answer is passage.
+# open, in a direct session only (a scheduled run is refused). Any other HTTP answer is
+# passage. A 403 is no proof: a storage or CDN host answers the probe's made-up path so too.
 if [ "$EGRESS" = 1 ]; then
   er="$(bash "$SCRIPT_DIR/egress-rules.sh" --json 2>/dev/null)" || er='{"rules":[]}'
   while IFS="$(printf '\t')" read -r how m h p why; do
+    case "${h#\*.}" in (''|*[!A-Za-z0-9.-]*) warn "egress:${h//[!A-Za-z0-9.*-]/?}" "not a plain host name — not probed; check the profile's egress"; continue;; esac
     case "$m" in (GET|HEAD|'*') ;; (*) warn "egress:$h" "$m $p is not probed (only GET) — $why"; continue;; esac
     case "$h" in ('*'*) warn "egress:$h" "a wildcard host is not probed: each host it reaches prompts once on first use (env.sh up) — approve each, or add the wildcard by hand"; continue;; esac
     case "$p" in ('*') path=/;; (*) path="${p//\*/qi-egress-check}";; esac
@@ -248,7 +251,8 @@ if [ "$EGRESS" = 1 ]; then
       (000:6) fail "egress:$h" "the host does not resolve (DNS)" "check the host name in the profile's egress (a typo is a profile defect: report it to the profile's repository)";;
       (000:35|000:51|000:60) fail "egress:$h" "TLS to the host failed (curl exit $rc)" \
         "check the host name and its certificate — not an egress rule; a gateway that intercepts TLS needs its CA in this VM's trust store";;
-      (403:*|000:*) fail "egress:$h" "GET $p refused at once${how:+ ($how)}" \
+      (403:*) warn "egress:$h" "GET $p answered HTTP 403 — the gateway's refusal, or the host's own answer to the probe's path${how:+ ($how)}: when this rule is not in the agent's network settings yet, add an allow rule there: host $h, method GET, path $p ($why)";;
+      (000:*) fail "egress:$h" "GET $p refused at once${how:+ ($how)}" \
         "add an allow rule in the agent's network settings: host $h, method GET, path $p — no prompt appears for a request under a deny (a prompt answered Deny forever left a deny rule: delete it)";;
       (*) ok "egress:$h" "GET $p passes (HTTP $code)";;
     esac

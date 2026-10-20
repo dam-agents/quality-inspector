@@ -29,7 +29,7 @@ confirmed before writing files.
 | 14 | Settings an operator may change, and which have no safe default | `config` (`ask`) |
 | 15 | Main UI areas and the terms users see | `SKILL.md` |
 | 16 | A published CLI or API (the command, the path of its OpenAPI JSON), its npm package, and how a user gets a token for it | `interfaces`, `boundary.packages`, `SKILL.md` → CLI and API |
-| 17 | The main object a user creates, with a name and a description (a project, a document); the namespace its pods run in when no engine names one | `security.entity`, `security.namespace` |
+| 17 | The main object a user creates, with a name and a description (a project, a document), and where in the UI; the namespace its pods run in when no engine names one | `security.entity`, `security.namespace`, `canary.thing` (`canary.field` when the text shows in another field, `canary.none` when there is no such object) |
 | 18 | API calls the security run cannot make through the UI: create that object, mint and use an API key | `suite/lib/security-api.ts` (its exports: the core's `docs/security.md`) |
 
 ## Where to look

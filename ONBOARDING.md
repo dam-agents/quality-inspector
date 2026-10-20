@@ -316,8 +316,10 @@ instance needs beyond the kit. Give the operator every `by-hand` row in its word
 method, path, why: "add an allow rule in this agent's network settings" — never a command; no
 prompt ever appears for it. Then run `bash "$HOME/scripts/verify-onboarding.sh" --egress`: it
 requests every `prompt` rule, so its approval prompt opens for the operator — "Allow
-permanently" — and reports each rule allowed, refused (`FAIL`, the rule to add by hand) or
-held (approve, re-run). Re-run until it shows no `FAIL` and nothing held.
+permanently" — and reports each rule allowed, refused (`FAIL`, the rule to add by hand),
+HTTP 403 (a `warn`: the gateway's refusal or the host's own answer — ask the operator whether
+that rule is in the network settings, and add it when not) or held (approve, re-run). Re-run
+until it shows no `FAIL` and nothing held.
 
 ## Step 4 — Reconstruct `QA.md` (only when it has no rows and comments were used before)
 

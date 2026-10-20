@@ -28,7 +28,7 @@ _bb_definition() {
 
 # The GitHub egress every deployment shares, one "<verdict> <method> <host> <path pattern>"
 # per line, on one GitHub host: the kit carries it for github.com (validate-definition.sh
-# compares), egress-rules.sh prints it for a GitHub Enterprise target. No rule names the
+# compares), egress-rules.sh lists it for a GitHub Enterprise target. No rule names the
 # target — the host is deny-by-default, and what opens opens for every repository alike: the
 # issues endpoints, the profile directory and a repository's metadata and head ref (the
 # platform's install and scan). The platform matches by the exact host, then a named method

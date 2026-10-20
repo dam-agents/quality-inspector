@@ -61,13 +61,15 @@ bash "$DEF/scripts/egress-rules.sh" | grep -qF '| prompt | allow | GET | `cdn.ex
   || { echo "  assertion failed: the table row of a prompt rule"; FAILED=1; }
 
 # verify-onboarding.sh --egress: one GET per profile rule; a held request is a warning, a
-# refusal a FAIL naming the rule to add by hand, any answer a pass; wildcard hosts are skipped.
+# refused connection a FAIL naming the rule to add by hand, a 403 a warning (the gateway or
+# the host itself), any other answer a pass; wildcard hosts and odd host names are skipped.
 mkdir -p "$SANDBOX/egress-bin"
 cat > "$SANDBOX/egress-bin/curl" <<'S'
 #!/usr/bin/env bash
 for a in "$@"; do case "$a" in
   (https://held.example/*) printf 000; exit 28;;
-  (https://refused.example/*) printf 403; exit 0;;
+  (https://refused.example/*) printf 000; exit 56;;
+  (https://forbidden.example/*) printf 403; exit 0;;
   (https://open.example/a/qi-egress-check) printf 404; exit 0;;
   (https://typo.example/*) printf 000; exit 6;;
   (https://badcert.example/*) printf 000; exit 60;;
@@ -83,7 +85,9 @@ cat > "$QI_PROFILE_DIR/profile.json" <<'J'
            {"host":"*.layers.example","method":"GET","why":"layers"},
            {"host":"up.example","method":"POST","why":"uploads"},
            {"host":"typo.example","method":"GET","why":"dns"},
-           {"host":"badcert.example","method":"GET","why":"tls"}]}
+           {"host":"badcert.example","method":"GET","why":"tls"},
+           {"host":"forbidden.example","method":"GET","why":"bucket"},
+           {"host":"u@evil.example/x?","method":"GET","why":"odd"}]}
 J
 eg="$(PATH="$SANDBOX/egress-bin:$PATH" bash "$SCRIPTS/verify-onboarding.sh" --egress 2>/dev/null | grep ' egress:')"
 printf '%s\n' "$eg" | grep -q '^ok   egress:open.example — GET /a/\* passes (HTTP 404)$' || { echo "  assertion failed: an answered request passes"; FAILED=1; }
@@ -94,6 +98,11 @@ printf '%s\n' "$eg" | grep -q '^warn egress:\*.layers.example — a wildcard hos
 printf '%s\n' "$eg" | grep -q '^warn egress:up.example — POST \* is not probed' || { echo "  assertion failed: a non-GET rule is skipped"; FAILED=1; }
 printf '%s\n' "$eg" | grep -q '^FAIL egress:typo.example — the host does not resolve (DNS) — fix: check the host name' || { echo "  assertion failed: a DNS failure is not an egress rule"; FAILED=1; }
 printf '%s\n' "$eg" | grep -q '^FAIL egress:badcert.example — TLS to the host failed (curl exit 60) — fix: check the host name and its certificate' || { echo "  assertion failed: a TLS failure is not an egress rule"; FAILED=1; }
+printf '%s\n' "$eg" | grep -q '^warn egress:forbidden.example — GET \* answered HTTP 403 — the gateway.s refusal, or the host.s own answer' \
+  || { echo "  assertion failed: a 403 warns, naming both causes"; FAILED=1; }
+printf '%s\n' "$eg" | grep -q '^FAIL egress:forbidden' && { echo "  assertion failed: a 403 is no FAIL"; FAILED=1; }
+printf '%s\n' "$eg" | grep -q '^warn egress:u?evil.example?x? — not a plain host name — not probed' \
+  || { echo "  assertion failed: an odd host name is not probed"; FAILED=1; }
 printf '%s\n' "$eg" | grep -E 'egress:(typo|badcert)\.example.*add an allow rule' && { echo "  assertion failed: no allow rule for a DNS or TLS failure"; FAILED=1; }
 
 exit $FAILED

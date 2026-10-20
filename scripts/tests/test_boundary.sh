@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The black-box boundary: the rules egress-rules.sh prints hold under the platform's rule
+# The black-box boundary: the rules egress-rules.sh lists hold under the platform's rule
 # matching, and the probes tell a refusal from a reachable or unproven surface.
 . "$(dirname "$0")/lib.sh"
 seed_work
