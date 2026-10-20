@@ -6,11 +6,17 @@
 #                                                 work/scenarios/S-<k>/ atomically (two turns
 #                                                 at once never share an id), logs
 #                                                 `scenario_new`, prints S-<k>
+#   scenarios.sh adopt <slug>                     the profile's scenarios/<slug>.md as P-<slug>:
+#                                                 creates work/scenarios/P-<slug>/, copies the
+#                                                 file byte for byte to source-<spec_hash>.md
+#                                                 (kept when it exists), logs `scenario_adopt`,
+#                                                 prints {"id","slug","spec_hash","source",
+#                                                 "previous_spec_hash"} — the previous from the row
 #   scenarios.sh admit                            {"runs_today":n,"cap":m,"admit":bool,
 #                                                  "env":{"busy":bool,"holder":…,"since":…}}
 #   scenarios.sh lint <request.md>                {"injection":{…},"injection_suspect":bool} —
 #                                                 the issues' injection lint (lib/scan-issues.mjs)
-#   scenarios.sh set S-<k> [<column>=<value>…]    the one writer of a work/SCENARIOS.md row: a
+#   scenarios.sh set <id> [<column>=<value>…]     (S-<k> or P-<slug>) the one writer of a work/SCENARIOS.md row: a
 #                                                 locked read-modify-write (Slack turns and runs
 #                                                 write at once), updated_utc = now, prints the
 #                                                 row. A new row needs source= and status=. A
@@ -33,6 +39,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/config.sh" || { echo "cannot source lib/config.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/state.sh" || { echo "cannot source lib/state.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/lock.sh" || { echo "cannot source lib/lock.sh" >&2; exit 1; }
+. "$SCRIPT_DIR/lib/profile.sh" || { echo "cannot source lib/profile.sh" >&2; exit 1; }
 if ! . "$SCRIPT_DIR/log.sh" 2>/dev/null; then logev() { :; }; fi
 export LOG_JOB="${LOG_JOB:-scenario}"
 
@@ -54,16 +61,24 @@ cmd_new() {
 }
 
 # Columns of a row, in SCENARIOS_HEADER order, and the values each one takes.
-SOURCES='slack|operator|discovery'
-STATUSES='proposed|queued|in_progress|report_pending|reported|rejected'
+SOURCES='slack|operator|discovery|profile'
+STATUSES='proposed|queued|in_progress|report_pending|reported|rejected|retired'
 VERDICTS='passed|failed|regression|needs-review|blocked|flaky|not-testable|-'
 one_of() { case "|$2|" in (*"|$1|"*) return 0;; esac; return 1; }
+
+# A scenario id: S-<k> (a request or a proposal), or P-<slug> (the profile's scenarios/<slug>.md).
+valid_id() {
+  case "$1" in
+    (S-[0-9]*) case "${1#S-}" in (*[!0-9]*) return 1;; esac; return 0 ;;
+    (P-*) printf '%s' "${1#P-}" | grep -qE '^[a-z0-9][a-z0-9-]{0,47}$' ;;
+    (*) return 1 ;;
+  esac
+}
 
 cmd_set() {
   local id="${1:-}" kv k v f="$WORK/SCENARIOS.md" lk="$WORK/scenarios/.lock" tries=0 tmp old row now ttl
   local c_source="" c_requester="" c_thread="" c_hash="" c_build="" c_verdict="" c_status=""
-  case "$id" in (S-[0-9]*) case "${id#S-}" in (*[!0-9]*) id="";; esac;; (*) id="";; esac
-  [ -n "$id" ] || { echo "usage: $0 set S-<k> [<column>=<value>…]" >&2; exit 2; }
+  valid_id "$id" || { echo "usage: $0 set <S-<k>|P-<slug>> [<column>=<value>…]" >&2; exit 2; }
   shift
   for kv in "$@"; do
     k="${kv%%=*}"; v="${kv#*=}"
@@ -151,10 +166,30 @@ cmd_lint() {
     console.log(JSON.stringify(injectionLint(readFileSync(process.argv[1], 'utf8'))));" "$1" "$SCRIPT_DIR/lib/scan-issues.mjs"
 }
 
+# The verbatim text of a profile scenario, kept per spec_hash next to the criteria the agent
+# freezes from it (docs/scenarios.md → Profile scenarios). Local only: the profile is the
+# skill already on disk.
+cmd_adopt() {
+  local slug="${1:-}" line h src dir prev row
+  printf '%s' "$slug" | grep -qE '^[a-z0-9][a-z0-9-]{0,47}$' || { echo "usage: $0 adopt <slug>" >&2; exit 2; }
+  line="$(profile_scenarios 2>/dev/null | awk -F'\t' -v s="$slug" '$1 == s {print; exit}')"
+  [ -n "$line" ] || { echo "scenarios: the profile has no scenarios/$slug.md" >&2; exit 1; }
+  h="$(printf '%s' "$line" | cut -f2)"; src="$(printf '%s' "$line" | cut -f3)"
+  dir="$WORK/scenarios/P-$slug"
+  mkdir -p "$dir" || exit 1
+  [ -f "$dir/source-$h.md" ] || cp "$src" "$dir/source-$h.md" || { echo "scenarios: cannot copy $src" >&2; exit 1; }
+  row="$(table_rows "$WORK/SCENARIOS.md" | awk -F'|' -v id="P-$slug" '{x=$2; gsub(/[ \t]/,"",x)} x==id {print; exit}')"
+  prev="-"; [ -n "$row" ] && prev="$(cell "$row" 5)"
+  logev info scenario_adopt "id=P-$slug spec=$h"
+  jq -nc --arg id "P-$slug" --arg s "$slug" --arg h "$h" --arg src "scenarios/P-$slug/source-$h.md" --arg p "$prev" \
+    '{id:$id, slug:$s, spec_hash:$h, source:$src, previous_spec_hash:(if $p == "-" then null else $p end)}'
+}
+
 case "${1:-}" in
   new)   cmd_new "${2:-}" ;;
+  adopt) cmd_adopt "${2:-}" ;;
   admit) cmd_admit ;;
   lint)  cmd_lint "${2:-}" ;;
   set)   shift; cmd_set "$@" ;;
-  *) echo "usage: $0 new <slack|operator|discovery> | admit | lint <request.md> | set S-<k> [<column>=<value>…]" >&2; exit 2 ;;
+  *) echo "usage: $0 new <slack|operator|discovery> | adopt <slug> | admit | lint <file> | set <S-<k>|P-<slug>> [<column>=<value>…]" >&2; exit 2 ;;
 esac

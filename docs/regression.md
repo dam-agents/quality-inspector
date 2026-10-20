@@ -17,22 +17,34 @@
   (tier `regression`, `assert_hash`, `promoted_utc` now) — the risk: an AC freeze the
   operator never read then gates every nightly run.
 - `regression` — promoted by the operator ("promote #N", "promote all pending" →
-  [on-demand.md](on-demand.md)) or by `auto_promote: verified`.
+  [on-demand.md](on-demand.md)), by `auto_promote: verified`, or — a profile scenario — by
+  its adoption ([scenarios.md](scenarios.md) → **Profile scenarios**): merged in the
+  product's repository, it needs no operator.
   `assert_hash` is the `scripts/check-asserts.sh --hash` value of its AC blocks; it changes
   only by a heal ([triage.md](triage.md), logged in `work/HEALS.md`) or by the operator.
 - `retired` — superseded by a completed issue ([triage.md](triage.md)); kept, not replayed.
 - `quarantined` — flaky on two builds within 14 days ([triage.md](triage.md) → Flaky tests
   and quarantine); kept, not replayed until the operator re-promotes it.
 - A scenario's row (`tests/scenario-<k>.e2e.ts`, `S-<k>` in the `issue` column) is tagged
-  `scenario-<k>`: wherever this file and [triage.md](triage.md) say `issue-<n>`, use that
+  `scenario-<k>`, a profile scenario's (`tests/profile-<slug>.e2e.ts`, `P-<slug>`)
+  `profile-<slug>`: wherever this file and [triage.md](triage.md) say `issue-<n>`, use that
   tag, and its report entries carry `scenario` instead of `issue`.
 
 ## The regression run
 
 The worklist carries `candidate`, `previous_candidate` (the build last regression-tested,
-`null` the first time), `tests[]`, `assert_drift[]` (`null` when the check could not
-run — say so, never treat it as clean), and `confirm_regressions` / `bisect_max_steps`
-([triage.md](triage.md) → Order of work, steps 5–6).
+`null` the first time), `replay`, `tests[]`, `assert_drift[]` (`null` when the check could
+not run — say so, never treat it as clean), `profile_scenarios`, `channel`, and
+`confirm_regressions` / `bisect_max_steps` ([triage.md](triage.md) → Order of work, steps 5–6).
+
+- `profile_scenarios` — `{files, adopt[], retire[], deferred}`, or `null` with
+  `profile_scenarios: disabled`: the profile's `scenarios/` against the `source=profile`
+  rows of `work/SCENARIOS.md`. `adopt[]` (`id`, `slug`, `spec_hash`, `kind` new|changed|retry
+  — `retry`: the same text, its adoption failed, blocked or flaky, taken on a new build only)
+  holds at most `max_scenarios_per_run` entries, retries last; `deferred` wait for a later night.
+- `replay` — `false` when the candidate was already regression-tested and only profile
+  scenarios changed: adopt and retire them (step 3a), replay nothing else, skip steps 3–6.
+- `channel` — `regression_channel`, or `null`: where step 9's summary goes.
 
 1. `env.sh lock regression` (busy → end the run, log it).
 2. `env.sh reset`, `env.sh up <candidate>`, `suite.sh run smoke-<candidate> --tag smoke`.
@@ -43,6 +55,11 @@ run — say so, never treat it as clean), and `confirm_regressions` / `bisect_ma
    the window, the published interfaces' diff, the impact per test, and your one-line
    expectation per impacted test. Rewrite `work/COVERAGE.md` from the new map
    ([change-awareness.md](change-awareness.md) → Coverage).
+3a. **Profile scenarios** ([scenarios.md](scenarios.md) → **Profile scenarios**): each
+   `retire[]` id, then each `adopt[]` entry — Adopt steps 1–6, the budgets counted per
+   scenario. A newly registered test is in step 5's replay from the next night: its
+   adoption run is tonight's result. List what was adopted, rejected and retired in the
+   report's `notes`, with the adoption runs' verdicts as entries (`scenario`: `P-<slug>`).
 4. Drifted tests (`assert_drift`) are **not run** — list them for the operator.
 5. Replay: `suite.sh run regression-<candidate> --evidence failures --tag issue-<a> --tag issue-<b> …`.
    `criterion()` judges a check whose control moved instead of failing it. Explorations
@@ -69,5 +86,11 @@ run — say so, never treat it as clean), and `confirm_regressions` / `bisect_ma
    to `work/REGRESSION.log` — the pre-flight keys "already tested" and
    `previous_candidate` on `ran candidate=`.
 9. `env.sh unlock regression`. Summary in the chat UI: regressions first, each with its
-   evidence link; then what needs review; then one line of what was absorbed.
+   evidence link; then what needs review; then one line of what was absorbed; then the
+   profile scenarios adopted, rejected and retired. With `channel` set, the same summary
+   as one `send_channel_message` to it — every night, also when all is `unchanged`, so a
+   missing post is noticed; a regression or a failed adoption opens with 🔴 and the test's
+   owner (the scenario's file, or the issue). Ledgered as surface `slack`
+   ([logging.md](logging.md) → **Ledger of external writes**); a refused post is logged,
+   never retried by the run.
 10. The catalog ([catalog.md](catalog.md) → **Build and publish**).

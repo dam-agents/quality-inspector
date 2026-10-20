@@ -7,6 +7,24 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.1.0 — 2026-10-20
+
+**Upgrade:**
+1. Nothing is required: the two new keys default when missing — `profile_scenarios: enabled`,
+   `regression_channel` empty. Add both lines to `work/CONFIG.md` to make them visible.
+2. Optional — the product team's scenarios: a profile may now carry `scenarios/<slug>.md`
+   ([docs/profile-contract.md](docs/profile-contract.md) → `scenarios/`). The nightly regression
+   run (`quality-inspector-regression-nightly`, off by default) adopts each new or changed
+   one — freezes its criteria, writes and runs its test, registers it in the regression
+   tier without an operator "promote" — and retires one whose file is gone. Turn the schedule
+   on to use them; set `profile_scenarios: disabled` to ignore them.
+3. Optional — set `regression_channel` to a Slack conversation bound to this agent for the
+   nightly summary post.
+
+Cost: an adoption costs about what a scenario run does (a few hundred thousand tokens),
+only for a new or changed text, at most `max_scenarios_per_run` a night; a night with no
+new build and no changed text still wakes no model. Replays cost as other promoted tests.
+
 ## 3.0.2 — 2026-10-16
 
 **Upgrade:**

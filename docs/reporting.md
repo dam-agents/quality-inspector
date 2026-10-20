@@ -55,6 +55,9 @@ Your judgment, the renderer's only input besides the runs:
  "notes": ["assertion edits after the first run, blocked reasons, anything a reader needs"]}
 ```
 
+A scenario's file (`"mode": "scenario"`) adds `request_file`: the path under `work/` of its
+words as received (`scenarios/S-7/request.md`, `scenarios/P-<slug>/source-<spec_hash>.md`),
+which the renderer shows verbatim above the criteria ([scenarios.md](scenarios.md) → State).
 `given` / `when` / `then` are copied from the criteria file verbatim; `baseline_run` is
 `null` when no baseline ran. Explorations and `noticed` add their own keys, never touching
 `acs` or `verdict` ([explorations.md](explorations.md) → **Reporting**, **Noticed in passing**). Never: credentials,

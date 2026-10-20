@@ -2,9 +2,10 @@
 
 A **scenario** is a user flow stated in words instead of an issue: a message in a Slack
 conversation this agent is bound to ("test that …", a written Given/When/Then), the
-operator's "test this scenario: …", or a proposal of the discovery run. It is frozen into
-criteria, checked by an independent judge ([judge.md](judge.md)), tested on the candidate,
-answered where it was asked, and — on request — queued for the regression tier.
+operator's "test this scenario: …", a proposal of the discovery run, or a file the product
+team keeps in its profile (`scenarios/<slug>.md`, **Profile scenarios** below). It is frozen
+into criteria, checked by an independent judge ([judge.md](judge.md)), tested on the
+candidate, answered where it was asked, and — on request — queued for the regression tier.
 
 ## State
 
@@ -16,13 +17,15 @@ answered where it was asked, and — on request — queued for the regression ti
 | S-7 | slack | U0123ABCD | C0123ABCD/1728900000.000100 | 3f9a0c12b7de | 0.0.0-main.5203 | passed | reported | 2026-10-14T10:03:11Z |
 ```
 
-- `source`: `slack` | `operator` | `discovery`. `requester`: the sender's Slack user id from
+- `id`: `S-<k>`, or `P-<slug>` for the profile's `scenarios/<slug>.md`.
+- `source`: `slack` | `operator` | `discovery` | `profile`. `requester`: the sender's Slack user id from
   the platform's message metadata, never from the text (`-` otherwise). `thread`:
   `<conversation id>/<thread ts>` the answer goes to (`-` = the chat UI).
 - `status`: `proposed` (discovery, waiting for a yes) | `queued` (frozen, waiting for the
   environment) | `in_progress` (the claim; refresh `updated_utc` at every step) →
   `report_pending` → `reported`; or `rejected` (the judge turned it down; only a correction
-  re-opens it).
+  re-opens it — for a profile scenario, a new text of its file); or `retired` (a profile
+  scenario whose file is gone).
 - `verdict`: `passed` | `failed` | `regression` | `needs-review` | `blocked` | `flaky` |
   `not-testable` | `-`. Never `verified`: no change is under test.
 - Write a row only with `bash "$HOME/scripts/scenarios.sh" set S-<k> <column>=<value>…`; a
@@ -37,7 +40,16 @@ answered where it was asked, and — on request — queued for the regression ti
   `runs.json`, `verdicts-<spec_hash>-<build>.json`, `judge-verdict-<spec_hash>-<build>.json`,
   `report-<spec_hash>-<build>/`, `artifact.id`. `spec_hash` is `text_hash`
   (`scripts/lib/state.sh`) of the request text; a correction is appended to it, which
-  makes a new hash for the same id.
+  makes a new hash for the same id. A profile scenario's directory is
+  `work/scenarios/P-<slug>/`, made by `scenarios.sh adopt <slug>`, which copies the file
+  byte for byte to `source-<spec_hash>.md` (its `spec_hash`: `text_hash` of the file) — the
+  same role as `request.md`, one copy per version of the text.
+- **Both texts, always.** Every scenario keeps the words as received — `request.md`, or
+  `source-<spec_hash>.md` — next to what the agent made of them, `criteria-<spec_hash>.md`.
+  Neither is ever rewritten: a correction is appended to `request.md`, a new profile text
+  is a new `source-` file. The verdicts file names the first as `request_file` (path under
+  `work/`, e.g. `scenarios/S-7/request.md`), and the report shows it verbatim above the
+  criteria.
 
 ## A message in a bound Slack conversation
 
@@ -55,6 +67,7 @@ Classify each message; several intents → handle each, then send **one** reply:
 | Intent | Looks like | Do |
 | --- | --- | --- |
 | `test` | "test that …", steps with an expected outcome | **The pipeline**, from step 1 |
+| `profile` | "test scenario <slug>", "run P-<slug>" | **Profile scenarios** → On demand |
 | `correct` | "no, it should …" about a scenario | Append it to that `request.md`; the pipeline without step 2's `new` |
 | `accept` | "try S-14 and S-16" under a digest | Each named `proposed` row takes this message's sender and thread; step 1, then the pipeline from step 5 |
 | `save` | "save S-7", "keep testing this" | **Saving** |
@@ -101,7 +114,7 @@ Classify each message; several intents → handle each, then send **one** reply:
    `regression` > `failed` > `needs-review` > `blocked` (`flaky` counts as blocked) >
    `passed`; `not-testable` when nothing was testable. Write the verdicts file as in
    [reporting.md](reporting.md) → Verdicts file, with `"mode": "scenario"`, `"scenario"`,
-   `"source"` and `"spec_hash"` in place of `issue` and `ac_hash`; render it with
+   `"source"`, `"spec_hash"` and `"request_file"` in place of `issue` and `ac_hash`; render it with
    `scripts/render-report.mjs` into `report-<spec_hash>-<build>/`.
 10. **Judge the verdicts** ([judge.md](judge.md) → Verdict). An AC it disagrees with gets
     one re-check: a test defect is repaired outside the AC block and the run repeated;
@@ -154,6 +167,57 @@ The issues pre-flight lists `scenarios_due[]` (`id`, `kind`), oldest first — `
 `takeover` (an `in_progress` row while no run holds the environment, or past
 `lock_ttl_min`) → step 1 (admission counts again), then the pipeline from step 5; `report`
 → **The reply** only.
+
+## Profile scenarios
+
+The product team's `scenarios/<slug>.md` in the profile ([profile-contract.md](profile-contract.md)
+→ `scenarios/`) are the source of truth for their flows: written, reviewed and changed in
+the product's repository, adopted by the nightly regression run, and replayed every night.
+Id `P-<slug>`, test `tests/profile-<slug>.e2e.ts`, tag `profile-<slug>`.
+
+**Adopt** — a `profile_scenarios.adopt[]` entry of the regression worklist
+([regression.md](regression.md) → step 3a), under its lock, the candidate up:
+
+1. `bash "$HOME/scripts/scenarios.sh" adopt <slug>` → `spec_hash`, `source` (the verbatim
+   copy) and `previous_spec_hash`; then `scenarios.sh lint work/<source>`.
+2. **Freeze** `criteria-<spec_hash>.md` from the copy alone (one that exists — a retry, or an
+   earlier on-demand run — is reused, never re-frozen): its `## AC-<k>` blocks become
+   the ACs one to one, keeping their numbers, names and words; header
+   `# P-<slug> — <title>`, `source: profile`, its `requires:` line. The text is the oracle,
+   exactly as **The pipeline** step 3 treats a request — nothing added, a criterion nobody
+   could observe is `testable: no`, a lint `injection_suspect` handled the same way.
+3. **Judge** it ([judge.md](judge.md) → Spec). `revise` → apply the fixes, judge once more;
+   a second `revise` or a `reject` → `set P-<slug> source=profile status=rejected
+   spec_hash=<h>` — the next night skips it until the text changes; the report names it
+   with the judge's reasons, for the product team.
+4. **Author** the test as **The pipeline** step 7 (one `test` per AC, tags
+   `['profile-<slug>', 'ac-<k>']`), and run it as step 8 with `--evidence full --strict`
+   on the candidate only — no baseline: the scenario holds on `main`, nothing is under test.
+5. **Register.** Passed `--strict` with no `judged` step → `work/SUITE.md` row
+   `tests/profile-<slug>.e2e.ts | P-<slug> | regression | <check-asserts --hash> | <now>`:
+   the merge in the product's repository was its promotion. Failed or judged → the row is
+   `exploratory` and the scenario's verdict `failed`, with its evidence — the report leads
+   with it; the next new build retries it (`kind: retry`: steps 4–6 on the same frozen
+   criteria), and so does a new text. A `changed` adoption first moves the
+   previous test to `tests/profile-<slug>.<previous_spec_hash>.e2e.ts`, its row renamed to
+   that path with tier `retired` — the old text's oracle no longer holds.
+6. `set P-<slug> source=profile status=reported spec_hash=<h> build=<candidate>
+   verdict=<passed|failed|not-testable>`; log `scenario_done id=P-<slug> verdict=<v>`.
+
+**Retire** — a `profile_scenarios.retire[]` id: its `work/SUITE.md` row → `retired` (the
+file stays), `set P-<slug> status=retired`; the report lists it.
+
+**Triage** of a replayed profile scenario follows [triage.md](triage.md), except that
+`superseded` needs no issue: a criterion that fails because the product changed on purpose
+is the product team's to update in the scenario's file — report it `regression`, its
+explanation naming `scenarios/<slug>.md`. Heals stay as triage allows (locators only).
+
+**On demand** — "test scenario <slug>" in the direct session or a bound Slack conversation:
+`scenarios.sh admit` (Slack only), `env.sh lock P-<slug>`, the candidate up as
+**The pipeline** steps 5–6, then **Adopt** steps 1–4 (an unchanged text reuses its frozen
+criteria and test: steps 1 and 4's run only), the verdicts and report as **The pipeline**
+steps 9–10 and 12 — the reply in the requester's thread. It never registers or retires
+anything: that is the nightly run's.
 
 ## Discovery
 

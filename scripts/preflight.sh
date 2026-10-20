@@ -173,12 +173,59 @@ scenarios_due() {
 }
 
 # ======================================================== REGRESSION MODE ====
+# The product team's scenarios (docs/regression.md → Profile scenarios): the profile's
+# scenarios/<slug>.md against the `source=profile` rows of SCENARIOS.md. adopt[] — a file with
+# no row, or whose text changed since its row's spec_hash (a `rejected` row waits for a new
+# text, a `retired` one comes back as new; `retry` — the same text whose adoption ended
+# failed, blocked or flaky, taken only on a new build); retire[] — a row whose file is gone. At most
+# max_scenarios_per_run adoptions a night (authoring costs tokens), new and changed texts
+# before retries; the rest wait. Sets PS to
+# the worklist's `profile_scenarios` object, or `null` when profile_scenarios is disabled — not
+# printed, so its warnings reach LOGS (a command substitution would lose them).
+PS=null
+profile_scenarios_work() {
+  local on files rows adopt retire per n deferred
+  on="$(cfg profile_scenarios)"
+  case "$on" in (''|enabled) ;; (disabled) echo null; return;;
+    (*) log "WARN: profile_scenarios '$on' is not enabled|disabled — treated as enabled";; esac
+  local err l
+  mkdir -p "$WORK/.cache" && err="$(mktemp "$WORK/.cache/profile-scenarios.XXXXXX")" || err=/dev/null
+  files="$(profile_scenarios 2>"$err" | jq -R 'split("\t") | {slug: .[0], spec_hash: .[1]}' | jq -sc .)"
+  while IFS= read -r l; do [ -n "$l" ] && log "WARN: $l"; done < "$err"
+  [ "$err" = /dev/null ] || rm -f "$err"
+  rows="$(table_rows "$WORK/SCENARIOS.md" | while IFS= read -r r; do
+      [ "$(cell "$r" 2)" = profile ] || continue
+      printf '%s\t%s\t%s\t%s\n' "$(cell "$r" 1)" "$(cell "$r" 5)" "$(cell "$r" 8)" "$(cell "$r" 7)"
+    done | jq -R 'split("\t") | {id: .[0], spec_hash: .[1], status: .[2], verdict: .[3]}' | jq -sc .)"
+  per="$(cfg max_scenarios_per_run)"; case "$per" in (''|*[!0-9]*) per=3;; esac
+  adopt="$(jq -nc --argjson f "$files" --argjson r "$rows" '
+    ($r | map({key: .id, value: .}) | from_entries) as $by
+    | [$f[] | ("P-" + .slug) as $id | $by[$id] as $row
+       | if $row == null or $row.status == "retired" then {id: $id, slug, spec_hash, kind: "new"}
+         elif $row.spec_hash != .spec_hash then {id: $id, slug, spec_hash, kind: "changed"}
+         elif $row.status == "reported" and ($row.verdict | IN("failed", "blocked", "flaky"))
+           then {id: $id, slug, spec_hash, kind: "retry"}
+         else empty end] | sort_by(.kind == "retry")')"
+  retire="$(jq -nc --argjson f "$files" --argjson r "$rows" '
+    ($f | map("P-" + .slug)) as $have | [$r[] | select(.status != "retired" and ((.id | IN($have[])) | not)) | .id]')"
+  n="$(jq length <<<"$adopt")"; deferred=0
+  if [ "$n" -gt "$per" ]; then
+    deferred=$((n - per)); adopt="$(jq -c --argjson p "$per" '.[:$p]' <<<"$adopt")"
+    log "$deferred profile scenario(s) wait for a later night (max_scenarios_per_run: $per)"
+  fi
+  PS="$(jq -nc --argjson a "$adopt" --argjson r "$retire" --argjson d "$deferred" --argjson t "$(jq length <<<"$files")" \
+    '{files:$t, adopt:$a, retire:$r, deferred:$d}')"
+}
+
 mode_regression() {
-  local tests last versions candidate drift confirm bisect
+  local tests last versions candidate drift confirm bisect ps ps_work=0 replay=true ch
   # Only the `regression` tier replays; exploratory, promotable, retired and quarantined never do.
   tests="$(table_rows "$WORK/SUITE.md" | awk -F'|' '{t=$2; tier=$4; gsub(/[ \t]/,"",t); gsub(/[ \t]/,"",tier)} tier=="regression" {print t}' \
            | jq -R . | jq -sc .)"
-  if [ "$(printf '%s' "$tests" | jq length)" = 0 ]; then
+  profile_scenarios_work; ps="$PS"
+  # Retries alone never make a night due: they ride along with a new build only.
+  [ "$ps" != null ] && ps_work="$(jq '(.adopt | map(select(.kind != "retry")) | length) + (.retire | length)' <<<"$ps")"
+  if [ "$(printf '%s' "$tests" | jq length)" = 0 ] && { [ "$ps" = null ] || [ "$(jq '(.adopt + .retire) | length' <<<"$ps")" = 0 ]; }; then
     log "no regression-tier tests yet"; runlog REGRESSION "skip=no-tests"
     jq -nc --argjson logs "$(logs_json)" '{mode:"regression", nothing_to_do:true, logs:$logs}'; return
   fi
@@ -187,8 +234,13 @@ mode_regression() {
   candidate="$(printf '%s' "$versions" | jq -r .candidate)"
   last="$(grep -o 'ran candidate=[^ ]*' "$WORK/REGRESSION.log" 2>/dev/null | tail -1 | cut -d= -f2)"
   if [ "$last" = "$candidate" ]; then
-    log "candidate $candidate already regression-tested"; runlog REGRESSION "skip=same-candidate candidate=$candidate"
-    jq -nc --arg c "$candidate" --argjson logs "$(logs_json)" '{mode:"regression", nothing_to_do:true, candidate:$c, logs:$logs}'; return
+    if [ "$ps_work" = 0 ]; then
+      log "candidate $candidate already regression-tested"; runlog REGRESSION "skip=same-candidate candidate=$candidate"
+      jq -nc --arg c "$candidate" --argjson logs "$(logs_json)" '{mode:"regression", nothing_to_do:true, candidate:$c, logs:$logs}'; return
+    fi
+    # Same build, new or changed scenario texts: adopt and run those only, replay nothing else.
+    replay=false; log "candidate $candidate already regression-tested — $ps_work profile scenario change(s) due"
+    ps="$(jq -c '.adopt |= map(select(.kind != "retry"))' <<<"$ps")"
   fi
   drift="$(bash "$SCRIPT_DIR/check-asserts.sh" --json 2>/dev/null | jq -c '.drift // []' 2>/dev/null)" || drift='null'
   [ -n "$drift" ] || drift='null'
@@ -201,12 +253,14 @@ mode_regression() {
   if [ "$bisect" -gt 0 ] && [ "$confirm" = false ]; then
     log "WARN: bisect_max_steps ignored — bisection needs confirm_regressions: enabled"; bisect=0
   fi
-  log "candidate $candidate is new (last regression: ${last:-never}) — due"
-  runlog REGRESSION "due candidate=$candidate tests=$(printf '%s' "$tests" | jq length)"
+  ch="$(cfg regression_channel)"
+  [ "$replay" = true ] && log "candidate $candidate is new (last regression: ${last:-never}) — due"
+  runlog REGRESSION "due candidate=$candidate tests=$(printf '%s' "$tests" | jq length) replay=$replay profile_scenarios=$ps_work"
   jq -nc --arg c "$candidate" --arg p "$last" --argjson t "$tests" --argjson d "$drift" --argjson logs "$(logs_json)" \
-    --argjson cr "$confirm" --argjson bs "$((10#$bisect))" \
+    --argjson cr "$confirm" --argjson bs "$((10#$bisect))" --argjson ps "$ps" --argjson rp "$replay" --arg ch "$ch" \
     '{mode:"regression", nothing_to_do:false, candidate:$c, previous_candidate:(if $p=="" then null else $p end),
-      tests:$t, assert_drift:$d, confirm_regressions:$cr, bisect_max_steps:$bs, logs:$logs}'
+      replay:$rp, tests:$t, assert_drift:$d, profile_scenarios:$ps, confirm_regressions:$cr, bisect_max_steps:$bs,
+      channel:(if $ch == "" then null else $ch end), logs:$logs}'
 }
 
 # ============================================================= AUDIT MODE ====
@@ -341,7 +395,7 @@ mode_audit() {
   local map cov=null
   map="$(ls -1t "$WORK"/inventory/*/inventory.json 2>/dev/null | head -1)"
   if [ -n "$map" ]; then
-    cov="$(find "$WORK/suite/tests" \( -name 'issue-*.e2e.ts' -o -name 'scenario-*.e2e.ts' \) 2>/dev/null | sort \
+    cov="$(find "$WORK/suite/tests" \( -name 'issue-*.e2e.ts' -o -name 'scenario-*.e2e.ts' -o -name 'profile-*.e2e.ts' \) 2>/dev/null | sort \
            | xargs node "$SCRIPT_DIR/coverage.mjs" "$map" "$WORK/SUITE.md" 2>/dev/null \
            | jq -c '{pages:(.pages|length), covered:([.pages[]|select(.covered)]|length), uncovered:(.uncovered|length), nav_without_golden_path:(.nav_without_golden_path|length)}' 2>/dev/null)"
     [ -n "$cov" ] || cov=null
@@ -407,7 +461,7 @@ mode_audit() {
   inj_scen="$(quoting "$WORK/scenarios" | sort -u | paste -sd, -)"
   inj_files="${inj_files}${inj_files:+${inj_scen:+,}}${inj_scen}"
   inj_events="$(suspects issue_injection_suspect 'issue=(?<n>[0-9]+)' | sort -un | paste -sd, -)"
-  inj_sev="$(suspects scenario_injection_suspect 'id=(?<n>S-[0-9]+)' | sort -u | paste -sd, -)"
+  inj_sev="$(suspects scenario_injection_suspect 'id=(?<n>S-[0-9]+|P-[a-z0-9-]+)' | sort -u | paste -sd, -)"
   if [ -z "$inj_files$inj_events$inj_sev" ]; then check criteria_injection ok "no injection suspects this week"
   else check criteria_injection warn "criteria quoting URLs/code/comments: ${inj_files:-none}; injection_suspect issues: ${inj_events:-none}${inj_sev:+; injection_suspect scenarios: $inj_sev}"; fi
   find "$WORK/logs" -name 'events-*.jsonl' -mtime +14 -delete 2>/dev/null || true
