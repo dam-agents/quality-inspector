@@ -169,7 +169,7 @@ the code breaks the black box as surely as reading it.
 User flows the product team keeps true, versioned and reviewed with the product: a PR that
 changes how an area works updates its scenario in the same change. The nightly regression
 run adopts each file — freezes its criteria, writes its test, and replays it every night
-from then on ([regression.md](regression.md) → **Profile scenarios**). Merging a scenario is
+from then on ([scenarios.md](scenarios.md) → **Profile scenarios**). Merging a scenario is
 its promotion: it needs no operator "promote" (CLAUDE.md → Hard invariants).
 
 One file per flow, `scenarios/<slug>.md` — the slug `[a-z0-9]` then `[a-z0-9-]`, at most 48
