@@ -241,6 +241,10 @@ mode_regression() {
     # Same build, new or changed scenario texts: adopt and run those only, replay nothing else.
     replay=false; log "candidate $candidate already regression-tested — $ps_work profile scenario change(s) due"
     ps="$(jq -c '.adopt |= map(select(.kind != "retry"))' <<<"$ps")"
+  elif [ "$(printf '%s' "$tests" | jq length)" = 0 ]; then
+    # A new build, but no regression-tier test yet: only profile scenarios are due. A replay
+    # with no --tag would run every file in tests/.
+    replay=false; log "candidate $candidate is new, no regression-tier test yet — profile scenarios only"
   fi
   drift="$(bash "$SCRIPT_DIR/check-asserts.sh" --json 2>/dev/null | jq -c '.drift // []' 2>/dev/null)" || drift='null'
   [ -n "$drift" ] || drift='null'

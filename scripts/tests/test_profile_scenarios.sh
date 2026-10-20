@@ -12,7 +12,7 @@ ln -s /etc/hosts "$sc/linked.md"
 
 # preflight: no regression tests, but two scenarios to adopt -> due
 out="$(bash "$SCRIPTS/preflight.sh" regression)"
-assert "new scenarios make a regression run due" '.nothing_to_do == false and .replay == true and .profile_scenarios.files == 2
+assert "new scenarios, no regression-tier test: due, replay nothing" '.nothing_to_do == false and .replay == false and .profile_scenarios.files == 2
   and (.profile_scenarios.adopt | map(.id)) == ["P-create-agent","P-sign-in"] and (.profile_scenarios.adopt | map(.kind) | unique) == ["new"]
   and .profile_scenarios.retire == [] and .channel == null' "$out"
 assert "a bad name and a symlink are skipped with a warning" '(.logs | map(select(test("Bad_Name.md.*skipped"))) | length) == 1

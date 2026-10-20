@@ -206,8 +206,10 @@ Id `P-<slug>`, test `tests/profile-<slug>.e2e.ts`, tag `profile-<slug>`.
 6. `set P-<slug> source=profile status=reported spec_hash=<h> build=<candidate>
    verdict=<passed|failed|not-testable>`; log `scenario_done id=P-<slug> verdict=<v>`.
 
-**Retire** — a `profile_scenarios.retire[]` id: its `work/SUITE.md` row → `retired` (the
-file stays), `set P-<slug> status=retired`; the report lists it.
+**Retire** — a `profile_scenarios.retire[]` id: its test moves as a `changed` adoption's
+does, to `work/suite/retired/profile-<slug>.<spec_hash>.e2e.ts` (the row's `spec_hash`), its
+`work/SUITE.md` row renamed with tier `retired`; `set P-<slug> status=retired`; the report
+lists it. A file that comes back is `new` and gets a new test and row.
 
 **Triage** of a replayed profile scenario follows [triage.md](triage.md), except that
 `superseded` needs no issue: a criterion that fails because the product changed on purpose
@@ -218,8 +220,11 @@ explanation naming `scenarios/<slug>.md`. Heals stay as triage allows (locators 
 `scenarios.sh admit` (Slack only), `env.sh lock P-<slug>`, the candidate up as
 **The pipeline** steps 5–6, then **Adopt** steps 1–4 (an unchanged text reuses its frozen
 criteria and test: steps 1 and 4's run only), the verdicts and report as **The pipeline**
-steps 9–10 and 12 — the reply in the requester's thread. It never registers or retires
-anything: that is the nightly run's.
+steps 9–10 and 12 — the reply in the requester's turn, or the chat UI.
+It writes no `P-<slug>` row: no status write of pipeline steps 5 and 12, none of Adopt step 3 (a
+rejection goes in the reply only). A row it wrote would read as adopted, and the nightly
+run would then never register the test. It never registers or retires anything either:
+that is the nightly run's.
 
 ## Discovery
 

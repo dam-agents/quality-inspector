@@ -22,7 +22,9 @@
   product's repository, it needs no operator.
   `assert_hash` is the `scripts/check-asserts.sh --hash` value of its AC blocks; it changes
   only by a heal ([triage.md](triage.md), logged in `work/HEALS.md`) or by the operator.
-- `retired` — superseded by a completed issue ([triage.md](triage.md)); kept, not replayed.
+- `retired` — superseded by a completed issue ([triage.md](triage.md)), or a profile
+  scenario's test whose file is gone or whose text changed ([scenarios.md](scenarios.md) →
+  **Profile scenarios**); kept, not replayed.
 - `quarantined` — flaky on two builds within 14 days ([triage.md](triage.md) → Flaky tests
   and quarantine); kept, not replayed until the operator re-promotes it.
 - A scenario's row (`tests/scenario-<k>.e2e.ts`, `S-<k>` in the `issue` column) is tagged
@@ -43,7 +45,9 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
   — `retry`: the same text, its adoption failed, blocked or flaky, taken on a new build only)
   holds at most `max_scenarios_per_run` entries, retries last; `deferred` wait for a later night.
 - `replay` — `false` when the candidate was already regression-tested and only profile
-  scenarios changed: adopt and retire them (step 3a), replay nothing else, skip steps 3–6.
+  scenarios changed, or when no test is in the regression tier yet: adopt and retire them
+  (step 3a), replay nothing else, skip steps 3 and 4–6. Steps 7–10 still run; step 8 records the
+  candidate.
 - `channel` — `regression_channel`, or `null`: where step 9's summary goes.
 
 1. `env.sh lock regression` (busy → end the run, log it).
