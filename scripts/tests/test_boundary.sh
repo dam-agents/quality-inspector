@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The black-box boundary: the rules egress-rules.sh prints hold under the platform's rule
+# The black-box boundary: the rules egress-rules.sh lists hold under the platform's rule
 # matching, and the probes tell a refusal from a reachable or unproven surface.
 . "$(dirname "$0")/lib.sh"
 seed_work
@@ -8,16 +8,15 @@ ROOT="$(cd "$SCRIPTS/.." && pwd)"
 # ---------------------------------------------------------------- the rules
 cat > "$QI_PROFILE_DIR/profile.json" <<'J'
 {"schema":"qi-profile/v1","product":"Stub","app":{"url":"http://localhost:8080"},
- "egress":[{"host":"github.com","method":"GET","path":"/cert-manager/cert-manager/releases/*","why":"manifest"},
+ "egress":[{"host":"get.helm.sh","method":"GET","why":"helm"},
            {"host":"*.quay.io","method":"GET","why":"image layers"}]}
 J
 printf -- '- work_repo: acme/widgets-qa\n' >> "$WORK_DIR/CONFIG.md"
 export QI_DEFINITION_REPO=github.com/dam-agents/quality-inspector
-cmds="$(bash "$SCRIPTS/egress-rules.sh" --kit)"
-assert_eq "the commands start with the AGENT guard" ': "${AGENT:?set AGENT to this agent'"'"'s name}"' "$(printf '%s\n' "$cmds" | head -1)"
-printf '%s\n' "$cmds" | grep -qxF 'dam network create "$AGENT" --host "*.gitlab.com" --path "/*" --verdict deny --yes' \
-  || { echo "  assertion failed: wildcard kit host quoted"; FAILED=1; }
-printf '%s\n' "$cmds" | grep -qxF 'dam network create "$AGENT" --host "*.quay.io" --method GET --yes  # image layers' \
+cmds="$(bash "$SCRIPTS/egress-rules.sh" --kit --json)"
+jq -e '.rules | any(.source == "kit" and .host == "*.gitlab.com" and .path == "/*" and .verdict == "deny")' >/dev/null <<<"$cmds" \
+  || { echo "  assertion failed: wildcard kit host listed"; FAILED=1; }
+jq -e '.rules | any(.source == "profile" and .host == "*.quay.io" and .method == "GET" and .how == "prompt" and .why == "image layers")' >/dev/null <<<"$cmds" \
   || { echo "  assertion failed: profile egress line"; FAILED=1; }
 
 # A model of the platform's gate and match (ext-authz gate, egress-rules-repository
@@ -29,12 +28,10 @@ printf '%s\n' "$cmds" | grep -qxF 'dam network create "$AGENT" --host "*.quay.io
 # exact case. The `trusted` preset and the GitHub connection hold host-wide
 # allows on these hosts before the kit's rules land.
 verdicts="$(printf '%s\n' "$cmds" | node -e '
-const lines = require("fs").readFileSync(0, "utf8").split("\n").filter(l => l.startsWith("dam network create"));
-const arg = (l, f) => { const m = l.match(new RegExp(f + " (\"[^\"]*\"|\\S+)")); return m ? m[1].replace(/"/g, "") : null; };
-const rules = lines.map(l => ({ host: arg(l, "--host"), method: arg(l, "--method") || "*",
-  path: arg(l, "--path") || "*", verdict: arg(l, "--verdict") || "allow" }));
+const rules = JSON.parse(require("fs").readFileSync(0, "utf8")).rules
+  .map(r => ({ host: r.host, method: r.method, path: r.path, verdict: r.verdict }));
 for (const h of ["github.com", "api.github.com", "codeload.github.com", "raw.githubusercontent.com",
-                 "objects.githubusercontent.com", "gitlab.com", "codeberg.org", "registry.npmjs.org"])
+                 "objects.githubusercontent.com", "release-assets.githubusercontent.com", "gitlab.com", "codeberg.org", "registry.npmjs.org"])
   rules.push({ host: h, method: "*", path: "*", verdict: "allow" });
 const like = (p, flags) => new RegExp("^" + [...p].map(c => c === "*" || c === "%" ? ".*" : c === "_" ? "." : c.replace(/[.+?^${}()|[\]\\\/]/g, "\\$&")).join("") + "$", flags);
 const rank = (r, host) => [r.host === host ? 0 : r.host === "*" ? 2 : 1, r.method === "*" ? 1 : 0, r.path === "*" ? 1 : 0, -r.path.length];
@@ -136,6 +133,14 @@ deny GET https://github.com/dam-agents/quality-inspector/../../acme/widgets.git/
 deny GET https://github.com/dam-agents/quality-inspector%2F..%2F..%2Facme%2Fwidgets/info/refs?service=git-upload-pack
 deny POST https://api.github.com/repos/dam-agents/quality-inspector/pulls
 allow GET https://github.com/cert-manager/cert-manager/releases/download/v1.15.0/cert-manager.yaml
+allow GET https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
+allow GET https://release-assets.githubusercontent.com/github-production-release-asset/92313258/58a98734?sp=r&sig=x
+deny GET https://github.com/cert-manager/cert-manager/releases/download/v1.15.0/cert-manager.crds.yaml
+deny GET https://github.com/cert-manager/cert-manager/blob/master/cert-manager.yaml
+deny GET https://github.com/cert-manager/cert-manager/archive/refs/tags/v1.15.0.tar.gz
+deny GET https://github.com/acme/widgets/raw/main/src?/cert-manager/cert-manager/releases/download/v1/cert-manager.yaml
+deny GET https://github.com/cert-manager/cert-manager/releases/download/v1/../../../../acme/widgets/raw/main/cert-manager.yaml
+deny GET https://github.com/cert-manager/cert-manager/releases/download/v1/%2e%2e/%2e%2e/%2e%2e/%2e%2e/acme/widgets/raw/main/cert-manager.yaml
 deny GET https://raw.githubusercontent.com/acme/widgets/HEAD/README.md
 deny GET https://gitlab.com/acme/widgets
 deny GET https://registry.gitlab.com/v2/
@@ -174,16 +179,16 @@ bash "$SCRIPTS/verify-onboarding.sh" --config 2>/dev/null | grep -q "^FAIL cfg:w
 # A GitHub Enterprise Server target: the shared rules on its host (the API under /api/v3 there),
 # deny-by-default as a whole; the definition on github.com gets nothing there.
 printf -- '- target_repo: ghe.acme.com/acme/widgets\n' > "$WORK_DIR/CONFIG.md"
-ghes="$(bash "$SCRIPTS/egress-rules.sh")"
-for want in '--host ghe.acme.com --method GET --path "/api/v3/repos/*/*/issues*" --yes' \
-            '--host ghe.acme.com --method GET --path "/api/v3/repos/*/*/*/issues*" --verdict deny --yes' \
-            '--host ghe.acme.com --path "/*" --verdict deny --yes' \
-            '--host raw.ghe.acme.com --path "/*" --verdict deny --yes'; do
-  printf '%s\n' "$ghes" | grep -qF -- "$want" || { echo "  assertion failed: GHES rule: $want"; FAILED=1; }
+ghes="$(bash "$SCRIPTS/egress-rules.sh" --json | jq -r '.rules[] | select(.source == "github") | "\(.how) \(.verdict) \(.method) \(.host) \(.path)"')"
+for want in 'by-hand allow GET ghe.acme.com /api/v3/repos/*/*/issues*' \
+            'by-hand deny GET ghe.acme.com /api/v3/repos/*/*/*/issues*' \
+            'by-hand deny * ghe.acme.com /*' \
+            'by-hand deny * raw.ghe.acme.com /*'; do
+  printf '%s\n' "$ghes" | grep -qxF -- "$want" || { echo "  assertion failed: GHES rule: $want"; FAILED=1; }
 done
 printf '%s\n' "$ghes" | grep -q 'quality-inspector\*' && { echo "  assertion failed: no definition rule on another host"; FAILED=1; }
 printf -- '- target_repo: acme/widgets\n' > "$WORK_DIR/CONFIG.md"
-printf '%s\n' "$(bash "$SCRIPTS/egress-rules.sh")" | grep -q '^# The target acme/widgets is on github.com: the kit.s GitHub rules hold for it — nothing to add\.$' \
+printf '%s\n' "$(bash "$SCRIPTS/egress-rules.sh")" | grep -q '^The target acme/widgets is on github.com: the kit.s GitHub rules hold for it — nothing to add\.$' \
   || { echo "  assertion failed: a github.com target needs no rule of its own"; FAILED=1; }
 
 # This definition's repository from the forms an origin takes.
@@ -275,7 +280,7 @@ dot="$(printf '%s\n' "$out" | sed -n 's|^fail boundary:repos/acme/widgets/conten
 assert_eq "a dot-segment fail names the gateway, never re-applies rules" \
   "report the gateway to the platform" "$(fix "$dot")"
 assert_eq "a plain fail points at the kit's rules" \
-  "the agent's egress lacks the kit's GitHub rules: recreate it from the kit, or have the operator apply what bash scripts/egress-rules.sh --kit prints (docs/black-box.md → Egress rules)" \
+  "the agent's egress lacks the kit's GitHub rules: recreate it from the kit, or have the operator add what bash scripts/egress-rules.sh --kit lists in the agent's network settings (docs/black-box.md → Egress rules)" \
   "$(fix "source surface reachable (HTTP 200)")"
 case_fail="$(STUB_OPEN="$PROFILE_OPEN|TIMELINE\$" probe | sed -n 's|^fail boundary:repos/acme/widgets/issues/7/TIMELINE ||p')"
 assert_eq "a deny in exact case only names the platform, never re-applies the rules" \

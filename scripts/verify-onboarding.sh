@@ -14,9 +14,15 @@
 #   FAIL <check> — <problem> — fix: <instruction>
 #
 #   --config            the CONFIG block only (mid-onboarding)
+#   --egress            the CONFIG block plus one request per profile egress rule: allowed,
+#                       refused at once (a kit deny or a denied prompt — add it by hand),
+#                       HTTP 403 (a warn: the gateway or the host itself) or held for the
+#                       operator's approval prompt (direct session only)
 #   (none)              every offline block: definition, schedules, work/, CONFIG
 #   --live              offline blocks plus integrations, the black-box boundary, the
 #                       VM, and one read-only pre-flight + Precheck per scheduled mode
+#   --models            the models the connection lists, each probed with one agent step
+#                       call: which answer, for choosing e2e_model (prints nothing else)
 #   --schedules <file>  JSON from mcp__platform-outbound__list_schedules, for the
 #                       schedule-name check (the script cannot call MCP itself)
 #
@@ -25,13 +31,15 @@
 set -u
 export LC_ALL=C
 
-LIVE=0; STRUCTURE=1; SCHED_FILE=""
+LIVE=0; STRUCTURE=1; SCHED_FILE=""; EGRESS=0; MODELS=0
 while [ $# -gt 0 ]; do
   case "$1" in
-    (--live)      LIVE=1;;
+    (--live)      LIVE=1; EGRESS=1;;
     (--config)    STRUCTURE=0;;
+    (--egress)    STRUCTURE=0; EGRESS=1;;
+    (--models)    MODELS=1;;
     (--schedules) SCHED_FILE="${2:-}"; shift;;
-    (*) printf 'usage: %s [--config|--live] [--schedules <file>]\n' "$0" >&2; exit 2;;
+    (*) printf 'usage: %s [--config|--egress|--live|--models] [--schedules <file>]\n' "$0" >&2; exit 2;;
   esac
   shift
 done
@@ -53,6 +61,20 @@ warn() { WARNS=$((WARNS+1)); printf 'warn %s — %s\n' "$1" "$2"; }
 . "$SCRIPT_DIR/lib/profile.sh" || { echo "cannot source lib/profile.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/boundary.sh" || { echo "cannot source lib/boundary.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/lock.sh" || { echo "cannot source lib/lock.sh" >&2; exit 1; }
+
+# --models: `<answer> <model> — <detail>` per listed model, e2e_model's first; exit 0 iff one answers.
+if [ "$MODELS" = 1 ]; then
+  cur="$(cfg e2e_model)"; cur="${cur:-claude-sonnet-5}"; any=1
+  for m in $( { echo "$cur"; model_list; } | awk '!seen[$0]++'); do
+    IFS='|' read -r code mbase _ _ merr <<<"$(model_probe "$m")"
+    case "$code" in
+      (none) echo "no model connection — give this agent one in its settings"; exit 1;;
+      (200) echo "answers $m"; any=0;;
+      (*) echo "fails   $m — HTTP $code${merr:+: $merr}";;
+    esac
+  done
+  exit $any
+fi
 
 SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-benchmark-monthly quality-inspector-security-weekly quality-inspector-audit-weekly quality-inspector-scenarios-weekly"
 KNOWN_KEYS="profile target_repo display_name qa_label retest_label marker_prefix candidate_channel
@@ -145,10 +167,10 @@ if [ -f "$CONFIG" ]; then
   t="$(cfg target_repo)"
   printf '%s' "$t" | grep -qE '^([A-Za-z0-9.-]+/)?[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' \
     && ok cfg:target_repo "set" || fail cfg:target_repo "missing or not [host/]owner/repo" "ask the operator (ONBOARDING.md Step 3)"
-  # Obsolete since 3.0.0: a profile lives under .quality-inspector/ in any repository, opened by the kit.
-  if [ -n "$(cfg profile_source_path)" ]; then
-    warn cfg:profile_source_path "obsolete since 3.0.0 — the profile lives under $PROFILE_SOURCE_DIR/ (docs/profile-contract.md → Where it lives); delete the line"
-  fi
+  # Keys a version dropped (lib/config.sh); a restore deletes them itself.
+  for k in $CONFIG_OBSOLETE_KEYS; do
+    grep -q "^- $k:" "$CONFIG" && warn "cfg:$k" "obsolete — delete the line (CHANGELOG.md names the version that dropped it)"
+  done
   w="$(cfg work_repo)"
   if [ -z "$w" ]; then ok cfg:work_repo "unset — work/ is local-only"
   elif ! printf '%s' "$w" | grep -qE '^([A-Za-z0-9.-]+/)?[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'; then
@@ -215,6 +237,33 @@ else
   fail config_file "work/CONFIG.md missing" "write it per ONBOARDING.md Step 3"
 fi
 
+# ------------------------------------------------------------------- egress
+# One request per profile egress rule, so a missing rule shows before env.sh up does. The
+# gateway refuses a request under a deny at once (no connection, or a 403) — no prompt ever
+# appears for it; a request no rule matches is held while the operator's approval prompt is
+# open, in a direct session only (a scheduled run is refused). Any other HTTP answer is
+# passage. A 403 is no proof: a storage or CDN host answers the probe's made-up path so too.
+if [ "$EGRESS" = 1 ]; then
+  er="$(bash "$SCRIPT_DIR/egress-rules.sh" --json 2>/dev/null)" || er='{"rules":[]}'
+  while IFS="$(printf '\t')" read -r how m h p why; do
+    case "${h#\*.}" in (''|*[!A-Za-z0-9.-]*) warn "egress:${h//[!A-Za-z0-9.*-]/?}" "not a plain host name — not probed; check the profile's egress"; continue;; esac
+    case "$m" in (GET|HEAD|'*') ;; (*) warn "egress:$h" "$m $p is not probed (only GET) — $why"; continue;; esac
+    case "$h" in ('*'*) warn "egress:$h" "a wildcard host is not probed: each host it reaches prompts once on first use (env.sh up) — approve each, or add the wildcard by hand"; continue;; esac
+    case "$p" in ('*') path=/;; (*) path="${p//\*/qi-egress-check}";; esac
+    code="$(curl -s -o /dev/null -r 0-0 --max-filesize 1048576 -w '%{http_code}' --max-time 25 "https://$h$path" </dev/null 2>/dev/null)"; rc=$?
+    case "$code:$rc" in
+      (000:28) warn "egress:$h" "held for approval — approve its prompt (Allow permanently), then re-run: GET $p ($why)";;
+      (000:6) fail "egress:$h" "the host does not resolve (DNS)" "check the host name in the profile's egress (a typo is a profile defect: report it to the profile's repository)";;
+      (000:35|000:51|000:60) fail "egress:$h" "TLS to the host failed (curl exit $rc)" \
+        "check the host name and its certificate — not an egress rule; a gateway that intercepts TLS needs its CA in this VM's trust store";;
+      (403:*) warn "egress:$h" "GET $p answered HTTP 403 — the gateway's refusal, or the host's own answer to the probe's path${how:+ ($how)}: when this rule is not in the agent's network settings yet, add an allow rule there: host $h, method GET, path $p ($why)";;
+      (000:*) fail "egress:$h" "GET $p refused at once${how:+ ($how)}" \
+        "add an allow rule in the agent's network settings: host $h, method GET, path $p — no prompt appears for a request under a deny (a prompt answered Deny forever left a deny rule: delete it)";;
+      (*) ok "egress:$h" "GET $p passes (HTTP $code)";;
+    esac
+  done < <(jq -r '.rules[] | select(.source == "profile" and .verdict == "allow") | [.how, .method, .host, .path, .why] | @tsv' <<<"$er")
+fi
+
 # --------------------------------------------------------------------- live
 if [ "$LIVE" = 1 ]; then
   T="${QI_TARGET_REPO:-$(cfg target_repo)}"
@@ -222,7 +271,7 @@ if [ "$LIVE" = 1 ]; then
   [ -n "$login" ] && ok github_identity "acting as $login${GL:+ (github_login)}" \
     || fail github_identity "github.sh whoami failed" "grant the GitHub connection to this agent (README → Setup); a GitHub App token: set github_login to its <slug>[bot]"
   bash "$SCRIPT_DIR/github.sh" check >/dev/null 2>&1 \
-    && ok issues_read "target issues readable" || fail issues_read "cannot list target issues" "check target_repo, the connection's repository access and the kit's egress (bash scripts/egress-rules.sh --kit)"
+    && ok issues_read "target issues readable" || fail issues_read "cannot list target issues" "check target_repo, the connection's repository access and the kit's egress (bash scripts/egress-rules.sh --kit lists it)"
   while read -r status id detail; do
     case "$status" in
       (fail) fail "$id" "${detail%% — *}" "$(boundary_fix "$detail")";;
@@ -233,7 +282,7 @@ if [ "$LIVE" = 1 ]; then
   wb="$(bash "$SCRIPT_DIR/work-backup.sh" check 2>/dev/null)"
   if [ "$(jq -r '.configured // empty' <<<"$wb" 2>/dev/null)" = true ]; then
     jq -e '.problem' >/dev/null 2>&1 <<<"$wb" \
-      && fail work_backup "$(jq -r .problem <<<"$wb")" "make work_repo a private repository the connection can push to, never the target or its fork, and apply the rules egress-rules.sh prints" \
+      && fail work_backup "$(jq -r .problem <<<"$wb")" "make work_repo a private repository the connection can push to, never the target or its fork, and have the operator add the work backup rule egress-rules.sh lists" \
       || ok work_backup "$(jq -r .repo <<<"$wb") private and reachable"
   fi
   cv="$(profile_run versions 2>&1)" && printf '%s' "$cv" | jq -e '.candidate' >/dev/null 2>&1 \
@@ -246,8 +295,12 @@ if [ "$LIVE" = 1 ]; then
     (401|403) fail model_provider "$mbase answered $code to $mvn${merr:+: $merr}" \
       "the gateway swaps only the connection's placeholder, in the header that connection uses: check that this agent's model connection is granted and that $mvn holds its placeholder (platform:conn:<id>)";;
     (400|404) fail model_provider "$mbase refused model $mmodel (HTTP $code)${merr:+: $merr}" \
-      "set e2e_model in work/CONFIG.md to a model this provider serves";;
-    (*) fail model_provider "$mbase unreachable (HTTP $code)" "allow the provider's host in the egress rules";;
+      "set e2e_model in work/CONFIG.md to a model this provider serves — bash scripts/verify-onboarding.sh --models lists the ones that answer";;
+    (429) fail model_provider "$mbase rate-limits or is out of quota for $mmodel (HTTP 429)${merr:+: $merr}" \
+      "not an egress problem: set e2e_model to another model or give the agent another provider — bash scripts/verify-onboarding.sh --models lists the ones that answer";;
+    (5??) fail model_provider "$mbase failed for $mmodel (HTTP $code)${merr:+: $merr}" \
+      "the provider's own error: retry later, or pick another model (bash scripts/verify-onboarding.sh --models)";;
+    (*) fail model_provider "$mbase unreachable (HTTP $code)" "the gateway refused or held it: add an allow rule for the provider's host in the agent's network settings";;
   esac
   # The environment lock frees a dead holder at once only when the runtime answers (lib/lock.sh).
   session_running "${CLAUDE_CODE_SESSION_ID:-}"
@@ -298,6 +351,7 @@ fi
 # ------------------------------------------------------------------- summary
 if [ "$LIVE" = 1 ]; then SCOPE="structure+live"
 elif [ "$STRUCTURE" = 1 ]; then SCOPE="structure"
+elif [ "$EGRESS" = 1 ]; then SCOPE="config+egress"
 else SCOPE="config"; fi
 if [ "$FAILS" -eq 0 ]; then
   printf 'PASS (%s) — %d checks passed, %d warning(s)\n' "$SCOPE" "$CHECKS" "$WARNS"

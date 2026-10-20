@@ -57,6 +57,16 @@ edit "$P" '.interfaces = {"cli":"acme","openapi":"/api/openapi.json"} | .securit
 out="$(check "$P")"
 assert_eq "interfaces, security: no unknown-key WARN" "" "$(grep 'unknown key' <<<"$out")"
 grep -q '^PASS  boundary: .*1 package(s)' <<<"$out" || { echo "  boundary.packages not reported"; FAILED=1; }
+P="$(helm_profile canary)"; edit "$P" '.canary = {"thing":"agent, under New agent","field":"name"}'
+out="$(check "$P")"
+grep -q '^PASS  canary: agent, under New agent, text in its name' <<<"$out" || { echo "  a canary object not reported"; FAILED=1; }
+grep -q "unknown key 'canary'" <<<"$out" && { echo "  canary is a contract key"; FAILED=1; }
+P="$(helm_profile canary-bad)"; edit "$P" '.canary = {"field":"name"}'
+check "$P" | grep -q '^FAIL  canary.thing' || { echo "  a canary without its object must fail"; FAILED=1; }
+P="$(helm_profile canary-none)"; edit "$P" '.canary = {"none":"nothing a user names"}'
+check "$P" | grep -q '^PASS  canary: none — nothing a user names' || { echo "  canary.none not reported"; FAILED=1; }
+{ grep -q 'QI_CANARY_THING' "$SCRIPTS/suite.sh" && grep -q 'QI_CANARY_THING' "$SCRIPTS/suite-skeleton/tests/canary.e2e.ts"; } \
+  || { echo "  the canary object does not reach the test"; FAILED=1; }
 P="$(helm_profile pk)"; edit "$P" '.boundary.packages = "@acme"'
 check "$P" | grep -q '^FAIL  boundary.packages' || { echo "  boundary.packages that is not a list must fail"; FAILED=1; }
 P="$(helm_profile api)"; edit "$P" '.interfaces = {"openapi":"api/openapi.json"}'

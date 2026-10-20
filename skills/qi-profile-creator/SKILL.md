@@ -159,7 +159,7 @@ agent's onboarding smoke test is their first real run — say so.
    - add a skill source — this repository, `path` `.quality-inspector` — and assign the
      profile skill to the agent; the kit's egress already opens that directory, so the
      profile needs no rule of its own;
-   - the egress rules that `scripts/egress-rules.sh` prints (`docs/black-box.md` → Egress
+   - the egress rules that `scripts/egress-rules.sh` lists (`docs/black-box.md` → Egress
      rules) — every `egress` entry of `profile.json`;
    - a deny for every `boundary.urls` entry;
    - the `profile.<key>` values onboarding will ask for.

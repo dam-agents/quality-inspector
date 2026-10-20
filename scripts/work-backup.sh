@@ -276,6 +276,19 @@ restore() {
   fi
   record_head "$(git_l rev-parse HEAD)"
   say "restored $n files from $REF@$(git_l rev-parse --short HEAD) ($(git_l log -1 --format=%cI))"
+  # A backup taken before its instance finished onboarding holds no VERSION: it adopted nothing,
+  # so migrate from the oldest (docs/persistence.md → Definition version & upgrade).
+  if [ ! -s "$WORK/VERSION" ]; then
+    echo 1.0.0 > "$WORK/VERSION"; say "the backup holds no VERSION — wrote 1.0.0: migrate from it now (ONBOARDING Step 2f)"
+  else
+    say "adopted version $(head -1 "$WORK/VERSION") — migrate from it now when it differs from the checkout (ONBOARDING Step 2f)"
+  fi
+  local k gone_keys=""
+  for k in $CONFIG_OBSOLETE_KEYS; do
+    grep -q "^- $k:" "$WORK/CONFIG.md" 2>/dev/null || continue
+    sed "/^- $k:/d" "$WORK/CONFIG.md" > "$WORK/CONFIG.md.tmp" && mv "$WORK/CONFIG.md.tmp" "$WORK/CONFIG.md" && gone_keys="$gone_keys $k"
+  done
+  [ -n "$gone_keys" ] && say "removed obsolete CONFIG keys:$gone_keys"
   foreign="$(git_l log --format='%h %an %cI' | grep -v " $NAME " | head -5)"
   [ -n "$foreign" ] && say "commits not made by this script (inspect before trusting them): $(printf '%s' "$foreign" | paste -sd';' -)"
   pending="$( { table_rows "$WORK/QA.md" | awk -F'|' '$7 ~ /report_pending/ {gsub(/ /,"",$2); printf "#%s ", $2}'

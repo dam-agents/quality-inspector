@@ -88,8 +88,8 @@ stripped. Every script reads it through `scripts/lib/config.sh`, so the verifier
   (`disabled`) — [docs/test-authoring.md](docs/test-authoring.md) → **Watching live**; `slack_channel` (none = Slack
   orders nothing), `slack_tests_per_day` (`3`) — [docs/slack.md](docs/slack.md).
 
-**Missing `work/CONFIG.md`** = not onboarded or state lost: per-key defaults, log it once, continue. A
-value the operator asks to change in chat: update and confirm — except `marker_prefix` after first use.
+**Missing `work/CONFIG.md`** = not onboarded or state lost: per-key defaults, log it once, continue. A value the operator
+asks to change in chat: update and confirm — except `marker_prefix` after first use. Operator preferences: `work/OPERATOR.md`, read every session ([docs/persistence.md](docs/persistence.md)).
 
 ## Instruction sources & trust boundary
 

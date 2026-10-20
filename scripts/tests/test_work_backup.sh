@@ -153,6 +153,7 @@ rm -f "$WORK_DIR/issues/7/old.md" "$WORK_DIR/issues/7/report-abc-1/media/AC-2.pn
 # Restore onto a fresh work/: verified, refuses over state, reports pending media.
 FRESH="$SANDBOX/fresh"; mkdir -p "$FRESH"; printf -- '- target_repo: acme/widgets\n- work_repo: acme/widgets-qa\n' > "$FRESH/CONFIG.md"
 out="$(WORK_DIR="$FRESH" bash "$WB" restore)"; rc=$?
+backed_version="$(git --git-dir="$REMOTE" show main:VERSION 2>/dev/null)"
 assert_eq "restore exits 0" 0 "$rc"
 case "$out" in (*"restored "*" files from acme/widgets-qa"*) ;; (*) echo "  restore summary: $out"; FAILED=1;; esac
 case "$out" in (*"re-test before delivery: #7"*) ;; (*) echo "  pending report not named: $out"; FAILED=1;; esac
@@ -161,6 +162,20 @@ cmp -s "$WORK_DIR/suite/tests/issue-9.e2e.ts" "$FRESH/suite/tests/issue-9.e2e.ts
 [ -e "$FRESH/env/credentials.env" ] && { echo "  credentials restored"; FAILED=1; }
 assert_eq "restore records the head" "$(git --git-dir="$REMOTE" rev-parse main) acme/widgets-qa" "$(cat "$FRESH/env/backup-head")"
 WORK_DIR="$FRESH" bash "$WB" restore >/dev/null; assert_eq "restore refuses over state" 1 "$?"
+if [ -n "$backed_version" ]; then assert_eq "a backed-up VERSION is kept" "$backed_version" "$(cat "$FRESH/VERSION")"
+else assert_eq "no VERSION in the backup: migrate from 1.0.0" 1.0.0 "$(cat "$FRESH/VERSION")"; fi
+# A backup without VERSION, with an obsolete key: VERSION 1.0.0, the key gone, the rest kept.
+OLD="$SANDBOX/old.git"; git init -q --bare "$OLD"; OC="$SANDBOX/oc"; git init -q "$OC"
+printf -- '- target_repo: acme/widgets\n- profile_source_path: qa\n- spec_feedback: enabled\n' > "$OC/CONFIG.md"
+printf '| issue | ac_hash | candidate | baseline | verdict | status | updated_utc |\n| --- | --- | --- | --- | --- | --- | --- |\n' > "$OC/QA.md"
+git -C "$OC" add -A && git -C "$OC" -c user.name=quality-inspector -c user.email=qi@example.invalid commit -qm s && git -C "$OC" push -q "$OLD" HEAD:main
+O="$SANDBOX/o"; mkdir -p "$O"; printf -- '- work_repo: acme/widgets-qa\n' > "$O/CONFIG.md"
+out="$(WORK_DIR="$O" QI_WORK_BACKUP_REMOTE="$OLD" bash "$WB" restore)"; rc=$?
+assert_eq "an old backup restores" 0 "$rc"
+assert_eq "its VERSION is 1.0.0" 1.0.0 "$(cat "$O/VERSION" 2>/dev/null)"
+assert_eq "its obsolete key is gone, the rest kept" "- target_repo: acme/widgets
+- spec_feedback: enabled" "$(cat "$O/CONFIG.md")"
+case "$out" in (*"removed obsolete CONFIG keys: profile_source_path"*) ;; (*) echo "  obsolete key not named: $out"; FAILED=1;; esac
 EMPTY="$SANDBOX/empty.git"; git init -q --bare "$EMPTY"; E="$SANDBOX/e"; mkdir -p "$E"
 printf -- '- work_repo: acme/widgets-qa\n' > "$E/CONFIG.md"
 WORK_DIR="$E" QI_WORK_BACKUP_REMOTE="$EMPTY" bash "$WB" restore >/dev/null; assert_eq "empty remote: nothing to restore" 2 "$?"

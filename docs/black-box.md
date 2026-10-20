@@ -108,7 +108,7 @@ gateway; the VM holds a placeholder, so these rules hold whatever the token may 
 | Host | Allowed — for every repository `o/r` | Denied |
 | --- | --- | --- |
 | `api.github.com` | `GET /user`; `GET /repos/o/r` and `…/git/refs/heads/*` (the platform's scan of a profile source); `GET …/issues*`; `POST …/issues/*/comments`; `DELETE …/issues/*/labels/*`; `GET …/contents/.quality-inspector/*` and `…/contents/.quality-inspector?*` (the profile directory, [profile-contract.md](profile-contract.md) → Where it lives) | `/*`; `GET …/issues/*/timeline*`, `…/issues/*/events*`, `…/issues/events*`; per allow `/repos/*/*<rest>`, `/repos/*/*/*<rest>` and `/repos/*_2F*<rest>` |
-| `github.com` | `GET /<D>*/info/refs?service=git-upload-pack`, `POST /<D>*/git-upload-pack` — the read-only fetch of this definition `<D>` (seed and Kit Update) | `/*` |
+| `github.com` | `GET /<D>*/info/refs?service=git-upload-pack`, `POST /<D>*/git-upload-pack` — the read-only fetch of this definition `<D>` (seed and Kit Update); `GET /cert-manager/cert-manager/releases/download/v*/cert-manager.yaml` and `GET /kubernetes-sigs/gateway-api/releases/download/v*/standard-install.yaml` — two cluster prerequisites a helm-k3s profile applies, redirected to `release-assets.githubusercontent.com`, which the `trusted` preset allows | `/*` |
 | `codeload.github.com`, `raw.githubusercontent.com`, gists, GitLab, Bitbucket, Codeberg, Gitea, Azure DevOps, Sourcegraph, SourceHut | — | `/*` |
 | `registry.npmjs.org` | `GET` (the `e2e` framework) | — |
 | `api.anthropic.com` | model calls for agent steps (a proxy connection's `ANTHROPIC_BASE_URL` host instead, allowed by that connection) | — |
@@ -121,14 +121,20 @@ and `/repos/*_2F*/issues*` wherever owner or repository hides an encoded slash; 
 `/repos/o/r/issues…` alone. A repository whose owner or name holds `2F` (any case) after a
 character is denied as a side effect. The probes request each such shape against the target.
 
-**What stays the operator's** (`bash scripts/egress-rules.sh` prints it as `dam network create`
-commands): the profile's own `egress` (where the product's builds come from), the `work_repo`
-backup's git push, and — for a target on GitHub Enterprise — the same shared rules on that host
-(the API under `/api/v3` there, on `api.<host>` for `ghe.com`, plus `/*` denies on its `raw.` and
-`codeload.` hosts). `--kit` prints the kit's own rules, for an agent created by hand or from a
-kit before 3.0.0, whose rules a kit never updates. Missing ones fail the gate, never open
-the code: any host no rule matches is **held** for approval on the operator's Home — approve
-nothing on the deny side; a held probe shows as `warn` until it is an explicit deny.
+**What stays the operator's** (`bash scripts/egress-rules.sh` lists it — host, method, path,
+verdict, why — never as commands): the profile's own `egress` (where the product's builds come
+from), the `work_repo` backup's git push, and — for a target on GitHub Enterprise — the same
+shared rules on that host (the API under `/api/v3` there, on `api.<host>` for `ghe.com`, plus `/*`
+denies on its `raw.` and `codeload.` hosts). `--kit` lists the kit's own rules, for an agent
+created by hand or from a kit before 3.0.0, whose rules a kit never updates. Each row says how it
+lands: `prompt` — no kit rule covers the host, so its first request in a direct session is held
+and the operator approves the prompt (`verify-onboarding.sh --egress` makes those requests);
+`by-hand` — under a kit deny a request is refused at once and no prompt ever appears, and a deny
+or a set that must land whole is never left to prompts: the operator adds it in the agent's
+network settings; `kit` — already allowed. A held request in a scheduled run is refused.
+Missing ones fail the gate, never open the code: any host no rule matches is **held** for
+approval on the operator's Home — approve nothing on the deny side; a held probe shows as
+`warn` until it is an explicit deny.
 
 **A profile inside the target repository** lives under `.quality-inspector/`. The platform
 fetches only that directory through the contents API when the archive is denied — every

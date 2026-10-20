@@ -74,6 +74,7 @@ this contract (`--live` also lists its builds).
   },
   "egress": [{ "host": "registry.example.com", "method": "GET", "why": "product images" }],
   "requires": { "root": true, "commands": ["docker"], "memory_gi": 8 },
+  "canary": { "thing": "widget, under Widgets → New", "field": "description" },
   "interfaces": { "cli": "widgets", "openapi": "/api/openapi.json" },
   "config": {
     "image_ref": { "default": "registry.example.com/widgets", "about": "image repository the builds come from" },
@@ -98,6 +99,12 @@ this contract (`--live` also lists its builds).
 - `security` (optional) — `entity`: the noun of the main object a user creates, with a
   name and a description (`"project"`); `namespace`: where its pods run, when the engine
   names none. The security run's input and deployment checks need them ([security.md](security.md)).
+- `canary` (optional) — what the injection canary ([nested-env.md](nested-env.md) →
+  Failures) creates: `thing`, an object a user creates with a name, in the product's words
+  and where (`"project, under Projects → New"`), and `field`, the free-text field that shows
+  the injected text (`description` by default; `name` puts it into the name itself). A
+  product with no such object says why in `none`; the canary is then skipped with that
+  reason. Absent → the act model looks for one.
 - `interfaces` — optional, both fields too: `cli`, the published CLI's command (on `PATH`
   or installed into `work/suite`), and `openapi`, the path under `app.url` that serves the
   API description as JSON. Their snapshots are change context

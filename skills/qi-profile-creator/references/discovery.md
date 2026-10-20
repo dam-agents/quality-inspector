@@ -29,7 +29,7 @@ confirmed before writing files.
 | 14 | Settings an operator may change, and which have no safe default | `config` (`ask`) |
 | 15 | Main UI areas and the terms users see | `SKILL.md` |
 | 16 | A published CLI or API (the command, the path of its OpenAPI JSON), its npm package, and how a user gets a token for it | `interfaces`, `boundary.packages`, `SKILL.md` → CLI and API |
-| 17 | The main object a user creates, with a name and a description (a project, a document); the namespace its pods run in when no engine names one | `security.entity`, `security.namespace` |
+| 17 | The main object a user creates, with a name and a description (a project, a document), and where in the UI; the namespace its pods run in when no engine names one | `security.entity`, `security.namespace`, `canary.thing` (`canary.field` when the text shows in another field, `canary.none` when there is no such object) |
 | 18 | API calls the security run cannot make through the UI: create that object, mint and use an API key | `suite/lib/security-api.ts` (its exports: the core's `docs/security.md`) |
 
 ## Where to look
@@ -108,11 +108,14 @@ needed), a `path` where the host is shared (e.g. `github.com` release downloads)
 `pkg-containers.githubusercontent.com`; Docker Hub → `registry-1.docker.io`,
 `auth.docker.io`, `production.cloudflare.docker.com`; GitHub release downloads →
 `objects.githubusercontent.com`, `release-assets.githubusercontent.com`. The helm-k3s
-engine also needs `get.helm.sh`. The operator applies these entries with the rules
-`scripts/egress-rules.sh` prints (the core's `docs/black-box.md` → Egress rules). GitHub
+engine also needs `get.helm.sh`. `scripts/egress-rules.sh` lists these entries for the operator (the core's
+`docs/black-box.md` → Egress rules): a host no kit rule covers lands through its approval
+prompt, one under a kit deny (any `github.com` path) only by hand — keep those few. GitHub
 is deny-by-default for every repository there, so an install that downloads from the
 target repository's own releases cannot work — such builds must come from a registry; a
-third-party release download needs an entry with its exact path.
+third-party release download needs an entry with its exact path. The kit already opens
+cert-manager's `cert-manager.yaml` and Gateway API's `standard-install.yaml` release files,
+and the `trusted` preset the hosts GitHub redirects downloads to — leave those out.
 
 ## Boundary
 

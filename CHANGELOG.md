@@ -7,6 +7,34 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.2.0 — 2026-10-20
+
+**Upgrade:**
+1. **Operator-only — the egress.** The kit now allows `GET` on `github.com` for two release files a
+   helm-k3s profile applies: `/cert-manager/cert-manager/releases/download/v*/cert-manager.yaml`
+   and `/kubernetes-sigs/gateway-api/releases/download/v*/standard-install.yaml`
+   ([docs/black-box.md](docs/black-box.md) → Egress rules). A kit never updates an existing
+   agent's rules: recreate the agent from the kit, or have the operator add these two allows in
+   the agent's network settings. `bash "$HOME/scripts/egress-rules.sh"` now lists rules as host,
+   method, path and why with how each lands (`prompt`, `by-hand`, `kit`) — never commands; give
+   the operator its `by-hand` rows in those words, then run
+   `bash "$HOME/scripts/verify-onboarding.sh" --egress` and have the operator approve each prompt.
+2. The suite skeleton changed; `suite.sh init` copies only missing files, so bring
+   `work/suite` up to it, keeping any operator change:
+   - `grep -q "role === 'owner'" "$HOME/work/suite/e2e.config.ts"` fails → take the
+     `credentials` filter of `scripts/suite-skeleton/e2e.config.ts` (a role without a password
+     is left out; e2e refuses an empty one).
+   - `grep -q "getByRole('main')" "$HOME/work/suite/tests/smoke.e2e.ts"` fails → copy the
+     skeleton's `tests/smoke.e2e.ts` (it waits for the page before judging it).
+   - `grep -q QI_CANARY_THING "$HOME/work/suite/tests/canary.e2e.ts"` fails → keep the old file as
+     `canary.e2e.ts.pre-3.1` outside `tests/`, copy the skeleton's, and tell the operator: the
+     object it creates now comes from the profile's `canary` ([docs/profile-contract.md](docs/profile-contract.md)).
+3. A standing operator preference kept anywhere else (the harness memory, a note in chat) moves
+   to `work/OPERATOR.md`, one dated line each (docs/persistence.md → **Operator preferences**).
+4. Nothing to run for the rest: `verify-onboarding.sh --models` lists the models that answer,
+   a 429 is reported as a rate limit, a restore without `work/VERSION` migrates from 1.0.0 and
+   drops obsolete `CONFIG.md` keys itself.
+
 ## 3.1.0 — 2026-10-20
 
 **Upgrade:**

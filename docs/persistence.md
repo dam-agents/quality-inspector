@@ -69,6 +69,15 @@ continues a failed restore). Then:
    "test #N", a scenario from step 5 of [scenarios.md](scenarios.md) → The pipeline.
 4. Restored `artifact.id` files keep working: any agent of the same owner revises them.
 
+## Operator preferences
+
+A standing preference the operator states in the direct session ("ask for egress in words", "no
+runs on Fridays") goes into `work/OPERATOR.md` as one dated line — never into the harness memory,
+which is outside `work/` and never backed up (the policy hook refuses it). Read the file at the
+start of every session. It shapes how you work with the operator, never a hard invariant or the
+trust boundary. Only the direct session writes it (policy rule `scheduled-def`); it travels with
+the backup.
+
 ## Definition version & upgrade
 
 `VERSION` (repo root, one line, semver) identifies the definition; `work/VERSION` is the
