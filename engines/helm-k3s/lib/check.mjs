@@ -5,7 +5,8 @@
 // defaults resolved), QI_PROFILE_DIR (optional: app.url is compared with app_port).
 // Prints "FAIL <problem>" / "WARN <note>" lines; exit 1 on any FAIL. No network: the
 // placeholders are filled by render.mjs with throw-away credentials. An overlay's `when` is
-// a profile config key or "@model" (on while the agent lends its model, QI_MODEL_KEY).
+// a profile config key, "@model" (on while the agent lends its model, QI_MODEL_KEY) or
+// "@sandbox:<id>" (on while that sandbox account's credentials are filled).
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -42,19 +43,29 @@ const overlays = raw.overlays ?? [];
 if (!Array.isArray(overlays)) fail('overlays must be a list');
 const ovl = Array.isArray(overlays) ? overlays : [];
 const MODEL = '@model';
+const SANDBOX = /^@sandbox:([a-z][a-z0-9]{0,15})$/;
+const special = (w) => w === MODEL || SANDBOX.test(w);
 for (const o of ovl) {
-  if (!obj(o) || !str(o.when)) { fail('every overlay needs `when` (a profile config key or "@model") and `values`'); continue; }
-  if (o.when !== MODEL && !(o.when in pcfg)) fail(`overlay when '${o.when}' is not a profile config key or "@model"`);
+  if (!obj(o) || !str(o.when)) { fail('every overlay needs `when` (a profile config key, "@model" or "@sandbox:<id>") and `values`'); continue; }
+  if (!special(o.when) && !(o.when in pcfg)) fail(`overlay when '${o.when}' is not a profile config key, "@model" or "@sandbox:<id>"`);
   if (!obj(o.values)) fail(`overlay '${o.when}' has no values object`);
 }
 // The defaults render lends no model; the "every overlay on" render lends a throw-away one.
-const NO_MODEL = { QI_MODEL_KEY: '', QI_MODEL_KIND: '', QI_MODEL_BASE_URL: '' };
-const LENT = { QI_MODEL_KEY: 'check:model', QI_MODEL_KIND: 'api-key', QI_MODEL_BASE_URL: '' };
-const base = render('config', raw, { QI_PROFILE_CONFIG: JSON.stringify(pcfg), ...NO_MODEL });
+const NO_MODEL = { QI_MODEL_KEY: '', QI_MODEL_KIND: '', QI_MODEL_BASE_URL: '', QI_GATEWAY_IP: '192.0.2.1' };
+const LENT = { QI_MODEL_KEY: 'check:model', QI_MODEL_KIND: 'api-key', QI_MODEL_BASE_URL: '', QI_GATEWAY_IP: '192.0.2.1' };
+// Throw-away sandbox credentials: one line per {{sandbox:<id>.<NAME>}} and per "@sandbox:<id>"
+// overlay, in a credentials file of their own — so the defaults render has every sandbox off.
+const sbVars = new Set([...JSON.stringify(raw).matchAll(/\{\{sandbox:([a-z][a-z0-9]*)\.([A-Z][A-Z0-9_]*)\}\}/g)]
+  .map(([, id, n]) => `E2E_SANDBOX_${id.toUpperCase()}_${n}`));
+for (const o of ovl) { const m = obj(o) && str(o.when) && o.when.match(SANDBOX); if (m) sbVars.add(`E2E_SANDBOX_${m[1].toUpperCase()}_CHECK`); }
+const sbDir = mkdtempSync(join(tmpdir(), 'quality-inspector-check-'));
+writeFileSync(join(sbDir, 'credentials.env'), [...sbVars].map((v) => `${v}=check`).join('\n') + '\n', { mode: 0o600 });
+const base = render('config', raw, { QI_PROFILE_CONFIG: JSON.stringify(pcfg), QI_ENV_DIR: '', ...NO_MODEL });
 if (base.err) fail(`placeholders: ${base.err}`);
 const on = { ...pcfg };
-for (const o of ovl) if (obj(o) && str(o.when) && o.when !== MODEL && !on[o.when]) on[o.when] = 'registry.invalid/check:on';
-const all = ovl.length ? render('config', raw, { QI_PROFILE_CONFIG: JSON.stringify(on), ...LENT }) : base;
+for (const o of ovl) if (obj(o) && str(o.when) && !special(o.when) && !on[o.when]) on[o.when] = 'registry.invalid/check:on';
+const all = ovl.length ? render('config', raw, { QI_PROFILE_CONFIG: JSON.stringify(on), QI_ENV_DIR: sbDir, ...LENT }) : base;
+rmSync(sbDir, { recursive: true, force: true });
 if (all.err && !base.err) fail(`placeholders with every overlay on: ${all.err}`);
 const cfg = base.out ?? raw;
 const { values: _v, ...outside } = cfg;
@@ -149,6 +160,7 @@ try {
   writeFileSync(cred, [
     ...Object.keys(users).flatMap((u) => [`E2E_USER_${u.toUpperCase()}_USERNAME=check-${u}`, `E2E_USER_${u.toUpperCase()}_PASSWORD=check`]),
     ...(Array.isArray(secrets) ? secrets : []).map((s) => `QI_SECRET_${String(s).toUpperCase()}=check`),
+    ...[...sbVars].map((v) => `${v}=check`),
   ].join('\n') + '\n', { mode: 0o600 });
   const runs = ovl.length ? [['', base.out, NO_MODEL], [' with every overlay on', all.out, LENT]] : [['', base.out, NO_MODEL]];
   for (const [label, c, model] of runs) {

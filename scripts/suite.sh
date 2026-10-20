@@ -142,6 +142,8 @@ cmd_run() {
     QI_CANARY_THING="$(profile_field '.canary.thing')" QI_CANARY_FIELD="$(profile_field '.canary.field')"
     QI_CANARY_NONE="$(profile_field '.canary.none')"
     export QI_CANARY_THING QI_CANARY_FIELD QI_CANARY_NONE
+    # The profile's config values (a sandbox repository's name), for its suite/ helpers.
+    QI_PROFILE_CONFIG="$(profile_config)"; export QI_PROFILE_CONFIG
     # Model calls leave through the gateway with the connection's placeholder, which it swaps
     # for the credential (lib/profile.sh → model_auth); e2e.config.ts picks the header.
     while IFS='=' read -r k v; do [ -n "$k" ] && export "$k=$v"; done < <(model_auth)

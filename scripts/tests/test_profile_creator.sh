@@ -48,6 +48,8 @@ assert_eq "complete profile: no black-box hint" "" "$(grep -E 'source paths|code
 # Black-box hints: what a user could not have written.
 P="$(helm_profile hint)"; printf '\nSign-in is handled in src/server/auth.ts.\n' >> "$P/SKILL.md"
 check "$P" | grep -q '^WARN  SKILL.md: looks like source paths — src/server/auth.ts' || { echo "  a source path in SKILL.md must warn"; FAILED=1; }
+P="$(helm_profile ownhelper)"; printf '\nThe test person writes through suite/lib/sandbox.ts.\n' >> "$P/SKILL.md"
+check "$P" | grep -q 'looks like source paths' && { echo "  the profile's own suite/ helper is no source path"; FAILED=1; }
 P="$(helm_profile link)"; printf '\nDesign: https://github.com/acme/app/blob/main/docs/design.md\n' >> "$P/SKILL.md"
 check "$P" | grep -q '^WARN  SKILL.md: links into a code host' || { echo "  a code-host link in SKILL.md must warn"; FAILED=1; }
 
@@ -81,6 +83,24 @@ P="$(helm_profile egressbad)"; edit "$P" '.egress += [{"host":"x.example","verdi
 out="$(check "$P")"
 grep -q "^FAIL  egress\[2\] (x.example): verdict 'maybe'" <<<"$out" || { echo "  an unknown egress verdict must fail"; FAILED=1; }
 grep -q '^FAIL  egress\[2\] (x.example): pathPattern must be' <<<"$out" || { echo "  a relative pathPattern must fail"; FAILED=1; }
+
+# Sandbox accounts: their shape, their guide on disk, a placeholder naming a config key.
+P="$(helm_profile sandbox)"; mkdir -p "$P/sandbox"; echo "Create it." > "$P/sandbox/github.md"
+edit "$P" '.sandbox = {"accounts":[{"id":"github","what":"an organization","guide":"sandbox/github.md","credentials":["APP_ID"]}]}
+  | .config.sb_repo = {"default":"","about":"the sandbox repository","ask":true}
+  | .egress += [{"host":"api.github.com","method":"POST","path":"/repos/{profile.sb_repo}/issues","why":"the issue"}]'
+out="$(check "$P")"
+assert_eq "sandbox: no FAIL" "" "$(grep '^FAIL' <<<"$out")"
+grep -q '^PASS  sandbox: 1 account(s) — github' <<<"$out" || { echo "  a sandbox must pass"; FAILED=1; }
+grep -q '^WARN  sandbox: no bin/sandbox' <<<"$out" || { echo "  a sandbox without bin/sandbox must warn"; FAILED=1; }
+P="$(helm_profile sandboxbad)"
+edit "$P" '.sandbox = {"accounts":[{"id":"Git","what":"x","guide":"g.md","credentials":["a"]},{"id":"slack","what":"","guide":"sandbox/slack.md","credentials":[]}]}
+  | .egress += [{"host":"api.github.com","method":"POST","path":"/repos/{profile.nope}/issues","why":"x"}]'
+out="$(check "$P")"
+for want in '^FAIL  Git: id must be' '^FAIL  sandbox slack: no what' '^FAIL  sandbox slack: sandbox/slack.md is missing' \
+  '^FAIL  sandbox slack: credentials must be' '^FAIL  egress (api.github.com): {profile.nope} names no config key'; do
+  grep -q "$want" <<<"$out" || { echo "  missing: $want"; FAILED=1; }
+done
 
 P="$(helm_profile url)"; edit "$P" '.app.url = "https://acme.example.com"'
 check "$P" | grep -q '^FAIL  app.url' || { echo "  a non-local app.url must fail"; FAILED=1; }

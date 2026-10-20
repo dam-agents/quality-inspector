@@ -28,6 +28,10 @@ The profile stays in `.quality-inspector/`: the one directory of a repository th
 | --- | --- | --- |
 | `profile.<fill: key>` | <fill: default, or "empty (asked)"> | <fill: its `about`> |
 
+## Sandbox accounts
+
+TODO(profile): with `sandbox` in `profile.json`, one line per account — what the operator creates (its guide in `sandbox/`), the credentials it fills in `work/env/credentials.env` — or delete this section.
+
 ## Egress
 
 Every entry of `profile.json` → `egress`, applied by the operator.

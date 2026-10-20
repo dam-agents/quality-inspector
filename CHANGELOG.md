@@ -7,6 +7,25 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.4.0 — 2026-10-20
+
+**Upgrade:**
+1. Nothing is required: a profile without a `sandbox` section works as before, and
+   `scripts/sandbox.sh status` says so.
+2. When the installed profile declares sandbox accounts
+   ([docs/profile-contract.md](docs/profile-contract.md) → `sandbox`): offer the operator
+   ONBOARDING.md Step 3a in the direct session — the guides, `sandbox.sh template`, the new
+   `by-hand` egress rows of `bash "$HOME/scripts/egress-rules.sh"`, `sandbox.sh check`. Until
+   then `verify-onboarding.sh` names the empty credentials and the criteria that need the
+   accounts stay `testable: no`.
+3. Nothing to run for the `helm-k3s` engine: it now fills `{{sandbox:<id>.<NAME>}}` and applies
+   `when: "@sandbox:<id>"` overlays, fills `{{gateway_ip}}` (the VM gateway's address, for a nested
+   platform's egress policy), and reads `credentials.env` with `export` and quotes. A test run and
+   the `e2e` MCP server now have `QI_PROFILE_CONFIG` (the profile's config) in their environment.
+4. A profile egress row now listed `refused` is never added: on a GitHub host only the
+   sandbox shapes pass ([docs/black-box.md](docs/black-box.md) → Sandbox accounts). If the
+   operator added such a rule earlier, ask them to delete it from the agent's network settings.
+
 ## 3.3.0 — 2026-10-20
 
 **Upgrade:**

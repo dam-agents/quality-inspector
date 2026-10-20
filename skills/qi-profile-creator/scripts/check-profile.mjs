@@ -116,7 +116,7 @@ else {
 if (m !== null && !obj(m)) { fail('profile.json: not an object'); m = null; }
 
 if (m) {
-  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'security', 'canary', 'interfaces', 'config'];
+  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'security', 'canary', 'interfaces', 'config', 'sandbox'];
   for (const k of Object.keys(m)) if (!TOP.includes(k)) warn(`profile.json: unknown key '${k}' — the core ignores it`);
   m.schema === 'qi-profile/v1' ? pass('schema qi-profile/v1') : fail(`schema '${m.schema ?? ''}' is not qi-profile/v1`);
   str(m.product) ? pass(`product: ${m.product}`) : fail('product: missing');
@@ -159,7 +159,7 @@ if (m) {
   const binDir = join(dir, 'bin');
   if (existsSync(binDir)) {
     for (const f of readdirSync(binDir)) {
-      if (!['env', 'versions', 'build-time'].includes(f)) warn(`bin/${f}: not a contract command — the core never calls it`);
+      if (!['env', 'versions', 'build-time', 'sandbox'].includes(f)) warn(`bin/${f}: not a contract command — the core never calls it`);
     }
   }
 
@@ -201,6 +201,39 @@ if (m) {
       if (!str(e.why)) warn(`${id} (${e.host}): no why — the operator applies it without knowing what it is for`);
     }
     if (ok) pass(`egress: ${m.egress.length} host rule(s)`);
+  }
+
+  // sandbox — the external test accounts the nested product connects to (scripts/sandbox.sh
+  // reads the same rules).
+  if (m.sandbox !== undefined) {
+    const acc = obj(m.sandbox) ? m.sandbox.accounts : undefined;
+    if (!Array.isArray(acc) || !acc.length) fail('sandbox.accounts: must be a non-empty list');
+    else {
+      let ok = true; const ids = new Set();
+      for (const [i, a] of acc.entries()) {
+        const id = obj(a) && typeof a.id === 'string' ? a.id : `sandbox.accounts[${i}]`;
+        if (!obj(a) || !/^[a-z][a-z0-9]{0,15}$/.test(String(a.id ?? ''))) { fail(`${id}: id must be [a-z][a-z0-9]{0,15}`); ok = false; continue; }
+        if (ids.has(a.id)) { fail(`sandbox ${id}: declared twice`); ok = false; } ids.add(a.id);
+        if (!str(a.what)) { fail(`sandbox ${id}: no what — the operator is told what to create`); ok = false; }
+        if (!/^sandbox\/[a-z0-9-]+\.md$/.test(String(a.guide ?? ''))) { fail(`sandbox ${id}: guide must be sandbox/<name>.md`); ok = false; }
+        else if (!existsSync(join(dir, a.guide))) { fail(`sandbox ${id}: ${a.guide} is missing`); ok = false; }
+        if (!Array.isArray(a.credentials) || !a.credentials.length || a.credentials.some((k) => !/^[A-Z][A-Z0-9_]{0,31}$/.test(String(k)))) {
+          fail(`sandbox ${id}: credentials must be a non-empty list of [A-Z][A-Z0-9_]{0,31} names`); ok = false;
+        }
+      }
+      const own = join(dir, 'bin', 'sandbox');
+      if (!existsSync(own)) warn('sandbox: no bin/sandbox — nothing checks the accounts at onboarding');
+      else if (!isExec(own)) { fail('bin/sandbox: not executable (chmod +x)'); ok = false; }
+      if (ok) pass(`sandbox: ${acc.length} account(s) — ${acc.map((a) => a.id).join(', ')}`);
+    }
+  }
+  // egress placeholders name profile keys that exist.
+  if (Array.isArray(m.egress)) {
+    for (const e of m.egress) {
+      for (const k of `${e?.host ?? ''} ${e?.pathPattern ?? e?.path ?? ''}`.matchAll(/\{profile\.([a-z0-9_]+)\}/g)) {
+        if (!obj(m.config) || !obj(m.config[k[1]])) fail(`egress (${e.host}): {profile.${k[1]}} names no config key`);
+      }
+    }
   }
 
   // requires
@@ -296,7 +329,9 @@ else {
     if (!/^#+ .*cannot/im.test(body)) warn('SKILL.md: no "cannot do" section — it is what makes criteria testable: no');
     // Black-box hints: things a user could not have written.
     const code = body.match(/(?:^|[\s`("'])((?:src|lib|pkg|internal|cmd|apps?|packages|server|backend|frontend|services)\/[\w./-]+|[\w./-]+\.(?:ts|tsx|jsx|mjs|py|go|rs|java|kt|rb|php|cs|sql|proto))(?=$|[\s`)"',.;:])/gm);
-    if (code) warn(`SKILL.md: looks like source paths — ${[...new Set(code.map((s) => s.trim().replace(/^[`("']/, '')))].slice(0, 3).join(', ')} (user-facing knowledge only)`);
+    // The profile's own suite/ helpers are named for the tester on purpose (profile-contract → sandbox).
+    const paths = [...new Set((code ?? []).map((s) => s.trim().replace(/^[`("']/, '')))].filter((p) => !p.startsWith('suite/'));
+    if (paths.length) warn(`SKILL.md: looks like source paths — ${paths.slice(0, 3).join(', ')} (user-facing knowledge only)`);
     const links = body.match(/https?:\/\/(?:www\.)?(?:github\.com|gitlab\.com|bitbucket\.org)\/[^\s)]*\/(?:blob|tree|commit|pull|merge_requests|-\/blob)\/[^\s)]*/g);
     if (links) warn(`SKILL.md: links into a code host — ${links.slice(0, 2).join(', ')}`);
   }

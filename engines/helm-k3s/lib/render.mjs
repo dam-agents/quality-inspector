@@ -8,9 +8,11 @@
 //                                      with {{user:NAME.username|password}}, {{secret:name}} and
 //                                      {{app_port}} filled from the credentials file, and
 //                                      {{model:key|kind|base_url}}, {{proxy:https|http|no}},
-//                                      {{gateway_ca}} from the environment.
-// An overlay whose `when` is "@model" applies while the agent lends its model (QI_MODEL_KEY).
-import { readFileSync } from 'node:fs';
+//                                      {{gateway_ca}}, {{gateway_ip}} from the environment.
+// An overlay whose `when` is "@model" applies while the agent lends its model (QI_MODEL_KEY);
+// "@sandbox:<id>" while that sandbox account's lines in $QI_ENV_DIR/credentials.env are all
+// filled (docs/profile-contract.md → `sandbox`), and its {{sandbox:<id>.<NAME>}} fill values.
+import { existsSync, readFileSync } from 'node:fs';
 
 const input = JSON.parse(readFileSync(0, 'utf8'));
 const mode = process.argv[2];
@@ -23,6 +25,11 @@ const merge = (a, b) => {
   return out;
 };
 const fail = (m) => { console.error(`render: ${m}`); process.exit(1); };
+// A credentials file as {NAME: value}: `export` and one layer of quotes allowed.
+const readEnv = (f) => Object.fromEntries(readFileSync(f, 'utf8').split('\n')
+  .map((l) => l.replace(/^export\s+/, '').match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean)
+  .map((m) => [m[1], m[2].trim().replace(/^(["'])(.*)\1$/, '$2')]));
+const sandboxVar = (id, name) => `E2E_SANDBOX_${id.toUpperCase()}_${name}`;
 
 if (mode === 'config') {
   const cfg = JSON.parse(process.env.QI_PROFILE_CONFIG || '{}');
@@ -35,15 +42,21 @@ if (mode === 'config') {
     .replace(/\{\{config_tag:([a-z0-9_]+)\}\}/g, (_, k) => split(ref(k))[1]);
   const { overlays = [], ...rest } = input;
   let out = walk(rest, fill);
-  const on = (w) => (w === '@model' ? !!process.env.QI_MODEL_KEY : String(cfg[w] ?? '') !== '');
+  const credFile = process.env.QI_ENV_DIR ? `${process.env.QI_ENV_DIR}/credentials.env` : '';
+  const cred = credFile && existsSync(credFile) ? readEnv(credFile) : {};
+  const sandboxOn = (id) => {
+    const vals = Object.entries(cred).filter(([k]) => k.startsWith(sandboxVar(id, ''))).map(([, v]) => v);
+    return vals.length > 0 && vals.every((v) => v !== '');
+  };
+  const on = (w) => (w === '@model' ? !!process.env.QI_MODEL_KEY
+    : w.startsWith('@sandbox:') ? sandboxOn(w.slice(9)) : String(cfg[w] ?? '') !== '');
   for (const o of overlays) {
     if (!o.when) fail('an overlay needs `when`');
     if (on(o.when)) out = { ...out, values: merge(out.values ?? {}, walk(o.values ?? {}, fill)) };
   }
   console.log(JSON.stringify(out));
 } else if (mode === 'values') {
-  const env = Object.fromEntries(readFileSync(process.argv[3], 'utf8').split('\n')
-    .map((l) => l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean).map((m) => [m[1], m[2]]));
+  const env = readEnv(process.argv[3]);
   const get = (k) => { if (!(k in env)) fail(`credentials have no ${k}`); return env[k]; };
   const e = process.env;
   // Pods reach the outside only through the gateway; cluster-internal traffic never does.
@@ -54,10 +67,13 @@ if (mode === 'config') {
   const fill = (s) => s
     .replace(/\{\{user:([A-Za-z0-9_]+)\.(username|password)\}\}/g, (_, u, f) => get(`E2E_USER_${u.toUpperCase()}_${f.toUpperCase()}`))
     .replace(/\{\{secret:([a-z0-9_]+)\}\}/g, (_, k) => get(`QI_SECRET_${k.toUpperCase()}`))
+    .replace(/\{\{sandbox:([a-z][a-z0-9]*)\.([A-Z][A-Z0-9_]*)\}\}/g, (_, id, n) => get(sandboxVar(id, n)))
     .replace(/\{\{app_port\}\}/g, String(input.app_port ?? ''))
     .replace(/\{\{model:(key|kind|base_url)\}\}/g, (_, k) => e[`QI_MODEL_${k.toUpperCase()}`] ?? '')
     .replace(/\{\{proxy:(https|http|no)\}\}/g, (_, k) => proxy[k])
-    .replace(/\{\{gateway_ca\}\}/g, () => ca());
+    .replace(/\{\{gateway_ca\}\}/g, () => ca())
+    .replace(/\{\{gateway_ip\}\}/g, () => /^\d{1,3}(\.\d{1,3}){3}$/.test(e.QI_GATEWAY_IP ?? '') ? e.QI_GATEWAY_IP
+      : fail("{{gateway_ip}}: the VM's gateway address did not resolve (getent ahostsv4 github.com)"));
   console.log(JSON.stringify(walk(input.values ?? {}, fill)));
 } else {
   fail('usage: render.mjs config | values <credentials.env>');
