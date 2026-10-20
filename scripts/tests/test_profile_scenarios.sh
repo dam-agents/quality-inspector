@@ -55,6 +55,7 @@ out="$(bash "$SCRIPTS/preflight.sh" regression)"
 assert "a failed adoption alone, same build -> idle" '.nothing_to_do == true' "$out"
 echo '{"candidate":"0.0.0-main.ccc3333","baseline":"0.2.19"}' > "$STUB_DIR/versions.json"
 out="$(bash "$SCRIPTS/preflight.sh" regression)"
+assert_eq "stdout is one JSON value" 1 "$(printf '%s' "$out" | jq -s length)"
 assert "a new build retries it" '.replay == true and .profile_scenarios.adopt == [{"id":"P-create-agent","slug":"create-agent","spec_hash":.profile_scenarios.adopt[0].spec_hash,"kind":"retry"}]' "$out"
 echo '{"candidate":"0.0.0-main.bbb2222","baseline":"0.2.19"}' > "$STUB_DIR/versions.json"
 
@@ -77,4 +78,5 @@ echo '- profile_scenarios: disabled' >> "$WORK_DIR/CONFIG.md"
 echo "2026-10-02T03:00:00Z ran candidate=0.0.0-main.bbb2222 unchanged=1" >> "$WORK_DIR/REGRESSION.log"
 out="$(bash "$SCRIPTS/preflight.sh" regression)"
 assert "disabled: no profile scenarios, same build -> idle" '.nothing_to_do == true' "$out"
+assert_eq "disabled: stdout is one JSON value" 1 "$(printf '%s' "$out" | jq -s length)"
 exit $FAILED

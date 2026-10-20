@@ -199,8 +199,10 @@ Id `P-<slug>`, test `tests/profile-<slug>.e2e.ts`, tag `profile-<slug>`.
    `exploratory` and the scenario's verdict `failed`, with its evidence — the report leads
    with it; the next new build retries it (`kind: retry`: steps 4–6 on the same frozen
    criteria), and so does a new text. A `changed` adoption first moves the
-   previous test to `tests/profile-<slug>.<previous_spec_hash>.e2e.ts`, its row renamed to
-   that path with tier `retired` — the old text's oracle no longer holds.
+   previous test out of `tests/` to `work/suite/retired/profile-<slug>.<previous_spec_hash>.e2e.ts`,
+   its row renamed to `retired/profile-<slug>.<previous_spec_hash>.e2e.ts` with tier `retired` —
+   the old text's oracle no longer holds, and outside the suite's `tests/**/*.e2e.ts` glob a
+   run selecting `profile-<slug>` never loads it.
 6. `set P-<slug> source=profile status=reported spec_hash=<h> build=<candidate>
    verdict=<passed|failed|not-testable>`; log `scenario_done id=P-<slug> verdict=<v>`.
 

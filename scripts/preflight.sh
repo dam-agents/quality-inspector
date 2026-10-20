@@ -186,7 +186,7 @@ PS=null
 profile_scenarios_work() {
   local on files rows adopt retire per n deferred
   on="$(cfg profile_scenarios)"
-  case "$on" in (''|enabled) ;; (disabled) echo null; return;;
+  case "$on" in (''|enabled) ;; (disabled) PS=null; return;;
     (*) log "WARN: profile_scenarios '$on' is not enabled|disabled — treated as enabled";; esac
   local err l
   mkdir -p "$WORK/.cache" && err="$(mktemp "$WORK/.cache/profile-scenarios.XXXXXX")" || err=/dev/null
