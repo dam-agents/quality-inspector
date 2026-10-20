@@ -329,7 +329,9 @@ else {
     if (!/^#+ .*cannot/im.test(body)) warn('SKILL.md: no "cannot do" section — it is what makes criteria testable: no');
     // Black-box hints: things a user could not have written.
     const code = body.match(/(?:^|[\s`("'])((?:src|lib|pkg|internal|cmd|apps?|packages|server|backend|frontend|services)\/[\w./-]+|[\w./-]+\.(?:ts|tsx|jsx|mjs|py|go|rs|java|kt|rb|php|cs|sql|proto))(?=$|[\s`)"',.;:])/gm);
-    if (code) warn(`SKILL.md: looks like source paths — ${[...new Set(code.map((s) => s.trim().replace(/^[`("']/, '')))].slice(0, 3).join(', ')} (user-facing knowledge only)`);
+    // The profile's own suite/ helpers are named for the tester on purpose (profile-contract → sandbox).
+    const paths = [...new Set((code ?? []).map((s) => s.trim().replace(/^[`("']/, '')))].filter((p) => !p.startsWith('suite/'));
+    if (paths.length) warn(`SKILL.md: looks like source paths — ${paths.slice(0, 3).join(', ')} (user-facing knowledge only)`);
     const links = body.match(/https?:\/\/(?:www\.)?(?:github\.com|gitlab\.com|bitbucket\.org)\/[^\s)]*\/(?:blob|tree|commit|pull|merge_requests|-\/blob)\/[^\s)]*/g);
     if (links) warn(`SKILL.md: links into a code host — ${links.slice(0, 2).join(', ')}`);
   }

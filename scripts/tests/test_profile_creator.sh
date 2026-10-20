@@ -48,6 +48,8 @@ assert_eq "complete profile: no black-box hint" "" "$(grep -E 'source paths|code
 # Black-box hints: what a user could not have written.
 P="$(helm_profile hint)"; printf '\nSign-in is handled in src/server/auth.ts.\n' >> "$P/SKILL.md"
 check "$P" | grep -q '^WARN  SKILL.md: looks like source paths — src/server/auth.ts' || { echo "  a source path in SKILL.md must warn"; FAILED=1; }
+P="$(helm_profile ownhelper)"; printf '\nThe test person writes through suite/lib/sandbox.ts.\n' >> "$P/SKILL.md"
+check "$P" | grep -q 'looks like source paths' && { echo "  the profile's own suite/ helper is no source path"; FAILED=1; }
 P="$(helm_profile link)"; printf '\nDesign: https://github.com/acme/app/blob/main/docs/design.md\n' >> "$P/SKILL.md"
 check "$P" | grep -q '^WARN  SKILL.md: links into a code host' || { echo "  a code-host link in SKILL.md must warn"; FAILED=1; }
 
