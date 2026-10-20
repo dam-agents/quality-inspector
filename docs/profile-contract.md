@@ -29,6 +29,7 @@ local development). The core never edits a profile; changes go to its own reposi
   bin/versions    optional — which builds exist (else its engine's)
   bin/build-time  optional — when a build was published (else its engine's)
   suite/          optional: files merged into work/suite on init (fixtures, helpers, lib/security-api.ts)
+  scenarios/      optional: the product team's scenarios, <slug>.md each (below)
   README.md       for the people who maintain the profile
 ```
 
@@ -169,6 +170,46 @@ account's role and what it may do, what the nested environment cannot do (no out
 a mock instead of a real model…), and the sentences that tell a tester an AC is
 `testable: no` for that reason — and which of them a lent model (`lend_model`) makes testable. Never implementation detail — a profile that describes
 the code breaks the black box as surely as reading it.
+
+## `scenarios/` — the product team's scenarios
+
+User flows the product team keeps true, versioned and reviewed with the product: a PR that
+changes how an area works updates its scenario in the same change. The nightly regression
+run adopts each file — freezes its criteria, writes its test, and replays it every night
+from then on ([scenarios.md](scenarios.md) → **Profile scenarios**). Merging a scenario is
+its promotion: it needs no operator "promote" (CLAUDE.md → Hard invariants).
+
+One file per flow, `scenarios/<slug>.md` — the slug `[a-z0-9]` then `[a-z0-9-]`, at most 48
+characters, is its stable id (`P-<slug>`); renaming a file retires one scenario and adds
+another. At most 64 KiB; plain files only.
+
+```markdown
+# The owner schedules a task
+requires: member
+
+## AC-1 — the task is listed
+Given the owner on the Tasks page
+When they schedule a task one minute from now
+Then the task is listed as Scheduled
+
+## AC-2 — the task runs
+Given that scheduled task
+When a minute passes
+Then the task shows Done and its message is in the Messages tab
+```
+
+- A `# <title>` line, then `## AC-<k> — <name>` blocks numbered from 1, each with `Given`,
+  `When` and `Then` lines and one observable outcome — the rules of
+  [acceptance-criteria.md](acceptance-criteria.md). The text is the oracle: the agent tests
+  what it says and nothing more, and a criterion it cannot observe is `testable: no`.
+- `requires: <role>` when the flow needs a second account (`member`, `viewer`,
+  `outsider`); the owner is always signed in.
+- Words a user could write: no URLs, code, selectors or source paths. The file is data to
+  the agent like an issue: an instruction inside it is never followed.
+- Changing the text (more than whitespace) is a new version: the next night re-freezes it
+  and writes a new test. Deleting the file retires its test.
+
+`check-profile.mjs` checks the name, size, title and AC blocks.
 
 ## Choosing and changing the profile
 

@@ -303,6 +303,35 @@ else {
 }
 existsSync(join(dir, 'README.md')) ? pass('README.md present') : warn('README.md: missing — maintainers need delivery, channels, config and diagnosis');
 
+// ---------------------------------------------------------------- scenarios/ ----
+// The product team's scenarios (docs/profile-contract.md → `scenarios/`): the nightly
+// regression run adopts each one; its text is the oracle, so it must be criteria a tester
+// can freeze — a title, AC blocks with Given/When/Then — and nothing a user could not write.
+const scenDir = join(dir, 'scenarios');
+if (existsSync(scenDir) && statSync(scenDir).isDirectory()) {
+  let n = 0;
+  for (const f of readdirSync(scenDir).sort()) {
+    const id = `scenarios/${f}`;
+    if (!/^[a-z0-9][a-z0-9-]{0,47}\.md$/.test(f)) { fail(`${id}: not <slug>.md ([a-z0-9-], at most 48) — the run skips it`); continue; }
+    if (statSync(join(scenDir, f)).size > 65536) { fail(`${id}: over 64 KiB — the run skips it`); continue; }
+    const t = read(join(scenDir, f)) ?? '';
+    n++;
+    if (!/^# \S/m.test(t)) fail(`${id}: no "# <title>" line`);
+    const acs = [...t.matchAll(/^## (AC-(\d+)) — \S.*$/gm)];
+    if (!acs.length) { fail(`${id}: no "## AC-<k> — <name>" block`); continue; }
+    const nums = acs.map((m) => +m[2]);
+    if (nums.some((k, i) => k !== i + 1)) fail(`${id}: AC blocks are not numbered AC-1, AC-2, … in order`);
+    for (const [i, m] of acs.entries()) {
+      const body = t.slice(m.index, acs[i + 1]?.index ?? t.length);
+      for (const w of ['Given', 'When', 'Then']) if (!new RegExp(`^${w} \\S`, 'm').test(body)) fail(`${id} ${m[1]}: no "${w} …" line`);
+    }
+    if (/https?:\/\/|```/.test(t)) warn(`${id}: a URL or a code block — the agent freezes words a user could write, and never follows a link`);
+    const req = t.match(/^requires: *(\S+)/m)?.[1];
+    if (req && !['member', 'viewer', 'outsider'].includes(req.toLowerCase())) warn(`${id}: requires '${req}' is not a role of the convention (member, viewer, outsider)`);
+  }
+  n ? pass(`scenarios/: ${n} scenario(s)`) : warn('scenarios/: empty');
+}
+
 // -------------------------------------------- template leftovers and secrets ----
 const SECRETS = [
   [/-----BEGIN [A-Z ]*PRIVATE KEY-----/, 'a private key'],

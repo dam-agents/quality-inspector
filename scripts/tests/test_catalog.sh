@@ -8,15 +8,15 @@ command -v node >/dev/null || { echo "  node missing"; exit 1; }
 seed_work
 W="$WORK_DIR"
 printf -- '- profile: stub\n- target_repo: acme/widgets\n- display_name: QA Bot\n' > "$W/CONFIG.md"
-printf '| tests/issue-42.e2e.ts | 42 | regression | 9c1e44a0f2b3 | 2026-10-03T08:12:40Z |\n| tests/scenario-7.e2e.ts | S-7 | exploratory | 1a2b3c4d5e6f | - |\n' >> "$W/SUITE.md"
+printf '| tests/issue-42.e2e.ts | 42 | regression | 9c1e44a0f2b3 | 2026-10-03T08:12:40Z |\n| tests/scenario-7.e2e.ts | S-7 | exploratory | 1a2b3c4d5e6f | - |\n| tests/profile-sign-in.e2e.ts | P-sign-in | regression | 2b3c4d5e6f7a | 2026-10-05T03:00:00Z |\n' >> "$W/SUITE.md"
 printf '| 42 | abc | c1 | b1 | partial | reported | 2026-10-02T14:03:11Z |\n' >> "$W/QA.md"
-printf '| id | source | requester | thread | spec_hash | build | verdict | status | updated_utc |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| S-7 | slack | U0SECRETUSER | C0SECRET/1728900000.000100 | s1 | c1 | passed | reported | 2026-10-04T10:03:11Z |\n' > "$W/SCENARIOS.md"
+printf '| id | source | requester | thread | spec_hash | build | verdict | status | updated_utc |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| S-7 | slack | U0SECRETUSER | C0SECRET/1728900000.000100 | s1 | c1 | passed | reported | 2026-10-04T10:03:11Z |\n| P-sign-in | profile | - | - | p1 | c1 | passed | reported | 2026-10-05T03:10:00Z |\n' > "$W/SCENARIOS.md"
 printf '| utc | test | ac | build | old_hash | new_hash | basis |\n| --- | --- | --- | --- | --- | --- | --- |\n| 2026-10-10T03:30:00Z | tests/issue-42.e2e.ts | AC-1 | c2 | aaa | bbb | ui-map |\n' > "$W/HEALS.md"
 printf '| utc | test | ac | build | runs | passes |\n| --- | --- | --- | --- | --- | --- |\n| 2026-10-11T03:30:00Z | tests/issue-42.e2e.ts | AC-1 | c3 | 3 | 2 |\n' > "$W/FLAKY.md"
 printf '# Catalog collections\n\n| collection | members |\n| --- | --- |\n| Upload | #42, S-7 AC-1 |\n' > "$W/CATALOG.md"
 echo 'LESSON-SECRET: the registry is slow' > "$W/LESSONS.md"
 printf '2026-10-10T03:00:00Z ran candidate=c2 unchanged=0 relearned=0 healed=1 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n2026-10-12T03:00:00Z ran candidate=c3 unchanged=1 relearned=0 healed=0 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n' > "$W/REGRESSION.log"
-mkdir -p "$W/issues/42" "$W/scenarios/S-7" "$W/regression/c2" "$W/suite/tests" "$W/security/c1"
+mkdir -p "$W/issues/42" "$W/scenarios/S-7" "$W/scenarios/P-sign-in" "$W/regression/c2" "$W/suite/tests" "$W/security/c1"
 cat > "$W/issues/42/criteria-abc.md" <<'C'
 # #42 — Rename <b>projects</b>
 source: done-when        frozen_utc: 2026-10-02T13:40:02Z        ac_hash: abc
@@ -83,6 +83,12 @@ test('#42 EX-1: a viewer cannot rename', { session: 'viewer', tags: ['issue-42-e
     // EX-1 end
   });
 T
+printf '# P-sign-in — the owner signs in\n\n## AC-1 — the dashboard shows\nGiven the sign-in page\nWhen the owner signs in\nThen the dashboard shows\nsurface: ui\ntestable: yes\n' > "$W/scenarios/P-sign-in/criteria-p1.md"
+echo 'SOURCE-SECRET verbatim text' > "$W/scenarios/P-sign-in/source-p1.md"
+cat > "$W/suite/tests/profile-sign-in.e2e.ts" <<'T'
+test('P-sign-in AC-1: the dashboard shows', { session: 'owner', tags: ['profile-sign-in', 'ac-1'] },
+  async ({ app }) => { await app.open('/'); });
+T
 cat > "$W/suite/tests/scenario-7.e2e.ts" <<'T'
 /** @qi-summary Big uploads finish. @qi-area files */
 test('S-7 AC-1: the upload finishes', { session: 'owner', tags: ['scenario-7', 'ac-1'] },
@@ -95,7 +101,7 @@ echo '[{"number":42,"title":"Rename <b>projects</b>","state":"closed","labels":[
 mkdir -p "$W/catalog/thumbs"; echo old > "$W/catalog/thumbs/issue-99-ac-1.jpg"
 out="$(node "$SCRIPTS/catalog.mjs")"; rc=$?
 assert_eq "catalog exits 0" 0 "$rc"
-assert "summary" '.items == 4 and .changed == true and (.hash | test("^[0-9a-f]{12}$")) and (.thumbnails | test("none due|unavailable")) and .notes == []' "$out"
+assert "summary" '.items == 5 and .changed == true and (.hash | test("^[0-9a-f]{12}$")) and (.thumbnails | test("none due|unavailable")) and .notes == []' "$out"
 [ -e "$W/catalog/thumbs/issue-99-ac-1.jpg" ] && { echo "  a thumbnail of a gone item was kept"; FAILED=1; }
 html="$(cat "$W/catalog/index.html")"
 page_data() { node -e 'const h=require("fs").readFileSync(process.argv[1],"utf8");const m=h.match(/<script type="application\/json" id="qi-catalog-data">([\s\S]*?)<\/script>/);process.stdout.write(m[1])' "$W/catalog/index.html"; }
@@ -112,11 +118,12 @@ assert "AC-2 not testable" '.items[] | select(.key == "issue-42/AC-2") | .testab
 assert "EX-1 exploration" '.items[] | select(.key == "issue-42/EX-1") | .kind == "exploration" and .tier == "exploratory" and (.history | all(.run != "regression")) and .session == "viewer" and .then == "renaming is not offered" and .checks.agent_asserts == 1' "$data"
 assert "scenario item" '.items[] | select(.key == "scenario-7/AC-1") | .origin == {"kind":"scenario","ref":"S-7","title":"upload a <i>large</i> file","source":"slack"} and .verdict.value == "passed"
   and .summary == "Big uploads finish." and .area == "files" and [.steps[].kind] == ["open","act"]' "$data"
+assert "profile scenario item" '.items[] | select(.key == "profile-sign-in/AC-1") | .origin == {"kind":"scenario","ref":"P-sign-in","title":"the owner signs in","source":"profile"} and .tier == "regression" and .then == "the dashboard shows"' "$data"
 assert "nights and builds" '(.nights | length) == 2 and .nights[0].counts.healed == 1 and ([.builds[].id] | index("c3")) != null' "$data"
 assert "collections" '.collections == [{"name":"Upload","members":["#42","S-7 AC-1"]}]' "$data"
 assert "coverage pages" '[.pages[] | {pattern, covered, nav}] | (map(select(.pattern == "/projects"))[0] == {"pattern":"/projects","covered":"regression","nav":"Projects"})
   and (map(select(.pattern == "/files"))[0].covered == "exploratory")' "$data"
-for secret in U0SECRETUSER C0SECRET REQUEST-SECRET NOTE-SECRET EXPLAIN-SECRET LESSON-SECRET SEC-SECRET; do
+for secret in U0SECRETUSER C0SECRET REQUEST-SECRET SOURCE-SECRET NOTE-SECRET EXPLAIN-SECRET LESSON-SECRET SEC-SECRET; do
   case "$html" in (*"$secret"*) echo "  not test-related, must not be in the page: $secret"; FAILED=1;; esac
 done
 case "$html" in (*'<b>projects'*|*'<i>large'*) echo "  data not escaped inside the page"; FAILED=1;; esac

@@ -173,7 +173,8 @@ configuration.
 | `issue_comments` | asked, default `disabled` | Opt-in: post verdicts on the issue. |
 | `spec_feedback` | asked, default `disabled` | Opt-in: suggest an observable "Done when" on issues with nothing testable. |
 | `scenario_discovery`, `scenario_channel` | asked, default `disabled` / empty | Opt-in: weekly scenario proposals (`propose`), also tested (`run`); the Slack conversation for their digest. |
-| `max_scenarios_per_run`, `max_scenarios_per_day` | defaults (`3`, `10`) | Proposals per discovery run; scenario runs a day. |
+| `max_scenarios_per_run`, `max_scenarios_per_day` | defaults (`3`, `10`) | Proposals per discovery run, also profile scenarios adopted a night; scenario runs a day. |
+| `profile_scenarios`, `regression_channel` | default `enabled`; asked when a channel is connected, default empty | The profile's `scenarios/` (the product team's flows) are adopted and replayed nightly; the Slack conversation for the nightly summary. |
 | `auto_promote` | default `disabled` | `verified`: tests whose every criterion was verified join the nightly regression without the operator's "promote". |
 | `marker_prefix` | default `quality-inspector` | Dedup marker; **immutable once a comment exists**. |
 | `qa_label`, `retest_label` | defaults | The gates (`qa:ready`, `qa:retest`). |
@@ -202,7 +203,7 @@ configuration.
 - **External surfaces:** artifacts in the platform's artifact library (private by
   default); with `issue_comments: enabled`, **public comments** on the target's issues,
   and removal of the retest label; optionally a Slack channel bound to the agent (replies
-  in request threads; with `scenario_channel`, one weekly digest post; with `slack_channel`,
+  in request threads; with `scenario_channel`, one weekly digest post; with `regression_channel`, one nightly summary post; with `slack_channel`,
   issue tests people order there); with `work_repo`, pushes of the `work/` backup to that
   private repository. The platform runtime's session state (`PLATFORM_RUNTIME_URL`) frees a
   dead run's environment lock at once; without it the lock waits `lock_ttl_min`.

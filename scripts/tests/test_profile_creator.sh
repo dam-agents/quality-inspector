@@ -109,6 +109,17 @@ check "$P" | grep -q '^FAIL  suite/fixture.md: a symlink' || { echo "  a symlink
 P="$(helm_profile submodule)"; mkdir -p "$P/suite/vendor"; echo 'gitdir: ../../.git/modules/vendor' > "$P/suite/vendor/.git"
 check "$P" | grep -q '^FAIL  suite/vendor: a git submodule' || { echo "  a submodule in the profile must fail"; FAILED=1; }
 
+# scenarios/: <slug>.md files with a title and AC blocks of Given/When/Then.
+P="$(helm_profile scen)"; mkdir -p "$P/scenarios"
+printf '# Sign-in\n\n## AC-1 — the dashboard shows\nGiven the sign-in page\nWhen the owner signs in\nThen the dashboard shows\n' > "$P/scenarios/sign-in.md"
+out="$(check "$P")"
+printf '%s\n' "$out" | grep -q '^PASS  scenarios/: 1 scenario' || { echo "  a good scenario must pass"; FAILED=1; }
+printf '# X\n\n## AC-2 — y\nGiven a\nThen b\nsee https://example.com\n' > "$P/scenarios/bad.md"; printf 'x\n' > "$P/scenarios/Bad_Name.md"
+out="$(check "$P")"
+for want in '^FAIL  scenarios/Bad_Name.md: not <slug>.md' '^FAIL  scenarios/bad.md: AC blocks are not numbered' '^FAIL  scenarios/bad.md AC-2: no "When' '^WARN  scenarios/bad.md: a URL'; do
+  printf '%s\n' "$out" | grep -q "$want" || { echo "  scenario check missing: $want"; FAILED=1; }
+done
+
 # Unfilled templates fail on their markers.
 T="$SANDBOX/tpl/qi-profile-acme"; mkdir -p "$T"
 cp "$SKILL/templates/profile.helm-k3s.json.template" "$T/profile.json"

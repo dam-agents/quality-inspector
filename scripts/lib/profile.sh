@@ -150,3 +150,28 @@ provided_roles() { # <credentials.env>
     gsub(/^["\047]|["\047][ \t]*$/, "", v); if (v == "") next
     sub(/^E2E_USER_/, "", k); sub(/_USERNAME$/, "", k); print tolower(k) }' "$1" | jq -R . | jq -sc 'unique'
 }
+
+# The product team's scenarios (docs/profile-contract.md → `scenarios/`): one line
+# `<slug>\t<spec_hash>\t<path>` per `scenarios/<slug>.md` of the profile, sorted by slug.
+# A slug is [a-z0-9] then [a-z0-9-], at most 48 characters; any other name, a symlink, a
+# non-regular file or one over 64 KiB is skipped with a line on stderr. Needs lib/state.sh
+# (text_hash). Nothing when the profile has no scenarios/.
+PROFILE_SCENARIO_MAX_BYTES=65536
+profile_scenarios() {
+  local dir f base slug size
+  dir="$(profile_dir)" || return 0
+  [ -d "$dir/scenarios" ] && [ ! -L "$dir/scenarios" ] || return 0
+  for f in "$dir"/scenarios/*.md; do
+    [ -e "$f" ] || [ -L "$f" ] || continue
+    base="$(basename "$f")"; slug="${base%.md}"
+    if ! printf '%s' "$slug" | grep -qE '^[a-z0-9][a-z0-9-]{0,47}$'; then
+      echo "profile scenario '$base' skipped: the name is not <slug>.md ([a-z0-9-], at most 48)" >&2; continue
+    fi
+    if [ -L "$f" ] || [ ! -f "$f" ]; then echo "profile scenario '$base' skipped: not a regular file" >&2; continue; fi
+    size="$(wc -c < "$f" | tr -d ' ')"
+    if [ "$size" -gt "$PROFILE_SCENARIO_MAX_BYTES" ]; then
+      echo "profile scenario '$base' skipped: $size bytes, over $PROFILE_SCENARIO_MAX_BYTES" >&2; continue
+    fi
+    printf '%s\t%s\t%s\n' "$slug" "$(text_hash "$(cat "$f")")" "$f"
+  done | sort
+}

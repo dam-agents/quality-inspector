@@ -36,8 +36,9 @@ run type (`issues`, `regression`, `security`, `scenario`, `discovery`, `audit`, 
 | `triage` | you | `issue=<n> ac=<k> category=<c> basis=<…>` |
 | `heal` | you | `issue=<n> ac=<k> old=<hash> new=<hash>` |
 | `scenario_new` | `scripts/scenarios.sh` | `id=S-<k> source=<s>` |
+| `scenario_adopt` | `scripts/scenarios.sh adopt` | `id=P-<slug> spec=<spec_hash>` — a profile scenario's text copied ([scenarios.md](scenarios.md) → Profile scenarios) |
 | `scenario_run` | `scripts/scenarios.sh` (`set … status=in_progress`) | `id=S-<k> build=<c>` — what `max_scenarios_per_day` counts |
-| `scenario_done` / `scenario_abort` | you | `id=S-<k> verdict=<v>` / `id=S-<k> reason=<environment\|budget\|…>` |
+| `scenario_done` / `scenario_abort` | you | `id=<S-<k>\|P-<slug>> verdict=<v>` / `id=S-<k> reason=<environment\|budget\|…>` |
 | `scenario_injection_suspect` / `scenario_saved` / `scenario_declined` | you | `id=S-<k> sentences=<k>` / `id=S-<k> by=<user id>` / `intent=<intent>` |
 | `discovery_done` | you | `candidate=<c> proposed=<n> rejected=<n>` |
 | `security_run` | you | `candidate=<c> critical=<n> high=<n> medium=<n> low=<n> skipped=<n>` |

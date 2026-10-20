@@ -33,6 +33,8 @@ scheduled ([persistence.md](persistence.md) → **Scheduled or direct session**)
 - **"propose scenarios"** (or "suggest scenarios for uncovered pages") —
   [scenarios.md](scenarios.md) → Discovery for the current candidate, even when explored or
   disabled; `propose` unless the operator says run — no test is written without a yes.
+- **"test scenario <slug>"** — a profile scenario now, on the current candidate:
+  [scenarios.md](scenarios.md) → **Profile scenarios** → On demand.
 - **"promote S-<k>"** / **"demote S-<k>"** — as for `#N`, on `tests/scenario-<k>.e2e.ts`;
   "promote all pending" includes saved scenarios.
 - **"reset the environment"** — `env.sh lock operator`, `env.sh reset`, optionally `up
