@@ -60,7 +60,10 @@ held in that key. In `values` only: `{{user:<name>.username|password}}`,
 → The `bin/` contract), empty when not lent; `{{proxy:https|http|no}}` — the gateway proxy
 for pods that must reach the outside (the lent model's host), `no` with the cluster's own
 ranges added; `{{gateway_ca}}` — the PEM of the CA the gateway presents (the file
-`NODE_EXTRA_CA_CERTS` or `SSL_CERT_FILE` names), empty when neither does. The rendered
+`NODE_EXTRA_CA_CERTS` or `SSL_CERT_FILE` names), empty when neither does; `{{gateway_ip}}` — the
+gateway's IPv4 address, which the VM's DNS gives for every public name, for a product whose
+own egress policy must name it (a nested platform's gateways); rendering fails when it does not
+resolve. The rendered
 values (`$QI_ENV_DIR/values.json`) are mode 600 and never printed.
 
 ## Check

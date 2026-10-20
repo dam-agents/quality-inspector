@@ -19,7 +19,8 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    then `verify-onboarding.sh` names the empty credentials and the criteria that need the
    accounts stay `testable: no`.
 3. Nothing to run for the `helm-k3s` engine: it now fills `{{sandbox:<id>.<NAME>}}` and applies
-   `when: "@sandbox:<id>"` overlays, and reads `credentials.env` with `export` and quotes.
+   `when: "@sandbox:<id>"` overlays, fills `{{gateway_ip}}` (the VM gateway's address, for a nested
+   platform's egress policy), and reads `credentials.env` with `export` and quotes.
 4. A profile egress row now listed `refused` is never added: on a GitHub host only the
    sandbox shapes pass ([docs/black-box.md](docs/black-box.md) → Sandbox accounts). If the
    operator added such a rule earlier, ask them to delete it from the agent's network settings.

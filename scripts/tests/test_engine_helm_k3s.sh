@@ -100,6 +100,12 @@ assert "a sandbox line still empty, overlay off" 'has("slack") | not' "$(rs)"
 sed -i.bak 's/^E2E_SANDBOX_SLACK_APP_TOKEN=$/export E2E_SANDBOX_SLACK_APP_TOKEN=xapp-2/' "$SBE/credentials.env"
 assert "every sandbox line filled, overlay on" '.slack == {"bot":"xoxb-1","app":"xapp-2"}' "$(rs)"
 
+# {{gateway_ip}}: the VM gateway's address from the environment; rendering fails without one.
+gi() { jq -nc '{values:{cidr:"{{gateway_ip}}/32"}}' | QI_GATEWAY_IP="$1" node "$ENG/lib/render.mjs" values "$SANDBOX/cred.env" 2>&1; }
+assert "gateway_ip fills the value" '.cidr == "10.0.2.3/32"' "$(gi 10.0.2.3)"
+gi "" | grep -q "{{gateway_ip}}: the VM's gateway address did not resolve" || { echo "  an unresolved gateway_ip must fail"; FAILED=1; }
+gi "not-an-ip" >/dev/null && { echo "  a gateway_ip that is no IPv4 address must fail"; FAILED=1; }
+
 # model_env: off by default; on, the placeholder and the kind from the provider's variables — never a value.
 seed_work
 mkdir -p "$SANDBOX/home/.platform"

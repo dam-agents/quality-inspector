@@ -8,7 +8,7 @@
 //                                      with {{user:NAME.username|password}}, {{secret:name}} and
 //                                      {{app_port}} filled from the credentials file, and
 //                                      {{model:key|kind|base_url}}, {{proxy:https|http|no}},
-//                                      {{gateway_ca}} from the environment.
+//                                      {{gateway_ca}}, {{gateway_ip}} from the environment.
 // An overlay whose `when` is "@model" applies while the agent lends its model (QI_MODEL_KEY);
 // "@sandbox:<id>" while that sandbox account's lines in $QI_ENV_DIR/credentials.env are all
 // filled (docs/profile-contract.md → `sandbox`), and its {{sandbox:<id>.<NAME>}} fill values.
@@ -71,7 +71,9 @@ if (mode === 'config') {
     .replace(/\{\{app_port\}\}/g, String(input.app_port ?? ''))
     .replace(/\{\{model:(key|kind|base_url)\}\}/g, (_, k) => e[`QI_MODEL_${k.toUpperCase()}`] ?? '')
     .replace(/\{\{proxy:(https|http|no)\}\}/g, (_, k) => proxy[k])
-    .replace(/\{\{gateway_ca\}\}/g, () => ca());
+    .replace(/\{\{gateway_ca\}\}/g, () => ca())
+    .replace(/\{\{gateway_ip\}\}/g, () => /^\d{1,3}(\.\d{1,3}){3}$/.test(e.QI_GATEWAY_IP ?? '') ? e.QI_GATEWAY_IP
+      : fail("{{gateway_ip}}: the VM's gateway address did not resolve (getent ahostsv4 github.com)"));
   console.log(JSON.stringify(walk(input.values ?? {}, fill)));
 } else {
   fail('usage: render.mjs config | values <credentials.env>');

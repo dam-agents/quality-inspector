@@ -155,6 +155,8 @@ ui_answers() { # <tries>
 cmd_up() {
   local tag="${1:?tag}" tmp chartdir vhash
   [ -f "$CRED" ] || cmd_init
+  # The VM's gateway answers every public name with its own address (README → Placeholders).
+  QI_GATEWAY_IP="$(getent ahostsv4 github.com 2>/dev/null | awk 'NR == 1 {print $1}')"; export QI_GATEWAY_IP
   ( umask 077; node "$ENGINE_DIR/lib/render.mjs" values "$CRED" <<<"$CFG" > "$ENVD/values.json" ) || die "values rendering failed"
   vhash="$( (sha256sum || shasum -a 256) < "$ENVD/values.json" 2>/dev/null | cut -c1-12)"
   start_k3s

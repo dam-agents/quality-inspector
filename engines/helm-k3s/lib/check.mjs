@@ -51,8 +51,8 @@ for (const o of ovl) {
   if (!obj(o.values)) fail(`overlay '${o.when}' has no values object`);
 }
 // The defaults render lends no model; the "every overlay on" render lends a throw-away one.
-const NO_MODEL = { QI_MODEL_KEY: '', QI_MODEL_KIND: '', QI_MODEL_BASE_URL: '' };
-const LENT = { QI_MODEL_KEY: 'check:model', QI_MODEL_KIND: 'api-key', QI_MODEL_BASE_URL: '' };
+const NO_MODEL = { QI_MODEL_KEY: '', QI_MODEL_KIND: '', QI_MODEL_BASE_URL: '', QI_GATEWAY_IP: '192.0.2.1' };
+const LENT = { QI_MODEL_KEY: 'check:model', QI_MODEL_KIND: 'api-key', QI_MODEL_BASE_URL: '', QI_GATEWAY_IP: '192.0.2.1' };
 // Throw-away sandbox credentials: one line per {{sandbox:<id>.<NAME>}} and per "@sandbox:<id>"
 // overlay, in a credentials file of their own — so the defaults render has every sandbox off.
 const sbVars = new Set([...JSON.stringify(raw).matchAll(/\{\{sandbox:([a-z][a-z0-9]*)\.([A-Z][A-Z0-9_]*)\}\}/g)]
