@@ -14,7 +14,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"; CONFIG="$WORK/CONFIG.md"
 . "$SCRIPT_DIR/lib/config.sh" && . "$SCRIPT_DIR/lib/profile.sh" || exit 1
 APP_URL="$(profile_field '.app.url')"
 case "$APP_URL" in (http://localhost*|http://127.0.0.1*) ;; (*) echo "e2e-mcp: refusing app url '$APP_URL' — nested product only" >&2; exit 1;; esac
-export APP_URL E2E_TELEMETRY_DISABLED=1 NODE_USE_ENV_PROXY=1
+QI_PROFILE_CONFIG="$(profile_config)"
+export APP_URL E2E_TELEMETRY_DISABLED=1 NODE_USE_ENV_PROXY=1 QI_PROFILE_CONFIG
 # The model connection's placeholder, never a literal key (lib/profile.sh → model_auth).
 while IFS='=' read -r k v; do [ -n "$k" ] && export "$k=$v"; done < <(model_auth)
 # live_browser: explore in the browser the operator watches (lib/config.sh → live_cdp).

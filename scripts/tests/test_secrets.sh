@@ -44,6 +44,7 @@ jq -n --arg p "$E2E_USER_OWNER_PASSWORD" '{run:{status:"failed",exitCode:1,summa
   attempts:[{error:{code:"X"},steps:[{api:"agent.act",label:("type " + $p),params:{p:$p},status:"failed"}]}]}]}}' > "$out/report.json"
 printf 'token %s\n' "$QI_SECRET_ADMIN" > "$out/trace/step.txt"
 echo "e2e: filled password $E2E_USER_OWNER_PASSWORD"
+printf '%s' "${QI_PROFILE_CONFIG:-}" > "$out/../profile-config.json"
 exit 1
 S
 chmod +x "$SANDBOX/bin/npx"
@@ -51,6 +52,7 @@ s="$(PATH="$SANDBOX/bin:$PATH" bash "$SCRIPTS/suite.sh" run stubbed 2>/dev/null)
 assert "summary is printed and masked" '.label == "stubbed" and .results[0].title == "login as ***"' "$s"
 case "$s" in *'p@ss'*) echo "  summary leaks the password"; FAILED=1;; esac
 grep -q 'filled password \*\*\*' "$RUNS/stubbed/run.log" || { echo "  run.log not masked"; FAILED=1; }
+assert "a run has the profile's config, resolved" '.image == "stub/img"' "$(cat "$RUNS/profile-config.json")"
 [ -z "$(leaks)" ] || { echo "  suite.sh left a credential in: $(leaks)"; FAILED=1; }
 assert "audit stays ok after a real run" '.status == "ok"' "$(audit)"
 s2="$(bash "$SCRIPTS/suite.sh" summary stubbed 2>/dev/null)"

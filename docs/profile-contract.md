@@ -213,7 +213,9 @@ company workspace.
   Onboarding and `verify-onboarding.sh --live` run it.
 - `suite/` — the test person's actions, as helpers the profile ships (say,
   `suite/lib/sandbox.ts`: post a message as the person, read the replies in a thread). A test
-  calls them; it never names a sandbox host itself. They reach only the sandbox's hosts.
+  calls them; it never names a sandbox host itself. They reach only the sandbox's hosts. A
+  test run has the `E2E_SANDBOX_*` values and `QI_PROFILE_CONFIG` (the profile's config,
+  resolved) in its environment.
 - `SKILL.md` — which criteria the sandbox makes testable, which helper does what, and what
   stays `testable: no` without it (an instance whose operator declined it).
 
