@@ -7,6 +7,18 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.3.0 — 2026-10-20
+
+**Upgrade:**
+1. In `work/CONFIG.md`, a key still at the old default moves to the new one:
+   `e2e_version: 0.17.0` → `0.20.0`, `e2e_web_version: 0.12.0` → `0.14.0`. A value the
+   operator chose differently stays.
+2. `bash "$HOME/scripts/suite.sh" init` — installs the new pins and re-checks that
+   `playwright-core` matches the image's browser.
+3. Expect the next run of every test to record its steps again (the replay cache misses
+   once across an `e2e` minor bump); no action.
+4. Run the smoke test as in `ONBOARDING.md` Step 6 and `verify-onboarding.sh --live`.
+
 ## 3.2.0 — 2026-10-20
 
 **Upgrade:**

@@ -19,4 +19,4 @@ export APP_URL E2E_TELEMETRY_DISABLED=1 NODE_USE_ENV_PROXY=1
 while IFS='=' read -r k v; do [ -n "$k" ] && export "$k=$v"; done < <(model_auth)
 # live_browser: explore in the browser the operator watches (lib/config.sh → live_cdp).
 cdp="$(live_cdp)" && export E2E_CDP_ENDPOINT="$cdp"
-exec npx e2e mcp --headless "$@"
+exec npx e2e mcp "$@"
