@@ -2,10 +2,11 @@
 
 A **scenario** is a user flow stated in words instead of an issue: a message in a Slack
 conversation this agent is bound to ("test that …", a written Given/When/Then), the
-operator's "test this scenario: …", a proposal of the discovery run, or a file the product
-team keeps in its profile (`scenarios/<slug>.md`, **Profile scenarios** below). It is frozen
-into criteria, checked by an independent judge ([judge.md](judge.md)), tested on the
-candidate, answered where it was asked, and — on request — queued for the regression tier.
+operator's "test this scenario: …", a request from the dashboard's Product map, a proposal
+of the discovery run, or a file the product team keeps in its profile (`scenarios/<slug>.md`,
+**Profile scenarios** below). It is frozen into criteria, checked by an independent judge
+([judge.md](judge.md)), tested on the candidate, answered where it was asked, and — on
+request — queued for the regression tier.
 
 ## State
 
@@ -87,8 +88,11 @@ in their own words ([catalog.md](catalog.md)); its button sends
   ([modules.md](modules.md) → Control): only this one message shape is taken, anything else
   is declined (`artifact_viewer_declined`). **The pipeline** as for Slack, with source
   `dashboard`, `requester` and `thread` `-`, the viewer as the frame names them in
-  `request.md` only, and the same daily cap. The viewer never sees a reply: every reply step
-  is skipped, and the dashboard published at step 12 shows the request's state and result.
+  `request.md` only, and the same daily cap. The viewer never sees a reply, so no step
+  replies: not steps 1, 3, 4, 5, 6 or 12, and a `report` entry of **Waiting scenarios** only
+  sets `reported`. The dashboard is the answer: wherever a turn ends after step 2 —
+  `rejected`, `queued` or delivered — it ends with the catalog ([catalog.md](catalog.md) →
+  **Build and publish**), which shows the request's state and later its run.
 - The page and control are context the request is about, not part of the oracle: the
   criteria come from the person's words alone (step 3).
 
@@ -139,8 +143,8 @@ in their own words ([catalog.md](catalog.md)); its button sends
     `judge` object to the verdicts file and render again.
 11. **Register** `tests/scenario-<k>.e2e.ts` in `work/SUITE.md` as `exploratory`, with
     `S-<k>` in the `issue` column; only **Saving** moves it on.
-12. **Deliver.** (Source `dashboard`: steps 4's and 12's replies are skipped — the catalog
-    below is the answer.) The artifact as [reporting.md](reporting.md) → Delivery step 1 (disabled →
+12. **Deliver.** (Source `dashboard`: no reply here or at any other step — **A request from
+    the dashboard**.) The artifact as [reporting.md](reporting.md) → Delivery step 1 (disabled →
     the link reads "evidence kept by the agent"), then `report_pending`, then **The
     reply**, then `reported` as the next write; every send is ledgered. Log
     `scenario_done id=S-<k> verdict=<v>`. `env.sh unlock S-<k>`. Then the catalog
