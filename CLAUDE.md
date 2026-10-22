@@ -48,7 +48,7 @@ Worklist keys → procedure:
 - `security`: `candidate`, `inventory`, `roles[]`, `deployment_checks` → [docs/security.md](docs/security.md); findings go to a private artifact only, never a comment.
 - `scenarios_due[]` (`id`, `kind` queued|takeover|report) in the issues worklist; `discovery` mode:
   `discovery`, `candidate`, `baseline`, `previous_candidate`, `budget` → [docs/scenarios.md](docs/scenarios.md).
-- `boundary_breach[]` (any mode): a probe reached a source surface — test nothing, report each line in the chat UI and end ([docs/black-box.md](docs/black-box.md) → **The gate**).
+- `boundary_breach[]` (any mode): a probe reached a source surface or the policy hook is gone — test nothing, report each line in the chat UI (and to `channel` when set) and end ([docs/black-box.md](docs/black-box.md) → **The gate**).
 - Every run: echo the logs, work each key per its doc; an issues run ends with the catalog ([docs/catalog.md](docs/catalog.md)), self-check, `work/ISSUES.log`.
 
 ## Runtime configuration: `work/CONFIG.md`
@@ -80,7 +80,7 @@ stripped. Every script reads it through `scripts/lib/config.sh`, so the verifier
   `focus_max_checks`, `modules_max_wallclock_min`, `dashboard_interactive` (`disabled`) — types, ranges and defaults in
   `scripts/lib/modules.json`, read through `reg`, written only by `scripts/modules.sh set` ([docs/modules.md](docs/modules.md)); invalid → default.
 - `scenario_discovery` (`disabled` | `propose` | `run`), `scenario_channel` (Slack id for the digest;
-  empty = chat UI), `max_scenarios_per_run` (`3`; also profile adoptions a night), `max_scenarios_per_day` (`10`), `profile_scenarios` (`enabled`; the profile's `scenarios/` join the nightly run), `regression_channel` (Slack id for the nightly summary; empty = chat UI) — [docs/scenarios.md](docs/scenarios.md).
+  empty = chat UI), `max_scenarios_per_run` (`3`; also profile adoptions a night), `max_scenarios_per_day` (`10`), `profile_scenarios` (`enabled`; the profile's `scenarios/` join the nightly run), `regression_channel` (Slack id for the nightly summary and a black-box breach alert, else `slack_channel`; empty = chat UI) — [docs/scenarios.md](docs/scenarios.md).
 - `security_checks` (`enabled`), `security_failed_logins` (`10`) — [docs/security.md](docs/security.md).
 - `max_wallclock_min_per_issue` (`150`, < `lock_ttl_min`), `max_model_steps_per_issue` (`400`) —
   [docs/nested-env.md](docs/nested-env.md) → **Budgets**; `min_free_disk_gi` (`10`) — `env.sh up` refuses below it.

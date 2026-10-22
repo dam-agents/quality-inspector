@@ -192,7 +192,7 @@ if [ -f "$CONFIG" ]; then
   else fail cfg:scenario_channel "'$v' is not a Slack conversation id" "set the C…/G…/D… id of a conversation this agent is bound to, or leave it empty"; fi
   enum profile_scenarios "enabled disabled"
   v="$(cfg regression_channel)"
-  if [ -z "$v" ]; then ok cfg:regression_channel "empty — the nightly summary stays in the chat UI"
+  if [ -z "$v" ]; then ok cfg:regression_channel "empty — the nightly summary stays in the chat UI; a black-box breach alert goes to slack_channel"
   elif printf '%s' "$v" | grep -qE '^[CDG][A-Z0-9]{6,}$'; then ok cfg:regression_channel "$v"
   else fail cfg:regression_channel "'$v' is not a Slack conversation id" "set the C…/G…/D… id of a conversation this agent is bound to, or leave it empty"; fi
   case "$(cfg slack_channel)" in ('') ok cfg:slack_channel "none — Slack orders no issue test";;

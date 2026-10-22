@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Offline git stub: `git ls-remote` of an https:// or ssh:// URL is refused (the black-box
+# probes expect exactly that); every other call — a local remote's ls-remote included — runs
+# the real git, the first one on PATH after this directory.
+remote=no; lsr=no
+for a in "$@"; do case "$a" in (ls-remote) lsr=yes;; (https://*|ssh://*) remote=yes;; esac; done
+if [ "$lsr$remote" = yesyes ]; then echo "fatal: unable to access: The requested URL returned error: 403" >&2; exit 128; fi
+self="$(cd "$(dirname "$0")" && pwd)"
+IFS=:; for d in $PATH; do
+  [ "$d" = "$self" ] || [ ! -x "$d/git" ] || exec "$d/git" "$@"
+done
+echo "stub git: no real git on PATH" >&2; exit 127
