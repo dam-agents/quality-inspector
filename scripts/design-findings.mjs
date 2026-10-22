@@ -48,9 +48,9 @@ for (let i = 2; i < process.argv.length; i++) {
 }
 const usage = 'usage: design-findings.mjs review-plan <sweep.json> [--max N] | merge <sweep.json> [--review FILE] [--no-render] | merge --noticed-only [--no-render]';
 const die = (m) => { console.error(m ? `design-findings: ${m}` : usage); process.exit(2); };
-const cfg = (k) => {
+const regValue = (k) => { // a registry key through lib/config.sh → reg: out of range reads as its default
   try {
-    return execFileSync('bash', ['-c', `CONFIG="$WORK/CONFIG.md"; . "$LIB/config.sh"; cfg "$1"`, '_', k],
+    return execFileSync('bash', ['-c', `CONFIG="$WORK/CONFIG.md"; . "$LIB/config.sh"; reg "$1"`, '_', k],
       { env: { ...process.env, WORK, LIB: join(here, 'lib') }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   } catch { return ''; }
 };
@@ -83,7 +83,7 @@ function reviewPlan(max) {
         : p.changed == null ? 'new: no shot of it in the previous sweep' : `${p.findings.length} finding${p.findings.length === 1 ? '' : 's'}` }));
 }
 const planMax = (v) => { const n = Number(v); return Number.isInteger(n) && n >= 0 ? n : null; };
-const cfgMax = planMax(cfg('ui_sweep_review_pages') || 10) ?? 10;
+const cfgMax = planMax(regValue('ui_sweep_review_pages') || 10) ?? 10;
 if (cmd === 'review-plan') {
   const max = flags.max !== undefined ? planMax(flags.max) : cfgMax;
   if (max === null) die(`--max '${flags.max}' is not a whole number`);

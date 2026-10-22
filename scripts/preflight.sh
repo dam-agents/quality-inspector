@@ -47,7 +47,7 @@ RETEST_LABEL="$(cfg retest_label)"; RETEST_LABEL="${RETEST_LABEL:-qa:retest}"
 versions_json() { # [baseline-channel override, e.g. none]
   QI_BASELINE_OVERRIDE="${1:-}" profile_run versions | jq -ce 'select(.candidate != null and .candidate != "")' 2>/dev/null
 }
-MAX_ISSUES="$(cfg max_issues_per_run)"; MAX_ISSUES="${MAX_ISSUES:-1}"
+MAX_ISSUES="$(reg max_issues_per_run)"; MAX_ISSUES="${MAX_ISSUES:-1}"
 LOCK_TTL_MIN="$(cfg lock_ttl_min)"; LOCK_TTL_MIN="${LOCK_TTL_MIN:-180}"
 case "$MAX_ISSUES" in (''|*[!0-9]*) MAX_ISSUES=1;; esac
 case "$LOCK_TTL_MIN" in (''|*[!0-9]*) LOCK_TTL_MIN=180;; esac
@@ -201,7 +201,7 @@ profile_scenarios_work() {
       [ "$(cell "$r" 2)" = profile ] || continue
       printf '%s\t%s\t%s\t%s\n' "$(cell "$r" 1)" "$(cell "$r" 5)" "$(cell "$r" 8)" "$(cell "$r" 7)"
     done | jq -R 'split("\t") | {id: .[0], spec_hash: .[1], status: .[2], verdict: .[3]}' | jq -sc .)"
-  per="$(cfg max_scenarios_per_run)"; case "$per" in (''|*[!0-9]*) per=3;; esac
+  per="$(reg max_scenarios_per_run)"; case "$per" in (''|*[!0-9]*) per=3;; esac
   adopt="$(jq -nc --argjson f "$files" --argjson r "$rows" '
     ($r | map({key: .id, value: .}) | from_entries) as $by
     | [$f[] | ("P-" + .slug) as $id | $by[$id] as $row
@@ -254,7 +254,7 @@ mode_regression() {
   [ -n "$drift" ] || drift='null'
   [ "$drift" = null ] && log "WARN: assertion drift check could not run"
   # Reverse red-green and bisection (docs/triage.md → Order of work, steps 5–6): off unless set.
-  confirm="$(cfg confirm_regressions)"; bisect="$(cfg bisect_max_steps)"
+  confirm="$(reg confirm_regressions)"; bisect="$(reg bisect_max_steps)"
   case "$confirm" in (enabled) confirm=true;; (''|disabled) confirm=false;;
     (*) log "WARN: confirm_regressions '$confirm' is not enabled|disabled — treated as disabled"; confirm=false;; esac
   case "$bisect" in (''|*[!0-9]*) [ -n "$bisect" ] && log "WARN: bisect_max_steps '$bisect' is not a number — treated as 0"; bisect=0;; esac
@@ -527,7 +527,7 @@ mode_audit() {
 # `run`) today's scenario cap leaves room. docs/scenarios.md → Discovery.
 mode_discovery() {
   local mode versions candidate baseline last per runs budget
-  mode="$(cfg scenario_discovery)"
+  mode="$(reg scenario_discovery)"
   case "$mode" in
     (propose|run) ;;
     (*) log "scenario discovery is disabled (scenario_discovery: ${mode:-disabled})"; runlog DISCOVERY "skip=disabled"
@@ -542,7 +542,7 @@ mode_discovery() {
     log "candidate $candidate already explored"; runlog DISCOVERY "skip=same-candidate candidate=$candidate"
     jq -nc --arg c "$candidate" --argjson logs "$(logs_json)" '{mode:"discovery", nothing_to_do:true, candidate:$c, logs:$logs}'; return
   fi
-  per="$(cfg max_scenarios_per_run)"; case "$per" in (''|*[!0-9]*) per=3;; esac
+  per="$(reg max_scenarios_per_run)"; case "$per" in (''|*[!0-9]*) per=3;; esac
   budget="$per"
   if [ "$mode" = run ]; then
     runs="$(scenario_runs_today)"
@@ -571,7 +571,7 @@ mode_benchmark() {
 # =========================================================== SECURITY MODE ====
 # Due once per candidate build (docs/security.md). Keyed on `ran candidate=` in SECURITY.log.
 mode_security() {
-  if [ "$(cfg security_checks)" = disabled ]; then
+  if [ "$(reg security_checks)" = disabled ]; then
     log "security checks are disabled (security_checks: disabled)"; runlog SECURITY "skip=disabled"
     jq -nc --argjson logs "$(logs_json)" '{mode:"security", nothing_to_do:true, logs:$logs}'; return
   fi
@@ -618,7 +618,7 @@ mode_modules() {
     jq -nc --arg c "$candidate" --argjson logs "$(logs_json)" '{mode:"modules", nothing_to_do:true, candidate:$c, logs:$logs}'; return
   fi
   inv="$WORK/inventory/$candidate/inventory.json"; [ -f "$inv" ] || inv=""
-  budget="$(bash "$SCRIPT_DIR/modules.sh" value modules_max_wallclock_min 2>/dev/null)"; case "$budget" in (''|*[!0-9]*) budget=90;; esac
+  budget="$(reg modules_max_wallclock_min)"; case "$budget" in (''|*[!0-9]*) budget=90;; esac
   log "candidate $candidate: due $(jq -r '.due | join(",")' <<<"$d")$(jq -r 'if (.focus|length) > 0 then " focus " + (.focus | join(",")) else "" end' <<<"$d")"
   runlog MODULES "due candidate=$candidate modules=$(jq -r '.due | join(",")' <<<"$d") focus=$(jq -r '.focus | length' <<<"$d")"
   jq -nc --arg c "$candidate" --arg b "$baseline" --arg inv "$inv" --argjson d "$d" --argjson budget "$budget" --argjson logs "$(logs_json)" \

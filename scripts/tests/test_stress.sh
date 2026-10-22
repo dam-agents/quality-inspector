@@ -32,7 +32,7 @@ printf -- '- stress_max_concurrency: 3\n- stress_duration_s: 7\n' >> "$WORK_DIR/
 p="$(node "$SCRIPTS/stress.mjs" --dry-run "$SANDBOX/inv.json" --base http://localhost:8080)"
 assert "config keys are read" '.config.concurrency == 3 and .config.duration_s == 7 and .config.contexts == 3' "$p"
 printf -- '- stress_max_concurrency: 80\n' > "$WORK_DIR/CONFIG.md"
-assert "the config is clamped too" '.config.concurrency == 50 and (.notes | map(select(test("clamped"))) | length) == 1' \
+assert "a config value out of the registry's range reads as its default" '.config.concurrency == 10 and (.notes | map(select(test("clamped"))) | length) == 0' \
   "$(node "$SCRIPTS/stress.mjs" --dry-run "$SANDBOX/inv.json" --base http://localhost:8080)"
 node "$SCRIPTS/stress.mjs" --dry-run "$SANDBOX/inv.json" --base http://staging.example.com >/dev/null 2>&1
 assert_eq "a non-local base is refused" 2 "$?"

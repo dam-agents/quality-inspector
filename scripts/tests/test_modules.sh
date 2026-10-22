@@ -136,4 +136,16 @@ v="$(bash "$SCRIPTS/verify-onboarding.sh" --config 2>/dev/null)"
 printf '%s\n' "$v" | grep -q "^FAIL cfg:bisect_max_steps — '99' is not one of: 0..20"; assert_eq "every registry key is judged, the older ones too" 0 "$?"
 printf '%s\n' "$v" | grep -q "^FAIL cfg:explorations "; assert_eq "an older enum, by the registry" 0 "$?"
 printf '%s\n' "$v" | grep -q "^FAIL cfg:lock_vs_modules "; assert_eq "the lock outlives the modules budget" 0 "$?"
+# ---------------------------------------------------------------- one reader for registry keys
+# Every script reads a registry key through lib/config.sh → reg, so a value out of range reads as
+# its default everywhere (docs/modules.md): no `cfg <registry key>` outside the registry's own code.
+keys="$(jq -r '[.global, (.modules[].settings)] | add | keys[]' "$SCRIPTS/lib/modules.json" | paste -sd'|' -)"
+raw="$(grep -nE "(\bcfg[ (]+['\"]?|cfg\(['\"])($keys)\b" "$SCRIPTS"/*.sh "$SCRIPTS"/*.mjs "$SCRIPTS"/lib/*.sh "$SCRIPTS"/lib/*.mjs 2>/dev/null \
+  | grep -v -e '/lib/config.sh:')"
+assert_eq "no script reads a registry key raw" "" "$raw"
+seed_work; printf -- '- ui_sweep_review_pages: 100\n- validation_max_cases: 999\n- stress_duration_s: 999\n- ui_sweep_viewports: 100x100\n- max_issues_per_run: 99\n' >> "$WORK_DIR/CONFIG.md"
+. "$SCRIPTS/lib/config.sh"; CONFIG="$WORK_DIR/CONFIG.md"
+assert_eq "reg: out of range reads as the default" "10 60 60 1440x900,768x1024,390x844" "$(reg ui_sweep_review_pages) $(reg validation_max_cases) $(reg stress_duration_s) $(reg ui_sweep_viewports)"
+assert_eq "reg: the first bullet wins as cfg reads it" "5" "$(reg max_issues_per_run)"
+reg target_repo >/dev/null; assert_eq "reg: only registry keys" 2 "$?"
 exit $FAILED

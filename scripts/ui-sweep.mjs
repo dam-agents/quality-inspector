@@ -61,7 +61,7 @@ if (flags.viewports !== undefined) {
   viewports = parseVp(flags.viewports);
   if (!viewports) die(`--viewports '${flags.viewports}': 1 to 4 of WxH (3-4 digits each), comma-separated`);
 } else {
-  const c = sh('cfg ui_sweep_viewports');
+  const c = sh('reg ui_sweep_viewports');
   viewports = c ? parseVp(c) : null;
   if (c && !viewports) notes.push(`ui_sweep_viewports '${c}' is invalid — the default ${DEFAULT_VP} is used`);
   viewports ??= parseVp(DEFAULT_VP);

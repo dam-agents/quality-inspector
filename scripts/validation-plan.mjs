@@ -46,7 +46,7 @@ if (!build) { console.error(usage); process.exit(2); }
 const profileDir = sh('profile_dir');
 const profile = (() => { try { return JSON.parse(readFileSync(join(profileDir, 'profile.json'), 'utf8')); } catch { return {}; } })();
 const exclude = Array.isArray(profile.validation?.exclude) ? profile.validation.exclude.filter((x) => typeof x === 'string') : [];
-const maxCases = Math.max(1, Math.floor(Number(flags['max-cases'] ?? (sh('cfg validation_max_cases') || 60))) || 60);
+const maxCases = Math.max(1, Math.floor(Number(flags['max-cases'] ?? (sh('reg validation_max_cases') || 60))) || 60);
 
 // ------------------------------------------------------------------ the plan (pure) ----
 const TEXT = new Set(['text', 'search', 'textarea', 'email', 'url', 'tel']); // whitespace, length

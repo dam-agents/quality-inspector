@@ -78,7 +78,7 @@ stripped. Every script reads it through `scripts/lib/config.sh`, so the verifier
 - `explorations` (`enabled`), `max_explorations_per_ac` (`3`; `0` = none) — checks beyond the ACs, outside every verdict ([docs/explorations.md](docs/explorations.md)); invalid → default.
 - The testing modules: `ui_sweep`, `validation_checks`, `stress_checks` (`disabled` | `per-build` | `weekly`), their tunables,
   `focus_max_checks`, `modules_max_wallclock_min`, `dashboard_interactive` (`disabled`) — types, ranges and defaults in
-  `scripts/lib/modules.json`, written only by `scripts/modules.sh set` ([docs/modules.md](docs/modules.md)); invalid → default.
+  `scripts/lib/modules.json`, read through `reg`, written only by `scripts/modules.sh set` ([docs/modules.md](docs/modules.md)); invalid → default.
 - `scenario_discovery` (`disabled` | `propose` | `run`), `scenario_channel` (Slack id for the digest;
   empty = chat UI), `max_scenarios_per_run` (`3`; also profile adoptions a night), `max_scenarios_per_day` (`10`), `profile_scenarios` (`enabled`; the profile's `scenarios/` join the nightly run), `regression_channel` (Slack id for the nightly summary; empty = chat UI) — [docs/scenarios.md](docs/scenarios.md).
 - `security_checks` (`enabled`), `security_failed_logins` (`10`) — [docs/security.md](docs/security.md).

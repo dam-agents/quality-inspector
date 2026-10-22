@@ -209,14 +209,14 @@ if [ -f "$CONFIG" ]; then
   else while IFS=$'\x1f' read -r k v okv allowed; do
       [ "$okv" = true ] && ok "cfg:$k" "$v" || fail "cfg:$k" "'$v' is not one of: $allowed" "set a documented value (docs/modules.md)"
     done < <(jq -r '.[] | [.key, .value, (.ok | tostring), .allowed] | join("\u001f")' <<<"$mc"); fi
-  case "$(cfg bisect_max_steps)" in (''|0|*[!0-9]*) ;; (*) [ "$(cfg confirm_regressions)" = enabled ] \
+  case "$(reg bisect_max_steps)" in (0) ;; (*) [ "$(reg confirm_regressions)" = enabled ] \
     || warn cfg:bisect_max_steps "set, but bisection runs only with confirm_regressions: enabled (docs/triage.md)";; esac
   # A live run must never look stale: the lock outlives the wall-clock budget (docs/nested-env.md → Budgets).
   ttl="$(cfg lock_ttl_min)"; case "$ttl" in (''|*[!0-9]*) ttl=180;; esac
-  wall="$(cfg max_wallclock_min_per_issue)"; case "$wall" in (''|*[!0-9]*) wall=150;; esac
+  wall="$(reg max_wallclock_min_per_issue)"; case "$wall" in (''|*[!0-9]*) wall=150;; esac
   [ "$ttl" -gt "$wall" ] && ok cfg:lock_vs_budget "lock_ttl_min $ttl > max_wallclock_min_per_issue $wall" \
     || fail cfg:lock_vs_budget "lock_ttl_min $ttl is not above max_wallclock_min_per_issue $wall" "raise lock_ttl_min or lower the budget"
-  wall="$(bash "$SCRIPT_DIR/modules.sh" value modules_max_wallclock_min 2>/dev/null)"; case "$wall" in (''|*[!0-9]*) wall=90;; esac
+  wall="$(reg modules_max_wallclock_min)"; case "$wall" in (''|*[!0-9]*) wall=90;; esac
   [ "$ttl" -gt "$wall" ] && ok cfg:lock_vs_modules "lock_ttl_min $ttl > modules_max_wallclock_min $wall" \
     || fail cfg:lock_vs_modules "lock_ttl_min $ttl is not above modules_max_wallclock_min $wall" "raise lock_ttl_min or lower the modules budget"
   # ---------------------------------------------------------------- profile
