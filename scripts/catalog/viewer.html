@@ -157,6 +157,24 @@ td.nw{white-space:nowrap}
 .cells i{width:9px;height:12px;border-radius:2px;background:var(--mutedbg)}
 .cells i.ok{background:var(--ok)}.cells i.warn{background:var(--warn)}.cells i.bad{background:var(--bad)}.cells i.muted{background:var(--muted)}
 pre.diff{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px;max-height:50vh;overflow:auto}
+.mods{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+.mod{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.mod header{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+.mod header h3{font-size:15px;margin:0}
+.mod p{margin:0}
+.set{display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr);gap:6px 10px;align-items:center;font-size:13px}
+.set dt{color:var(--dim);overflow-wrap:anywhere}.set dd{margin:0;display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-width:0}
+.set input{width:9ch;padding:2px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg)}
+.set input.wide{width:min(26ch,100%)}
+.pending{background:var(--sel);border:1px solid var(--link);border-radius:6px;padding:6px 8px;font-size:13px;display:flex;flex-direction:column;gap:4px}
+.btn.primary{background:var(--link);border-color:var(--link);color:var(--bg)}
+.btn:disabled{opacity:.6;cursor:default}
+.note{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:13px;color:var(--dim)}
+.dcard{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.dcard img{width:100%;display:block;border-radius:6px;border:1px solid var(--line);background:#fff}
+.dcard .saw{font-weight:600;overflow-wrap:anywhere}
+.dcard details summary{cursor:pointer;color:var(--link);font-size:12.5px}
+@media (max-width:520px){.set{grid-template-columns:minmax(0,1fr)}.set dd{margin-bottom:6px}}
 @media (max-width:1200px){.maplayout{grid-template-columns:200px minmax(0,1fr)}.maplayout .mapdetail{grid-column:1/-1}}
 @media (max-width:900px){.maplayout{grid-template-columns:minmax(0,1fr)}.pagelist{display:none}.pagepick{display:block}}
 @media (max-width:900px){.layout{grid-template-columns:minmax(0,1fr)}.side{display:none}.side.open{display:block}.filters-toggle{display:inline-block}.funnel .row{grid-template-columns:120px minmax(0,1fr) 44px}.dl{grid-template-columns:90px minmax(0,1fr)}}
@@ -335,7 +353,7 @@ const FACETS = [
 const FACET = Object.fromEntries(FACETS.map((f) => [f.id, f]));
 
 // ------------------------------------------------------------------- state
-const VIEWS = [['overview', 'Overview'], ['runs', 'Runs'], ['map', 'Product map'], ['catalog', 'Catalog'], ['gallery', 'Gallery'], ['coverage', 'Coverage'], ['history', 'History'], ['lifecycle', 'Lifecycle']];
+const VIEWS = [['overview', 'Overview'], ['modules', 'Modules'], ['findings', 'Findings'], ['design', 'Design'], ['runs', 'Runs'], ['map', 'Product map'], ['catalog', 'Catalog'], ['gallery', 'Gallery'], ['coverage', 'Coverage'], ['history', 'History'], ['lifecycle', 'Lifecycle']];
 const COLS = {
   ref: ['Origin', (i) => i.ref, (a, b) => (a.origin.kind || '').localeCompare(b.origin.kind || '') || num(a.ref) - num(b.ref)],
   id: ['ID', (i) => str(i.id), (a, b) => str(a.id).localeCompare(str(b.id)) || num(a.id) - num(b.id)],
@@ -424,13 +442,30 @@ const tierB = (t) => h('span', { class: `tier ${t}` }, t);
 function stepText(t) {
   return str(t).split(/(\{[A-Za-z_]\w*\})/).map((p) => (/^\{[A-Za-z_]\w*\}$/.test(p) ? h('span', { class: 'token' }, p) : p));
 }
+// The commands the page may offer: the operator's words of docs/on-demand.md and docs/modules.md,
+// built from constants and ids only. Anything else is never shown, copied or sent.
+const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+)$/;
+// On an interactive artifact beside the agent's chat the platform injects `platform.sendPrompt`:
+// a click sends the command as the operator's own chat message. It gives no answer back.
+const bridge = () => { try { return window.platform && typeof window.platform.sendPrompt === 'function' ? window.platform : null; } catch { return null; } };
 function copyBox(text) {
+  if (!CMD_RE.test(text)) return null;
   const box = h('span', { class: 'cmd' }, h('code', {}, text));
   const b = h('button', { class: 'btn', type: 'button', onclick: async () => {
     try { await navigator.clipboard.writeText(text); b.textContent = 'Copied'; setTimeout(() => { b.textContent = 'Copy'; }, 1500); return; } catch { /* no clipboard */ }
     const inp = h('input', { readonly: true, value: text, 'aria-label': 'Command to copy' }); b.replaceWith(inp); inp.focus(); inp.select();
   } }, 'Copy');
-  box.append(b); return box;
+  box.append(b);
+  if (bridge()) {
+    const send = h('button', { class: 'btn primary', type: 'button', onclick: () => {
+      const p = bridge(); if (!p) return;
+      send.disabled = true;
+      Promise.resolve().then(() => p.sendPrompt(text)).then(() => { send.textContent = 'Sent — the answer is in the chat'; },
+        () => { send.disabled = false; send.textContent = 'Not sent — copy it instead'; });
+    } }, 'Send to the agent');
+    box.append(send);
+  }
+  return box;
 }
 function minibar(list, cls = 'minibar') {
   const c = { bad: 0, warn: 0, muted: 0, ok: 0 }; for (const i of list) if (c[i.cls] != null) c[i.cls]++;
@@ -458,16 +493,16 @@ const commands = (i) => {
 // ------------------------------------------------------------------ header
 function renderHeader() {
   const a = D.agent || {};
-  $('#h-title').textContent = `${D.product ? `${str(D.product)} · ` : ''}Test catalog`;
+  $('#h-title').textContent = `${D.product ? `${str(D.product)} · ` : ''}Quality control center`;
   document.title = $('#h-title').textContent;
   const meta = $('#h-meta'); meta.textContent = '';
   meta.append([str(D.target), str(a.display_name), a.version ? `v${a.version}` : '', D.generated_utc ? `generated ${rel(D.generated_utc)} (${str(D.generated_utc)})` : ''].filter(Boolean).join(' · '));
   const tabs = $('#tabs'); tabs.textContent = '';
   for (const [k, label] of VIEWS) tabs.append(h('button', { role: 'tab', type: 'button', 'aria-selected': S.v === k ? 'true' : 'false', onclick: () => { S.v = k; S.limit = 100; writeHash(); render(); } }, label));
-  tabs.append(h('span', { class: 'sp' }),
+  tabs.append(...[h('span', { class: 'sp' }),
     builds.length ? h('select', { 'aria-label': 'Show the state as of a build', onchange: (e) => go({ at: e.target.value || null }) },
       h('option', { value: '' }, 'As of: now'), builds.slice().reverse().map((b) => h('option', { value: b.id, selected: S.at === b.id ? true : null }, `As of ${fmtDate(b.utc)} · ${b.id}`))) : null,
-    h('button', { type: 'button', onclick: toggleLegend, 'aria-expanded': $('#legend') ? 'true' : 'false' }, 'Legend'));
+    h('button', { type: 'button', onclick: toggleLegend, 'aria-expanded': $('#legend') ? 'true' : 'false' }, 'Legend')].filter(Boolean)); // DOM append writes a null as text
 }
 function toggleLegend() {
   const old = $('#legend'); if (old) { old.remove(); renderHeader(); return; }
@@ -483,7 +518,8 @@ function toggleLegend() {
       h('li', {}, tierB('quarantined'), ' flaky on two builds, not replayed'),
       h('li', {}, tierB('retired'), ' superseded by a completed issue'),
       h('li', {}, tierB('untracked'), ' no test (not testable) or no suite row')),
-    h('p', { class: 'muted-t' }, 'The catalog is read-only. Commands are pasted into the agent\'s own chat.')));
+    h('p', { class: 'muted-t' }, bridge() ? 'A command button sends that command to the agent\'s chat as your message; nothing changes before the agent does it.'
+      : 'The page changes nothing itself. Copy a command into the agent\'s own chat; on an interactive page opened beside that chat, its button sends it.')));
   renderHeader();
 }
 
@@ -518,7 +554,8 @@ function nightsChart(list, w = 460, hgt = 150) {
 }
 function viewOverview() {
   const v = $('#view');
-  if (!items.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No tests in the catalog yet.'), h('p', {}, 'Tests appear here after the first issue run.'))); return; }
+  if (!items.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No tests in the catalog yet.'), h('p', {}, 'Tests appear here after the first issue run.'),
+    modList.length ? h('p', {}, h('button', { class: 'btn', type: 'button', onclick: () => go({ v: 'modules' }) }, 'Testing modules →')) : null)); return; }
   const t = (x) => items.filter((i) => i.tier === x).length;
   const origins = new Set(items.map((i) => `${i.origin.kind}:${i.ref}`));
   const cov = pagesData.filter((p) => p.covered === 'regression').length;
@@ -538,7 +575,12 @@ function viewOverview() {
   const all = builds.map((b) => items.filter((i) => i.file && i.history.length && str(i.history[0].utc) <= b.utc).length);
   const reg = builds.map((b) => items.filter((i) => i.promoted_utc && str(i.promoted_utc) <= b.utc && i.tier === 'regression').length);
   const dist = {}; for (const i of items) dist[i.latest || 'none'] = (dist[i.latest || 'none'] || 0) + 1;
+  const openD = design.filter((d) => d.status === 'open');
   v.append(h('div', { class: 'panels' },
+    modList.length ? h('section', { class: 'panel' }, h('h2', {}, 'Testing modules'), h('ul', { class: 'att' }, modList.map((m) => h('li', {}, stateB(str(m.state)), ' ',
+      h('button', { class: 'linkish', type: 'button', onclick: () => go({ v: 'modules' }) }, str(m.title) || str(m.id)),
+      m.last_run && m.last_run.utc ? h('span', { class: 'meta' }, ` · ${rel(m.last_run.utc)}`) : null))),
+      h('p', { class: 'meta' }, openD.length ? h('button', { class: 'linkish', type: 'button', onclick: () => go({ v: 'design' }) }, `${openD.length} open design finding(s), ${openD.filter((d) => d.severity === 'major').length} major →`) : 'No open design finding.')) : null,
     h('section', { class: 'panel' }, h('h2', {}, `Needs attention (${att.length})`), att.length ? h('ul', { class: 'att' }, att.slice(0, 14).map((i) => h('li', {}, badge(i.latest || (i.flags.includes('drift') ? 'drift' : '')), ' ',
       h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key) }, `${i.label} — ${str(i.name)}`)))) : h('p', { class: 'muted-t' }, 'Nothing needs attention.')),
     h('section', { class: 'panel' }, h('h2', {}, 'Suite size over builds'), builds.length ? lineChart([{ name: 'tests', color: 'var(--link)', values: all }, { name: 'regression tier', color: 'var(--ok)', values: reg }], labels) : h('p', { class: 'muted-t' }, 'No builds yet.')),
@@ -902,6 +944,177 @@ function viewMap() {
   v.append(h('div', { class: 'maplayout' }, list, h('div', { style: 'min-width:0' }, sel, head, stage), detail));
 }
 
+// ----------------------------------------------------------------- modules
+// The testing modules (docs/modules.md). A control never changes anything here: it shows the
+// command for the agent's direct session, which its button sends on an interactive page.
+const MODS = D.modules && typeof D.modules === 'object' ? D.modules : {};
+const ID_RE = /^[a-z][a-z-]{1,30}$/;
+const KEY_RE = /^[a-z_]{1,40}$/;
+const modList = arr(MODS.modules).filter((m) => m && ID_RE.test(str(m.id)));
+const cadences = arr(MODS.cadences).map(str).filter((c) => /^[a-z-]{1,20}$/.test(c));
+const areas = arr(D.areas).map(str).filter((a) => /^[A-Za-z0-9][A-Za-z0-9 _./-]{0,39}$/.test(a));
+const MKIND = { core: 'Always on', config: 'Inside each issue run', schedule: 'Its own schedule', modules: 'Nightly modules run', queue: 'Once, on request' };
+const ON = new Set(['on', 'enabled', 'per-build', 'weekly', 'propose', 'run']);
+const stateB = (st) => h('span', { class: `badge ${ON.has(st) ? 'ok' : st === 'off' || st === 'disabled' ? 'muted' : 'none'}` }, st || 'unknown');
+const pending = new Map(); // module id -> the command its last change stands for
+const want = (id, cmd) => { if (CMD_RE.test(cmd)) pending.set(id, cmd); else pending.delete(id); render(); };
+function settingRow(id, key, spec) {
+  if (!KEY_RE.test(key) || !spec || typeof spec !== 'object') return null;
+  const val = str(spec.value); const t = str(spec.type);
+  let ctl;
+  if (t === 'cadence' || t === 'enum') {
+    const vals = (t === 'cadence' ? cadences : arr(spec.values).map(str)).filter((v) => /^[A-Za-z0-9._-]{1,40}$/.test(v));
+    ctl = vals.map((v) => h('button', { class: `chip${v === val ? ' on' : ''}`, type: 'button', 'aria-pressed': v === val ? 'true' : 'false',
+      onclick: () => (v === val ? (pending.delete(id), render()) : want(id, `module ${id} set ${key}=${v}`)) }, v));
+  } else if (t === 'int' || t === 'viewports') {
+    const isInt = t === 'int';
+    const inp = h('input', { type: isInt ? 'number' : 'text', class: isInt ? null : 'wide', value: val, min: isInt ? spec.min : null, max: isInt ? spec.max : null, 'aria-label': key });
+    const ok = (v) => (isInt ? /^\d{1,6}$/.test(v) && +v >= +spec.min && +v <= +spec.max : /^\d{3,4}x\d{3,4}(,\d{3,4}x\d{3,4}){0,3}$/.test(v));
+    const msg = h('span', { class: 'meta' }, isInt ? `${spec.min}–${spec.max}` : 'WxH, comma-separated, up to 4');
+    ctl = [inp, h('button', { class: 'btn', type: 'button', onclick: () => {
+      const v = inp.value.trim();
+      if (!ok(v)) { msg.textContent = isInt ? `between ${spec.min} and ${spec.max}` : 'like 1440x900,390x844'; msg.className = 'badge bad'; return; }
+      if (v === val) { pending.delete(id); render(); return; }
+      want(id, `module ${id} set ${key}=${v}`);
+    } }, 'Change'), msg];
+  } else ctl = h('code', {}, val);
+  return [h('dt', { title: str(spec.default) ? `default ${str(spec.default)}` : null }, key), h('dd', {}, ctl)];
+}
+function moduleCard(m) {
+  const id = str(m.id); const sc = m.schedule && typeof m.schedule === 'object' ? m.schedule : null;
+  const settings = m.settings && typeof m.settings === 'object' ? Object.entries(m.settings) : [];
+  const lr = m.last_run && typeof m.last_run === 'object' ? m.last_run : null;
+  const actions = [];
+  if (m.kind === 'schedule' && sc) actions.push(sc.enabled === false ? h('button', { class: 'btn', type: 'button', onclick: () => want(id, `module ${id} on`) }, 'Switch the schedule on')
+    : sc.enabled === true ? h('button', { class: 'btn', type: 'button', onclick: () => want(id, `module ${id} off`) }, 'Switch the schedule off') : null);
+  if (m.kind !== 'core' && m.kind !== 'config' && m.kind !== 'queue') actions.push(h('button', { class: 'btn', type: 'button', onclick: () => want(id, `module ${id} run now`) }, 'Run now'));
+  let focus = null;
+  if (m.kind === 'queue') {
+    const q = arr(MODS.focus).filter((f) => f && f.area);
+    const pick = h('input', { type: 'text', class: 'wide', list: 'qi-areas', placeholder: 'an area, e.g. Upload', 'aria-label': 'Area to test in depth' });
+    focus = [h('datalist', { id: 'qi-areas' }, areas.map((a) => h('option', { value: a }))),
+      h('div', { class: 'set' }, h('dt', {}, 'Area'), h('dd', {}, pick, h('button', { class: 'btn', type: 'button', onclick: () => {
+        if (CMD_RE.test(`focus ${pick.value.trim()}`)) { want(id, `focus ${pick.value.trim()}`); return; }
+        pick.setCustomValidity('Letters, digits, spaces and _ . / - only, up to 40'); pick.reportValidity();
+      } }, 'Queue'))),
+      q.length ? h('ul', { class: 'att' }, q.slice(-8).reverse().map((f) => h('li', {}, h('span', { class: `badge ${f.status === 'queued' ? 'warn' : 'ok'}` }, str(f.status)), ` ${str(f.area)} · ${fmtDate(f.queued_utc)}${f.build ? ` · ${str(f.build)}` : ''}`))) : null];
+  }
+  return h('section', { class: 'mod', 'aria-label': str(m.title) || id },
+    h('header', {}, h('h3', {}, str(m.title) || id), stateB(str(m.state)), h('span', { class: 'meta' }, MKIND[m.kind] || str(m.kind))),
+    m.what ? h('p', { class: 'meta' }, str(m.what)) : null,
+    h('p', { class: 'meta' }, lr ? `Last run ${rel(lr.utc)}${lr.candidate ? ` on ${str(lr.candidate)}` : ''}` : 'Not run yet',
+      sc ? ` · schedule ${sc.enabled === true ? 'on' : sc.enabled === false ? 'off' : 'state unknown'}${sc.cron ? ` (${str(sc.cron)})` : ''}` : ''),
+    settings.length ? h('dl', { class: 'set' }, settings.map(([k, spec]) => settingRow(id, k, spec))) : null,
+    focus, actions.filter(Boolean).length ? h('div', { class: 'cmd' }, actions) : null,
+    pending.has(id) ? h('div', { class: 'pending', role: 'status' }, h('span', {}, 'Nothing has changed yet. The agent changes it on this command:'), copyBox(pending.get(id))) : null);
+}
+function viewModules() {
+  const v = $('#view');
+  if (!modList.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'The module state was not available when this page was built.'))); return; }
+  v.append(h('div', { class: 'note' }, bridge() ? 'A change below becomes a command; its "Send to the agent" button sends it to the agent\'s chat as your message.'
+    : D.interactive ? 'Open this page beside the agent\'s chat to send commands with a click; here, copy them into the chat.'
+      : 'A change below becomes a command to paste into the agent\'s chat; the agent applies it and refreshes this page.',
+    MODS.schedules_as_of ? ` Schedule states as of ${fmtDate(MODS.schedules_as_of)}.` : ''));
+  const groups = [['Testing modules', (m) => m.kind === 'modules' || m.kind === 'queue'], ['Scheduled runs', (m) => m.kind === 'schedule'], ['Issue runs', (m) => m.kind === 'core' || m.kind === 'config']];
+  for (const [title, f] of groups) {
+    const list = modList.filter(f); if (!list.length) continue;
+    v.append(h('h2', { style: 'font-size:15px;margin:16px 0 8px' }, title), h('div', { class: 'mods' }, list.map(moduleCard)));
+  }
+  const g = MODS.global && typeof MODS.global === 'object' ? Object.entries(MODS.global) : [];
+  if (g.length) v.append(h('h2', { style: 'font-size:15px;margin:16px 0 8px' }, 'Every module'), h('div', { class: 'mods' }, h('section', { class: 'mod' },
+    h('dl', { class: 'set' }, g.map(([k, spec]) => settingRow('global', k, spec))),
+    pending.has('global') ? h('div', { class: 'pending', role: 'status' }, h('span', {}, 'Nothing has changed yet. The agent changes it on this command:'), copyBox(pending.get('global'))) : null)));
+}
+
+// ---------------------------------------------------------------- findings
+const F = D.findings && typeof D.findings === 'object' ? D.findings : {};
+const SEVC = { critical: 'bad', high: 'bad', major: 'bad', medium: 'warn', minor: 'warn', low: 'muted', info: 'muted' };
+const sevB = (sv) => h('span', { class: `badge ${SEVC[str(sv)] || 'none'}` }, str(sv) || '–');
+const design = arr(D.design).filter((d) => d && /^D-\d+$/.test(str(d.id)));
+function viewFindings() {
+  const v = $('#view');
+  const val = F.validation && typeof F.validation === 'object' ? F.validation : null;
+  const vf = val ? arr(val.cases).filter((c) => c && c.result && c.result !== 'ok') : [];
+  const st = F.stress && typeof F.stress === 'object' ? F.stress : null;
+  const sf = st ? arr(st.checks).filter((c) => c && c.status !== 'pass') : [];
+  const sec = F.security && typeof F.security === 'object' ? F.security : null;
+  const open = design.filter((d) => d.status === 'open');
+  const obs = items.filter((i) => i.kind === 'exploration' && i.latest === 'observation');
+  const kpi = (label, val2, cls, f) => h(f ? 'button' : 'div', { class: 'kpi', type: f ? 'button' : null, style: f ? 'text-align:left;cursor:pointer' : null, onclick: f || null },
+    h('b', { class: cls || null }, String(val2)), h('span', {}, label));
+  const secN = sec && sec.counts ? (+sec.counts.critical || 0) + (+sec.counts.high || 0) : null;
+  v.append(h('div', { class: 'grid-kpi' },
+    kpi('Design: open (major)', `${open.length} (${open.filter((d) => d.severity === 'major').length})`, null, () => go({ v: 'design' })),
+    kpi('Validation findings', val ? vf.filter((c) => c.result === 'finding').length : '–'),
+    kpi('Stress: failed checks', st ? sf.filter((c) => c.status === 'fail').length : '–'),
+    kpi('Security: critical + high', secN == null ? '–' : secN),
+    kpi('Edge-case observations', obs.length, null, obs.length ? () => { S.f = { kind: ['exploration'], verdict: ['observation'] }; S.v = 'catalog'; writeHash(); render(); } : null)));
+  const tableOf = (cols, rows) => h('div', { class: 'tablewrap' }, h('table', { class: 'list' }, h('thead', {}, h('tr', {}, cols.map((c) => h('th', { style: 'cursor:default' }, c)))),
+    h('tbody', {}, rows.map((r) => h('tr', { style: 'cursor:default' }, r.map((c) => h('td', {}, c)))))));
+  const sec2 = (title, sub, body) => h('section', { class: 'panel', style: 'margin-top:14px' }, h('h2', {}, title), sub ? h('p', { class: 'meta' }, sub) : null, body);
+  v.append(sec2('Form validation', val ? `Build ${str(val.build)} · run ${str(val.run)} · ${fmtDate(val.utc)} · ${arr(val.cases).length} cases` : null,
+    !val ? h('p', { class: 'muted-t' }, 'The validation module has not run yet.') : vf.length ? tableOf(['Case', 'Page', 'Form · field', 'Input', 'Result', 'Severity', 'What broke'],
+      vf.sort((a, b) => (a.result === 'finding' ? 0 : 1) - (b.result === 'finding' ? 0 : 1) || (SEVC[a.severity] === 'bad' ? 0 : 1) - (SEVC[b.severity] === 'bad' ? 0 : 1))
+        .map((c) => [h('code', {}, str(c.id)), h('code', {}, str(c.page)), `${str(c.form)}${c.field ? ` · ${str(c.field)}` : ''}`, str(c.kind),
+          h('span', { class: `badge ${c.result === 'finding' ? 'bad' : c.result === 'flaky' ? 'warn' : 'muted'}` }, str(c.result)), c.severity ? sevB(c.severity) : '', str(c.message)])) : h('p', { class: 'muted-t' }, 'Every case passed.')));
+  v.append(sec2('Stress', st ? `Build ${str(st.build)} · ${fmtDate(st.utc)}${st.config ? ` · ${str(st.config.concurrency)} workers × ${str(st.config.duration_s)} s` : ''}` : null,
+    !st ? h('p', { class: 'muted-t' }, 'The stress module has not run yet.') : sf.length ? tableOf(['Check', 'Target', 'Status', 'Severity', 'Evidence'],
+      sf.map((c) => [h('code', {}, str(c.id)), h('code', {}, str(c.target)), h('span', { class: `badge ${c.status === 'fail' ? 'bad' : 'muted'}` }, str(c.status)), sevB(c.severity),
+        str(c.evidence || c.reason)])) : h('p', { class: 'muted-t' }, 'Every check passed.')));
+  v.append(sec2('Security', sec ? `Build ${str(sec.candidate)} · ${fmtDate(sec.utc)} — the findings stay in the private report` : null,
+    !sec ? h('p', { class: 'muted-t' }, 'The security run has not run yet.') : h('div', {}, h('p', {}, ['critical', 'high', 'medium', 'low', 'info', 'skipped'].map((k) =>
+      h('span', { style: 'margin-right:10px' }, sevB(k), ` ${+((sec.counts || {})[k]) || 0}`))), h('p', {}, artLink(sec.report)))));
+}
+
+// ------------------------------------------------------------------ design
+const DS = { st: 'open', sev: '', vp: '', ck: '', pg: '', q: '' };
+const dCheck = (d) => str(d.check).replace(/^review:.*/, 'review').replace(/^a11y:.*/, 'a11y');
+function designMarkdown(list) {
+  return list.map((d) => `- **${str(d.id)}** (${str(d.severity)}${d.suspect ? ', suspect' : ''}) \`${str(d.pattern)}\`${d.viewport && d.viewport !== '-' ? ` @ ${str(d.viewport)}` : ''} — ${str(d.saw)}`
+    + ` _(${str(d.check)}; since ${str(d.first_seen)}${d.status !== 'open' ? `; ${str(d.status)}` : ''})_`).join('\n');
+}
+function viewDesign() {
+  const v = $('#view');
+  if (!design.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No design findings yet.'), h('p', {}, 'Switch the UI sweep on in Modules; tests\' "noticed in passing" items appear here too.'))); return; }
+  const uniq = (f) => [...new Set(design.map(f).filter(Boolean))].sort();
+  const pass = (d) => (!DS.st || d.status === DS.st) && (!DS.sev || d.severity === DS.sev) && (!DS.vp || str(d.viewport) === DS.vp) && (!DS.ck || dCheck(d) === DS.ck)
+    && (!DS.pg || str(d.pattern) === DS.pg) && (!DS.q || [d.id, d.saw, d.target, d.pattern, d.check].map(str).join(' ').toLowerCase().includes(DS.q.toLowerCase()));
+  const list = design.filter(pass).sort((a, b) => (a.severity === 'major' ? 0 : 1) - (b.severity === 'major' ? 0 : 1) || str(a.pattern).localeCompare(str(b.pattern)) || num(a.id) - num(b.id));
+  const newest = design.map((d) => str(d.last_seen)).sort().pop();
+  const open = design.filter((d) => d.status === 'open');
+  v.append(h('div', { class: 'grid-kpi' }, [['Open', open.length], ['Open · major', open.filter((d) => d.severity === 'major').length],
+    ['New in the newest build', open.filter((d) => str(d.first_seen) === newest).length], ['Suspect (model unsure)', open.filter((d) => d.suspect).length],
+    ['Resolved', design.filter((d) => d.status === 'resolved').length], ['Dismissed', design.filter((d) => d.status === 'dismissed').length]]
+    .map(([l, n]) => h('div', { class: 'kpi' }, h('b', {}, String(n)), h('span', {}, l)))));
+  const sel = (label, key, opts, fmt) => h('select', { 'aria-label': label, onchange: (e) => { DS[key] = e.target.value; render(); } },
+    h('option', { value: '' }, `${label}: all`), opts.map((o) => h('option', { value: o, selected: DS[key] === o ? true : null }, fmt ? fmt(o) : o)));
+  const copyMd = h('button', { class: 'btn', type: 'button', onclick: async () => {
+    const md = designMarkdown(list);
+    try { await navigator.clipboard.writeText(md); copyMd.textContent = `Copied ${list.length}`; setTimeout(() => { copyMd.textContent = 'Copy as Markdown'; }, 1500); return; } catch { /* no clipboard */ }
+    const ta = h('textarea', { readonly: true, rows: 8, style: 'width:100%', 'aria-label': 'Findings as Markdown' }); ta.value = md; copyMd.replaceWith(ta); ta.select();
+  } }, 'Copy as Markdown');
+  const q = h('input', { type: 'search', placeholder: 'Search findings', value: DS.q, 'aria-label': 'Search findings', oninput: debounce((e) => { DS.q = e.target.value; render(true); }, 200) });
+  v.append(h('div', { class: 'toolbar', style: 'margin-top:14px' }, q, sel('Status', 'st', ['open', 'resolved', 'dismissed']), sel('Severity', 'sev', ['major', 'minor']),
+    sel('Screen', 'vp', uniq((d) => str(d.viewport))), sel('Check', 'ck', uniq(dCheck)), sel('Page', 'pg', uniq((d) => str(d.pattern))),
+    h('span', { class: 'count' }, `${list.length} of ${design.length}`), copyMd));
+  if (!list.length) { v.append(h('p', { class: 'empty' }, 'No finding matches.')); return; }
+  v.append(h('div', { class: 'gal' }, list.slice(0, S.limit).map((d) => {
+    const src = img(d.crop);
+    return h('article', { class: 'dcard', 'aria-label': str(d.id) },
+      src ? h('img', { src, alt: `${str(d.id)}: ${str(d.saw)}`, loading: 'lazy' }) : h('div', { class: 'ph' }, 'no screenshot'),
+      h('div', { style: 'display:flex;flex-wrap:wrap;gap:4px;align-items:center' }, h('b', {}, str(d.id)), sevB(d.severity),
+        h('span', { class: `badge ${d.status === 'open' ? 'warn' : d.status === 'resolved' ? 'ok' : 'muted'}` }, str(d.status)), d.suspect ? h('span', { class: 'badge muted', title: 'The model was unsure — check before acting' }, 'suspect') : null),
+      h('div', { class: 'saw' }, str(d.saw)),
+      h('div', { class: 'meta' }, h('code', {}, str(d.pattern)), d.viewport && d.viewport !== '-' ? ` @ ${str(d.viewport)}` : '', ` · ${str(d.check)}`),
+      h('details', {}, h('summary', {}, 'Details'), h('dl', { class: 'dl' },
+        h('dt', {}, 'Element'), h('dd', {}, str(d.target) || '–'), h('dt', {}, 'Source'), h('dd', {}, { sweep: 'UI sweep check', review: 'model review of the screenshot', noticed: 'noticed while testing' }[d.source] || str(d.source)),
+        h('dt', {}, 'First seen'), h('dd', {}, str(d.first_seen) || '–'), h('dt', {}, 'Last seen'), h('dd', {}, str(d.last_seen) || '–'),
+        d.resolved_build ? [h('dt', {}, 'Resolved in'), h('dd', {}, str(d.resolved_build))] : null),
+        d.status === 'open' ? h('div', {}, h('span', { class: 'meta' }, 'Not a defect? '), copyBox(`dismiss ${str(d.id)}`)) : null));
+  })));
+  if (list.length > S.limit) v.append(h('div', { class: 'more-row' }, h('button', { class: 'btn', type: 'button', onclick: () => { S.limit += 100; render(); } }, `Show more (${list.length - S.limit})`)));
+}
+
 // ------------------------------------------------------------------ render
 function render(keepSearchFocus) {
   const pos = keepSearchFocus && document.activeElement && document.activeElement.type === 'search' ? document.activeElement.selectionStart : null;
@@ -914,12 +1127,14 @@ function render(keepSearchFocus) {
       nightOf(S.at) ? h('button', { class: 'btn', type: 'button', onclick: () => openRun(nightOf(S.at)) }, 'That night') : null,
       h('button', { class: 'btn', type: 'button', onclick: () => go({ at: null }) }, 'Back to now')));
   }
-  ({ overview: viewOverview, runs: viewRuns, map: viewMap, catalog: () => viewList(false), gallery: () => viewList(true), coverage: viewCoverage, history: viewHistory, lifecycle: viewLifecycle }[S.v] || viewOverview)();
+  ({ overview: viewOverview, modules: viewModules, findings: viewFindings, design: viewDesign, runs: viewRuns, map: viewMap, catalog: () => viewList(false), gallery: () => viewList(true), coverage: viewCoverage, history: viewHistory, lifecycle: viewLifecycle }[S.v] || viewOverview)();
   if (pos != null) { const q = $('input[type=search]'); if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch { /* ignore */ } } }
 }
 readHash();
 render();
 renderDrawer();
+// The platform may inject its bridge after this script ran: draw the send buttons then.
+if (!bridge()) window.addEventListener('load', () => { if (bridge()) { render(); renderDrawer(); } });
 window.addEventListener('hashchange', () => { readHash(); render(); renderDrawer(); });
 })();
 </script>

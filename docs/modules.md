@@ -20,14 +20,13 @@ A `modules` module's cadence is `disabled` (default), `per-build` (once per cand
 
 Only the operator, in the direct session, changes a module (CLAUDE.md → trust boundary):
 
-| Operator says | Do |
+| Operator says (the dashboard's commands verbatim) | Do |
 | --- | --- |
-| "module `<id>` `<cadence>`", "set `<key>` to `<value>`" | `modules.sh set <id> <key>=<value>…` (`global` for `modules_max_wallclock_min`, `dashboard_interactive`) |
-| "module `<id>` on/off" for a schedule kind | the platform's schedule tools: enable or disable its schedule, then `modules.sh schedules` with the new `list_schedules` answer |
-| "module `<id>` run now" | the modules run below for that module only, ignoring "already ran"; for a schedule kind its own on-demand command ([on-demand.md](on-demand.md)) |
-| "focus `<area>`" | `modules.sh focus <area>` — the next modules run takes it |
-| "dismiss D-`<k>`" | a row in `work/design/DISMISSED.md` ([ui-sweep.md](ui-sweep.md)) |
-| "dashboard interactive on/off" | `modules.sh set global dashboard_interactive=enabled\|disabled`, then the catalog ([catalog.md](catalog.md) → **Build and publish**) |
+| `module <id> set <key>=<value>` (or the same in words) | `modules.sh set <id> <key>=<value>` — `global` for `modules_max_wallclock_min` and `dashboard_interactive` |
+| `module <id> on` / `off` (a schedule kind) | the platform's schedule tools: enable or disable its schedule; then `modules.sh schedules` with the new `list_schedules` answer |
+| `module <id> run now` | the modules run below for that module only, ignoring "already ran"; a schedule kind: its own on-demand command ([on-demand.md](on-demand.md)) |
+| `focus <area>` | `modules.sh focus <area>` — the next modules run takes it |
+| `dismiss D-<k>` | a row `\| D-<k> \| <ISO> \|` in `work/design/DISMISSED.md` ([ui-sweep.md](ui-sweep.md)) |
 
 `modules.sh set` and `focus` write only registry keys with valid values and refuse to run
 outside the direct session (`lib/config.sh` → `direct_session`; the policy hook's

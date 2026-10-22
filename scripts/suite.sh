@@ -39,6 +39,7 @@ if ! . "$SCRIPT_DIR/log.sh" 2>/dev/null; then logev() { :; }; fi
 
 E2E_VERSION="$(cfg e2e_version)"; E2E_VERSION="${E2E_VERSION:-0.20.0}"
 E2E_WEB_VERSION="$(cfg e2e_web_version)"; E2E_WEB_VERSION="${E2E_WEB_VERSION:-0.14.0}"
+AXE_VERSION=4.10.2   # axe-core for the ui-sweep module's accessibility checks (docs/ui-sweep.md)
 E2E_MODEL="$(cfg e2e_model)"; E2E_MODEL="${E2E_MODEL:-claude-sonnet-5}"
 APP_URL="${APP_URL:-$(profile_field '.app.url')}"
 
@@ -58,9 +59,10 @@ cmd_init() {
     done
   done
   if [ "$(jq -r .version "$SUITE/node_modules/e2e/package.json" 2>/dev/null)" != "$E2E_VERSION" ] \
-     || [ "$(jq -r .version "$SUITE/node_modules/@e2e-dev/web/package.json" 2>/dev/null)" != "$E2E_WEB_VERSION" ]; then
+     || [ "$(jq -r .version "$SUITE/node_modules/@e2e-dev/web/package.json" 2>/dev/null)" != "$E2E_WEB_VERSION" ] \
+     || [ "$(jq -r .version "$SUITE/node_modules/axe-core/package.json" 2>/dev/null)" != "$AXE_VERSION" ]; then
     ( cd "$SUITE" && npm install --no-audit --no-fund --save-exact -D \
-        "e2e@$E2E_VERSION" "@e2e-dev/web@$E2E_WEB_VERSION" ai @ai-sdk/anthropic >/dev/null 2>"/tmp/quality-inspector-npm.err" ) \
+        "e2e@$E2E_VERSION" "@e2e-dev/web@$E2E_WEB_VERSION" ai @ai-sdk/anthropic "axe-core@$AXE_VERSION" >/dev/null 2>"/tmp/quality-inspector-npm.err" ) \
       || { local e; e="$(tail -5 /tmp/quality-inspector-npm.err)"; rm -f /tmp/quality-inspector-npm.err; die "npm install failed: $e"; }
     rm -f /tmp/quality-inspector-npm.err
   fi

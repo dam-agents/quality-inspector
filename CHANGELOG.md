@@ -7,6 +7,23 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.6.0 — 2026-10-22
+
+**Upgrade:**
+1. Create the schedule `quality-inspector-modules-nightly` from `kit.yaml` if
+   `mcp__platform-outbound__list_schedules` lacks it (ONBOARDING.md Step 5); it declines while
+   every module is off. Then `bash "$HOME/scripts/modules.sh" schedules` with that listing.
+2. `bash "$HOME/scripts/verify-onboarding.sh"` and apply every `FAIL` line's `fix:`. The new
+   `work/CONFIG.md` keys may stay missing: each reads as its default (every module off).
+3. `bash "$HOME/scripts/suite.sh" init` — installs axe-core into the suite for the UI sweep.
+4. Offer the operator the testing modules ([docs/modules.md](docs/modules.md)): `ui_sweep`,
+   `validation_checks`, `stress_checks` (`per-build` or `weekly`) and a feature focus — never
+   switch one on unasked.
+5. **operator-only:** to send the dashboard's commands with a click, switch on Interactive
+   artifacts in the platform; then the operator's "module global set dashboard_interactive=enabled"
+   — the next catalog publish creates a new, interactive artifact ([docs/catalog.md](docs/catalog.md)
+   → Build and publish); the operator deletes the old one.
+
 ## 3.5.0 — 2026-10-22
 
 **Upgrade:**
