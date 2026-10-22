@@ -37,7 +37,9 @@ allows `modules.sh` only as one plain `status|due|ran|focus-done|check|value|sch
 refuses a command naming the session variables `direct_session` reads, and refuses edits of
 `work/CONFIG.md`, `work/FOCUS.md` and `work/design/DISMISSED.md` (`module-set`, `scheduled-def`).
 **Limit:** a schedule is switched through the platform's tools, which the policy hook does not
-see — only this rule keeps it the operator's. After any change: one line to the operator with
+see — only this rule keeps it the operator's. The hook reads a `$'…'` span as bash decodes it,
+and does not count a glob of `*` alone (`*`, `*.sh`), so ordinary scheduled commands pass. Such
+a glob, or a name built at run time, can still reach `modules.sh`; the script then refuses. After any change: one line to the operator with
 the old and new value, then rebuild and publish the catalog.
 
 **From the dashboard.** Each control on the page shows the command it stands for. On an

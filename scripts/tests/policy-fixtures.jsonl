@@ -196,3 +196,11 @@
 {"name": "reading modules.sh, scheduled", "expect": "allow", "mode": "scheduled", "tool": "Bash", "input": {"command": "grep -n focus scripts/modules.sh"}}
 {"name": "dismissed findings edit, scheduled", "expect": "deny", "mode": "scheduled", "rule": "scheduled-def", "tool": "Write", "input": {"file_path": "@WORK@/design/DISMISSED.md", "content": "| D-1 | x |"}}
 {"name": "dismissed findings edit, direct", "expect": "allow", "tool": "Write", "input": {"file_path": "@WORK@/design/DISMISSED.md", "content": "| D-1 | x |"}}
+{"name": "an ANSI-C tab in a loop, scheduled", "expect": "allow", "mode": "scheduled", "tool": "Bash", "input": {"command": "jq -r '.a' work/x.json | while IFS=$'\\t' read -r a b; do echo \"$a\"; done"}}
+{"name": "a *.sh glob, scheduled", "expect": "allow", "mode": "scheduled", "tool": "Bash", "input": {"command": "node scripts/coverage.mjs work/suite/tests/*.sh"}}
+{"name": "a * glob, scheduled", "expect": "allow", "mode": "scheduled", "tool": "Bash", "input": {"command": "cp work/suite/out/* /tmp/quality-inspector-x/"}}
+{"name": "a brace sequence, scheduled", "expect": "allow", "mode": "scheduled", "tool": "Bash", "input": {"command": "for i in {1..3}; do node x.mjs; done"}}
+{"name": "modules.sh in ANSI-C hex escapes, scheduled", "expect": "deny", "mode": "scheduled", "rule": "module-set", "tool": "Bash", "input": {"command": "bash scripts/$'\\x6d'odules.sh set stress stress_checks=weekly"}}
+{"name": "modules.sh in an ANSI-C span read as plain quotes, scheduled", "expect": "deny", "mode": "scheduled", "rule": "module-set", "tool": "Bash", "input": {"command": "bash scripts/$'modul\\es.sh' focus Upload"}}
+{"name": "modules.sh through a ? glob, channel turn", "expect": "deny", "mode": "channel", "rule": "module-set", "tool": "Bash", "input": {"command": "bash scripts/?odules.sh focus Upload"}}
+{"name": "a session variable in an ANSI-C span, scheduled", "expect": "deny", "mode": "scheduled", "rule": "module-set", "tool": "Bash", "input": {"command": "export $'CLAUDE_CONFIG_DIR'=/tmp/quality-inspector-x"}}
