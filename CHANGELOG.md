@@ -10,10 +10,13 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 ## 3.9.1 — 2026-10-23
 
 **Upgrade:**
-Nothing — scripts are re-read per run. A profile's `bin/<cmd>` now runs without its exec bit
-(through `bash`), so a profile installed as plain files no longer skips `sandbox.sh check`
-("the profile has no bin/sandbox"); rerun `bash "$HOME/scripts/verify-onboarding.sh" --live`
-once to see the sandbox accounts checked.
+Nothing to run — scripts are re-read per run. A profile's `bin/<cmd>` now counts without its
+exec bit and starts through the interpreter its `#!` line names (`bash` when it has none).
+On a profile installed as plain files, its own `bin/env`, `bin/versions`, `bin/build-time` and
+`bin/sandbox` now run where the engine's commands (or nothing, for `sandbox`) ran before:
+1. `bash "$HOME/scripts/verify-onboarding.sh" --config` and read the `profile_bin:*` lines —
+   each names the command that now runs.
+2. `bash "$HOME/scripts/verify-onboarding.sh" --live` once to see the sandbox accounts checked.
 
 ## 3.9.0 — 2026-10-22
 
