@@ -68,6 +68,13 @@ test('#42 AC-1: a renamed project keeps its tasks', { session: 'owner', tags: ['
 - Tags: `issue-<n>` and `ac-<k>` on every AC test; `smoke` only on the skeleton's smoke and
   injection canary tests (never edit the canary's judgement; [nested-env.md](nested-env.md) → Failures).
 - Sign-in comes from the `owner` setup session; never type credentials in a test.
+- **Clean up only after a pass.** What a test leaves in a sandbox account (a pull request,
+  a branch, an issue, a channel post) and what it made in the nested product for that flow
+  (the agent) it removes as the last step of its last AC test, after the last `criterion`,
+  through the profile's `suite/` helpers — so a failed criterion stops before it and the
+  evidence stays where a reader can open it. The report names each leftover of a failed
+  run; the next nested reset removes the product's, the profile's helpers name how a
+  sandbox's are found (the run's `unique()` id in their title).
 
 **Explorations** ([explorations.md](explorations.md)) live in the same file, one test per
 EX tagged `issue-<n>-ex`, `ex-<k>`, `from-ac-<j>`, with `// EX-<k> begin` / `end` blocks

@@ -155,13 +155,20 @@ _subst() { # <text>
 }
 # How a profile rule gets onto the agent, against the kit's rules.
 _how() { # <verdict> <method> <host> <path>
-  local v m h p
+  local v m h p s best=-1 win=""
   [ "$1" = deny ] && { echo by-hand; return; }
   _github_host "$3" && [ -n "$(_github_refusal "$2" "$3" "$4")" ] && { echo refused; return; }
-  while read -r v m h p; do
-    [ "$v" = allow ] && [ "$h" = "$3" ] && { [ "$m" = "$2" ] || [ "$m" = '*' ]; } && [ "$4" != '*' ] && _covers "$p" "$4" \
-      && { echo kit; return; }
-  done < <(kit_rules)
+  # The kit rule the platform would pick on this exact host: a named method over '*', then
+  # the longer path; a deny wins a tie. Only an allow picked so covers it — a longer kit deny
+  # beside a shorter kit allow (`/repos/*/*/*` beside `/repos/*/*`) refuses the request.
+  if [ "$4" != '*' ]; then
+    while read -r v m h p; do
+      [ "$h" = "$3" ] && { [ "$m" = "$2" ] || [ "$m" = '*' ]; } && _covers "$p" "$4" || continue
+      s=${#p}; [ "$m" = '*' ] || s=$((s + 100000))
+      if [ "$s" -gt "$best" ] || { [ "$s" = "$best" ] && [ "$v" = deny ]; }; then best=$s; win=$v; fi
+    done < <(kit_rules)
+    [ "$win" = allow ] && { echo kit; return; }
+  fi
   while read -r v m h p; do
     [ "$v" = deny ] && _host_covers "$h" "$3" && { [ "$4" = '*' ] || _covers "$p" "$4"; } && { echo by-hand; return; }
   done < <(kit_rules)
