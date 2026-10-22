@@ -422,7 +422,8 @@ const activity = {
   // null: the listing failed or did not run — unknown, not empty.
   waiting: !issuesListed ? null : [...issueMeta].filter(([n, m]) => m.state === 'open' && (!qaRows.some(([q]) => q === n) || (m.labels ?? []).includes(retestLabel)))
     .map(([n, m]) => ({ issue: +n, title: m.title ?? null, kind: qaRows.some(([q]) => q === n) ? 'retest' : 'new' })).sort((a, b) => a.issue - b.issue).slice(0, 50),
-  budget_min: +cfg('max_wallclock_min_per_issue') > 0 ? +cfg('max_wallclock_min_per_issue') : 150,
+  // Through the registry (modules.sh status), so an out-of-range value reads as its default.
+  budget_min: (() => { const v = +(modules?.modules ?? []).find((m) => m?.id === 'issues')?.settings?.max_wallclock_min_per_issue?.value; return v > 0 ? v : 150; })(),
   schedules: sched && typeof sched.schedules === 'object' ? { taken_utc: sched.taken_utc ?? null,
     list: Object.entries(sched.schedules).filter(([n]) => /^quality-inspector-[a-z0-9-]+$/.test(n))
       .map(([name, x]) => ({ name, enabled: x?.enabled !== false, cron: typeof x?.cron === 'string' && /^[0-9*,/ -]{9,40}$/.test(x.cron) ? x.cron : null })) } : null,
