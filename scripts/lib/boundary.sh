@@ -82,7 +82,9 @@ work_repo_rules() {
 # <url> (`git ls-remote`), url <url> (curl). {issue} stands for a real issue number, {id}
 # for repository number 1. Besides each surface, the shapes that would slip a code path past
 # the shared allows: <rest> of an allow in a query string, an encoded slash, a dot segment
-# out of the profile directory.
+# out of the profile directory. And the target's web pages, which a browser signed in to
+# github.com through a sandbox's OAuth allows (docs/black-box.md → Sandbox accounts) would
+# render — also behind an encoded dot segment out of the authorize page.
 boundary_targets() { # <target>
   local h r R pd="$PROFILE_SOURCE_DIR" dir p
   h="$(_bb_host "$1")"; r="$(_bb_repo "$1")"; R="$(_bb_swapcase "$r")"
@@ -99,6 +101,8 @@ boundary_targets() { # <target>
     "gh repositories/{id}/contents/" "gql $r" \
     "git https://$h/$r.git" "git https://$h/$r.wiki.git" "ssh ssh://git@$h/$r.git" \
     "url https://$h/$r/archive/HEAD.tar.gz" "url https://$h/$R/archive/HEAD.tar.gz" \
+    "url https://$h/$r/blob/HEAD/README.md" "url https://$h/$r/raw/HEAD/README.md" \
+    "url https://$h/login/oauth/authorize/%2e%2e/%2e%2e/%2e%2e/$r/blob/HEAD/README.md" \
     "url https://$h/$r.git/info/refs?service=git-upload-pack" \
     "url https://gitlab.com/" "url https://codeberg.org/"
   [ "$h" = github.com ] && printf '%s\n' "ssh ssh://git@ssh.github.com:443/$r.git" \

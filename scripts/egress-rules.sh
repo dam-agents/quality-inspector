@@ -21,10 +21,14 @@
 # A profile rule may name `{profile.<key>}` in its host or path — the instance's value of that
 # profile key (a sandbox account's organization or repository, docs/profile-contract.md →
 # `sandbox`). On a GitHub host (github.com, *.github.com, *.githubusercontent.com, the
-# target's host) a profile allow passes only on the API host and only as
-# /repos/<owner>/<repo>/<rest> — owner and repository literal [A-Za-z0-9.-], the owner never
-# the target's or the work backup's, <rest> not empty: a sandbox repository the nested product
-# writes to with a token scoped to it (docs/black-box.md → Sandbox accounts).
+# target's host) a profile allow passes only on the API host as /repos/<owner>/<repo>/<rest>,
+# <rest> not empty, or on the web host as one of git's four smart-HTTP requests to
+# /<owner>/<repo>[.git]/ with its own method (GET info/refs?service=git-upload-pack|
+# git-receive-pack, POST git-upload-pack|git-receive-pack) — owner and repository literal
+# [A-Za-z0-9.-], the owner never the target's or the work backup's: a sandbox repository the
+# nested product writes to with a token scoped to it — or, on the web host, one of the exact
+# requests of the OAuth sign-in a sandbox user connects GitHub through (_github_oauth below;
+# docs/black-box.md → Sandbox accounts).
 # The black-box gate (scripts/preflight.sh) and `verify-onboarding.sh --live` prove them.
 #
 #   egress-rules.sh [--kit] [--json]
@@ -81,13 +85,42 @@ _github_host() { # <host>
   esac
   return 1
 }
+# The OAuth sign-in through which a sandbox user connects GitHub to the nested product, on
+# the web host: the login form, the password, the two-factor (TOTP) page and its answer, the
+# authorize page and its consent, and the product's server-side code exchange — each one
+# exact path with its one method. Only the login form (its return_to) and the authorize page
+# take a query, and a query never changes the page GitHub serves; no path names an owner or
+# a repository, and a redirect to one meets the host's deny. '_' in access_token is a pattern
+# wildcard: it also opens /login/oauth/access?token, a page that does not exist.
+_github_oauth() { # <method> <path>
+  case "$1 $2" in
+    ('GET /login'|'GET /login?*'|'POST /session') return 0;;
+    ('GET /sessions/two-factor/app'|'POST /sessions/two-factor') return 0;;
+    ('GET /login/oauth/authorize?*'|'POST /login/oauth/authorize'|'POST /login/oauth/access_token') return 0;;
+  esac
+  return 1
+}
 # Why a profile allow on a GitHub host is refused; nothing when it is in the closed set.
 _github_refusal() { # <method> <host> <path>
-  local api o r rest lo
-  api="$(_bb_api_host "$(_bb_host "${T:-x/y}")")"
-  case "$2" in (api.github.com|"$api") ;; (*) echo "a GitHub host other than its API"; return;; esac
-  case "$3" in (/repos/*/*/?*) ;; (*) echo "not /repos/<owner>/<repo>/<rest>"; return;; esac
-  rest="${3#/repos/}"; o="${rest%%/*}"; rest="${rest#*/}"; r="${rest%%/*}"
+  local web api o r rest lo
+  web="$(_bb_host "${T:-x/y}")"; api="$(_bb_api_host "$web")"
+  case "$2" in
+    (api.github.com|"$api")
+      case "$3" in (/repos/*/*/?*) ;; (*) echo "not /repos/<owner>/<repo>/<rest>"; return;; esac
+      rest="${3#/repos/}";;
+    (github.com|"$web")
+      # The OAuth sign-in of a sandbox user: no owner, no repository, so nothing more to check.
+      _github_oauth "$1" "$3" && return 0
+      # git over smart HTTP: the four requests of a clone and a push, each with its own method.
+      rest="${3#/}"
+      case "${rest#*/*/}:$1" in
+        ('info/refs?service=git-upload-pack:GET'|'git-upload-pack:POST') ;;
+        ('info/refs?service=git-receive-pack:GET'|'git-receive-pack:POST') ;;
+        (*) echo "a GitHub host other than its API, but for git's /<owner>/<repo>.git requests and the OAuth sign-in"; return;;
+      esac;;
+    (*) echo "a GitHub host other than its API"; return;;
+  esac
+  o="${rest%%/*}"; rest="${rest#*/}"; r="${rest%%/*}"
   for lo in "$o" "$r"; do
     case "$lo" in (''|.|..|*[!A-Za-z0-9.-]*) echo "owner and repository must be literal [A-Za-z0-9.-] names"; return;; esac
   done

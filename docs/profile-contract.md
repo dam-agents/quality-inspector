@@ -201,7 +201,13 @@ company workspace.
   `bin/env init` never removes those lines. Names that are no secret (a repository) are
   `config` keys instead, so the egress can name them.
 - Egress — every host the nested product or the test person reaches, in `egress`, narrow:
-  the method and the path the flow needs. On a GitHub host, only the sandbox shapes.
+  the method and the path the flow needs. On a GitHub host, only the sandbox shapes: a
+  sandbox repository's API paths and git requests, and the OAuth sign-in's exact requests on
+  the web host, through which a sandbox user (login, password, TOTP secret as credentials)
+  connects GitHub to the nested product ([black-box.md](black-box.md) → **Sandbox accounts**).
+  The sign-in page is driven by a `suite/` helper that computes the TOTP code from the
+  secret, so a test never names `github.com`; the OAuth App the product uses is registered
+  in the sandbox organization, its callback on the nested product's `localhost` URL.
 - Install-time values — a service the product configures per install (a Slack app's tokens)
   takes them where the install is described: in an engine's values as
   `{{sandbox:<id>.<NAME>}}` inside an overlay `when: "@sandbox:<id>"`, on only while that

@@ -64,7 +64,8 @@ bash "$DEF/scripts/egress-rules.sh" | grep -qF '| prompt | allow | GET | `cdn.ex
 # instance's value; an unset or odd value refuses the rule; on a GitHub host only the
 # closed set passes — a literal owner/repo, never the target's or the backup's; a GitHub
 # App's endpoints are not in it. Under the kit's deny, an accepted one lands by hand.
-kit '  - host: api.github.com' '    pathPattern: "/*"' '    verdict: deny'
+kit '  - host: api.github.com' '    pathPattern: "/*"' '    verdict: deny' \
+    '  - host: github.com' '    pathPattern: "/*"' '    verdict: deny'
 cat > "$QI_PROFILE_DIR/profile.json" <<'J'
 {"schema":"qi-profile/v1","product":"Stub","app":{"url":"http://localhost:8080"},
  "config":{"sb_repo":{"default":""},"sb_odd":{"default":"a/../b"},"sb_target":{"default":"ACME/x"}},
@@ -76,6 +77,29 @@ cat > "$QI_PROFILE_DIR/profile.json" <<'J'
            {"host":"api.github.com","method":"POST","path":"/repos/*/qa/issues","why":"wildcard owner"},
            {"host":"api.github.com","method":"POST","path":"/repos/my_org/qa/issues","why":"underscore"},
            {"host":"api.github.com","method":"POST","path":"/repos/sb/qa","why":"no rest"},
+           {"host":"github.com","method":"GET","path":"/{profile.sb_repo}.git/info/refs?service=git-upload-pack","why":"clone"},
+           {"host":"github.com","method":"POST","path":"/{profile.sb_repo}.git/git-upload-pack","why":"clone"},
+           {"host":"github.com","method":"GET","path":"/{profile.sb_repo}/info/refs?service=git-receive-pack","why":"push, no .git"},
+           {"host":"github.com","method":"POST","path":"/{profile.sb_repo}.git/git-receive-pack","why":"push"},
+           {"host":"github.com","method":"POST","path":"/{profile.sb_repo}.git/info/refs?service=git-receive-pack","why":"wrong method"},
+           {"host":"github.com","method":"*","path":"/{profile.sb_repo}.git/git-receive-pack","why":"any method"},
+           {"host":"github.com","method":"GET","path":"/ACME/x.git/info/refs?service=git-upload-pack","why":"the target's owner"},
+           {"host":"github.com","method":"POST","path":"/sb/qa/x/git-upload-pack","why":"a third segment"},
+           {"host":"github.com","method":"POST","path":"/*/qa.git/git-upload-pack","why":"wildcard owner"},
+           {"host":"github.com","method":"GET","path":"/login?*","why":"oauth: the login form"},
+           {"host":"github.com","method":"POST","path":"/session","why":"oauth: the password"},
+           {"host":"github.com","method":"GET","path":"/sessions/two-factor/app","why":"oauth: the TOTP page"},
+           {"host":"github.com","method":"POST","path":"/sessions/two-factor","why":"oauth: the TOTP code"},
+           {"host":"github.com","method":"GET","path":"/login/oauth/authorize?*","why":"oauth: the authorize page"},
+           {"host":"github.com","method":"POST","path":"/login/oauth/authorize","why":"oauth: the consent"},
+           {"host":"github.com","method":"POST","path":"/login/oauth/access_token","why":"oauth: the code exchange"},
+           {"host":"github.com","method":"*","path":"/session","why":"oauth: any method"},
+           {"host":"github.com","method":"GET","path":"/login*","why":"oauth: a wildcard path"},
+           {"host":"github.com","method":"GET","path":"/login/oauth/*","why":"oauth: a wildcard tail"},
+           {"host":"github.com","method":"GET","path":"/sessions/*","why":"oauth: a wildcard tail"},
+           {"host":"github.com","method":"POST","path":"/login/oauth/authorize?*","why":"oauth: the consent with a query"},
+           {"host":"github.com","method":"GET","path":"/settings/applications","why":"oauth: a settings page"},
+           {"host":"api.github.com","method":"POST","path":"/login/oauth/access_token","why":"oauth: on the API host"},
            {"host":"github.com","method":"GET","path":"/sb/qa/*","why":"not the API"},
            {"host":"raw.githubusercontent.com","method":"GET","path":"/sb/qa/*","why":"raw"},
            {"host":"slack.com","method":"POST","path":"/api/*","why":"slack"}]}
@@ -90,6 +114,29 @@ refused POST api.github.com /repos/ACME/x/issues
 refused POST api.github.com /repos/*/qa/issues
 refused POST api.github.com /repos/my_org/qa/issues
 refused POST api.github.com /repos/sb/qa
+by-hand GET github.com /qa-sandbox/e2e-playground.git/info/refs?service=git-upload-pack
+by-hand POST github.com /qa-sandbox/e2e-playground.git/git-upload-pack
+by-hand GET github.com /qa-sandbox/e2e-playground/info/refs?service=git-receive-pack
+by-hand POST github.com /qa-sandbox/e2e-playground.git/git-receive-pack
+refused POST github.com /qa-sandbox/e2e-playground.git/info/refs?service=git-receive-pack
+refused * github.com /qa-sandbox/e2e-playground.git/git-receive-pack
+refused GET github.com /ACME/x.git/info/refs?service=git-upload-pack
+refused POST github.com /sb/qa/x/git-upload-pack
+refused POST github.com /*/qa.git/git-upload-pack
+by-hand GET github.com /login?*
+by-hand POST github.com /session
+by-hand GET github.com /sessions/two-factor/app
+by-hand POST github.com /sessions/two-factor
+by-hand GET github.com /login/oauth/authorize?*
+by-hand POST github.com /login/oauth/authorize
+by-hand POST github.com /login/oauth/access_token
+refused * github.com /session
+refused GET github.com /login*
+refused GET github.com /login/oauth/*
+refused GET github.com /sessions/*
+refused POST github.com /login/oauth/authorize?*
+refused GET github.com /settings/applications
+refused POST api.github.com /login/oauth/access_token
 refused GET github.com /sb/qa/*
 refused GET raw.githubusercontent.com /sb/qa/*
 prompt POST slack.com /api/*" "$sb"

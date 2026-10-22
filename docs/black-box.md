@@ -156,8 +156,33 @@ A GitHub App's endpoints (`/app/…`, `/installation/…`) are not in it. Anythi
 `*.githubusercontent.com` or the target's host is `refused` — a profile defect,
 `verify-onboarding.sh` fails on it. Each such allow is longer than the kit's denies, so it
 opens that sandbox repository and nothing beside it; the black-box probes, which request the
-target's surfaces, prove the rest unchanged. A shape a new product needs (an OAuth sign-in
-on `github.com`) joins this set in the kit, never in a profile.
+target's surfaces, prove the rest unchanged. A shape a new product needs joins this set in
+the kit, never in a profile.
+
+**The OAuth sign-in** is such a shape: a sandbox user (a GitHub account of its own, with a
+password and a TOTP secret) connects GitHub to the nested product through the real sign-in on
+the web host (`github.com`, or the target's GitHub Enterprise host). These requests pass, each
+with exactly this method and path — no other method, no wildcard but the query of the two
+`GET`s that take one:
+
+| method | path | step |
+| --- | --- | --- |
+| `GET` | `/login`, `/login?*` | the login form (its `return_to` in the query) |
+| `POST` | `/session` | the password |
+| `GET` | `/sessions/two-factor/app` | the TOTP page |
+| `POST` | `/sessions/two-factor` | the TOTP code |
+| `GET` | `/login/oauth/authorize?*` | the authorize page |
+| `POST` | `/login/oauth/authorize` | the consent |
+| `POST` | `/login/oauth/access_token` | the product's server-side code exchange |
+
+None names an owner or a repository, and a query never changes the page GitHub serves; the
+redirect after the sign-in to anything else (a repository page in `return_to`) meets the
+host's deny. `_` in `access_token` is a pattern wildcard and opens `/login/oauth/access?token`
+too, a page that does not exist — the stated limit. The probes request the target's web
+pages (`blob`, `raw`, and a `blob` behind an encoded dot segment out of the authorize page),
+which a browser signed in this way would render. The identity lookup after the exchange
+(`GET /user` on the API host) the kit already allows. A device-verification e-mail, a passkey
+or a GitHub App's installation pages are not in the set: the sandbox user signs in with a TOTP.
 
 The agent itself still requests nothing there: the policy hook's `github` rule holds, the
 nested product and the profile's own helpers make those requests, and a test reaches a
