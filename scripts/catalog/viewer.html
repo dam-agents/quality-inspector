@@ -127,6 +127,38 @@ td.nw{white-space:nowrap}
 .empty{padding:40px 0;text-align:center;color:var(--dim)}
 .close{float:right}
 .muted-t{color:var(--dim)}
+.asof{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--warnbg);color:var(--warn);border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin-bottom:12px;font-size:13px}
+.tabs select{border:1px solid var(--line);border-radius:6px;background:var(--bg);padding:2px 6px;margin:4px 6px;max-width:220px}
+.maplayout{display:grid;grid-template-columns:220px minmax(0,1fr) 320px;gap:16px;align-items:start}
+.pagelist{max-height:78vh;overflow:auto}
+.pagelist h4{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px}
+.pagelist button{display:flex;gap:6px;align-items:center;width:100%;background:none;border:0;border-radius:6px;padding:4px 6px;cursor:pointer;text-align:left}
+.pagelist button:hover{background:var(--card)}
+.pagelist button[aria-current=true]{background:var(--sel)}
+.pagelist .n{margin-left:auto;color:var(--dim);font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--bad)}
+.dot.regression{background:var(--ok)}.dot.exploratory{background:var(--warn)}
+.pagepick{display:none;margin-bottom:8px;max-width:100%}
+.stage{position:relative;width:100%;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+.stage img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
+.stage.wf{background:var(--card);background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:40px 40px}
+.hs{position:absolute;border:2px solid var(--muted);border-radius:3px;background:color-mix(in srgb,var(--muted) 14%,transparent);cursor:pointer;padding:0;overflow:hidden;min-width:6px;min-height:6px}
+.hs:hover,.hs.sel{outline:3px solid var(--link);outline-offset:1px;z-index:3}
+.hs.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 16%,transparent)}
+.hs.warn{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 18%,transparent)}
+.hs.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 20%,transparent)}
+.hs.none{border:1px dashed var(--dim);background:transparent}
+.stage.wf .hs{background:var(--bg)}
+.hs span{display:block;font-size:10px;line-height:1.2;padding:1px 3px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.legend-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12.5px;color:var(--dim);margin:8px 0}
+.sw{display:inline-block;width:14px;height:10px;border-radius:2px;border:2px solid var(--muted);vertical-align:middle;margin-right:4px}
+.sw.ok{border-color:var(--ok)}.sw.warn{border-color:var(--warn)}.sw.bad{border-color:var(--bad)}.sw.none{border:1px dashed var(--dim)}
+.cells{display:inline-flex;gap:2px;vertical-align:middle}
+.cells i{width:9px;height:12px;border-radius:2px;background:var(--mutedbg)}
+.cells i.ok{background:var(--ok)}.cells i.warn{background:var(--warn)}.cells i.bad{background:var(--bad)}.cells i.muted{background:var(--muted)}
+pre.diff{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px;max-height:50vh;overflow:auto}
+@media (max-width:1200px){.maplayout{grid-template-columns:200px minmax(0,1fr)}.maplayout .mapdetail{grid-column:1/-1}}
+@media (max-width:900px){.maplayout{grid-template-columns:minmax(0,1fr)}.pagelist{display:none}.pagepick{display:block}}
 @media (max-width:900px){.layout{grid-template-columns:minmax(0,1fr)}.side{display:none}.side.open{display:block}.filters-toggle{display:inline-block}.funnel .row{grid-template-columns:120px minmax(0,1fr) 44px}.dl{grid-template-columns:90px minmax(0,1fr)}}
 </style>
 </head>
@@ -135,7 +167,7 @@ td.nw{white-space:nowrap}
   <div class="title"><h1 id="h-title">Test catalog</h1><span class="meta" id="h-meta"></span></div>
   <nav class="tabs" role="tablist" aria-label="Views" id="tabs"></nav>
 </div></header>
-<main class="wrap" id="view" tabindex="-1"></main>
+<main class="wrap" id="view" tabindex="-1"><noscript><p class="empty">The catalog is drawn by JavaScript: open it where scripts run (the published artifact, or a browser), not in a static preview.</p></noscript></main>
 <script type="application/json" id="qi-catalog-data">__QI_CATALOG_DATA__</script>
 <script>
 'use strict';
@@ -191,7 +223,7 @@ const VAL = {
   verified: ['Verified', 'ok'], passed: ['Passed', 'ok'], unchanged: ['Unchanged', 'ok'], relearned: ['UI changed · steps re-learned', 'ok'], 'observed-ok': ['Observed OK', 'ok'],
   healed: ['UI changed · check repaired', 'warn'], 'needs-review': ['Needs review', 'warn'], flaky: ['Flaky', 'warn'], inconclusive: ['Inconclusive', 'warn'], partial: ['Partial', 'warn'], observation: ['Observation', 'warn'],
   failed: ['Failed', 'bad'], regression: ['Regression', 'bad'],
-  blocked: ['Blocked', 'muted'], superseded: ['Superseded by a change', 'muted'], 'not-testable': ['Not testable', 'muted'], drift: ['Drift — not run', 'muted'],
+  blocked: ['Blocked', 'muted'], environment: ['Environment failed — no results', 'muted'], superseded: ['Superseded by a change', 'muted'], 'not-testable': ['Not testable', 'muted'], drift: ['Drift — not run', 'muted'],
 };
 const vLabel = (v) => (own(VAL, v) ? VAL[v][0] : v ? str(v) : 'No verdict yet');
 const vClass = (v) => (own(VAL, v) ? VAL[v][1] : 'none');
@@ -200,40 +232,66 @@ const TIERS = ['regression', 'promotable', 'exploratory', 'quarantined', 'retire
 const tierRank = (t) => { const i = TIERS.indexOf(t); return i < 0 ? 9 : i; };
 const ATTN = new Set(['regression', 'failed', 'needs-review', 'flaky']);
 
-const items = arr(D.items).filter((x) => x && typeof x === 'object' && x.key).map((x) => {
+const ALL = arr(D.items).filter((x) => x && typeof x === 'object' && x.key).map((x) => {
   const o = x.origin && typeof x.origin === 'object' ? x.origin : {};
   const hist = arr(x.history).filter((e) => e && typeof e === 'object');
-  const verdict = x.verdict && typeof x.verdict === 'object' ? x.verdict : hist[hist.length - 1] || null;
   const it = {
-    ...x, origin: o, history: hist, verdict, steps: arr(x.steps).filter((e) => e && typeof e === 'object'),
-    heals: arr(x.heals), flaky: arr(x.flaky), pages: arr(x.pages).map(str), duration_ms: arr(x.duration_ms).filter(Number.isFinite),
+    ...x, origin: o, full: hist, verdict0: x.verdict && typeof x.verdict === 'object' ? x.verdict : hist[hist.length - 1] || null, steps: arr(x.steps).filter((e) => e && typeof e === 'object'),
+    healsAll: arr(x.heals), flakyAll: arr(x.flaky), pages: arr(x.pages).map(str), duration_ms: arr(x.duration_ms).filter(Number.isFinite),
     tier: x.tier || 'untracked', kind: x.kind === 'exploration' ? 'exploration' : 'criterion', checks: x.checks && typeof x.checks === 'object' ? x.checks : null,
   };
   it.ref = str(o.ref) || str(x.key).split('/')[0];
   it.label = `${it.ref} ${str(x.id)}`.trim();
-  it.latest = verdict ? str(verdict.value) : '';
-  it.cls = vClass(it.latest);
   it.dur = it.duration_ms.length ? it.duration_ms[it.duration_ms.length - 1] : null;
-  it.flags = [];
-  if (it.flaky.length || it.latest === 'flaky') it.flags.push('flaky');
-  if (it.heals.length) it.flags.push('healed');
-  if (x.drift) it.flags.push('drift');
-  if (it.tier === 'quarantined') it.flags.push('quarantined');
-  if (it.checks && it.checks.agent_asserts > 0) it.flags.push('agent.assert');
-  if (img(x.still)) it.flags.push('has still');
-  if (x.testable === false) it.flags.push('not testable');
-  if (ATTN.has(it.latest) || x.drift) it.flags.push('needs attention');
   it.text = [it.label, x.name, x.given, x.when, x.then, x.summary, o.title, x.file, x.area, ...it.steps.map((e) => e.text)].map(str).join(' \n ').toLowerCase();
   return it;
 });
-const byKey = new Map(items.map((i) => [i.key, i]));
+const byKey = new Map(ALL.map((i) => [i.key, i]));
+const builds = arr(D.builds).filter((b) => b && b.id).map((b) => ({ id: str(b.id), utc: str(b.utc) }));
+
+// "As of a build": every verdict, heal, flaky confirmation, flag and count as it stood when that
+// build was last run; an item without a verdict by then is left out. Files, tiers and steps stay today's.
+let items = ALL;
+let presentSet = new Set();
+let nightsAt = []; let runsAt = []; let buildsAt = builds; // the nights, runs and builds up to that build
+let derivedAt;
+function derive() {
+  const at = S.at ? builds.find((b) => b.id === S.at) : null;
+  if (S.at && !at) S.at = null;
+  if (derivedAt === S.at) return;
+  derivedAt = S.at;
+  const upto = at ? at.utc : null;
+  const then = (e) => !upto || (e && str(e.utc) <= upto);
+  items = [];
+  for (const it of ALL) {
+    it.history = it.full.filter(then);
+    it.heals = it.healsAll.filter(then);
+    it.flaky = it.flakyAll.filter(then);
+    it.verdict = upto ? it.history[it.history.length - 1] || null : it.verdict0;
+    it.latest = it.verdict ? str(it.verdict.value) : '';
+    it.cls = vClass(it.latest);
+    it.flags = [];
+    if (it.flaky.length || it.latest === 'flaky') it.flags.push('flaky');
+    if (it.heals.length) it.flags.push('healed');
+    if (it.drift) it.flags.push('drift');
+    if (it.tier === 'quarantined') it.flags.push('quarantined');
+    if (it.checks && it.checks.agent_asserts > 0) it.flags.push('agent.assert');
+    if (img(it.still)) it.flags.push('has still');
+    if (it.testable === false) it.flags.push('not testable');
+    if (ATTN.has(it.latest) || it.drift) it.flags.push('needs attention');
+    if (!upto || it.history.length) items.push(it);
+  }
+  presentSet = new Set(items.map((i) => i.key));
+  nightsAt = nights.filter(then); runsAt = runs.filter(then); buildsAt = builds.filter(then);
+}
+const present = (k) => presentSet.has(k);
 
 // Collections: "#42", "#42 AC-1", "S-7", "S-7 AC-1".
 const collections = arr(D.collections).filter((c) => c && c.name).map((c) => ({ name: str(c.name), members: arr(c.members).map(str) }));
 const memberOf = new Map();
 for (const c of collections) for (const m of c.members) {
   const [ref, id] = m.trim().split(/\s+/);
-  for (const i of items) if (i.ref === ref && (!id || str(i.id) === id)) (memberOf.get(i.key) || memberOf.set(i.key, []).get(i.key)).push(c.name);
+  for (const i of ALL) if (i.ref === ref && (!id || str(i.id) === id)) (memberOf.get(i.key) || memberOf.set(i.key, []).get(i.key)).push(c.name);
 }
 const colls = (i) => [...new Set(memberOf.get(i.key) || [])];
 
@@ -243,9 +301,22 @@ let pins = new Set();
 if (storageOK) try { pins = new Set(JSON.parse(localStorage.getItem(PIN_KEY) || '[]')); } catch { pins = new Set(); }
 const savePins = () => { try { localStorage.setItem(PIN_KEY, JSON.stringify([...pins])); } catch { /* ignore */ } };
 
-const builds = arr(D.builds).filter((b) => b && b.id).map((b) => ({ id: str(b.id), utc: str(b.utc) }));
 const nights = arr(D.nights).filter((n) => n && n.build).sort((a, b) => str(a.utc).localeCompare(str(b.utc)));
-const pagesData = arr(D.pages).filter((p) => p && p.pattern);
+const pagesData = arr(D.pages).filter((p) => p && p.pattern).map((p) => ({ ...p, pattern: str(p.pattern), items: arr(p.items).map(str),
+  hotspots: arr(p.hotspots).filter((x) => x && arr(x.box).length === 4 && arr(x.box).every((n) => Number.isFinite(+n))).map((x) => ({ ...x, name: str(x.name), kind: str(x.kind), box: x.box.map(Number), items: arr(x.items).map(str) })) }));
+const pageOf = (pat) => pagesData.find((p) => p.pattern === pat);
+
+// Runs: every night, issue run and scenario run — the way into each one's report.
+const RUNTYPE = { regression: 'Nightly regression', issue: 'Issue run', scenario: 'Scenario run' };
+const runs = arr(D.runs).filter((r) => r && typeof r === 'object' && r.utc && own(RUNTYPE, r.type)).map((r) => ({
+  ...r, type: str(r.type), ref: r.ref == null ? '' : str(r.ref), build: str(r.build), utc: str(r.utc), entries: arr(r.entries).filter((e) => e && e.key).map((e) => ({ key: str(e.key), value: str(e.value) })),
+  issues: arr(r.issues).filter((x) => x && x.number != null), counts: r.counts && typeof r.counts === 'object' ? r.counts : null, signals: r.signals && typeof r.signals === 'object' ? r.signals : null,
+  id: [r.type, r.ref, r.build, r.utc].map(str).join('~') }));
+const byRun = new Map(runs.map((r) => [r.id, r]));
+const nightOf = (build) => runs.find((r) => r.type === 'regression' && r.build === build && r.verdict !== 'environment') || runs.find((r) => r.type === 'regression' && r.build === build) || null;
+const runFor = (i, e) => (e.run === 'regression' ? nightOf(str(e.build))
+  : runs.find((r) => r.type !== 'regression' && r.ref === i.ref && r.build === str(e.build) && str(r.utc) === str(e.utc)) || runs.find((r) => r.type !== 'regression' && r.ref === i.ref && r.build === str(e.build)) || null);
+const originTitle = (ref) => { const i = ALL.find((x) => x.ref === ref); return i ? str(i.origin.title) : ''; };
 
 // ------------------------------------------------------------------ facets
 const FACETS = [
@@ -266,7 +337,7 @@ const FACETS = [
 const FACET = Object.fromEntries(FACETS.map((f) => [f.id, f]));
 
 // ------------------------------------------------------------------- state
-const VIEWS = [['overview', 'Overview'], ['catalog', 'Catalog'], ['gallery', 'Gallery'], ['coverage', 'Coverage'], ['history', 'History'], ['lifecycle', 'Lifecycle']];
+const VIEWS = [['overview', 'Overview'], ['runs', 'Runs'], ['map', 'Product map'], ['catalog', 'Catalog'], ['gallery', 'Gallery'], ['coverage', 'Coverage'], ['history', 'History'], ['lifecycle', 'Lifecycle']];
 const COLS = {
   ref: ['Origin', (i) => i.ref, (a, b) => (a.origin.kind || '').localeCompare(b.origin.kind || '') || num(a.ref) - num(b.ref)],
   id: ['ID', (i) => str(i.id), (a, b) => str(a.id).localeCompare(str(b.id)) || num(a.id) - num(b.id)],
@@ -290,9 +361,9 @@ const QUICK = [
   ['Nightly regression', { tier: ['regression'] }], ['Needs attention', { flag: ['needs attention'] }], ['Promotable queue', { tier: ['promotable'] }],
   ['Flaky & healed', { flag: ['flaky', 'healed'] }], ['Costly (agent.assert)', { flag: ['agent.assert'] }], ['Explorations', { kind: ['exploration'] }], ['Scenarios', { origin: ['scenario'] }],
 ];
-const S = { v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS.slice(), i: null, hall: false, hsort: 'recent', limit: 100, side: false };
+const S = { v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS.slice(), i: null, r: null, at: null, pg: null, hs: null, rt: 'all', all: false, hall: false, hsort: 'recent', limit: 100, side: false };
 
-const DEFAULTS = JSON.stringify({ v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS, i: null });
+const DEFAULTS = JSON.stringify({ v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS, i: null, r: null, at: null, pg: null, hs: null, rt: 'all' });
 function readHash() {
   let p;
   try { p = new URLSearchParams(location.hash.slice(1)); } catch { return; }
@@ -306,6 +377,11 @@ function readHash() {
   if (p.get('l') === 'cards') S.l = 'cards';
   if (p.get('c')) { const c = p.get('c').split(',').filter((k) => own(COLS, k)); if (c.length) S.cols = c; }
   S.i = p.get('i') && byKey.has(p.get('i')) ? p.get('i') : null;
+  S.r = !S.i && p.get('r') && byRun.has(p.get('r')) ? p.get('r') : null;
+  S.at = p.get('at') && builds.some((b) => b.id === p.get('at')) ? p.get('at') : null;
+  S.pg = p.get('pg') && pageOf(p.get('pg')) ? p.get('pg') : null;
+  S.hs = S.pg && /^\d+$/.test(p.get('hs') || '') && +p.get('hs') < pageOf(S.pg).hotspots.length ? +p.get('hs') : null;
+  if (own(RUNTYPE, p.get('rt'))) S.rt = p.get('rt');
 }
 function writeHash() {
   const p = new URLSearchParams();
@@ -318,6 +394,11 @@ function writeHash() {
   if (S.l !== 'table') p.set('l', S.l);
   if (S.cols.join(',') !== DEFAULT_COLS.join(',')) p.set('c', S.cols.join(','));
   if (S.i) p.set('i', S.i);
+  if (S.r) p.set('r', S.r);
+  if (S.at) p.set('at', S.at);
+  if (S.pg) p.set('pg', S.pg);
+  if (S.hs != null) p.set('hs', String(S.hs));
+  if (S.rt !== 'all') p.set('rt', S.rt);
   try { history.replaceState(null, '', `#${p.toString()}`); } catch { /* sandboxed: state stays in memory */ }
 }
 
@@ -361,7 +442,11 @@ function minibar(list, cls = 'minibar') {
 }
 const star = (i) => (storageOK ? h('button', { class: `star${pins.has(i.key) ? ' on' : ''}`, type: 'button', 'aria-pressed': pins.has(i.key) ? 'true' : 'false', title: 'Pin (this browser only)', 'aria-label': `Pin ${i.label}`,
   onclick: (e) => { e.stopPropagation(); pins.has(i.key) ? pins.delete(i.key) : pins.add(i.key); savePins(); render(); } }, pins.has(i.key) ? '★' : '☆') : null);
-const openItem = (key) => { S.i = key; writeHash(); renderDrawer(); };
+const openItem = (key) => { S.i = key; S.r = null; writeHash(); renderDrawer(); };
+const openRun = (r) => { if (!r) return; S.r = r.id; S.i = null; writeHash(); renderDrawer(); };
+const go = (patch) => { Object.assign(S, { i: null, r: null, limit: 100 }, patch); writeHash(); render(); renderDrawer(); };
+const cells = (hist, n = 12) => h('span', { class: 'cells', 'aria-hidden': true }, hist.slice(-n).map((e) => h('i', { class: vClass(e.value), title: `${fmtDate(e.utc)} ${str(e.build)}: ${vLabel(e.value)}` })));
+const artLink = (ref) => (/^https:\/\/\S+$/.test(str(ref)) ? h('a', { href: str(ref), target: '_blank', rel: 'noopener noreferrer' }, 'open the report') : ref ? h('code', {}, str(ref)) : '–');
 const commands = (i) => {
   const out = [];
   if (i.kind === 'exploration') return out;
@@ -381,7 +466,10 @@ function renderHeader() {
   meta.append([str(D.target), str(a.display_name), a.version ? `v${a.version}` : '', D.generated_utc ? `generated ${rel(D.generated_utc)} (${str(D.generated_utc)})` : ''].filter(Boolean).join(' · '));
   const tabs = $('#tabs'); tabs.textContent = '';
   for (const [k, label] of VIEWS) tabs.append(h('button', { role: 'tab', type: 'button', 'aria-selected': S.v === k ? 'true' : 'false', onclick: () => { S.v = k; S.limit = 100; writeHash(); render(); } }, label));
-  tabs.append(h('span', { class: 'sp' }), h('button', { type: 'button', onclick: toggleLegend, 'aria-expanded': $('#legend') ? 'true' : 'false' }, 'Legend'));
+  tabs.append(h('span', { class: 'sp' }),
+    builds.length ? h('select', { 'aria-label': 'Show the state as of a build', onchange: (e) => go({ at: e.target.value || null }) },
+      h('option', { value: '' }, 'As of: now'), builds.slice().reverse().map((b) => h('option', { value: b.id, selected: S.at === b.id ? true : null }, `As of ${fmtDate(b.utc)} · ${b.id}`))) : null,
+    h('button', { type: 'button', onclick: toggleLegend, 'aria-expanded': $('#legend') ? 'true' : 'false' }, 'Legend'));
 }
 function toggleLegend() {
   const old = $('#legend'); if (old) { old.remove(); renderHeader(); return; }
@@ -421,7 +509,9 @@ function nightsChart(list, w = 460, hgt = 150) {
     for (const [key, color] of KEYS) {
       const v = +((n.counts || {})[key]) || 0; if (!v) continue;
       const hh = (v * (hgt - 30)) / max; y0 -= hh;
-      svg.append(s('rect', { x: 26 + k * bw, y: y0, width: Math.max(1, bw - 2), height: hh, fill: color, opacity: key === 'relearned' ? 0.6 : 1 }, s('title', {}, `${str(n.build)} · ${key}: ${v}`)));
+      const r = s('rect', { x: 26 + k * bw, y: y0, width: Math.max(1, bw - 2), height: hh, fill: color, opacity: key === 'relearned' ? 0.6 : 1, style: 'cursor:pointer' }, s('title', {}, `${str(n.build)} · ${key}: ${v} — open the night`));
+      r.addEventListener('click', () => openRun(nightOf(str(n.build))));
+      svg.append(r);
     }
   });
   svg.append(s('text', { x: 2, y: 12 }, String(max)), s('line', { x1: 26, x2: w, y1: hgt - 18, y2: hgt - 18, stroke: 'var(--line)' }));
@@ -434,27 +524,30 @@ function viewOverview() {
   const t = (x) => items.filter((i) => i.tier === x).length;
   const origins = new Set(items.map((i) => `${i.origin.kind}:${i.ref}`));
   const cov = pagesData.filter((p) => p.covered === 'regression').length;
-  const last = nights[nights.length - 1];
+  const last = nightsAt[nightsAt.length - 1];
   const lastTxt = last ? (last.counts && +last.counts.regression ? `${last.counts.regression} regression(s)` : 'no regression') : 'no night yet';
   v.append(h('div', { class: 'grid-kpi' },
     [['Regression tier', t('regression'), { tier: ['regression'] }], ['Promotable', t('promotable'), { tier: ['promotable'] }], ['Exploratory', t('exploratory'), { tier: ['exploratory'] }],
       ['Retired · quarantined', t('retired') + t('quarantined'), { tier: ['retired', 'quarantined'] }],
       ['Criteria · explorations', `${items.filter((i) => i.kind === 'criterion').length} · ${items.filter((i) => i.kind === 'exploration').length}`, null],
       ['Issues · scenarios', `${[...origins].filter((o) => o.startsWith('issue')).length} · ${[...origins].filter((o) => o.startsWith('scenario')).length}`, null],
-      ['Pages covered', pagesData.length ? `${cov} / ${pagesData.length}` : '–', null], ['Last night', lastTxt, last ? null : null],
+      ['Pages covered', pagesData.length ? `${cov} / ${pagesData.length}` : '–', null], ['Last night', lastTxt, last ? () => openRun(nightOf(str(last.build))) : null],
       ['Flaky', items.filter((i) => i.flags.includes('flaky')).length, { flag: ['flaky'] }], ['Drift', items.filter((i) => i.flags.includes('drift')).length, { flag: ['drift'] }]]
       .map(([label, val, f]) => h(f ? 'button' : 'div', { class: 'kpi', type: f ? 'button' : null, style: f ? 'text-align:left;cursor:pointer' : null,
-        onclick: f ? () => { S.f = JSON.parse(JSON.stringify(f)); S.v = 'catalog'; writeHash(); render(); } : null }, h('b', {}, String(val)), h('span', {}, label)))));
+        onclick: typeof f === 'function' ? f : f ? () => { S.f = JSON.parse(JSON.stringify(f)); S.v = 'catalog'; writeHash(); render(); } : null }, h('b', {}, String(val)), h('span', {}, label)))));
   const att = items.filter((i) => i.flags.includes('needs attention')).sort((a, b) => SEV[a.cls] - SEV[b.cls] || str(b.verdict && b.verdict.utc).localeCompare(str(a.verdict && a.verdict.utc)));
-  const labels = builds.map((b) => fmtDate(b.utc) || b.id);
-  const all = builds.map((b) => items.filter((i) => i.file && i.history.length && str(i.history[0].utc) <= b.utc).length);
-  const reg = builds.map((b) => items.filter((i) => i.promoted_utc && str(i.promoted_utc) <= b.utc && i.tier === 'regression').length);
+  const labels = buildsAt.map((b) => fmtDate(b.utc) || b.id);
+  const all = buildsAt.map((b) => items.filter((i) => i.file && i.history.length && str(i.history[0].utc) <= b.utc).length);
+  const reg = buildsAt.map((b) => items.filter((i) => i.promoted_utc && str(i.promoted_utc) <= b.utc && i.tier === 'regression').length);
   const dist = {}; for (const i of items) dist[i.latest || 'none'] = (dist[i.latest || 'none'] || 0) + 1;
   v.append(h('div', { class: 'panels' },
     h('section', { class: 'panel' }, h('h2', {}, `Needs attention (${att.length})`), att.length ? h('ul', { class: 'att' }, att.slice(0, 14).map((i) => h('li', {}, badge(i.latest || (i.flags.includes('drift') ? 'drift' : '')), ' ',
       h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key) }, `${i.label} — ${str(i.name)}`)))) : h('p', { class: 'muted-t' }, 'Nothing needs attention.')),
-    h('section', { class: 'panel' }, h('h2', {}, 'Suite size over builds'), builds.length ? lineChart([{ name: 'tests', color: 'var(--link)', values: all }, { name: 'regression tier', color: 'var(--ok)', values: reg }], labels) : h('p', { class: 'muted-t' }, 'No builds yet.')),
-    h('section', { class: 'panel' }, h('h2', {}, `Nightly outcomes (${Math.min(30, nights.length)} nights)`), nights.length ? nightsChart(nights.slice(-30)) : h('p', { class: 'muted-t' }, 'The nightly regression has not run yet.')),
+    h('section', { class: 'panel' }, h('h2', {}, 'Suite size over builds'), buildsAt.length ? lineChart([{ name: 'tests', color: 'var(--link)', values: all }, { name: 'regression tier', color: 'var(--ok)', values: reg }], labels) : h('p', { class: 'muted-t' }, 'No builds yet.')),
+    h('section', { class: 'panel' }, h('h2', {}, 'Latest runs'), runsAt.length ? [h('ul', { class: 'att' }, runsAt.slice(0, 8).map((r) => h('li', {}, badge(r.verdict), ' ',
+      h('button', { class: 'linkish', type: 'button', onclick: () => openRun(r) }, `${fmtDate(r.utc)} · ${runName(r)}`)))),
+      h('button', { class: 'linkish', type: 'button', onclick: () => go({ v: 'runs' }) }, `All ${runs.length} runs →`)] : h('p', { class: 'muted-t' }, 'No run yet.')),
+    h('section', { class: 'panel' }, h('h2', {}, `Nightly outcomes (${Math.min(30, nightsAt.length)} nights)`), nightsAt.length ? nightsChart(nightsAt.slice(-30)) : h('p', { class: 'muted-t' }, 'The nightly regression has not run yet.')),
     h('section', { class: 'panel' }, h('h2', {}, 'Latest verdicts'), h('ul', { class: 'att' }, Object.entries(dist).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
       h('li', {}, h('button', { class: 'linkish', type: 'button', onclick: () => { S.f = { verdict: [k] }; S.v = 'catalog'; writeHash(); render(); } }, badge(k === 'none' ? '' : k)), ` ${n}`))))));
 }
@@ -569,9 +662,9 @@ function viewCoverage() {
     v.append(h('section', { class: 'navgroup' }, h('h3', {}, str(nav), h('span', { class: 'bar', title: `regression ${c.regression} · exploratory ${c.exploratory} · none ${c.none}` },
       ['regression', 'exploratory', 'none'].map((k, n) => (c[k] ? h('i', { class: ['ok', 'warn', 'bad'][n], style: `width:${(100 * c[k]) / ps.length}%` }) : null))), h('span', { class: 'count' }, `${ps.length} pages`)),
     h('div', { class: 'pages' }, ps.map((p) => {
-      const src = img(p.shot); const its = arr(p.items).filter((k) => byKey.has(k));
-      return h('div', { class: `page cov-${p.covered in c ? p.covered : 'none'}`, role: 'button', tabindex: 0, title: 'Show the items that reach this page',
-        onclick: () => { S.f = { page: [str(p.pattern)] }; S.v = 'catalog'; writeHash(); render(); }, onkeydown: (e) => { if (e.key === 'Enter') { S.f = { page: [str(p.pattern)] }; S.v = 'catalog'; writeHash(); render(); } } },
+      const src = img(p.shot); const its = arr(p.items).filter(present);
+      return h('div', { class: `page cov-${p.covered in c ? p.covered : 'none'}`, role: 'button', tabindex: 0, title: 'Show this page on the product map',
+        onclick: () => go({ v: 'map', pg: p.pattern, hs: null }), onkeydown: (e) => { if (e.key === 'Enter') go({ v: 'map', pg: p.pattern, hs: null }); } },
       src ? h('img', { src, alt: str(p.title), loading: 'lazy' }) : null, h('b', {}, str(p.title) || str(p.pattern)), h('code', {}, str(p.pattern)),
       h('div', {}, h('span', { class: `badge ${{ regression: 'ok', exploratory: 'warn' }[p.covered] || 'bad'}` }, p.covered === 'regression' ? 'regression' : p.covered === 'exploratory' ? 'exploratory only' : 'not covered'),
         ' ', h('span', { class: 'count' }, `${its.length} item(s)`), p.golden_path === false ? h('span', { class: 'badge warn', style: 'margin-left:6px' }, 'no golden path') : null));
@@ -594,7 +687,7 @@ function viewHistory() {
     h('span', { class: 'count' }, `${list.length} rows × ${cols.length} builds${Object.values(S.f).some((x) => x.length) || S.q ? ' (catalog filters apply)' : ''}`)));
   if (!list.length || !cols.length) { v.append(h('div', { class: 'empty' }, 'No history yet.')); return; }
   const shown = list.slice(0, S.limit);
-  v.append(h('div', { class: 'heat' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', { style: 'writing-mode:horizontal-tb;transform:none;left:0;z-index:2' }, ''), cols.map((b) => h('th', { title: `${b.id} · ${b.utc}` }, `${fmtDate(b.utc)} ${b.id}`.trim())))),
+  v.append(h('div', { class: 'heat' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', { style: 'writing-mode:horizontal-tb;transform:none;left:0;z-index:2' }, ''), cols.map((b) => h('th', { title: `${b.id} · ${b.utc}${nightOf(b.id) ? ' — open the night' : ''}`, style: nightOf(b.id) ? 'cursor:pointer' : null, onclick: () => openRun(nightOf(b.id)) }, `${fmtDate(b.utc)} ${b.id}`.trim())))),
     h('tbody', {}, shown.map((i) => {
       const at = new Map(); for (const e of i.history) at.set(str(e.build), e);
       return h('tr', {}, h('td', { class: 'rowh', title: str(i.name), onclick: () => openItem(i.key) }, `${i.label} ${str(i.name)}`),
@@ -633,10 +726,14 @@ function sparkline(vals, w = 220, hh = 36) {
 }
 let lastFocus = null;
 function renderDrawer() {
+  const had = !!$('#drawer');
   for (const e of ['#drawer', '#scrim']) { const n = $(e); if (n) n.remove(); }
+  derive();
   const i = S.i && byKey.get(S.i);
-  if (!i) { if (lastFocus && lastFocus.isConnected) lastFocus.focus(); return; }
-  if (!$('#drawer')) lastFocus = document.activeElement;
+  const run = !i && S.r && byRun.get(S.r);
+  if (!i && !run) { if (lastFocus && lastFocus.isConnected) lastFocus.focus(); return; }
+  if (!had) lastFocus = document.activeElement;
+  if (run) { runDrawer(run); return; }
   const close = () => { S.i = null; writeHash(); renderDrawer(); };
   const o = i.origin;
   let link = null;
@@ -662,10 +759,16 @@ function renderDrawer() {
       h('dt', {}, 'Promoted'), h('dd', {}, i.promoted_utc ? fmtDate(i.promoted_utc) : '–'),
       h('dt', {}, 'Checks'), h('dd', {}, i.checks ? `${i.checks.expects ?? 0} expect · ${i.checks.agent_asserts ?? 0} agent.assert` : '–', i.checks && i.checks.agent_asserts ? h('div', { class: 'meta' }, 'agent.assert calls the model on every run — it costs tokens every night.') : null),
       h('dt', {}, 'Duration'), h('dd', {}, sparkline(i.duration_ms) || '–'),
-      h('dt', {}, 'Evidence'), h('dd', {}, i.evidence ? h('code', {}, str(i.evidence)) : '–'),
+      h('dt', {}, 'Evidence'), h('dd', {}, artLink(i.evidence)),
       h('dt', {}, 'Collections'), h('dd', {}, colls(i).join(', ') || '–')),
     i.steps.length ? h('section', { class: 'sec' }, h('h3', {}, 'Steps'), h('ol', { class: 'steps' }, i.steps.map((st) => h('li', { 'data-k': { open: '↗', act: '▶', assert: '?', expect: '=', shot: '◉' }[st.kind] || '•', class: st.kind }, h('span', { class: 'meta' }, `${str(st.kind)} `), stepText(st.text))))) : null,
-    h('section', { class: 'sec' }, h('h3', {}, `History (${i.history.length})`), i.history.length ? h('div', { class: 'hist' }, i.history.map((e) => h('span', { class: vClass(e.value), title: `${str(e.build)} · ${str(e.run)} · ${vLabel(e.value)} · ${str(e.utc)}` }, `${fmtDate(e.utc)} ${vLabel(e.value)}`))) : h('p', { class: 'muted-t' }, 'Not run yet.')),
+    h('section', { class: 'sec' }, h('h3', {}, `History (${i.history.length})${S.at ? ` up to ${S.at}` : ''}`), i.history.length ? h('div', { class: 'hist' }, i.history.map((e) => {
+      const r = runFor(i, e); const t = `${str(e.build)} · ${str(e.run)} · ${vLabel(e.value)} · ${str(e.utc)}`;
+      return r ? h('button', { class: `badge ${vClass(e.value)}`, type: 'button', style: 'border:0;cursor:pointer;font-weight:400', title: `${t} — open the run`, onclick: () => openRun(r) }, `${fmtDate(e.utc)} ${vLabel(e.value)}`)
+        : h('span', { class: vClass(e.value), title: t }, `${fmtDate(e.utc)} ${vLabel(e.value)}`);
+    })) : h('p', { class: 'muted-t' }, 'Not run yet.')),
+    onMap(i).length ? h('section', { class: 'sec' }, h('h3', {}, 'On the product map'), h('ul', { class: 'att' }, onMap(i).map(([p, k]) => h('li', {},
+      h('button', { class: 'linkish', type: 'button', onclick: () => go({ v: 'map', pg: p.pattern, hs: k }) }, k == null ? `${str(p.title) || p.pattern} — the page` : `${str(p.title) || p.pattern} — ${KIND[p.hotspots[k].kind] || 'control'} "${p.hotspots[k].name}"`))))) : null,
     i.heals.length ? h('section', { class: 'sec' }, h('h3', {}, 'Repaired checks'), h('ul', {}, i.heals.map((x) => h('li', {}, `${fmtDate(x.utc)} on ${str(x.build)} — basis: ${str(x.basis)}`)))) : null,
     i.flaky.length ? h('section', { class: 'sec' }, h('h3', {}, 'Flaky confirmations'), h('ul', {}, i.flaky.map((x) => h('li', {}, `${fmtDate(x.utc)} on ${str(x.build)} — ${x.passes ?? '?'} of ${x.runs ?? '?'} runs passed`)))) : null,
     commands(i).length ? h('section', { class: 'sec' }, h('h3', {}, 'Commands for the agent\'s direct session'), commands(i).map((c) => h('div', { style: 'margin:4px 0' }, copyBox(c)))) : null,
@@ -674,12 +777,146 @@ function renderDrawer() {
   d.focus();
 }
 
+// -------------------------------------------------------------------- runs
+const runName = (r) => (r.type === 'regression' ? `${RUNTYPE.regression} · ${r.build}` : `${RUNTYPE[r.type]} ${r.ref} · ${r.build}`);
+const COUNT_KEYS = ['regression', 'needs-review', 'flaky', 'healed', 'relearned', 'superseded', 'blocked', 'drift', 'unchanged'];
+function outcome(r) {
+  if (r.counts) return COUNT_KEYS.filter((k) => +r.counts[k] > 0).map((k) => `${+r.counts[k]} ${vLabel(k).toLowerCase()}`).join(' · ') || 'nothing replayed';
+  const c = {}; for (const e of r.entries) c[e.value] = (c[e.value] || 0) + 1;
+  return Object.entries(c).map(([k, n]) => `${n} ${vLabel(k).toLowerCase()}`).join(' · ');
+}
+function viewRuns() {
+  const v = $('#view');
+  if (!runs.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No runs yet.'), h('p', {}, 'Issue runs, scenario runs and every nightly regression appear here, each with its report.'))); return; }
+  const list = runs.filter((r) => S.rt === 'all' || r.type === S.rt);
+  v.append(h('div', { class: 'chips' }, [['all', 'All runs'], ...Object.entries(RUNTYPE)].map(([k, l]) => {
+    const n = k === 'all' ? runs.length : runs.filter((r) => r.type === k).length;
+    return h('button', { class: `chip${S.rt === k ? ' on' : ''}`, type: 'button', 'aria-pressed': S.rt === k ? 'true' : 'false', onclick: () => go({ rt: k }) }, `${l} (${n})`);
+  })));
+  const shown = list.slice(0, S.limit);
+  v.append(h('div', { class: 'tablewrap' }, h('table', { class: 'list' },
+    h('thead', {}, h('tr', {}, ['Date', 'Run', 'Build', 'Result', 'Outcome', 'Report'].map((c) => h('th', { scope: 'col', style: 'cursor:default' }, c)))),
+    h('tbody', {}, shown.map((r) => h('tr', { tabindex: 0, onclick: () => openRun(r), onkeydown: (e) => { if (e.key === 'Enter') openRun(r); } },
+      h('td', { class: 'nw', title: r.utc }, `${fmtDate(r.utc)} ${r.utc.slice(11, 16)}`),
+      h('td', { class: 'name' }, h('div', {}, r.type === 'regression' ? RUNTYPE.regression : `${RUNTYPE[r.type]} ${r.ref}`), r.type !== 'regression' && originTitle(r.ref) ? h('div', { class: 'meta' }, originTitle(r.ref)) : null),
+      h('td', { class: 'nw' }, h('code', {}, r.build), r.baseline ? h('div', { class: 'meta' }, `vs ${str(r.baseline)}`) : r.previous ? h('div', { class: 'meta' }, `since ${str(r.previous)}`) : null),
+      h('td', {}, badge(r.verdict)), h('td', {}, outcome(r)),
+      h('td', { onclick: (e) => e.stopPropagation() }, artLink(r.report))))))));
+  if (list.length > S.limit) v.append(h('div', { class: 'more-row' }, h('button', { class: 'btn', type: 'button', onclick: () => { S.limit += 100; render(); } }, `Show more (${list.length - S.limit} left)`)));
+}
+function runDrawer(r) {
+  const close = () => { S.r = null; writeHash(); renderDrawer(); };
+  const tpl = str(D.issue_url);
+  const issueLink = (n, text) => (tpl.startsWith('https://') && tpl.includes('{n}') && Number.isInteger(n) ? h('a', { href: tpl.replace('{n}', String(n)), target: '_blank', rel: 'noopener noreferrer' }, text) : text);
+  const night = r.type === 'regression';
+  const ents = r.entries.slice().sort((a, b) => SEV[vClass(a.value)] - SEV[vClass(b.value)]);
+  const hasBuild = builds.some((b) => b.id === r.build);
+  const d = h('div', { id: 'drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${runName(r)} details`, tabindex: -1, onkeydown: (e) => { if (e.key === 'Escape') close(); } },
+    h('button', { class: 'btn close', type: 'button', onclick: close }, 'Close'),
+    h('div', { class: 'meta' }, `${RUNTYPE[r.type]} · ${r.utc}`),
+    h('h2', {}, night ? `Night of ${fmtDate(r.utc)} · ${r.build}` : `${r.ref} · ${r.build}`),
+    !night && originTitle(r.ref) ? h('div', {}, originTitle(r.ref)) : null,
+    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' }, badge(r.verdict)),
+    h('dl', { class: 'dl' },
+      h('dt', {}, 'Build'), h('dd', {}, h('code', {}, r.build)),
+      night ? [h('dt', {}, 'Since'), h('dd', {}, r.previous ? h('code', {}, str(r.previous)) : 'the first night')] : [h('dt', {}, 'Baseline'), h('dd', {}, r.baseline ? h('code', {}, str(r.baseline)) : '–')],
+      r.window ? [h('dt', {}, 'Window'), h('dd', {}, typeof r.window === 'object' ? Object.values(r.window).map(str).join(' → ') : str(r.window))] : null,
+      h('dt', {}, 'Report'), h('dd', {}, artLink(r.report)), h('dt', {}, 'Outcome'), h('dd', {}, outcome(r) || '–')),
+    hasBuild ? h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
+      h('button', { class: 'btn', type: 'button', onclick: () => go({ at: r.build, v: 'catalog' }) }, 'Catalog as of this build'),
+      h('button', { class: 'btn', type: 'button', onclick: () => go({ at: r.build, v: 'map' }) }, 'Product map as of this build')) : null,
+    r.verdict === 'environment' ? h('p', { class: 'muted-t' }, 'The product did not come up on this build: nothing was replayed, and no test has a result from this night.') : null,
+    h('section', { class: 'sec' }, h('h3', {}, night ? `Results that were not unchanged (${ents.length})` : `Verdicts (${ents.length})`),
+      ents.length ? h('ul', { class: 'att' }, ents.map((e) => { const i = byKey.get(e.key); return h('li', {}, badge(e.value), ' ',
+        i ? h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key) }, `${i.label} — ${str(i.name)}`) : h('code', {}, e.key)); })) : null,
+      night && r.verdict !== 'environment' ? h('p', { class: 'muted-t' }, 'Every other regression-tier test that night: unchanged (drifted ones are not run).') : null),
+    r.signals && Object.values(r.signals).some((n) => +n > 0) ? h('section', { class: 'sec' }, h('h3', {}, 'Signals no test covers'), h('ul', {}, Object.entries(r.signals).filter(([, n]) => +n > 0).map(([k, n]) => h('li', {}, `${k.replace(/_/g, ' ')}: ${+n}`)))) : null,
+    r.issues.length ? h('section', { class: 'sec' }, h('h3', {}, `Completed issues in the window (${r.issues.length})`), h('ul', { class: 'att' }, r.issues.map((x) => h('li', {}, issueLink(+x.number, `#${str(x.number)}`), ' ', str(x.title))))) : null,
+    r.ui_diff ? h('section', { class: 'sec' }, h('h3', {}, 'What moved in the UI'), h('pre', { class: 'diff' }, str(r.ui_diff))) : null);
+  document.body.append(h('div', { id: 'scrim', onclick: close }), d);
+  d.focus();
+}
+
+// --------------------------------------------------------------------- map
+const KIND = { nav: 'Navigation item', headings: 'Heading', tabs: 'Tab', buttons: 'Button', inputs: 'Field', links: 'Link' };
+const hsItems = (x) => x.items.filter(present).map((k) => byKey.get(k));
+const hsState = (its) => (!its.length ? 'none' : ['bad', 'warn', 'ok', 'muted'].find((c) => its.some((i) => i.cls === c)) || 'muted');
+function onMap(i) {
+  const out = [];
+  for (const p of pagesData) {
+    const ks = p.hotspots.map((x, k) => (x.items.includes(i.key) ? k : -1)).filter((k) => k >= 0);
+    if (ks.length) for (const k of ks.slice(0, 3)) out.push([p, k]); else if (p.items.includes(i.key)) out.push([p, null]);
+  }
+  return out.slice(0, 12);
+}
+function itemRow(i) {
+  return h('li', { style: 'margin:6px 0' }, badge(i.latest), ' ', h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key) }, `${i.label} — ${str(i.name)}`),
+    ' ', tierB(i.tier), i.history.length ? h('div', {}, cells(i.history)) : null);
+}
+function viewMap() {
+  const v = $('#view');
+  if (!pagesData.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No UI map yet.'), h('p', {}, 'The product map appears after the first nightly regression run walks the product.'))); return; }
+  const p = pageOf(S.pg) || pageOf('/') || pagesData[0];
+  const groups = new Map(); for (const x of pagesData) { const k = str(x.nav) || '(other)'; (groups.get(k) || groups.set(k, []).get(k)).push(x); }
+  const tested = (x) => x.hotspots.filter((y) => hsItems(y).length).length;
+  const pick = (x) => go({ v: 'map', pg: x.pattern, hs: null });
+  const list = h('nav', { class: 'pagelist', 'aria-label': 'Pages' }, [...groups].sort((a, b) => a[0].localeCompare(b[0])).map(([g, ps]) => [h('h4', {}, g),
+    ps.map((x) => h('button', { type: 'button', 'aria-current': x === p ? 'true' : null, onclick: () => pick(x), title: x.pattern },
+      h('span', { class: `dot ${str(x.covered)}` }), h('span', {}, str(x.title) || x.pattern), h('span', { class: 'n' }, x.hotspots.length ? `${tested(x)}/${x.hotspots.length}` : '')))]));
+  const sel = h('select', { class: 'pagepick', 'aria-label': 'Page', onchange: (e) => pick(pageOf(e.target.value)) },
+    pagesData.map((x) => h('option', { value: x.pattern, selected: x === p ? true : null }, `${str(x.title) || x.pattern} — ${x.pattern}`)));
+
+  const src = img(p.shot);
+  const vp = arr(p.viewport).map(Number);
+  const ratio = vp.length === 2 && vp[0] > 0 && vp[1] > 0 ? vp[0] / vp[1] : 1.6;
+  const showAll = S.all || !src;
+  const stage = h('div', { class: `stage${src ? '' : ' wf'}`, style: `aspect-ratio:${ratio}` }, src ? h('img', { src, alt: `Screenshot of ${str(p.title) || p.pattern}` }) : null);
+  const order = p.hotspots.map((x, k) => k).sort((a, b) => p.hotspots[b].box[2] * p.hotspots[b].box[3] - p.hotspots[a].box[2] * p.hotspots[a].box[3]);
+  for (const k of order) {
+    const x = p.hotspots[k]; const its = hsItems(x); const st = hsState(its);
+    if (!its.length && !showAll && S.hs !== k) continue;
+    const [bx, by, bw, bh] = x.box.map((n) => Math.max(0, Math.min(1, n)) * 100);
+    const what = `${KIND[x.kind] || 'Control'} "${x.name}"`;
+    stage.append(h('button', { class: `hs ${st}${S.hs === k ? ' sel' : ''}`, type: 'button', style: `left:${bx}%;top:${by}%;width:${bw}%;height:${bh}%`,
+      title: `${what} — ${its.length ? `${its.length} test(s), ${vLabel(its.find((i) => i.cls === st)?.latest || '')}` : 'no test names it'}`,
+      'aria-label': `${what}: ${its.length} test(s)`, 'aria-pressed': S.hs === k ? 'true' : 'false', onclick: () => go({ hs: S.hs === k ? null : k }) },
+    src ? null : h('span', {}, x.name)));
+  }
+  const pageItems = p.items.filter(present).map((k) => byKey.get(k)).sort((a, b) => SEV[a.cls] - SEV[b.cls]);
+  const named = p.hotspots.filter((x) => hsItems(x).length).length;
+  const head = h('div', {},
+    h('div', { style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:baseline' }, h('h2', { style: 'font-size:16px;margin:0' }, str(p.title) || p.pattern), h('code', {}, p.pattern),
+      h('span', { class: `badge ${{ regression: 'ok', exploratory: 'warn' }[p.covered] || 'bad'}` }, p.covered === 'regression' ? 'regression' : p.covered === 'exploratory' ? 'exploratory only' : 'not covered')),
+    h('div', { class: 'legend-row' },
+      p.hotspots.length ? h('span', {}, `${named} of ${p.hotspots.length} controls named by a test`) : h('span', {}, 'This UI map has no control positions yet — they appear after the next nightly run.'),
+      h('span', {}, h('i', { class: 'sw bad' }), 'regression / failed'), h('span', {}, h('i', { class: 'sw warn' }), 'needs a look'), h('span', {}, h('i', { class: 'sw ok' }), 'passing'), h('span', {}, h('i', { class: 'sw' }), 'blocked / no verdict'),
+      src && p.hotspots.length ? h('label', {}, h('input', { type: 'checkbox', checked: S.all ? true : null, onchange: () => { S.all = !S.all; render(); } }), ' ', h('i', { class: 'sw none' }), 'show controls no test names') : null));
+  if (!src && !p.hotspots.length) stage.append(h('div', { class: 'ph', style: 'position:absolute;inset:0;border:0' }, 'No screenshot and no control positions for this page.'));
+  const x = S.hs != null ? p.hotspots[S.hs] : null;
+  const its = x ? hsItems(x) : [];
+  const detail = h('section', { class: 'panel mapdetail' },
+    x ? [h('div', { class: 'meta' }, KIND[x.kind] || 'Control'), h('h3', {}, `"${x.name}"`),
+      x.to ? h('p', { class: 'meta' }, `Leads to ${x.to}: the tests that reach that page.`, pageOf(x.to) ? [' ', h('button', { class: 'linkish', type: 'button', onclick: () => go({ pg: x.to, hs: null }) }, 'Open it on the map →')] : null) : null,
+      its.length ? h('ul', { class: 'att' }, its.map(itemRow)) : h('p', { class: 'muted-t' }, x.to ? 'No test reaches that page.' : 'No test names this control.'),
+      h('button', { class: 'linkish', type: 'button', onclick: () => go({ hs: null }) }, '← the whole page')]
+      : [h('h3', {}, `Tests that reach this page (${pageItems.length})`), pageItems.length ? h('ul', { class: 'att' }, pageItems.map(itemRow)) : h('p', { class: 'muted-t' }, 'No test reaches this page.'),
+        h('p', { class: 'meta' }, src || p.hotspots.length ? 'Click a highlighted control to see the tests that name it.' : '')]);
+  v.append(h('div', { class: 'maplayout' }, list, h('div', { style: 'min-width:0' }, sel, head, stage), detail));
+}
+
 // ------------------------------------------------------------------ render
 function render(keepSearchFocus) {
   const pos = keepSearchFocus && document.activeElement && document.activeElement.type === 'search' ? document.activeElement.selectionStart : null;
+  derive();
   renderHeader();
   const v = $('#view'); v.textContent = '';
-  ({ overview: viewOverview, catalog: () => viewList(false), gallery: () => viewList(true), coverage: viewCoverage, history: viewHistory, lifecycle: viewLifecycle }[S.v] || viewOverview)();
+  if (S.at) {
+    const b = builds.find((x) => x.id === S.at);
+    v.append(h('div', { class: 'asof', role: 'status' }, h('b', {}, `As of build ${S.at}`), ` (${fmtDate(b && b.utc)}): verdicts and counts as they stood then; files, tiers and steps are today's.`,
+      nightOf(S.at) ? h('button', { class: 'btn', type: 'button', onclick: () => openRun(nightOf(S.at)) }, 'That night') : null,
+      h('button', { class: 'btn', type: 'button', onclick: () => go({ at: null }) }, 'Back to now')));
+  }
+  ({ overview: viewOverview, runs: viewRuns, map: viewMap, catalog: () => viewList(false), gallery: () => viewList(true), coverage: viewCoverage, history: viewHistory, lifecycle: viewLifecycle }[S.v] || viewOverview)();
   if (pos != null) { const q = $('input[type=search]'); if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch { /* ignore */ } } }
 }
 readHash();

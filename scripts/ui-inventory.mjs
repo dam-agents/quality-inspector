@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // ui-inventory.mjs — a read-only map of the nested product's UI for one build: every
 // reachable page pattern with its headings, navigation, buttons, tabs, form fields and
-// links, plus an accessibility snapshot and a screenshot, and the page's signals: console
+// links, where each sits in the screenshot (`boxes`, for the catalog's product map), plus an
+// accessibility snapshot and a screenshot, and the page's signals: console
 // errors, failed same-origin requests and load timing. Two maps diff into what was added,
 // removed, renamed or moved, and which signals are new (ui-diff.mjs). Rationale:
 // docs/change-awareness.md.
@@ -116,8 +117,28 @@ const extract = () => {
   const pick = (sel, f = name) => [...document.querySelectorAll(sel)].filter((e) => vis(e) && !inData(e)).map(f).filter(Boolean);
   const label = (e) => clean((e.id && document.querySelector(`label[for="${CSS.escape(e.id)}"]`)?.innerText) || e.getAttribute('aria-label') || e.getAttribute('placeholder') || e.getAttribute('name'));
   const uniq = (a) => [...new Set(a)];
+  // Where each named control sits in the screenshot (the viewport), for the catalog's product
+  // map: [kind, name, x, y, w, h] in CSS pixels, clipped to the viewport; off-screen ones left out.
+  const W = innerWidth, H = innerHeight;
+  const boxes = [];
+  const box = (k, sel, f = name, data = true) => {
+    for (const e of document.querySelectorAll(sel)) {
+      if (boxes.length >= 200 || !vis(e) || (data && inData(e))) continue;
+      const n = f(e); const r = e.getBoundingClientRect();
+      const x = Math.max(0, r.left), y = Math.max(0, r.top), x2 = Math.min(W, r.right), y2 = Math.min(H, r.bottom);
+      if (n && x2 - x >= 4 && y2 - y >= 4) boxes.push([k, n, Math.round(x), Math.round(y), Math.round(x2 - x), Math.round(y2 - y)]);
+    }
+  };
+  box('nav', 'nav a,[role=navigation] a,aside a', name, false);
+  box('headings', 'h1,h2,h3,[role=heading]');
+  box('tabs', '[role=tab]');
+  box('buttons', 'button,[role=button],input[type=submit]');
+  box('inputs', 'input:not([type=hidden]):not([type=submit]),textarea,select,[role=combobox],[role=switch],[role=checkbox]', label);
+  box('links', 'a[href]:not(nav a):not([role=navigation] a):not(aside a)');
   return {
     title: document.title,
+    viewport: [W, H],
+    boxes: boxes.filter((b, i) => boxes.findIndex((o) => o[1] === b[1] && o[2] === b[2] && o[3] === b[3]) === i),
     headings: uniq(pick('h1,h2,h3,[role=heading]')),
     nav: uniq([...document.querySelectorAll('nav a,[role=navigation] a,aside a')].filter(vis).map(name).filter(Boolean)),
     buttons: uniq(pick('button,[role=button],input[type=submit]')),

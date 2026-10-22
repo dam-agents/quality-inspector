@@ -145,8 +145,10 @@ One more artifact shows the whole suite: every criterion, exploration and scenar
 its Given/When/Then, steps, tier, verdict history per build, heals, flakiness and the still of
 the screen it checks — filterable, sortable and groupable by tier, origin, verdict, area, page,
 label or the operator's own collections, with a gallery, a coverage map of the UI, a
-build-by-test heatmap and the promotion funnel. It holds test-related content only, so the
-operator may share it ([docs/catalog.md](docs/catalog.md)).
+build-by-test heatmap and the promotion funnel. It is also the way into every run — each night,
+issue run and scenario run with its outcome and report — and a product map: the UI map's page
+shots with each control clickable to the tests that use it, viewable as of any past build. It
+holds test-related content only, so the operator may share it ([docs/catalog.md](docs/catalog.md)).
 
 ## When the UI changes
 
