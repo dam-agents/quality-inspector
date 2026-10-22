@@ -148,7 +148,8 @@ A profile's sandbox accounts ([profile-contract.md](profile-contract.md) → `sa
 throwaway accounts the nested product connects to — a GitHub organization of its own, a
 Slack workspace. Their egress is the profile's, landed by the operator, and on a GitHub host
 `egress-rules.sh` passes a profile allow only in a closed set: on the API host
-`/repos/<owner>/<repo>/<rest>`, `<rest>` not empty; on the web host git's four smart-HTTP
+`/repos/<owner>/<repo>/<rest>` (`/api/v3/repos/…` on a GitHub Enterprise Server, one host
+for both), `<rest>` not empty; on the web host git's four smart-HTTP
 requests to `/<owner>/<repo>[.git]/`, each with its own method (`GET
 info/refs?service=git-upload-pack` and `…=git-receive-pack`, `POST git-upload-pack` and
 `git-receive-pack`); owner and repository literal `[A-Za-z0-9.-]` (no `*`; `_` is a pattern

@@ -21,8 +21,9 @@
 # A profile rule may name `{profile.<key>}` in its host or path — the instance's value of that
 # profile key (a sandbox account's organization or repository, docs/profile-contract.md →
 # `sandbox`). On a GitHub host (github.com, *.github.com, *.githubusercontent.com, the
-# target's host) a profile allow passes only on the API host as /repos/<owner>/<repo>/<rest>,
-# <rest> not empty, or on the web host as one of git's four smart-HTTP requests to
+# target's host) a profile allow passes only on the API host as /repos/<owner>/<repo>/<rest>
+# (/api/v3/repos/… on a GitHub Enterprise Server, one host for both), <rest> not empty, or
+# on the web host as one of git's four smart-HTTP requests to
 # /<owner>/<repo>[.git]/ with its own method (GET info/refs?service=git-upload-pack|
 # git-receive-pack, POST git-upload-pack|git-receive-pack) — owner and repository literal
 # [A-Za-z0-9.-], the owner never the target's or the work backup's: a sandbox repository the
@@ -102,24 +103,32 @@ _github_oauth() { # <method> <path>
 }
 # Why a profile allow on a GitHub host is refused; nothing when it is in the closed set.
 _github_refusal() { # <method> <host> <path>
-  local web api o r rest lo
+  local web api pre="" is_api=0 is_web=0 o r rest="" lo
   web="$(_bb_host "${T:-x/y}")"; api="$(_bb_api_host "$web")"
-  case "$2" in
-    (api.github.com|"$api")
-      case "$3" in (/repos/*/*/?*) ;; (*) echo "not /repos/<owner>/<repo>/<rest>"; return;; esac
-      rest="${3#/repos/}";;
-    (github.com|"$web")
-      # The OAuth sign-in of a sandbox user: no owner, no repository, so nothing more to check.
-      _github_oauth "$1" "$3" && return 0
-      # git over smart HTTP: the four requests of a clone and a push, each with its own method.
-      rest="${3#/}"
-      case "${rest#*/*/}:$1" in
-        ('info/refs?service=git-upload-pack:GET'|'git-upload-pack:POST') ;;
-        ('info/refs?service=git-receive-pack:GET'|'git-receive-pack:POST') ;;
-        (*) echo "a GitHub host other than its API, but for git's /<owner>/<repo>.git requests and the OAuth sign-in"; return;;
-      esac;;
-    (*) echo "a GitHub host other than its API"; return;;
-  esac
+  # A GitHub Enterprise Server is one host for both: its API under /api/v3, its pages beside it.
+  case "$2" in (api.github.com) is_api=1;; (github.com) is_web=1;; esac
+  [ "$2" = "$api" ] && { is_api=1; pre="$(_bb_api_prefix "$web")"; }
+  [ "$2" = "$web" ] && is_web=1
+  [ "$is_api$is_web" = 00 ] && { echo "a GitHub host other than its API"; return; }
+  if [ "$is_api" = 1 ]; then
+    case "$3" in ("$pre"/repos/*/*/?*) rest="${3#"$pre"/repos/}";; esac
+  fi
+  if [ -z "$rest" ] && [ "$is_web" = 1 ]; then
+    # The OAuth sign-in of a sandbox user: no owner, no repository, so nothing more to check.
+    _github_oauth "$1" "$3" && return 0
+    # git over smart HTTP: the four requests of a clone and a push, each with its own method.
+    rest="${3#/}"
+    case "${rest#*/*/}:$1" in
+      ('info/refs?service=git-upload-pack:GET'|'git-upload-pack:POST') ;;
+      ('info/refs?service=git-receive-pack:GET'|'git-receive-pack:POST') ;;
+      (*) rest="";;
+    esac
+  fi
+  if [ -z "$rest" ]; then
+    if [ "$is_web" = 1 ]; then echo "a GitHub host other than its API, but for git's /<owner>/<repo>.git requests and the OAuth sign-in"
+    else echo "not $pre/repos/<owner>/<repo>/<rest>"; fi
+    return
+  fi
   o="${rest%%/*}"; rest="${rest#*/}"; r="${rest%%/*}"
   for lo in "$o" "$r"; do
     case "$lo" in (''|.|..|*[!A-Za-z0-9.-]*) echo "owner and repository must be literal [A-Za-z0-9.-] names"; return;; esac

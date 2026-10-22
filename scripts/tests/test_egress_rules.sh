@@ -149,6 +149,27 @@ assert_eq "the work backup's owner is refused" "refused" \
   "$(bash "$DEF/scripts/egress-rules.sh" --json | jq -r '[.rules[] | select(.source == "profile" and .method == "POST" and (.path | endswith("/issues")))][0].how')"
 sed -i.bak '/^- profile.sb_repo:/d; /^- work_repo:/d' "$WORK_DIR/CONFIG.md"
 
+# A GitHub Enterprise Server target is one host for the API (under /api/v3) and the pages:
+# each shape passes there as on github.com, and the API shape only under its prefix.
+cat > "$QI_PROFILE_DIR/profile.json" <<'J'
+{"schema":"qi-profile/v1","product":"Stub","app":{"url":"http://localhost:8080"},
+ "egress":[{"host":"ghe.acme.io","method":"GET","path":"/login?*","why":"oauth"},
+           {"host":"ghe.acme.io","method":"POST","path":"/session","why":"oauth"},
+           {"host":"ghe.acme.io","method":"POST","path":"/sb/qa.git/git-upload-pack","why":"git"},
+           {"host":"ghe.acme.io","method":"POST","path":"/api/v3/repos/sb/qa/issues","why":"api"},
+           {"host":"ghe.acme.io","method":"POST","path":"/repos/sb/qa/issues","why":"api without its prefix"},
+           {"host":"ghe.acme.io","method":"GET","path":"/sb/qa/blob/HEAD/x","why":"a page"},
+           {"host":"ghe.acme.io","method":"POST","path":"/api/v3/repos/acme/x/issues","why":"the target's owner"}]}
+J
+ghes="$(QI_TARGET_REPO=ghe.acme.io/acme/widgets bash "$DEF/scripts/egress-rules.sh" --json | jq -r '.rules[] | select(.source == "profile") | "\(.how == "refused") \(.method) \(.path)"')"
+assert_eq "GHES: the sandbox shapes on the one host" "false GET /login?*
+false POST /session
+false POST /sb/qa.git/git-upload-pack
+false POST /api/v3/repos/sb/qa/issues
+true POST /repos/sb/qa/issues
+true GET /sb/qa/blob/HEAD/x
+true POST /api/v3/repos/acme/x/issues" "$ghes"
+
 # verify-onboarding.sh --egress: one GET per profile rule; a held request is a warning, a
 # refused connection a FAIL naming the rule to add by hand, a 403 a warning (the gateway or
 # the host itself), any other answer a pass; wildcard hosts and odd host names are skipped.
