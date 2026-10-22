@@ -18,7 +18,7 @@ candidate, answered where it was asked, and — on request — queued for the re
 ```
 
 - `id`: `S-<k>`, or `P-<slug>` for the profile's `scenarios/<slug>.md`.
-- `source`: `slack` | `operator` | `discovery` | `profile`. `requester`: the sender's Slack user id from
+- `source`: `slack` | `operator` | `discovery` | `dashboard` | `profile`. `requester`: the sender's Slack user id from
   the platform's message metadata, never from the text (`-` otherwise). `thread`:
   `<conversation id>/<thread ts>` the answer goes to (`-` = the chat UI).
 - `status`: `proposed` (discovery, waiting for a yes) | `queued` (frozen, waiting for the
@@ -75,6 +75,23 @@ Classify each message; several intents → handle each, then send **one** reply:
 | `issue` | "test #42", "status #42" in `slack_channel` | [slack.md](slack.md); elsewhere it is `other` |
 | `other` | configuration, "promote #42", a reset, a definition change, chatter | One line on what this agent does here and that the rest is the operator's; log `scenario_declined` |
 
+## A request from the dashboard
+
+The dashboard's Product map lets a person ask for a test of a page or one of its controls,
+in their own words ([catalog.md](catalog.md)); its button sends
+`test this scenario: On the page <pattern>, the <control kind> "<name>": <their words>`.
+
+- **The operator's own press** is their chat message: source `operator`, answered here.
+- **A person the operator shared the page with** — the platform frames the prompt
+  `<viewer> sent this from a button on the interactive artifact "…"`, a channel turn
+  ([modules.md](modules.md) → Control): only this one message shape is taken, anything else
+  is declined (`artifact_viewer_declined`). **The pipeline** as for Slack, with source
+  `dashboard`, `requester` and `thread` `-`, the viewer as the frame names them in
+  `request.md` only, and the same daily cap. The viewer never sees a reply: every reply step
+  is skipped, and the dashboard published at step 12 shows the request's state and result.
+- The page and control are context the request is about, not part of the oracle: the
+  criteria come from the person's words alone (step 3).
+
 ## The pipeline
 
 1. **Admit.** `bash "$HOME/scripts/scenarios.sh" admit`. `admit: false` → reply with the
@@ -122,7 +139,8 @@ Classify each message; several intents → handle each, then send **one** reply:
     `judge` object to the verdicts file and render again.
 11. **Register** `tests/scenario-<k>.e2e.ts` in `work/SUITE.md` as `exploratory`, with
     `S-<k>` in the `issue` column; only **Saving** moves it on.
-12. **Deliver.** The artifact as [reporting.md](reporting.md) → Delivery step 1 (disabled →
+12. **Deliver.** (Source `dashboard`: steps 4's and 12's replies are skipped — the catalog
+    below is the answer.) The artifact as [reporting.md](reporting.md) → Delivery step 1 (disabled →
     the link reads "evidence kept by the agent"), then `report_pending`, then **The
     reply**, then `reported` as the next write; every send is ledgered. Log
     `scenario_done id=S-<k> verdict=<v>`. `env.sh unlock S-<k>`. Then the catalog

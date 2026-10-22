@@ -27,6 +27,8 @@ The operator may share the page beyond themselves, so it carries only what conce
   `boxes`, [change-awareness.md](change-awareness.md) → The three sources) with the items that
   name it in a quoted string — on that page only, or in a test that opens the page; a navigation
   item stands for the items that reach the page it leads to.
+- **Requests:** the scenarios still queued, running, awaiting delivery or rejected — id,
+  source, state, the frozen title; never the request's words.
 - **Control center:** every module's state, settings, schedule and last run (`modules.sh
   status`), the focus queue and the areas; the design findings register with each finding's crop
   ([ui-sweep.md](ui-sweep.md)); the newest validation results and stress checks; of the newest
