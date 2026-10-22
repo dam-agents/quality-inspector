@@ -253,7 +253,8 @@ file → keep its values, show them once, and ask only for the keys it lacks. As
    `C…` id; empty keeps the digest in chat). When the profile has a `scenarios/` directory,
    say that the nightly regression run adopts and replays them (`profile_scenarios`,
    default `enabled`), and with a channel connected ask `regression_channel` for the
-   nightly summary (empty keeps it in chat).
+   nightly summary and a black-box breach alert (empty: the alert goes to `slack_channel`, the
+   summary stays in chat).
 9. **`e2e_model`** — `bash "$HOME/scripts/verify-onboarding.sh" --models` probes the configured
    model and the ones the connection lists: keep the configured one when it answers, else offer
    those that do and write the operator's pick. None answers → checklist item 7 (the

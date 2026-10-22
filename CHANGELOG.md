@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.6.0 — 2026-10-22
+## 3.7.0 — 2026-10-22
 
 **Upgrade:**
 1. Create the schedule `quality-inspector-modules-nightly` from `kit.yaml` if
@@ -23,6 +23,21 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    artifacts in the platform; then the operator's "module global set dashboard_interactive=enabled"
    — the next catalog publish creates a new, interactive artifact ([docs/catalog.md](docs/catalog.md)
    → Build and publish); the operator deletes the old one.
+
+## 3.6.0 — 2026-10-22
+
+**Upgrade:**
+1. Nothing to run: the new version re-runs the black-box probes on the next run
+   ([docs/black-box.md](docs/black-box.md) → The gate). They now also go through `git
+   ls-remote` (HTTPS and SSH) and a GraphQL query for the target's tree, and an answer from
+   GitHub itself fails whatever its status. A new `boundary_breach` is reported as before;
+   a new `warn boundary:ssh:…` (an SSH server answers) goes to the operator as an
+   **operator-only** request to the platform to block SSH to code hosts.
+2. The gate now also runs `scripts/hooks/install.sh --check` once a day: when it fails, run
+   `bash "$HOME/scripts/hooks/install.sh"` in the direct session (ONBOARDING.md Step 2e).
+3. A breach is also posted to `regression_channel`, else `slack_channel`, when one is set
+   ([docs/black-box.md](docs/black-box.md) → The gate). With neither set, offer the operator
+   `regression_channel` — the offer, never the setting.
 
 ## 3.5.0 — 2026-10-22
 

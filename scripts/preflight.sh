@@ -646,15 +646,16 @@ mode_slack() {
 }
 
 # ======================================================== BLACK-BOX GATE ====
-# docs/black-box.md → The gate: the boundary probes, once a day and after a definition or
-# target change, cached in work/env/boundary.json. A probe that reaches a source surface
-# stops every mode but the audit — no product is tested while the egress would let the
-# code through. The run that first finds a breach (or a different one) wakes the agent to
-# report it (`boundary_breach`); later ones decline until the probes pass, except a Slack
-# turn, where a person waits for the answer.
+# docs/black-box.md → The gate: the boundary probes and the policy hook's registration, once
+# a day and after a definition or target change, cached in work/env/boundary.json. A probe
+# that reaches a source surface, or a hook that no longer holds, stops every mode but the
+# audit — no product is tested while the egress would let the code through or the harness
+# would let the agent try. The run that first finds a breach (or a different one) wakes the
+# agent to report it (`boundary_breach`, and `channel` for the Slack alert); later ones
+# decline until the probes pass, except a Slack turn, where a person waits for the answer.
 BOUNDARY_TTL_S=86400
 boundary_gate() {
-  local f="$WORK/env/boundary.json" v fails prev="" reported=false
+  local f="$WORK/env/boundary.json" v fails prev="" reported=false ph ch key
   [ -n "$TARGET" ] || return 0
   v="$(head -1 "$SCRIPT_DIR/../VERSION" 2>/dev/null)"
   if jq -e --arg v "$v" --arg t "$TARGET" --argjson now "$NOW_EPOCH" --argjson ttl "$BOUNDARY_TTL_S" \
@@ -662,16 +663,23 @@ boundary_gate() {
     fails="$(jq -c '.fails // []' "$f")"; reported=true
   else
     prev="$(jq -c '.fails // []' "$f" 2>/dev/null)"
-    fails="$(boundary_probe "$TARGET" 2>/dev/null | sed -n 's/^fail //p' | jq -R . | jq -sc '[.[] | select(length > 0)]')"
+    fails="$( { boundary_probe "$TARGET" 2>/dev/null | sed -n 's/^fail //p'
+                ph="$(bash "$SCRIPT_DIR/hooks/install.sh" --check 2>&1)" \
+                  || printf 'policy_hook %s — bash "$HOME/scripts/hooks/install.sh" (ONBOARDING.md Step 2e), then start a new session\n' "$(printf '%s' "$ph" | head -1)"
+              } | jq -R . | jq -sc '[.[] | select(length > 0)]')"
     mkdir -p "$WORK/env" && jq -nc --arg v "$v" --arg t "$TARGET" --arg at "$NOW_ISO" --argjson e "$NOW_EPOCH" --argjson f "$fails" \
       '{version:$v, target:$t, checked_utc:$at, checked_epoch:$e, fails:$f}' > "$f.tmp" && mv "$f.tmp" "$f"
     [ "$prev" = "$fails" ] && reported=true
   fi
   [ "$fails" = '[]' ] && return 0
   [ "$MODE" = slack ] && reported=false
-  log "black-box gate: $(jq length <<<"$fails") source surface(s) reachable — no product is tested until the probes pass (work/env/boundary.json)"
-  jq -nc --arg mode "$MODE" --argjson r "$reported" --argjson f "$fails" --argjson logs "$(logs_json)" \
-    '{mode:$mode, nothing_to_do:$r, boundary_breach:$f, logs:$logs}'
+  log "black-box gate: $(jq length <<<"$fails") breach(es) — no product is tested until the probes pass (work/env/boundary.json)"
+  # The alert's conversation: the nightly summary's, else the one that orders tests; a Slack
+  # turn answers its own thread instead.
+  ch="$(cfg regression_channel)"; [ -n "$ch" ] || ch="$(cfg slack_channel)"; [ "$MODE" = slack ] && ch=""
+  key="breach@$(printf '%s' "$fails" | { sha256sum 2>/dev/null || shasum -a 256; } | cut -c1-12)"
+  jq -nc --arg mode "$MODE" --argjson r "$reported" --argjson f "$fails" --arg ch "$ch" --arg k "$key" --argjson logs "$(logs_json)" \
+    '{mode:$mode, nothing_to_do:$r, boundary_breach:$f, channel:(if $ch == "" then null else $ch end), key:$k, logs:$logs}'
   return 1
 }
 

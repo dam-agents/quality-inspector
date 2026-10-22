@@ -112,4 +112,19 @@ rm -f "$STUB_DIR/repo-acme_widgets_contents_.json"
 jq '.checked_epoch = 0' "$WORK_DIR/env/boundary.json" > "$SANDBOX/b" && mv "$SANDBOX/b" "$WORK_DIR/env/boundary.json"
 out="$(bash "$SCRIPTS/preflight.sh" issues)"
 assert "a passing probe clears the gate" '(has("boundary_breach") | not) and .mode == "issues"' "$out"
+
+# The policy hook is part of the gate: a settings file without it is a breach; the alert goes
+# to regression_channel, else slack_channel, never from a Slack turn.
+jq '.hooks.PreToolUse = []' "$QI_CLAUDE_SETTINGS" > "$SANDBOX/s" && cp "$QI_CLAUDE_SETTINGS" "$SANDBOX/settings.full" && mv "$SANDBOX/s" "$QI_CLAUDE_SETTINGS"
+printf -- '- slack_channel: C0SLACK01\n' >> "$WORK_DIR/CONFIG.md"
+jq '.checked_epoch = 0' "$WORK_DIR/env/boundary.json" > "$SANDBOX/b" && mv "$SANDBOX/b" "$WORK_DIR/env/boundary.json"
+out="$(bash "$SCRIPTS/preflight.sh" issues)"
+assert "a missing policy hook stops the run" '.nothing_to_do == false and .boundary_breach == ["policy_hook policy hook not registered — bash \"$HOME/scripts/hooks/install.sh\" (ONBOARDING.md Step 2e), then start a new session"]
+  and .channel == "C0SLACK01" and (.key | test("^breach@[0-9a-f]{12}$"))' "$out"
+printf -- '- regression_channel: C0NIGHT01\n' >> "$WORK_DIR/CONFIG.md"
+assert "regression_channel wins" '.channel == "C0NIGHT01"' "$(bash "$SCRIPTS/preflight.sh" regression)"
+assert "a Slack turn alerts no channel" '.channel == null and (.boundary_breach | length) == 1' "$(bash "$SCRIPTS/preflight.sh" slack)"
+mv "$SANDBOX/settings.full" "$QI_CLAUDE_SETTINGS"
+jq '.checked_epoch = 0' "$WORK_DIR/env/boundary.json" > "$SANDBOX/b" && mv "$SANDBOX/b" "$WORK_DIR/env/boundary.json"
+assert "the hook back clears the gate" '(has("boundary_breach") | not)' "$(bash "$SCRIPTS/preflight.sh" issues)"
 exit $FAILED
