@@ -147,12 +147,16 @@ approval on the operator's Home — approve nothing on the deny side; a held pro
 A profile's sandbox accounts ([profile-contract.md](profile-contract.md) → `sandbox`) are
 throwaway accounts the nested product connects to — a GitHub organization of its own, a
 Slack workspace. Their egress is the profile's, landed by the operator, and on a GitHub host
-`egress-rules.sh` passes a profile allow only in a closed set, on the API host alone:
-`/repos/<owner>/<repo>/<rest>` with owner and repository literal `[A-Za-z0-9.-]` (no `*`;
-`_` is a pattern wildcard, so a sandbox name never holds one), the owner never the target's
-or the work backup's, `<rest>` not empty — a repository the nested product writes to with a
-token scoped to it (a fine-grained token; `GET /user`, its identity, the kit already allows).
-A GitHub App's endpoints (`/app/…`, `/installation/…`) are not in it. Anything else on `github.com`, `*.github.com`,
+`egress-rules.sh` passes a profile allow only in a closed set: on the API host
+`/repos/<owner>/<repo>/<rest>`, `<rest>` not empty; on the web host git's four smart-HTTP
+requests to `/<owner>/<repo>[.git]/`, each with its own method (`GET
+info/refs?service=git-upload-pack` and `…=git-receive-pack`, `POST git-upload-pack` and
+`git-receive-pack`); owner and repository literal `[A-Za-z0-9.-]` (no `*`; `_` is a pattern
+wildcard, so a sandbox name never holds one), the owner never the target's or the work
+backup's — a repository the nested product clones and writes to with a token scoped to it
+(a fine-grained token; `GET /user`, its identity, the kit already allows). Besides those, the
+OAuth sign-in below. A GitHub App's endpoints (`/app/…`, `/installation/…`) are not in it.
+Anything else on `github.com`, `*.github.com`,
 `*.githubusercontent.com` or the target's host is `refused` — a profile defect,
 `verify-onboarding.sh` fails on it. Each such allow is longer than the kit's denies, so it
 opens that sandbox repository and nothing beside it; the black-box probes, which request the
