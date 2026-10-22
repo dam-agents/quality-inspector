@@ -219,6 +219,7 @@ runs.splice(RUNS_MAX);
 // ------------------------------------------------------------------------ issues
 // One paginated GET of the labelled issues for labels, state and title (best effort).
 const issueMeta = new Map();
+let issuesListed = false;
 const target = process.env.QI_TARGET_REPO ?? cfg('target_repo');
 if (target && process.env.QI_CATALOG_OFFLINE !== '1') {
   const host = target.split('/').length === 3 ? target.split('/')[0] : null;
@@ -234,6 +235,7 @@ if (target && process.env.QI_CATALOG_OFFLINE !== '1') {
         if (i?.number != null) issueMeta.set(String(i.number), { title: i.title ?? null, labels: (i.labels ?? []).map((l) => l?.name ?? l), state: i.state ?? null });
       }
     }
+    issuesListed = true;
   } catch { notes.push('issue labels and state unavailable (the issues listing failed)'); }
 }
 
@@ -417,7 +419,8 @@ const sched = readJson(join(work, 'schedules.json'));
 const activity = {
   lock: /^[A-Za-z][A-Za-z0-9-]{0,40}$/.test(lockLine[0] ?? '') && /^\d{4}-\d\d-\d\dT[\d:]{8}Z$/.test(lockLine[1] ?? '') ? { owner: lockLine[0], since: lockLine[1] } : null,
   issues: qaRows.filter(([, , , , , st]) => st === 'in_progress' || st === 'report_pending').map(qaRow),
-  waiting: [...issueMeta].filter(([n, m]) => m.state === 'open' && (!qaRows.some(([q]) => q === n) || (m.labels ?? []).includes(retestLabel)))
+  // null: the listing failed or did not run — unknown, not empty.
+  waiting: !issuesListed ? null : [...issueMeta].filter(([n, m]) => m.state === 'open' && (!qaRows.some(([q]) => q === n) || (m.labels ?? []).includes(retestLabel)))
     .map(([n, m]) => ({ issue: +n, title: m.title ?? null, kind: qaRows.some(([q]) => q === n) ? 'retest' : 'new' })).sort((a, b) => a.issue - b.issue).slice(0, 50),
   budget_min: +cfg('max_wallclock_min_per_issue') > 0 ? +cfg('max_wallclock_min_per_issue') : 150,
   schedules: sched && typeof sched.schedules === 'object' ? { taken_utc: sched.taken_utc ?? null,

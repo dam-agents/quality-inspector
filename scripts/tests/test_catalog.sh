@@ -238,4 +238,7 @@ case "$v" in (FAIL*) ;; (*) echo "  a changed CATALOG.md header passes the verif
 printf -- '- test_catalog: maybe\n' >> "$W/CONFIG.md"
 bash "$SCRIPTS/verify-onboarding.sh" --config 2>/dev/null | grep -q '^FAIL cfg:test_catalog ' \
   || { echo "  assertion failed: verify-onboarding --config fails test_catalog: maybe"; FAILED=1; }
+# A failed issue listing leaves the waiting issues unknown, never an empty queue.
+STUB_GH_FAIL=1 node "$SCRIPTS/catalog.mjs" >/dev/null 2>&1
+assert "activity: a failed listing is unknown, not empty" '.activity.waiting == null' "$(page_data)"
 exit $FAILED

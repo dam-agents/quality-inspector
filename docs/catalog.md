@@ -31,7 +31,7 @@ The operator may share the page beyond themselves, so it carries only what conce
   item stands for the items that reach the page it leads to.
 - **Activity** (Overview, as of the page's build): the environment lock's holder and since (never
   its session), the `work/QA.md` rows `in_progress` or `report_pending`, the labelled open issues
-  with no row yet or carrying `retest_label`, the queued scenario requests, the time budget
+  with no row yet or carrying `retest_label` (unknown, not empty, when the listing failed), the queued scenario requests, the time budget
   (`max_wallclock_min_per_issue`), each schedule's name, switch and cron from
   `work/schedules.json`, and the last 14 days of runs drawn from the runs above.
 - **Requests:** the scenarios still queued, running, awaiting delivery or rejected — id,

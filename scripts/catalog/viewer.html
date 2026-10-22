@@ -666,6 +666,7 @@ function activityNow() {
   return card;
 }
 function activityQueue() {
+  const listed = Array.isArray(A.waiting);
   const waiting = arr(A.waiting).filter((x) => x && Number.isInteger(x.issue));
   const pending = arr(A.issues).filter((x) => x && x.status === 'report_pending');
   const rq = arr(F.requests).filter((x) => x && x.status === 'queued');
@@ -680,7 +681,9 @@ function activityQueue() {
   ];
   const total = groups.reduce((n, g) => n + g[2].length, 0);
   const card = h('section', { class: 'panel' }, h('h2', {}, `Queue (${total})`));
-  if (!total) { card.append(h('p', { class: 'muted-t' }, 'Nothing waits: every labelled issue has its verdict.')); return card; }
+  const unknown = listed ? null : h('p', { class: 'meta', style: 'color:var(--warn)' }, 'Waiting issues unknown: the issue listing failed when this page was built.');
+  if (!total) { card.append(unknown || h('p', { class: 'muted-t' }, 'Nothing waits: every labelled issue has its verdict.')); return card; }
+  if (unknown) card.append(unknown);
   card.append(h('div', { class: 'qbar', role: 'img', 'aria-label': groups.map((g) => `${g[0]}: ${g[2].length}`).join(', ') },
     groups.filter((g) => g[2].length).map((g) => h('i', { class: g[1], style: `flex:${g[2].length}`, title: `${g[0]}: ${g[2].length}` }))));
   for (const [label, cls, list] of groups) if (list.length) card.append(...[h('h3', { class: 'qh' }, h('i', { class: `qdot ${cls}` }), `${label} (${list.length})`),
