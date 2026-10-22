@@ -7,6 +7,14 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.8.1 — 2026-10-22
+
+**Upgrade:**
+Nothing — scripts are re-read per run. A profile's `bin/<cmd>` now runs without its exec bit
+(through `bash`), so a profile installed as plain files no longer skips `sandbox.sh check`
+("the profile has no bin/sandbox"); rerun `bash "$HOME/scripts/verify-onboarding.sh" --live`
+once to see the sandbox accounts checked.
+
 ## 3.8.0 — 2026-10-22
 
 **Upgrade:**

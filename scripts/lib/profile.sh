@@ -29,11 +29,13 @@ profile_config() {
 profile_field() { local dir; dir="$(profile_dir)" || return 1; jq -r "$1 // empty" "$dir/profile.json"; }
 
 # The executable for one command: the profile's own bin/<cmd>, else its engine's
-# (engines/<engine>/bin/<cmd> in this definition). Nothing when neither exists.
+# (engines/<engine>/bin/<cmd> in this definition). Nothing when neither exists. A profile's
+# file counts without its exec bit: a skill installed through the platform (or fetched by
+# the contents API) arrives as plain files, so profile_run starts it with bash then.
 profile_bin() { # <cmd>
   local dir eng core
   dir="$(profile_dir)" || return 1
-  [ -x "$dir/bin/$1" ] && { printf '%s\n' "$dir/bin/$1"; return; }
+  [ -f "$dir/bin/$1" ] && [ ! -L "$dir/bin/$1" ] && { printf '%s\n' "$dir/bin/$1"; return; }
   eng="$(jq -r '.engine // empty' "$dir/profile.json" 2>/dev/null)"
   core="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
   [ -n "$eng" ] && [ -x "$core/engines/$eng/bin/$1" ] && { printf '%s\n' "$core/engines/$eng/bin/$1"; return; }
@@ -137,7 +139,7 @@ profile_run() { # <bin> [args…]
     QI_ENGINE_CONFIG="$(jq -c '.engine_config // {}' "$dir/profile.json")" \
     QI_CANDIDATE_CHANNEL="$(cfg candidate_channel)" QI_BASELINE_CHANNEL="${QI_BASELINE_OVERRIDE:-$(cfg baseline_channel)}" \
     QI_MODEL_KEY="$mk" QI_MODEL_KIND="$mkind" QI_MODEL_BASE_URL="$mbase" \
-      "$exe" "$@" )
+      $([ -x "$exe" ] || echo bash) "$exe" "$@" )
 }
 
 # The e2e roles a credentials.env provides (docs/profile-contract.md → The `bin/` contract):

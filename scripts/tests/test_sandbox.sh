@@ -58,6 +58,9 @@ echo "FAIL slack token $E2E_SANDBOX_SLACK_HUMAN_TOKEN refused"
 exit 1
 S
 chmod +x "$QI_PROFILE_DIR/bin/sandbox"
+chmod -x "$QI_PROFILE_DIR/bin/sandbox"
+SB check >/dev/null; assert_eq "a bin/sandbox without its exec bit still runs (through bash)" 1 "$?"
+chmod +x "$QI_PROFILE_DIR/bin/sandbox"
 out="$(SB check)"; rc=$?
 assert_eq "a failing check exits non-zero" 1 "$rc"
 assert_eq "its output is masked (a value under 4 characters is not)" "ok github app 42
