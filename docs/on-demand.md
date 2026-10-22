@@ -45,6 +45,10 @@ scheduled ([persistence.md](persistence.md) → **Scheduled or direct session**)
 - **"module <id> set|on|off|run now …"**, **"focus <area>"**, **"dismiss D-<k>"** — the testing modules
   ([modules.md](modules.md) → **Control**); the dashboard's buttons send the same words.
 - **"show the environment"** — `env.sh status` plus non-running pods; read-only.
+- **"open the report <id>"** — read-only, the dashboard's "Open the report": find the
+  `artifact.id` under `work/issues/`, `work/scenarios/`, `work/regression/` or `work/security/`
+  that holds exactly `<id>` and answer with one line: a Markdown link titled `<run> · <build> — report` to `platform://artifacts/<id>`
+  (the platform's chip opens it beside the chat). No such file → say so; never another artifact.
 - **"add #N to the collection <name>"** / **"remove … from …"** / **"show the catalog"** — edit
   `work/CATALOG.md` ([catalog.md](catalog.md) → Describing and categorizing), then build and
   publish it; "show" just builds, publishes and gives the artifact reference.

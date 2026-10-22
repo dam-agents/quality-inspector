@@ -119,10 +119,10 @@ in their own words ([catalog.md](catalog.md)); its button sends
 5. **Claim.** `env.sh lock S-<k>`. Busy → stay `queued`, tell the requester it runs once the
    current holder finishes (the next issues run takes it), end. Else `set S-<k>
    status=in_progress build=<candidate>` — the claim time the budgets count from; it logs
-   the `scenario_run` that the daily cap counts.
+   the `scenario_run` that the daily cap counts. Then the catalog ([catalog.md](catalog.md) → **Build and publish**).
 6. **Candidate**: `env.sh up <candidate>` and the smoke run, as [issue-qa.md](issue-qa.md)
-   step 4. An environment failure sets `queued` back, unlocks, logs `scenario_abort`, and
-   says so — never a verdict.
+   step 4. An environment failure sets `queued` back, unlocks, logs `scenario_abort`, publishes
+   the catalog ([catalog.md](catalog.md) → **Build and publish**), and says so — never a verdict.
 7. **Author** `work/suite/tests/scenario-<k>.e2e.ts` ([test-authoring.md](test-authoring.md)),
    then `check-asserts.sh --lint` as [issue-qa.md](issue-qa.md) step 5.
 8. **Run** `suite.sh run S-<k>-candidate --evidence full --strict --tag scenario-<k>`.
