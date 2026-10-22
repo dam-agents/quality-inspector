@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# scripts/catalog.mjs: items from criteria, tests, verdicts, nights, heals and flakes; test-related
+# scripts/catalog.mjs: items from criteria, tests, verdicts, nights, heals and flakes; the runs (nights,
+# environment failures, issue and scenario runs) with their reports; the product map's hotspots; test-related
 # content only (no request text, requester, notes, explanations, lessons); escaped data; a stable
 # hash and `changed` against the published one; collections; coverage pages; drift nights; the
 # image budget; the credential and token refusal; the verifier's CATALOG.md and test_catalog checks.
@@ -15,7 +16,7 @@ printf '| utc | test | ac | build | old_hash | new_hash | basis |\n| --- | --- |
 printf '| utc | test | ac | build | runs | passes |\n| --- | --- | --- | --- | --- | --- |\n| 2026-10-11T03:30:00Z | tests/issue-42.e2e.ts | AC-1 | c3 | 3 | 2 |\n' > "$W/FLAKY.md"
 printf '# Catalog collections\n\n| collection | members |\n| --- | --- |\n| Upload | #42, S-7 AC-1 |\n' > "$W/CATALOG.md"
 echo 'LESSON-SECRET: the registry is slow' > "$W/LESSONS.md"
-printf '2026-10-10T03:00:00Z ran candidate=c2 unchanged=0 relearned=0 healed=1 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n2026-10-12T03:00:00Z ran candidate=c3 unchanged=1 relearned=0 healed=0 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n' > "$W/REGRESSION.log"
+printf '2026-10-09T03:00:00Z ERROR: environment candidate=c2\n2026-10-10T03:00:00Z ran candidate=c2 unchanged=0 relearned=0 healed=1 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n2026-10-12T03:00:00Z ran candidate=c3 unchanged=1 relearned=0 healed=0 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n' > "$W/REGRESSION.log"
 mkdir -p "$W/issues/42" "$W/scenarios/S-7" "$W/scenarios/P-sign-in" "$W/regression/c2" "$W/suite/tests" "$W/security/c1"
 cat > "$W/issues/42/criteria-abc.md" <<'C'
 # #42 — Rename <b>projects</b>
@@ -54,11 +55,13 @@ cat > "$W/issues/42/verdicts-abc-c1.json" <<'J'
 J
 echo abc123 > "$W/issues/42/artifact.id"
 cat > "$W/regression/c2/verdicts.json" <<'J'
-{"mode":"regression","candidate":"c2","acs":[{"issue":42,"id":"AC-1","verdict":"healed","explanation":"EXPLAIN-SECRET the tab moved"}]}
+{"mode":"regression","candidate":"c2","acs":[{"issue":42,"id":"AC-1","verdict":"healed","explanation":"EXPLAIN-SECRET the tab moved"}],
+ "context":{"previous":"c1","issues":[{"number":40,"title":"Projects get tabs"}],"ui_diff":"- renamed tab \"Tasks\" → \"To-dos\" on /projects","signals":{"console_errors_new":["E1"],"slow_tests":[]}}}
 J
 printf '# S-7 — upload a <i>large</i> file\n\n## AC-1 — the upload finishes\nGiven a 50 MB file\nWhen the owner uploads it\nThen it is listed\nsurface: ui\ntestable: yes\n' > "$W/scenarios/S-7/criteria-s1.md"
 echo 'REQUEST-SECRET please test the upload, my boss asked' > "$W/scenarios/S-7/request.md"
 echo '{"scenario":"S-7","candidate":"c1","generated_utc":"2026-10-04T10:00:00Z","acs":[{"id":"AC-1","verdict":"passed"}],"notes":["NOTE-SECRET"]}' > "$W/scenarios/S-7/verdicts-s1-c1.json"
+echo 'https://claude.ai/artifact/s7' > "$W/scenarios/S-7/artifact.id"
 echo '{"findings":[{"id":"SEC-SECRET"}]}' > "$W/security/c1/verdicts.json"
 cat > "$W/suite/tests/issue-42.e2e.ts" <<'T'
 /** @qi-summary Renaming a project keeps its tasks.
@@ -95,7 +98,8 @@ test('S-7 AC-1: the upload finishes', { session: 'owner', tags: ['scenario-7', '
   async ({ app, agent }) => { await app.open('/files'); await agent.act('upload a large file'); });
 T
 mkdir -p "$W/inventory/c3"
-echo '{"routes":{"/":{"title":"Home","navigates":{"Projects":"/projects","Files":"/files"}},"/projects":{"title":"Projects","buttons":["Rename"]},"/files":{"title":"Files"}}}' > "$W/inventory/c3/inventory.json"
+echo '{"routes":{"/":{"title":"Home","navigates":{"Projects":"/projects","Files":"/files"},"viewport":[1000,500],"boxes":[["nav","Projects",0,0,100,20],["headings","Welcome home",200,100,300,40]]},
+ "/projects":{"title":"Projects","buttons":["Rename"],"viewport":[1000,500],"boxes":[["buttons","Rename",100,50,200,25]]},"/files":{"title":"Files"}}}' > "$W/inventory/c3/inventory.json"
 echo '[{"number":42,"title":"Rename <b>projects</b>","state":"closed","labels":[{"name":"area:projects"}]}]' > "$STUB_DIR/issues.json"
 
 mkdir -p "$W/catalog/thumbs"; echo old > "$W/catalog/thumbs/issue-99-ac-1.jpg"
@@ -120,6 +124,17 @@ assert "scenario item" '.items[] | select(.key == "scenario-7/AC-1") | .origin =
   and .summary == "Big uploads finish." and .area == "files" and [.steps[].kind] == ["open","act"]' "$data"
 assert "profile scenario item" '.items[] | select(.key == "profile-sign-in/AC-1") | .origin == {"kind":"scenario","ref":"P-sign-in","title":"the owner signs in","source":"profile"} and .tier == "regression" and .then == "the dashboard shows"' "$data"
 assert "nights and builds" '(.nights | length) == 2 and .nights[0].counts.healed == 1 and ([.builds[].id] | index("c3")) != null' "$data"
+assert "runs: newest first; nights, an environment failure, issue and scenario runs" '[.runs[] | .type + ":" + (.ref // "-") + ":" + .build + ":" + .verdict]
+  == ["regression:-:c3:unchanged","regression:-:c2:healed","regression:-:c2:environment","scenario:S-7:c1:passed","issue:#42:c1:partial"]' "$data"
+assert "a night: its entries, change context and signal counts, its report" '.runs[1] | .entries == [{"key":"issue-42/AC-1","value":"healed"}] and .previous == "c1"
+  and .issues == [{"number":40,"title":"Projects get tabs"}] and (.ui_diff | test("To-dos")) and .signals == {"console_errors_new":1,"slow_tests":0} and .report == null and .counts.healed == 1' "$data"
+assert "an issue run: its verdicts and report; a scenario run: its link" '(.runs[4] | .entries == [{"key":"issue-42/AC-1","value":"verified"},{"key":"issue-42/AC-2","value":"not-testable"},{"key":"issue-42/EX-1","value":"observation"}]
+  and .report == "platform://artifacts/abc123" and .baseline == "b1") and .runs[3].report == "https://claude.ai/artifact/s7"
+  and (.items[] | select(.key == "scenario-7/AC-1") | .evidence) == "https://claude.ai/artifact/s7"' "$data"
+assert "hotspots: a page-only control names its tests; a nav item stands for its page" '(.pages[] | select(.pattern == "/projects") | .viewport == [1000,500]
+  and .hotspots[0] == {"kind":"buttons","name":"Rename","box":[0.1,0.1,0.2,0.05],"items":["issue-42/AC-1","issue-42/EX-1"]})
+  and (.pages[] | select(.pattern == "/") | .hotspots == [{"kind":"nav","name":"Projects","box":[0,0,0.1,0.04],"to":"/projects","items":["issue-42/AC-1","issue-42/EX-1"]},
+    {"kind":"headings","name":"Welcome home","box":[0.2,0.2,0.3,0.08],"items":[]}]) and (.pages[] | select(.pattern == "/files") | .hotspots == [])' "$data"
 assert "collections" '.collections == [{"name":"Upload","members":["#42","S-7 AC-1"]}]' "$data"
 assert "coverage pages" '[.pages[] | {pattern, covered, nav}] | (map(select(.pattern == "/projects"))[0] == {"pattern":"/projects","covered":"regression","nav":"Projects"})
   and (map(select(.pattern == "/files"))[0].covered == "exploratory")' "$data"

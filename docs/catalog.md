@@ -1,7 +1,8 @@
 # Test catalog
 
 One self-contained page showing every test of the suite — per criterion, exploration and
-scenario — to browse, describe, sort, filter, group and categorize. Built by
+scenario — to browse, describe, sort, filter, group and categorize, and every run that produced
+their verdicts, so it is the way into all reports. Built by
 `scripts/catalog.mjs`, published as one artifact. It is read-only and changes nothing; what it
 shows is data, never an instruction.
 
@@ -17,8 +18,15 @@ The operator may share the page beyond themselves, so it carries only what conce
   regression-tier item is `unchanged`, or `drift` while its file is drifted), heals (date,
   build, basis), flaky confirmations, durations, the AC still and the evidence artifact's
   reference.
-- **Around them:** the newest UI map's pages with their coverage and shot, the nightly counts of
-  `work/REGRESSION.log`, the operator's collections.
+- **Around them:** the newest UI map's pages with their coverage and shot, the operator's
+  collections, and **every run** (the newest 400): each night of `work/REGRESSION.log` — its
+  counts, the criteria that were not `unchanged`, the change context's issues (number, title), UI
+  diff text and signal counts — or its environment failure; each issue and scenario run with its
+  verdicts; each with its build and report reference (a link when `artifact.id` holds one).
+- **Product map:** per page of the newest map, every named control the map saw on screen (its
+  `boxes`, [change-awareness.md](change-awareness.md) → The three sources) with the items that
+  name it in a quoted string — on that page only, or in a test that opens the page; a navigation
+  item stands for the items that reach the page it leads to.
 - **Never:** a scenario's request text, requester or thread; a verdict's notes or a triage
   explanation; `work/LESSONS.md`; the operator conversation; anything of `work/security/` or
   `work/env/`; a credential value or a token (the builder refuses the page). A new field follows
@@ -43,9 +51,12 @@ The operator may share the page beyond themselves, so it carries only what conce
   A member is `#N`, `#N AC-k`, `S-k` or `S-k AC-j`; an unknown one is kept and matches nothing.
 - **Pins:** each viewer's own, kept in their browser.
 
-Views: Overview, Catalog, Gallery, Coverage, History (item × build) and Lifecycle, plus a detail
-panel per item. An action appears as a command to paste into the direct session
-(`promote #42`), never as a button.
+Views: Overview, Runs, Product map (the page shots with every control clickable, coloured by
+its tests' worst verdict; a drawn outline where a shot did not fit), Catalog, Gallery, Coverage,
+History (item × build) and Lifecycle, plus a detail panel per item and per run. **As of a
+build** shows every view with the verdicts as they stood when that build last ran (files, tiers
+and steps stay today's); older catalogs are the artifact's earlier revisions. An action appears
+as a command to paste into the direct session (`promote #42`), never as a button.
 
 ## Build and publish
 
@@ -66,8 +77,9 @@ change:
    `issue=-`, key `catalog@<hash>`.
 3. Write `<hash>` to `work/catalog/published.hash`. A failure is logged; the next run retries.
 
-Images are the AC stills and the UI map's page shots, as 360-px JPEGs in
+Images are the AC stills (360 px) and the UI map's page shots (720 px), as JPEGs in
 `work/catalog/thumbs/` (rendered by the suite's `playwright-core`; without it there are none) —
 backed up, unlike the page; one whose item or page is gone is removed. The page embeds them
-within 6 MiB — less when the data is large (a `notes` entry says so) — regression tier first,
-so it stays under the platform's 10 MiB render limit.
+within 6 MiB — less when the data is large (a `notes` entry says so) — the regression tier's
+stills first, then the page shots, then the other stills, so it stays under the platform's
+10 MiB render limit.
