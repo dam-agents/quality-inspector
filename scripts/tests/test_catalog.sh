@@ -122,6 +122,14 @@ data="$(page_data)"
 node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");require("fs").writeFileSync(process.argv[2],[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((x)=>x[1]).join("\n"))' \
   "$SCRIPTS/catalog/viewer.html" "$SANDBOX/viewer.js" && node --check "$SANDBOX/viewer.js" 2>/dev/null
 assert_eq "the viewer's script parses" 0 "$?"
+# A scenario request the page sends has one shape (docs/scenarios.md → A request from the dashboard).
+scen="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const m=s.match(/^const SCEN_RE = (\/.*\/);$/m);const re=eval(m[1]);
+const w="Rename a project and save: the new name shows in the list.";
+const t=[`test this scenario: On the page /projects/:id, the button "Save": ${w}`, `test this scenario: On the page /: ${w}\nAnd then the list is sorted.`,
+  "test this scenario: On the page /projects: too short", `promote #42: ${w}`, `test this scenario: On the page /x, the button "a"b": ${w}`,
+  `test this scenario: On the page /x: ${w}\u0007`, `test this scenario: On the page /x: ${"a".repeat(2001)}`];
+process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "a scenario request: the composed shape only, bounded, no control characters" 1100000 "$scen"
 assert "schema and header" '.schema == "qi-catalog/v1" and .agent.display_name == "QA Bot" and .target == "acme/widgets" and .issue_url == "https://github.com/acme/widgets/issues/{n}"' "$data"
 i='.items[] | select(.key == "issue-42/AC-1")'
 assert "AC-1 from criteria, test and SUITE" "$i"' | .tier == "regression" and .then == "the project shows its new name with the task" and .area == "projects"

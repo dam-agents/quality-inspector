@@ -28,7 +28,8 @@ The operator may share the page beyond themselves, so it carries only what conce
   name it in a quoted string — on that page only, or in a test that opens the page; a navigation
   item stands for the items that reach the page it leads to.
 - **Requests:** the scenarios still queued, running, awaiting delivery or rejected — id,
-  source, state, the frozen title; never the request's words.
+  source, state, the frozen title, the build and verdict once there are any, the time of the
+  row's last update; never the request's words.
 - **Control center:** every module's state, settings, schedule and last run (`modules.sh
   status`), the focus queue and the areas; the design findings register with each finding's crop
   ([ui-sweep.md](ui-sweep.md)); the newest validation results and stress checks; of the newest
@@ -68,12 +69,17 @@ as a command for the direct session (`promote #42`, `module stress set stress_ch
 only one of the closed set of [on-demand.md](on-demand.md) and [modules.md](modules.md) →
 **Control**, built from constants and ids, never from page data. It can be copied; on an
 interactive page opened beside the agent's chat its button sends it as the operator's message.
+The one exception is **Ask for a test** on the Product map: a scenario request built from the
+page's pattern, the control's kind and name, and the person's own words, in the one shape of
+[scenarios.md](scenarios.md) → **A request from the dashboard**. A shared viewer may send only
+this one; the agent takes their words as data.
 
 ## Build and publish
 
 With `test_catalog: enabled` and `artifact_reports: enabled`, at the end of an issues run, a
-regression run, a modules run and a scenario delivery, and after an operator's promote, demote,
-collection change or module change ([modules.md](modules.md) → **Control**):
+regression run, a modules run and a scenario delivery, at the end of every turn of a dashboard
+request ([scenarios.md](scenarios.md) → **A request from the dashboard**), and after an
+operator's promote, demote, collection change or module change ([modules.md](modules.md) → **Control**):
 
 1. `node "$HOME/scripts/design-findings.mjs" merge --noticed-only` (the run's "noticed in passing"
    items into the design register, [ui-sweep.md](ui-sweep.md)), then
