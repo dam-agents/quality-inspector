@@ -2,7 +2,7 @@
 # scenarios.sh — bookkeeping for scenarios (docs/scenarios.md). Local only: no external
 # calls; its writes are a scenario's empty directory, its work/SCENARIOS.md row and event lines.
 #
-#   scenarios.sh new <slack|operator|discovery>   reserve the next id: creates
+#   scenarios.sh new <slack|operator|discovery|dashboard>  reserve the next id: creates
 #                                                 work/scenarios/S-<k>/ atomically (two turns
 #                                                 at once never share an id), logs
 #                                                 `scenario_new`, prints S-<k>
@@ -46,7 +46,7 @@ export LOG_JOB="${LOG_JOB:-scenario}"
 iso2epoch() { date -d "$1" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
 
 cmd_new() {
-  case "${1:-}" in (slack|operator|discovery) ;; (*) echo "usage: $0 new <slack|operator|discovery>" >&2; exit 2;; esac
+  case "${1:-}" in (slack|operator|discovery|dashboard) ;; (*) echo "usage: $0 new <slack|operator|discovery|dashboard>" >&2; exit 2;; esac
   mkdir -p "$WORK/scenarios" || exit 1
   local k n
   k="$(ls -1 "$WORK/scenarios" 2>/dev/null | sed -n 's/^S-\([0-9][0-9]*\)$/\1/p' | sort -n | tail -1)"
@@ -61,9 +61,7 @@ cmd_new() {
 }
 
 # Columns of a row, in SCENARIOS_HEADER order, and the values each one takes.
-SOURCES='slack|operator|discovery|profile'
-STATUSES='proposed|queued|in_progress|report_pending|reported|rejected|retired'
-VERDICTS='passed|failed|regression|needs-review|blocked|flaky|not-testable|-'
+SOURCES="$SCEN_SOURCES"; STATUSES="$SCEN_STATUSES"; VERDICTS="$SCEN_VERDICTS"   # lib/state.sh
 one_of() { case "|$2|" in (*"|$1|"*) return 0;; esac; return 1; }
 
 # A scenario id: S-<k> (a request or a proposal), or P-<slug> (the profile's scenarios/<slug>.md).
@@ -191,5 +189,5 @@ case "${1:-}" in
   admit) cmd_admit ;;
   lint)  cmd_lint "${2:-}" ;;
   set)   shift; cmd_set "$@" ;;
-  *) echo "usage: $0 new <slack|operator|discovery> | adopt <slug> | admit | lint <file> | set <S-<k>|P-<slug>> [<column>=<value>…]" >&2; exit 2 ;;
+  *) echo "usage: $0 new <slack|operator|discovery|dashboard> | adopt <slug> | admit | lint <file> | set <S-<k>|P-<slug>> [<column>=<value>…]" >&2; exit 2 ;;
 esac

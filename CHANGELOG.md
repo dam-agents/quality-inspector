@@ -7,6 +7,14 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.8.0 — 2026-10-22
+
+**Upgrade:**
+Nothing to run. The dashboard's Product map gains "Ask for a test" on its next build: a page or
+control plus the person's own words become a scenario request ([docs/scenarios.md](docs/scenarios.md)
+→ A request from the dashboard); a viewer the operator shared the page with may ask too, within
+`max_scenarios_per_day`.
+
 ## 3.7.0 — 2026-10-22
 
 **Upgrade:**

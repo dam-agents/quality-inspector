@@ -11,6 +11,10 @@ HEALS_HEADER='| utc | test | ac | build | old_hash | new_hash | basis |'
 FLAKY_HEADER='| utc | test | ac | build | runs | passes |'
 COVERAGE_HEADER='| page | title | tests | covered |'   # written by scripts/coverage.mjs --md
 SCENARIOS_HEADER='| id | source | requester | thread | spec_hash | build | verdict | status | updated_utc |'
+# The values of its columns — one home for scenarios.sh (the writer) and verify-onboarding.sh.
+SCEN_SOURCES='slack|operator|discovery|dashboard|profile'
+SCEN_STATUSES='proposed|queued|in_progress|report_pending|reported|rejected|retired'
+SCEN_VERDICTS='passed|failed|regression|needs-review|blocked|flaky|not-testable|-'
 CATALOG_HEADER='| collection | members |'   # work/CATALOG.md, the operator's collections (docs/catalog.md)
 FOCUS_HEADER='| area | queued_utc | status | build |'   # work/FOCUS.md, written by scripts/modules.sh (docs/modules.md)
 DISMISSED_HEADER='| id | dismissed_utc |'   # work/design/DISMISSED.md, written by scripts/modules.sh dismiss (docs/ui-sweep.md)

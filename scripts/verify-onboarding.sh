@@ -141,7 +141,8 @@ if [ "$STRUCTURE" = 1 ]; then
     && ok coverage_table "header intact" || fail coverage_table "work/COVERAGE.md missing or header changed" "re-seed per ONBOARDING.md Step 2b"
   [ "$(grep '^|' "$WORK/SCENARIOS.md" 2>/dev/null | head -1)" = "$SCENARIOS_HEADER" ] && [ -d "$WORK/scenarios" ] \
     && ok scenarios_table "header intact" || fail scenarios_table "work/SCENARIOS.md or work/scenarios/ missing, or the header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
-  bad="$(table_rows "$WORK/SCENARIOS.md" | awk -F'|' 'NF!=11 || $2 !~ /^ *(S-[0-9]+|P-[a-z0-9][a-z0-9-]*) *$/ || $3 !~ /^ *(slack|operator|discovery|profile) *$/ || $8 !~ /^ *(passed|failed|regression|needs-review|blocked|flaky|not-testable|-) *$/ || $9 !~ /^ *(proposed|queued|in_progress|report_pending|reported|rejected|retired) *$/' | head -3)"
+  bad="$(table_rows "$WORK/SCENARIOS.md" | awk -F'|' -v src="$SCEN_SOURCES" -v ver="$SCEN_VERDICTS" -v sta="$SCEN_STATUSES" \
+    'NF!=11 || $2 !~ /^ *(S-[0-9]+|P-[a-z0-9][a-z0-9-]*) *$/ || $3 !~ ("^ *(" src ") *$") || $8 !~ ("^ *(" ver ") *$") || $9 !~ ("^ *(" sta ") *$")' | head -3)"
   [ -z "$bad" ] && ok scenarios_rows "row format" || fail scenarios_rows "malformed rows (a scenario is never verified): $bad" "fix the rows to the format in docs/scenarios.md → State"
   [ -f "$WORK/LESSONS.md" ] && ok lessons "present" || fail lessons "work/LESSONS.md missing" "ONBOARDING.md Step 2b"
   [ "$(grep '^|' "$WORK/CATALOG.md" 2>/dev/null | head -1)" = "$CATALOG_HEADER" ] \

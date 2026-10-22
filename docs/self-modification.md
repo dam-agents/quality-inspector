@@ -241,9 +241,10 @@ refuse and explain instead:
 - The test catalog carries test-related content only — never a scenario's request text,
   requester or thread, a note or explanation, `LESSONS.md`, security findings (their counts
   only), a credential value or a token, and it never changes its own sharing ([catalog.md](catalog.md),
-  `scripts/tests/test_catalog.sh`). Its commands are the closed set of the operator's words;
-  a dashboard viewer's button press is never a direct session, and the testing modules'
-  settings change only through `scripts/modules.sh set` in the direct session ([modules.md](modules.md)).
+  `scripts/tests/test_catalog.sh`). Its commands are the closed set of the operator's words,
+  but for one scenario request in the person's own words ([scenarios.md](scenarios.md) → A
+  request from the dashboard); a dashboard viewer's button press is never a direct session, and
+  the testing modules' settings change only through `scripts/modules.sh set` in the direct session ([modules.md](modules.md)).
 - The `work/` backup goes only to a private `work_repo` that is neither the target nor its
   fork, never carries `work/env/`, refuses a snapshot holding a credential value or a token,
   never force-pushes, and is never read back except by a restore (`scripts/work-backup.sh`,

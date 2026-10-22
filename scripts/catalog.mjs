@@ -386,8 +386,16 @@ const focus = ls(join(work, 'focus')).map((d) => ({ d, f: join(work, 'focus', d,
       checks: (Array.isArray(r) ? r : r.checks ?? r.explorations ?? []).filter((c) => c && c.id).map((c) => ({ id: c.id, heuristic: c.heuristic ?? null,
         given: c.given ?? null, when: c.when ?? null, expected: c.expected ?? null, verdict: c.verdict ?? null, severity: c.severity ?? null })) };
   });
+// Scenario requests still on their way (docs/scenarios.md): id, source, state and the frozen
+// title once there is one — never the request text, its requester or thread.
+const requests = rows(join(work, 'SCENARIOS.md')).filter(([id, , , , , , , status]) => /^S-\d+$/.test(id) && ['queued', 'in_progress', 'report_pending', 'rejected'].includes(status))
+  .map(([id, source, , , specHash, build, verdict, status, utc]) => ({ id, source, status, build: build && build !== '-' ? build : null,
+    verdict: verdict && verdict !== '-' ? verdict : null, utc: utc || null,
+    title: parseCriteria(read(join(work, 'scenarios', id, `criteria-${specHash}.md`)) ?? '')?.title ?? null }))
+  .sort((a, b) => String(b.utc).localeCompare(String(a.utc))).slice(0, 50);
 const sweepFile = newestOf('design', 'sweep.json');
 const findings = {
+  requests,
   focus,
   design_build: sweepFile ? readJson(sweepFile)?.build ?? null : null,
   validation: val ? { build: val.build ?? null, run: val.run ?? null, utc: val.generated_utc ?? null,
