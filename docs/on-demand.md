@@ -47,7 +47,7 @@ scheduled ([persistence.md](persistence.md) → **Scheduled or direct session**)
 - **"show the environment"** — `env.sh status` plus non-running pods; read-only.
 - **"open the report <id>"** — read-only, the dashboard's "Open the report": find the
   `artifact.id` under `work/issues/`, `work/scenarios/`, `work/regression/` or `work/security/`
-  that holds exactly `<id>` and answer with one line `[<run> · <build> — report](platform://artifacts/<id>)`
+  that holds exactly `<id>` and answer with one line: a Markdown link titled `<run> · <build> — report` to `platform://artifacts/<id>`
   (the platform's chip opens it beside the chat). No such file → say so; never another artifact.
 - **"add #N to the collection <name>"** / **"remove … from …"** / **"show the catalog"** — edit
   `work/CATALOG.md` ([catalog.md](catalog.md) → Describing and categorizing), then build and
