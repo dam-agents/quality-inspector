@@ -7,6 +7,19 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.9.1 — 2026-10-22
+
+**Upgrade:**
+1. Only where the profile lists `egress` or the target is on GitHub Enterprise:
+   `bash "$HOME/scripts/egress-rules.sh"` and have the operator add each `by-hand` profile row
+   the agent's network settings do not hold yet ([docs/black-box.md](docs/black-box.md) → Egress
+   rules). New `by-hand` rows: a row that said `kit` but falls under a longer kit deny (a
+   sandbox repository's `GET /repos/<owner>/<repo>/<rest>`), and on GitHub Enterprise a row
+   that said `prompt` but falls under the shared rules' deny — no prompt appears for either.
+2. Nothing to run for the suite: a test removes its sandbox leftovers only after its last
+   criterion passes ([docs/test-authoring.md](docs/test-authoring.md) → Clean up only after a
+   pass); a repair of a sandbox test follows it from the next run.
+
 ## 3.9.0 — 2026-10-22
 
 **Upgrade:**
@@ -14,8 +27,7 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    run ([docs/black-box.md](docs/black-box.md) → The gate).
 2. Only where the profile's sandbox now lists git requests to its repository or the OAuth sign-in on `github.com`
    ([docs/black-box.md](docs/black-box.md) → Sandbox accounts): `bash "$HOME/scripts/egress-rules.sh"`
-   and have the operator add its `by-hand` rows in the agent's network settings — also a row that
-   said `kit` before and says `by-hand` now (a longer kit deny beside the kit's allow), then
+   and have the operator add its `by-hand` rows in the agent's network settings, then
    `bash "$HOME/scripts/sandbox.sh" template` for the new credential lines, which the operator
    fills in `work/env/credentials.env` — never in chat.
 

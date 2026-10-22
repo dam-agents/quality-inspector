@@ -11,8 +11,9 @@
 #            and the operator answers its approval prompt ("Allow permanently");
 #            `verify-onboarding.sh --egress` makes that request. A wildcard host prompts
 #            once per host it reaches.
-#   by-hand  the operator adds it in the agent's network settings: it falls under a kit
-#            deny (refused at once, no prompt ever appears), it is a deny, or it belongs to
+#   by-hand  the operator adds it in the agent's network settings: it falls under a deny of
+#            the kit or of a GitHub Enterprise target's shared rules (refused at once, no
+#            prompt ever appears), it is a deny, or it belongs to
 #            a set that must land whole (the kit's own, the work backup, GitHub Enterprise).
 #   kit      the kit already allows it — nothing to do.
 #   refused  never to be added: a profile allow on a GitHub host outside the closed set
@@ -153,27 +154,31 @@ _subst() { # <text>
   done
   printf '%s\n' "$t"
 }
-# How a profile rule gets onto the agent, against the kit's rules.
+# How a profile rule gets onto the agent, against the rules that land beside it: the kit's
+# and, for a GitHub Enterprise target, the shared GitHub rules on its host (GHR, by hand).
 _how() { # <verdict> <method> <host> <path>
-  local v m h p s best=-1 win=""
+  local src v m h p s best=-1 win=""
   [ "$1" = deny ] && { echo by-hand; return; }
   _github_host "$3" && [ -n "$(_github_refusal "$2" "$3" "$4")" ] && { echo refused; return; }
-  # The kit rule the platform would pick on this exact host: a named method over '*', then
-  # the longer path; a deny wins a tie. Only an allow picked so covers it — a longer kit deny
+  # The rule the platform would pick on this exact host: a named method over '*', then the
+  # longer path; a deny wins a tie. Only a kit allow picked so covers it — a longer deny
   # beside a shorter kit allow (`/repos/*/*/*` beside `/repos/*/*`) refuses the request.
   if [ "$4" != '*' ]; then
-    while read -r v m h p; do
+    while read -r src v m h p; do
       [ "$h" = "$3" ] && { [ "$m" = "$2" ] || [ "$m" = '*' ]; } && _covers "$p" "$4" || continue
       s=${#p}; [ "$m" = '*' ] || s=$((s + 100000))
-      if [ "$s" -gt "$best" ] || { [ "$s" = "$best" ] && [ "$v" = deny ]; }; then best=$s; win=$v; fi
-    done < <(kit_rules)
-    [ "$win" = allow ] && { echo kit; return; }
+      if [ "$s" -gt "$best" ] || { [ "$s" = "$best" ] && [ "$v" = deny ]; }; then best=$s; win="$src $v"; fi
+    done < <(_landed_rules)
+    [ "$win" = "kit allow" ] && { echo kit; return; }
   fi
-  while read -r v m h p; do
+  while read -r src v m h p; do
     [ "$v" = deny ] && _host_covers "$h" "$3" && { [ "$4" = '*' ] || _covers "$p" "$4"; } && { echo by-hand; return; }
-  done < <(kit_rules)
+  done < <(_landed_rules)
   echo prompt
 }
+GHR=""
+# The kit's rules and GHR, each line "<kit|github> <verdict> <method> <host> <path pattern>".
+_landed_rules() { kit_rules | sed 's/^/kit /'; [ -z "$GHR" ] || printf '%s\n' "$GHR" | sed 's/^/github /'; }
 
 # kit.yaml's egressRules as "<verdict> <method> <host> <path pattern>" lines; a key counts
 # on the item's "- " line too, quoted or not, before a trailing comment — as the
@@ -204,7 +209,8 @@ else
   H="$(_bb_host "$T")"
   note "The target $T is on $H: the shared GitHub rules on that host (docs/black-box.md → Egress rules), all of them."
   d=""; read -r dh dr < <(_bb_definition) && [ "$dh" = "$H" ] && d="$dr"
-  while read -r v m h p; do row github "$v" "$m" "$h" "$p" by-hand; done < <(github_rules "$H" $d)
+  GHR="$(github_rules "$H" $d)"
+  [ -z "$GHR" ] || while read -r v m h p; do row github "$v" "$m" "$h" "$p" by-hand; done <<<"$GHR"
 fi
 if [ -n "$W" ]; then
   while read -r v m h p; do row work_repo "$v" "$m" "$h" "$p" by-hand "the work backup $W (git fetch and push)"; done < <(work_repo_rules)
