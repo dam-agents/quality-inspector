@@ -16,8 +16,9 @@ three black-box sources, never from code or pull requests ([black-box.md](black-
 2. **What the UI looks like now — the UI map.** `node "$HOME/scripts/ui-inventory.mjs"
    work/inventory/<build>` signs in and walks the nested product read-only: every page
    reachable through links, navigation items and tabs, with its headings, nav items,
-   buttons, tabs, fields and links (repeated data rows and cards excluded), an
-   accessibility snapshot, a screenshot, and the page's **signals** — console errors,
+   buttons, tabs, fields and links (repeated data rows and cards excluded), where each sits in
+   the screenshot (`boxes`, for the catalog's product map), an accessibility snapshot, a
+   screenshot, and the page's **signals** — console errors,
    failed same-origin requests, load timing. `node "$HOME/scripts/ui-diff.mjs" <old> <new>`
    turns two maps into pages added/removed and controls renamed, moved, removed or added —
    including a **likely rename** when one control left and one arrived in exactly the same

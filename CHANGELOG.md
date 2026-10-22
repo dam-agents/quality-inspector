@@ -7,6 +7,13 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.5.0 — 2026-10-22
+
+**Upgrade:**
+Nothing to run. The catalog gains the Runs and Product map views and "as of a build" on its next
+build ([docs/catalog.md](docs/catalog.md)); the map's clickable controls appear once the next
+regression run records a UI map with `boxes` — until then its pages show without them.
+
 ## 3.4.0 — 2026-10-20
 
 **Upgrade:**
