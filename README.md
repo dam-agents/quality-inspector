@@ -114,8 +114,9 @@ adds the kit's rules for an agent created by hand or from a kit before 3.0.0 —
 updates an existing agent's rules). A host no kit rule covers lands through its approval prompt
 (`verify-onboarding.sh --egress` asks for each); a rule under a kit deny the operator adds by
 hand, since no prompt ever appears for it. A rule counts only once a probe proves it: before each day's work
-the pre-flight's **black-box gate** requests each forbidden surface and stops every run while
-one answers; `verify-onboarding.sh --live` and the weekly audit report the same probes.
+the pre-flight's **black-box gate** requests each forbidden surface — through `gh` (REST,
+GraphQL), `git` (HTTPS, SSH) and `curl` — and stops every run while one answers, with an alert
+to `regression_channel` (else `slack_channel`); `verify-onboarding.sh --live` and the weekly audit report the same probes.
 Approve no held request on the deny side.
 
 Inside the VM, a Claude Code `PreToolUse` hook and a `permissions.deny` list, merged into
@@ -125,7 +126,8 @@ platform's Kit Update `git fetch origin` excepted — plus `git clean`, containe
 filesystems, writes outside `work/` (the agent proposes changes to itself as patches in
 `work/patches/`), commits from a scheduled run or a Slack turn, and any GitHub write from a
 Slack turn except a Slack-ordered "test #N"'s comment and retest-label removal on that issue
-([docs/black-box.md](docs/black-box.md) → Enforcement layers).
+([docs/black-box.md](docs/black-box.md) → Enforcement layers). The daily gate also stops every
+run while the hook or the deny list is gone.
 
 ## What a report looks like
 
@@ -176,7 +178,7 @@ configuration.
 | `spec_feedback` | asked, default `disabled` | Opt-in: suggest an observable "Done when" on issues with nothing testable. |
 | `scenario_discovery`, `scenario_channel` | asked, default `disabled` / empty | Opt-in: weekly scenario proposals (`propose`), also tested (`run`); the Slack conversation for their digest. |
 | `max_scenarios_per_run`, `max_scenarios_per_day` | defaults (`3`, `10`) | Proposals per discovery run, also profile scenarios adopted a night; scenario runs a day. |
-| `profile_scenarios`, `regression_channel` | default `enabled`; asked when a channel is connected, default empty | The profile's `scenarios/` (the product team's flows) are adopted and replayed nightly; the Slack conversation for the nightly summary. |
+| `profile_scenarios`, `regression_channel` | default `enabled`; asked when a channel is connected, default empty | The profile's `scenarios/` (the product team's flows) are adopted and replayed nightly; the Slack conversation for the nightly summary and a black-box breach alert (else `slack_channel`). |
 | `auto_promote` | default `disabled` | `verified`: tests whose every criterion was verified join the nightly regression without the operator's "promote". |
 | `marker_prefix` | default `quality-inspector` | Dedup marker; **immutable once a comment exists**. |
 | `qa_label`, `retest_label` | defaults | The gates (`qa:ready`, `qa:retest`). |
@@ -205,7 +207,7 @@ configuration.
 - **External surfaces:** artifacts in the platform's artifact library (private by
   default); with `issue_comments: enabled`, **public comments** on the target's issues,
   and removal of the retest label; optionally a Slack channel bound to the agent (replies
-  in request threads; with `scenario_channel`, one weekly digest post; with `regression_channel`, one nightly summary post; with `slack_channel`,
+  in request threads; with `scenario_channel`, one weekly digest post; with `regression_channel`, one nightly summary post and a black-box breach alert; with `slack_channel`,
   issue tests people order there); with `work_repo`, pushes of the `work/` backup to that
   private repository. The platform runtime's session state (`PLATFORM_RUNTIME_URL`) frees a
   dead run's environment lock at once; without it the lock waits `lock_ttl_min`.

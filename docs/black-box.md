@@ -61,9 +61,9 @@ A need that seems to require one of these is a criterion you mark `blocked` or
 
 | Layer | Holds | Proven by |
 | --- | --- | --- |
-| Egress rules (below) | the network: what the VM may reach at all — the kit's, the same for every target, so no operator step stands between a new agent and its boundary | the boundary probes (`scripts/lib/boundary.sh`: the surfaces above, the wildcard shapes below, the profile's `boundary`; only the gateway's refusal proves a deny, a `404` is a `warn`) |
+| Egress rules (below) | the network: what the VM may reach at all — the kit's, the same for every target, so no operator step stands between a new agent and its boundary | the boundary probes (`scripts/lib/boundary.sh`: the surfaces above, each through the client an agent would use — `gh` for REST and GraphQL, `git ls-remote` over HTTPS and SSH, `curl` — the wildcard shapes below, the profile's `boundary`). Only the gateway's refusal proves a deny: an answer from GitHub itself (its `X-GitHub-Request-Id`) is a `fail` whatever its status — a rule let the request through; any other answer, an SSH server that answers, or a probe that sent nothing (no client, `gh` without a token) is a `warn` |
 | The gate (below) | no product is tested while a probe reaches a source surface | `scripts/tests/test_issues.sh`; the gate's `work/env/boundary.json` |
-| PreToolUse hook [`scripts/hooks/policy.sh`](../scripts/hooks/policy.sh) | every tool call before it runs — its header is the rule table: GitHub but through `scripts/github.sh` (rule `github`), the profile's URLs and packages, source maps, chart templates, `git clean`, container filesystems, writes outside `work/` (the live definition included — a change is a patch), commits and the Kit Update fetch in a scheduled run or a channel turn, and any GitHub write in a channel turn except a Slack-ordered "test #N"'s delivery ([persistence.md](persistence.md) → **Scheduled or direct session**, [slack.md](slack.md)) | `scripts/tests/test_policy_hook.sh` and the validator in CI; `policy_hook` in `verify-onboarding.sh` and the audit |
+| PreToolUse hook [`scripts/hooks/policy.sh`](../scripts/hooks/policy.sh) | every tool call before it runs — its header is the rule table: GitHub but through `scripts/github.sh` (rule `github`), the profile's URLs and packages, source maps, chart templates, `git clean`, container filesystems, writes outside `work/` (the live definition included — a change is a patch), commits and the Kit Update fetch in a scheduled run or a channel turn, and any GitHub write in a channel turn except a Slack-ordered "test #N"'s delivery ([persistence.md](persistence.md) → **Scheduled or direct session**, [slack.md](slack.md)) | `scripts/tests/test_policy_hook.sh` and the validator in CI; `policy_hook` in the gate (below), `verify-onboarding.sh` and the audit |
 | `permissions.deny` | the commands static patterns can express, as a second net | the same `policy_hook` check |
 
 `scripts/hooks/install.sh` merges the hook and the deny list into
@@ -75,13 +75,17 @@ reaches nothing on GitHub but issues.
 
 ## The gate
 
-`scripts/preflight.sh` runs the boundary probes before the work of every mode but the audit —
-once a day, and again after a definition or target change — and keeps the result in
-`work/env/boundary.json`. A `fail` line stops the run: no install, no test, no delivery. The
-first run that finds a breach (or a different one) returns `boundary_breach[]` with
-`nothing_to_do: false` — report every line in the chat UI with its fix and end; later runs
-decline quietly until the probes pass again. A Slack turn always gets it, to answer the person.
-The audit runs the same probes and reports them as checks.
+`scripts/preflight.sh` runs the boundary probes and `scripts/hooks/install.sh --check` (the
+policy hook and the deny list still registered, hooks not disabled) before the work of every
+mode but the audit — once a day, and again after a definition or target change — and keeps
+the result in `work/env/boundary.json`. A `fail` line or a missing hook stops the run: no
+install, no test, no delivery. The first run that finds a breach (or a different one) returns
+`boundary_breach[]` with `nothing_to_do: false` — report every line in the chat UI with its
+fix; with `channel` set (`regression_channel`, else `slack_channel`), also as one
+`send_channel_message` there opening with 🔴, ledgered as surface `slack` with the result's
+`key` ([logging.md](logging.md) → **Ledger of external writes**); then end. Later runs decline
+quietly until the probes pass again. A Slack turn always gets it, to answer the person in its
+thread (`channel` is `null` there). The audit runs the same probes and reports them as checks.
 
 ## Egress rules
 

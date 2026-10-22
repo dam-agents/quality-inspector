@@ -7,6 +7,9 @@ trap 'rm -rf "$SANDBOX"' EXIT
 export WORK_DIR="$SANDBOX/work" STUB_DIR="$SANDBOX/stub" PATH="$TESTS_DIR/bin:$PATH"
 unset QI_TARGET_REPO
 mkdir -p "$WORK_DIR/logs" "$STUB_DIR"
+# The harness settings the black-box gate checks: the policy hook registered, as onboarding leaves it.
+export QI_CLAUDE_SETTINGS="$SANDBOX/claude-settings.json"
+bash "$SCRIPTS/hooks/install.sh" >/dev/null 2>&1
 FAILED=0
 assert() { # <description> <jq filter that must be true> <json>
   if printf '%s' "$3" | jq -e "$2" >/dev/null 2>&1; then :; else

@@ -79,7 +79,7 @@ never holds a space (`%20`), and `intent` and its outcome share `surface`, `issu
 | `label` | the label name | `target_repo` |
 | `artifact` | `<ac_hash>@<candidate>`; regression: `issue=-`, `regression@<candidate>`; the test catalog: `issue=-`, `catalog@<hash>` | `artifact:<id>`, `artifact:new` before a first create |
 | `definition_issue` | 12-hex sha256 of the `failures[]` signature; `issue=-` | `<definition repo>`, `#<n>` appended on `done` |
-| `slack` | a scenario's answer `S-<k>:<spec_hash>`, a digest `digest@<candidate>`; `issue=-` | the conversation id |
+| `slack` | a scenario's answer `S-<k>:<spec_hash>`, a digest `digest@<candidate>`, a black-box breach alert `breach@<hash>` (the gate's `key`); `issue=-` | the conversation id |
 | `slack_test` | `start` or `report` of a Slack-ordered "test #N" ([slack.md](slack.md)) | `slack:<slack_channel>` |
 | `backup` | the pushed tree's sha, 12 hex; `issue=-`; written by `scripts/work-backup.sh` | `work_repo` |
 

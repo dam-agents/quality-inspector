@@ -213,6 +213,8 @@ case "$args" in
   *"contents/.quality-inspector/p/link?ref=HEAD --jq"*) echo "file ${STUB_LINK_SIZE:-34}"; exit 0 ;;
 esac
 path="${*: -1}"; case "$args" in *graphql*) path=graphql;; esac
+[ -n "${STUB_GH_RC:-}" ] && exit "$STUB_GH_RC"
+if [ -n "${STUB_GHID:-}" ] && printf '%s' "$path" | grep -qE "$STUB_GHID"; then printf 'HTTP/2.0 404 Not Found\nX-Github-Request-Id: AB12:3C4D\n\n{}\n'; exit 1; fi
 if [ -n "${STUB_OPEN:-}" ] && printf '%s' "$path" | grep -qE "$STUB_OPEN"; then echo "HTTP/2.0 200 OK"; exit 0; fi
 if [ -n "${STUB_404:-}" ] && printf '%s' "$path" | grep -qE "$STUB_404"; then echo "HTTP/2.0 404 Not Found"; exit 1; fi
 echo "HTTP/1.1 403 Forbidden"; exit 1
@@ -220,11 +222,29 @@ S
 cat > "$BIN/curl" <<'S'
 #!/usr/bin/env bash
 url="${*: -1}"
-if [ -n "${STUB_HELD:-}" ] && printf '%s' "$url" | grep -qE "$STUB_HELD"; then printf 'HTTP/1.1 000'; exit 28; fi
+if [ -n "${STUB_HELD:-}" ] && printf '%s' "$url" | grep -qE "$STUB_HELD"; then exit 28; fi
 if [ -n "${STUB_OPEN:-}" ] && printf '%s' "$url" | grep -qE "$STUB_OPEN"; then printf 'HTTP/1.1 302'; exit 0; fi
 printf 'HTTP/1.1 403'; exit 0
 S
-chmod +x "$BIN/gh" "$BIN/curl"
+# git ls-remote as the probes run it (GIT_TRACE_CURL on stderr): STUB_GIT_OPEN lists the refs,
+# STUB_GIT_GHID gets GitHub's own 404, STUB_SSH_KEY an SSH server refusing the key; else refused.
+cat > "$BIN/git" <<'S'
+#!/usr/bin/env bash
+url="${*: -2:1}"; printf '%s\n' "$*" >> "$STUB_DIR/git.calls"
+[ -n "${STUB_GIT_RC:-}" ] && exit "$STUB_GIT_RC"
+if [ -n "${STUB_GIT_OPEN:-}" ] && printf '%s' "$url" | grep -qE "$STUB_GIT_OPEN"; then printf 'abc123\tHEAD\n'; exit 0; fi
+case "$url" in
+  (ssh://*) if [ -n "${STUB_SSH_KEY:-}" ]; then echo 'git@github.com: Permission denied (publickey).' >&2
+            else echo "ssh: connect to host github.com port 22: Connection refused" >&2; fi ;;
+  (*) echo '12:00:00.000000 http.c:756  <= Recv header: HTTP/2 404' >&2
+      [ -n "${STUB_GIT_GHID:-}" ] && printf '%s\n' "$url" | grep -qE "$STUB_GIT_GHID" \
+        && echo '12:00:00.000000 http.c:756  <= Recv header: x-github-request-id: AB12:3C4D' >&2 \
+        || echo '12:00:00.000000 http.c:756  <= Recv header: HTTP/2 403' >&2
+      echo 'fatal: unable to access: The requested URL returned error: 403' >&2 ;;
+esac
+exit 128
+S
+chmod +x "$BIN/gh" "$BIN/curl" "$BIN/git"
 probe() { ( PATH="$BIN:$PATH"; . "$SCRIPTS/lib/config.sh"; . "$SCRIPTS/lib/profile.sh"; . "$SCRIPTS/lib/boundary.sh"
             CONFIG="$WORK_DIR/CONFIG.md" boundary_probe acme/widgets ); }
 
@@ -264,6 +284,33 @@ printf '%s\n' "$out" | grep -qF 'ok boundary:repositories/1/contents/ refused' \
 grep -qE '(^| )repos/acme/widgets( |$)' "$STUB_DIR/gh.calls" \
   && { echo "  assertion failed: a probe read GET /repos/<T>, not an issues endpoint"; FAILED=1; }
 printf '%s\n' "$out" | grep -qF 'ok boundary:graphql refused' || { echo "  assertion failed: graphql probed"; FAILED=1; }
+grep -qF 'repository(owner:"acme",name:"widgets"){object(expression:"HEAD:")' "$STUB_DIR/gh.calls" \
+  || { echo "  assertion failed: the GraphQL probe asks for the target's tree"; FAILED=1; }
+for want in 'ok boundary:git:https://github.com/acme/widgets.git refused' 'ok boundary:git:https://github.com/acme/widgets.wiki.git refused' \
+            'ok boundary:ssh:ssh://git@github.com/acme/widgets.git refused' 'ok boundary:ssh:ssh://git@ssh.github.com:443/acme/widgets.git refused' \
+            'ok boundary:repos/acme/widgets/zipball/HEAD refused' 'ok boundary:repos/acme/widgets/git/trees/HEAD refused'; do
+  printf '%s\n' "$out" | grep -qxF "$want" || { echo "  assertion failed: probed: $want"; FAILED=1; }
+done
+
+# An answer from GitHub itself is a breach whatever its status: the egress let it through.
+out="$(STUB_OPEN="$PROFILE_OPEN" STUB_GHID='git/blobs/' STUB_GIT_GHID='\.wiki\.git' probe)"
+printf '%s\n' "$out" | grep -q '^fail boundary:repos/acme/widgets/git/blobs/0\{40\} source surface reachable (HTTP 404 from GitHub itself' \
+  || { echo "  assertion failed: GitHub's own 404 through gh fails"; FAILED=1; }
+printf '%s\n' "$out" | grep -q '^fail boundary:git:https://github.com/acme/widgets.wiki.git source surface reachable (HTTP 404 from GitHub itself' \
+  || { echo "  assertion failed: GitHub's own 404 through git fails"; FAILED=1; }
+assert_eq "only GitHub's own answers fail" "2" "$(printf '%s\n' "$out" | grep -c '^fail ')"
+# git listing the refs is a breach; an SSH server refusing the key is unproven, never a pass.
+out="$(STUB_OPEN="$PROFILE_OPEN" STUB_GIT_OPEN='^https://github.com/acme/widgets.git$' STUB_SSH_KEY=1 probe)"
+printf '%s\n' "$out" | grep -qxF 'fail boundary:git:https://github.com/acme/widgets.git source surface reachable (HTTP 200)' \
+  || { echo "  assertion failed: a git ls-remote that lists refs fails"; FAILED=1; }
+assert_eq "an SSH server that answers warns, per SSH host" "2" "$(printf '%s\n' "$out" | grep -c '^warn boundary:ssh:.* an SSH server answered')"
+# A probe that sent nothing proves nothing: no client, or gh without a token.
+out="$(STUB_OPEN="$PROFILE_OPEN" STUB_GH_RC=4 STUB_GIT_RC=127 probe)"
+printf '%s\n' "$out" | grep -qxF 'warn boundary:graphql not probed: gh has no token, so no request left the VM — the deny is unproven' \
+  || { echo "  assertion failed: gh without a token warns"; FAILED=1; }
+printf '%s\n' "$out" | grep -qxF 'warn boundary:git:https://github.com/acme/widgets.git not probed: the VM has no git client — the deny is unproven' \
+  || { echo "  assertion failed: no git client warns"; FAILED=1; }
+printf '%s\n' "$out" | grep -q '^ok boundary:\(repos\|graphql\|git\|ssh\)' && { echo "  assertion failed: an unsent probe passed"; FAILED=1; }
 
 out="$(STUB_OPEN='^repos/.*/contents/$|archive/|contents/\.quality-inspector(/\.\.|\?ref=HEAD)$' STUB_404='timeline$' STUB_HELD='gitlab' probe)"
 assert_eq "an open surface fails" "5" "$(printf '%s\n' "$out" | grep -c '^fail ')"
