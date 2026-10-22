@@ -7,6 +7,14 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.8.1 — 2026-10-22
+
+**Upgrade:**
+Nothing to run. On the dashboard's next build a report opens through "Open the report" (the
+command `open the report <id>`, answered with the report's chip in the chat), and the Product map
+draws every control — dashed where no test names it — with navigation items and links walking to
+the page they lead to.
+
 ## 3.8.0 — 2026-10-22
 
 **Upgrade:**

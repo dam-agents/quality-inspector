@@ -335,7 +335,7 @@ if (newestMap) {
       const f = (n) => Math.round(n * 10000) / 10000;
       return (r.boxes ?? []).filter((b) => Array.isArray(b) && matchable(String(b[1]))).slice(0, HOTSPOTS_MAX).map(([kind, name, x, y, w, h]) => {
         const box = [f(x / vw), f(y / vh), f(w / vw), f(h / vh)];
-        const to = kind === 'nav' ? navTarget(name) : null;
+        const to = kind === 'nav' || kind === 'links' ? navTarget(name) : null;
         if (to) return { kind, name, box, to, items: reachOf.get(to) ?? [] };
         const re = controlRe(String(name), { quoted: true });
         const only = onPages.get(String(name).toLowerCase())?.size === 1;

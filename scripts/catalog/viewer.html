@@ -144,15 +144,16 @@ td.nw{white-space:nowrap}
 .stage.wf{background:var(--card);background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:40px 40px}
 .hs{position:absolute;border:2px solid var(--muted);border-radius:3px;background:color-mix(in srgb,var(--muted) 14%,transparent);cursor:pointer;padding:0;overflow:hidden;min-width:6px;min-height:6px}
 .hs:hover,.hs.sel{outline:3px solid var(--link);outline-offset:1px;z-index:3}
+.hs.go{cursor:alias}
 .hs.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 16%,transparent)}
 .hs.warn{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 18%,transparent)}
 .hs.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 20%,transparent)}
-.hs.none{border:1px dashed var(--dim);background:transparent}
+.hs.none{border:2px dashed var(--link);background:color-mix(in srgb,var(--link) 7%,transparent)}
 .stage.wf .hs{background:var(--bg)}
 .hs span{display:block;font-size:10px;line-height:1.2;padding:1px 3px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
 .legend-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12.5px;color:var(--dim);margin:8px 0}
 .sw{display:inline-block;width:14px;height:10px;border-radius:2px;border:2px solid var(--muted);vertical-align:middle;margin-right:4px}
-.sw.ok{border-color:var(--ok)}.sw.warn{border-color:var(--warn)}.sw.bad{border-color:var(--bad)}.sw.none{border:1px dashed var(--dim)}
+.sw.ok{border-color:var(--ok)}.sw.warn{border-color:var(--warn)}.sw.bad{border-color:var(--bad)}.sw.none{border:2px dashed var(--link)}
 .cells{display:inline-flex;gap:2px;vertical-align:middle}
 .cells i{width:9px;height:12px;border-radius:2px;background:var(--mutedbg)}
 .cells i.ok{background:var(--ok)}.cells i.warn{background:var(--warn)}.cells i.bad{background:var(--bad)}.cells i.muted{background:var(--muted)}
@@ -381,7 +382,7 @@ const QUICK = [
   ['Nightly regression', { tier: ['regression'] }], ['Needs attention', { flag: ['needs attention'] }], ['Promotable queue', { tier: ['promotable'] }],
   ['Flaky & healed', { flag: ['flaky', 'healed'] }], ['Costly (agent.assert)', { flag: ['agent.assert'] }], ['Explorations', { kind: ['exploration'] }], ['Scenarios', { origin: ['scenario'] }],
 ];
-const S = { v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS.slice(), i: null, r: null, at: null, pg: null, hs: null, rt: 'all', all: false, hall: false, hsort: 'recent', limit: 100, side: false };
+const S = { v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS.slice(), i: null, r: null, at: null, pg: null, hs: null, rt: 'all', only: false, hall: false, hsort: 'recent', limit: 100, side: false };
 
 const DEFAULTS = JSON.stringify({ v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS, i: null, r: null, at: null, pg: null, hs: null, rt: 'all' });
 function readHash() {
@@ -448,7 +449,7 @@ function stepText(t) {
 }
 // The commands the page may offer: the operator's words of docs/on-demand.md and docs/modules.md,
 // built from constants and ids only. Anything else is never shown, copied or sent.
-const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+)$/;
+const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+|open the report [A-Za-z0-9_-]{1,64})$/;
 // On an interactive artifact beside the agent's chat the platform injects `platform.sendPrompt`:
 // a click sends the command as the operator's own chat message. It gives no answer back.
 const bridge = () => { try { return window.platform && typeof window.platform.sendPrompt === 'function' ? window.platform : null; } catch { return null; } };
@@ -487,7 +488,29 @@ const openItem = (key) => { S.i = key; S.r = null; writeHash(); renderDrawer(); 
 const openRun = (r) => { if (!r) return; S.r = r.id; S.i = null; writeHash(); renderDrawer(); };
 const go = (patch) => { Object.assign(S, { i: null, r: null, limit: 100 }, patch); writeHash(); render(); renderDrawer(); };
 const cells = (hist, n = 12) => h('span', { class: 'cells', 'aria-hidden': true }, hist.slice(-n).map((e) => h('i', { class: vClass(e.value), title: `${fmtDate(e.utc)} ${str(e.build)}: ${vLabel(e.value)}` })));
-const artLink = (ref) => (/^https:\/\/\S+$/.test(str(ref)) ? h('a', { href: str(ref), target: '_blank', rel: 'noopener noreferrer' }, 'open the report') : ref ? h('code', {}, str(ref)) : '–');
+// A report is a private artifact: the page cannot link to it (the app has no address for one), so
+// the agent opens it — "open the report <id>" answers with the platform's chip beside the chat.
+const reportCmd = (ref) => { const m = /^platform:\/\/artifacts\/([A-Za-z0-9_-]{1,64})$/.exec(str(ref)); return m ? `open the report ${m[1]}` : null; };
+const artLink = (ref) => {
+  if (/^https:\/\/\S+$/.test(str(ref))) return h('a', { href: str(ref), target: '_blank', rel: 'noopener noreferrer' }, 'open the report');
+  const c = reportCmd(ref);
+  if (!c) return ref ? h('code', {}, str(ref)) : '–';
+  return h('div', {}, copyBox(c), h('div', { class: 'meta' }, bridge() ? 'The agent answers in the chat with the report; click it there to open it beside the chat.'
+    : 'A private report: paste this in the agent\'s chat and it answers with the report to open, or find it in the app\'s Artifacts.'));
+};
+// In a table: one button — it sends the command where the page can, else opens the run with it.
+const artCell = (ref, open) => {
+  if (/^https:\/\/\S+$/.test(str(ref))) return artLink(ref);
+  const c = reportCmd(ref);
+  if (!c) return ref ? h('code', {}, str(ref)) : '–';
+  const b = h('button', { class: 'btn', type: 'button', onclick: () => {
+    const p = bridge();
+    if (!p) { open(); return; }
+    b.disabled = true;
+    Promise.resolve().then(() => p.sendPrompt(c)).then(() => { b.textContent = 'Sent — see the chat'; }, () => { b.disabled = false; open(); });
+  } }, 'Open the report');
+  return b;
+};
 const commands = (i) => {
   const out = [];
   if (i.kind === 'exploration') return out;
@@ -849,7 +872,7 @@ function viewRuns() {
       h('td', { class: 'name' }, h('div', {}, r.type === 'regression' ? RUNTYPE.regression : `${RUNTYPE[r.type]} ${r.ref}`), r.type !== 'regression' && originTitle(r.ref) ? h('div', { class: 'meta' }, originTitle(r.ref)) : null),
       h('td', { class: 'nw' }, h('code', {}, r.build), r.baseline ? h('div', { class: 'meta' }, `vs ${str(r.baseline)}`) : r.previous ? h('div', { class: 'meta' }, `since ${str(r.previous)}`) : null),
       h('td', {}, badge(r.verdict)), h('td', {}, outcome(r)),
-      h('td', { onclick: (e) => e.stopPropagation() }, artLink(r.report))))))));
+      h('td', { onclick: (e) => e.stopPropagation() }, artCell(r.report, () => openRun(r)))))))));
   if (list.length > S.limit) v.append(h('div', { class: 'more-row' }, h('button', { class: 'btn', type: 'button', onclick: () => { S.limit += 100; render(); } }, `Show more (${list.length - S.limit} left)`)));
 }
 function runDrawer(r) {
@@ -901,6 +924,9 @@ function itemRow(i) {
   return h('li', { style: 'margin:6px 0' }, badge(i.latest), ' ', h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key) }, `${i.label} — ${str(i.name)}`),
     ' ', tierB(i.tier), i.history.length ? h('div', {}, cells(i.history)) : null);
 }
+// The pages walked through on the map, for its "back" (this view only, never in the address).
+const mapTrail = [];
+const walk = (from, to) => { mapTrail.push(from); if (mapTrail.length > 50) mapTrail.shift(); go({ pg: to, hs: null }); };
 function viewMap() {
   const v = $('#view');
   if (!pagesData.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No UI map yet.'), h('p', {}, 'The product map appears after the first nightly regression run walks the product.'))); return; }
@@ -917,7 +943,7 @@ function viewMap() {
   const src = img(p.shot);
   const vp = arr(p.viewport).map(Number);
   const ratio = vp.length === 2 && vp[0] > 0 && vp[1] > 0 ? vp[0] / vp[1] : 1.6;
-  const showAll = S.all || !src;
+  const showAll = !S.only || !src;
   const stage = h('div', { class: `stage${src ? '' : ' wf'}`, style: `aspect-ratio:${ratio}` }, src ? h('img', { src, alt: `Screenshot of ${str(p.title) || p.pattern}` }) : null);
   const order = p.hotspots.map((x, k) => k).sort((a, b) => p.hotspots[b].box[2] * p.hotspots[b].box[3] - p.hotspots[a].box[2] * p.hotspots[a].box[3]);
   for (const k of order) {
@@ -925,20 +951,27 @@ function viewMap() {
     if (!its.length && !showAll && S.hs !== k) continue;
     const [bx, by, bw, bh] = x.box.map((n) => Math.max(0, Math.min(1, n)) * 100);
     const what = `${KIND[x.kind] || 'Control'} "${x.name}"`;
-    stage.append(h('button', { class: `hs ${st}${S.hs === k ? ' sel' : ''}`, type: 'button', style: `left:${bx}%;top:${by}%;width:${bw}%;height:${bh}%`,
-      title: `${what} — ${its.length ? `${its.length} test(s), ${vLabel(its.find((i) => i.cls === st)?.latest || '')}` : 'no test names it'}`,
-      'aria-label': `${what}: ${its.length} test(s)`, 'aria-pressed': S.hs === k ? 'true' : 'false', onclick: () => go({ hs: S.hs === k ? null : k }) },
-    src ? null : h('span', {}, x.name)));
+    // A control that leads to a mapped page walks there, like a click-through wireframe.
+    const to = x.to && x.to !== p.pattern && pageOf(x.to) ? x.to : null;
+    const tests = its.length ? `${its.length} test(s), ${vLabel(its.find((i) => i.cls === st)?.latest || '')}` : 'no test names it';
+    stage.append(h('button', { class: `hs ${st}${to ? ' go' : ''}${S.hs === k ? ' sel' : ''}`, type: 'button', style: `left:${bx}%;top:${by}%;width:${bw}%;height:${bh}%`,
+      title: to ? `${what} — opens ${to} on the map (${tests})` : `${what} — ${tests}`,
+      'aria-label': to ? `${what}: open ${to}` : `${what}: ${its.length} test(s)`, 'aria-pressed': to ? null : S.hs === k ? 'true' : 'false',
+      onclick: () => (to ? walk(p.pattern, to) : go({ hs: S.hs === k ? null : k })) },
+    src ? null : h('span', {}, to ? `${x.name} ↗` : x.name)));
   }
   const pageItems = p.items.filter(present).map((k) => byKey.get(k)).sort((a, b) => SEV[a.cls] - SEV[b.cls]);
   const named = p.hotspots.filter((x) => hsItems(x).length).length;
+  const back = mapTrail.length && pageOf(mapTrail[mapTrail.length - 1]) ? mapTrail[mapTrail.length - 1] : null;
   const head = h('div', {},
-    h('div', { style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:baseline' }, h('h2', { style: 'font-size:16px;margin:0' }, str(p.title) || p.pattern), h('code', {}, p.pattern),
+    h('div', { style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:baseline' },
+      back ? h('button', { class: 'btn', type: 'button', onclick: () => { mapTrail.pop(); go({ pg: back, hs: null }); } }, `← ${str(pageOf(back).title) || back}`) : null, h('h2', { style: 'font-size:16px;margin:0' }, str(p.title) || p.pattern), h('code', {}, p.pattern),
       h('span', { class: `badge ${{ regression: 'ok', exploratory: 'warn' }[p.covered] || 'bad'}` }, p.covered === 'regression' ? 'regression' : p.covered === 'exploratory' ? 'exploratory only' : 'not covered')),
     h('div', { class: 'legend-row' },
       p.hotspots.length ? h('span', {}, `${named} of ${p.hotspots.length} controls named by a test`) : h('span', {}, 'This UI map has no control positions yet — they appear after the next nightly run.'),
       h('span', {}, h('i', { class: 'sw bad' }), 'regression / failed'), h('span', {}, h('i', { class: 'sw warn' }), 'needs a look'), h('span', {}, h('i', { class: 'sw ok' }), 'passing'), h('span', {}, h('i', { class: 'sw' }), 'blocked / no verdict'),
-      src && p.hotspots.length ? h('label', {}, h('input', { type: 'checkbox', checked: S.all ? true : null, onchange: () => { S.all = !S.all; render(); } }), ' ', h('i', { class: 'sw none' }), 'show controls no test names') : null));
+      p.hotspots.length ? h('span', {}, h('i', { class: 'sw none' }), 'no test names it yet') : null,
+      src && p.hotspots.length ? h('label', {}, h('input', { type: 'checkbox', checked: S.only ? true : null, onchange: () => { S.only = !S.only; render(); } }), ' only the controls a test names') : null));
   if (!src && !p.hotspots.length) stage.append(h('div', { class: 'ph', style: 'position:absolute;inset:0;border:0' }, 'No screenshot and no control positions for this page.'));
   const x = S.hs != null ? p.hotspots[S.hs] : null;
   const its = x ? hsItems(x) : [];
@@ -948,7 +981,7 @@ function viewMap() {
       its.length ? h('ul', { class: 'att' }, its.map(itemRow)) : h('p', { class: 'muted-t' }, x.to ? 'No test reaches that page.' : 'No test names this control.'),
       h('button', { class: 'linkish', type: 'button', onclick: () => go({ hs: null }) }, '← the whole page')]
       : [h('h3', {}, `Tests that reach this page (${pageItems.length})`), pageItems.length ? h('ul', { class: 'att' }, pageItems.map(itemRow)) : h('p', { class: 'muted-t' }, 'No test reaches this page.'),
-        h('p', { class: 'meta' }, src || p.hotspots.length ? 'Click a highlighted control to see the tests that name it.' : '')]);
+        h('p', { class: 'meta' }, p.hotspots.length ? 'Click any outlined control on the screenshot: its tests, or ask for a test of it. A navigation item or link (↗) opens the page it leads to.' : '')]);
   detail.append(askForm(p, x));
   v.append(h('div', { class: 'maplayout' }, list, h('div', { style: 'min-width:0' }, sel, head, stage), detail));
 }

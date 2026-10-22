@@ -22,7 +22,9 @@ The operator may share the page beyond themselves, so it carries only what conce
   collections, and **every run** (the newest 400): each night of `work/REGRESSION.log` — its
   counts, the criteria that were not `unchanged`, the change context's issues (number, title), UI
   diff text and signal counts — or its environment failure; each issue and scenario run with its
-  verdicts; each with its build and report reference (a link when `artifact.id` holds one).
+  verdicts; each with its build and report reference (a link when `artifact.id` holds one; else
+  "Open the report" — the command `open the report <id>`, since a private artifact has no
+  address a page can link to).
 - **Product map:** per page of the newest map, every named control the map saw on screen (its
   `boxes`, [change-awareness.md](change-awareness.md) → The three sources) with the items that
   name it in a quoted string — on that page only, or in a test that opens the page; a navigation
@@ -61,12 +63,14 @@ The operator may share the page beyond themselves, so it carries only what conce
 Views: Overview, Modules (each module's switches and settings), Findings (validation, stress,
 security counts, edge-case observations), Design (the design findings: crops, filters, "copy as
 Markdown" for the design team), Runs, Product map (the page shots with every control clickable, coloured by
-its tests' worst verdict; a drawn outline where a shot did not fit), Catalog, Gallery, Coverage,
+its tests' worst verdict, dashed where no test names it; a drawn outline where a shot did not fit; a
+navigation item or link to a mapped page opens that page, like a click-through wireframe, with a
+"back"), Catalog, Gallery, Coverage,
 History (item × build) and Lifecycle, plus a detail panel per item and per run. **As of a
 build** shows every view with the verdicts as they stood when that build last ran (files, tiers
 and steps stay today's); older catalogs are the artifact's earlier revisions. An action appears
 as a command for the direct session (`promote #42`, `module stress set stress_checks=weekly`) —
-only one of the closed set of [on-demand.md](on-demand.md) and [modules.md](modules.md) →
+only one of the closed set of [on-demand.md](on-demand.md) (`open the report <id>` included) and [modules.md](modules.md) →
 **Control**, built from constants and ids, never from page data. It can be copied; on an
 interactive page opened beside the agent's chat its button sends it as the operator's message.
 The one exception is **Ask for a test** on the Product map: a scenario request built from the
