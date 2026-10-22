@@ -219,15 +219,20 @@ if [ -n "${STUB_OPEN:-}" ] && printf '%s' "$path" | grep -qE "$STUB_OPEN"; then 
 if [ -n "${STUB_404:-}" ] && printf '%s' "$path" | grep -qE "$STUB_404"; then echo "HTTP/2.0 404 Not Found"; exit 1; fi
 echo "HTTP/1.1 403 Forbidden"; exit 1
 S
+# curl -D - -w behind the gateway's proxy: its CONNECT answer comes first, then the upstream's
+# (none when held: rc 28, or a failed TLS handshake: STUB_TLS_FAIL, rc 35).
 cat > "$BIN/curl" <<'S'
 #!/usr/bin/env bash
 url="${*: -1}"
-if [ -n "${STUB_HELD:-}" ] && printf '%s' "$url" | grep -qE "$STUB_HELD"; then exit 28; fi
-if [ -n "${STUB_OPEN:-}" ] && printf '%s' "$url" | grep -qE "$STUB_OPEN"; then printf 'HTTP/1.1 302'; exit 0; fi
-printf 'HTTP/1.1 403'; exit 0
+printf 'HTTP/1.1 200 Connection established\r\n\r\n'
+if [ -n "${STUB_HELD:-}" ] && printf '%s' "$url" | grep -qE "$STUB_HELD"; then printf '\nHTTP-CODE 000\n'; exit 28; fi
+if [ -n "${STUB_TLS_FAIL:-}" ] && printf '%s' "$url" | grep -qE "$STUB_TLS_FAIL"; then printf '\nHTTP-CODE 000\n'; exit 35; fi
+if [ -n "${STUB_OPEN:-}" ] && printf '%s' "$url" | grep -qE "$STUB_OPEN"; then printf 'HTTP/1.1 302 Found\r\n\r\n\nHTTP-CODE 302\n'; exit 0; fi
+printf 'HTTP/1.1 403 Forbidden\r\n\r\n\nHTTP-CODE 403\n'; exit 0
 S
-# git ls-remote as the probes run it (GIT_TRACE_CURL on stderr): STUB_GIT_OPEN lists the refs,
-# STUB_GIT_GHID gets GitHub's own 404, STUB_SSH_KEY an SSH server refusing the key; else refused.
+# git ls-remote as the probes run it (GIT_TRACE_CURL on stderr), behind the proxy's CONNECT:
+# STUB_GIT_OPEN lists the refs, STUB_GIT_GHID gets GitHub's own 404, STUB_GIT_TUNNEL no answer
+# after the tunnel, STUB_SSH_KEY an SSH server refusing the key; else refused.
 cat > "$BIN/git" <<'S'
 #!/usr/bin/env bash
 url="${*: -2:1}"; printf '%s\n' "$*" >> "$STUB_DIR/git.calls"
@@ -236,7 +241,10 @@ if [ -n "${STUB_GIT_OPEN:-}" ] && printf '%s' "$url" | grep -qE "$STUB_GIT_OPEN"
 case "$url" in
   (ssh://*) if [ -n "${STUB_SSH_KEY:-}" ]; then echo 'git@github.com: Permission denied (publickey).' >&2
             else echo "ssh: connect to host github.com port 22: Connection refused" >&2; fi ;;
-  (*) echo '12:00:00.000000 http.c:756  <= Recv header: HTTP/2 404' >&2
+  (*) echo '12:00:00.000000 http.c:756  <= Recv header: HTTP/1.1 200 Connection established' >&2
+      if [ -n "${STUB_GIT_TUNNEL:-}" ] && printf '%s\n' "$url" | grep -qE "$STUB_GIT_TUNNEL"; then
+        echo 'fatal: unable to access: Recv failure: Connection reset by peer' >&2; exit 128; fi
+      echo '12:00:00.000000 http.c:756  <= Recv header: HTTP/2 404' >&2
       [ -n "${STUB_GIT_GHID:-}" ] && printf '%s\n' "$url" | grep -qE "$STUB_GIT_GHID" \
         && echo '12:00:00.000000 http.c:756  <= Recv header: x-github-request-id: AB12:3C4D' >&2 \
         || echo '12:00:00.000000 http.c:756  <= Recv header: HTTP/2 403' >&2
@@ -320,6 +328,13 @@ printf '%s\n' "$out" | grep -q '^warn boundary:repos/acme/widgets/issues/7/timel
   || { echo "  assertion failed: a 404 is no proof of a deny"; FAILED=1; }
 printf '%s\n' "$out" | grep -q '^warn boundary:https://gitlab.com/ request held' \
   || { echo "  assertion failed: a held request warns"; FAILED=1; }
+# A proxy's CONNECT 200 with no upstream answer after it is never a status: no false breach.
+tun="$(STUB_OPEN="$PROFILE_OPEN" STUB_HELD='gitlab' STUB_TLS_FAIL='codeberg' STUB_GIT_TUNNEL='\.wiki\.git' probe)"
+assert_eq "a tunnel without an answer is no breach" "" "$(printf '%s\n' "$tun" | grep '^fail ')"
+printf '%s\n' "$tun" | grep -qxF 'ok boundary:https://codeberg.org/ refused' \
+  || { echo "  assertion failed: a failed TLS handshake after the tunnel is refused"; FAILED=1; }
+printf '%s\n' "$tun" | grep -qxF 'ok boundary:git:https://github.com/acme/widgets.wiki.git refused' \
+  || { echo "  assertion failed: git with only the tunnel's 200 is refused"; FAILED=1; }
 
 # The fix of a fail line: its own remedy where it carries one, else the printed rules.
 fix() ( . "$SCRIPTS/lib/config.sh"; . "$SCRIPTS/lib/boundary.sh"; boundary_fix "$1" )

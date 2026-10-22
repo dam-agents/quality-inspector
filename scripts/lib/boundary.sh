@@ -112,17 +112,27 @@ boundary_targets() { # <target>
 # git's SSH client for the ssh probes: never a prompt, a short connect, any host key.
 _BB_SSH='ssh -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR'
 
-# One probe's answer, from what its client printed — gh -i, curl -D -, git's curl trace, ssh's
-# errors — and a last "rc=<exit code>" line: "<code> <github>". <code> is the last HTTP status
-# (a proxy's CONNECT answer comes first) or held, none (no connection), nocli (no client in the
-# VM), noauth (gh sent nothing: no token), sshd (an SSH server answered); <github> is yes when
-# GitHub itself sent the answer (its X-GitHub-Request-Id header), whatever the status.
+# One probe's answer, from what its client printed — gh -i, curl -D - with its final status
+# as "HTTP-CODE <n>", git's curl trace, ssh's errors — and a last "rc=<exit code>" line:
+# "<code> <github>". <code> is the final HTTP status or held, none (no connection), nocli (no
+# client in the VM), noauth (gh sent nothing: no token), sshd (an SSH server answered);
+# <github> is yes when GitHub itself sent the answer (its X-GitHub-Request-Id header),
+# whatever the status. A proxy's answer to CONNECT is never the status: curl's %{http_code}
+# leaves it out, and git's trace shows it first — a 2xx or 3xx there counts only when git
+# listed the refs or GitHub's header came with it (gh prints no tunnel).
 _bb_answer() { # <kind> <output>
   local out="$2" rc code github=no
   rc="${out##*rc=}"; rc="${rc%%[!0-9]*}"
-  code="$(printf '%s\n' "$out" | sed -n 's/^HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p' | tail -1)"
   printf '%s\n' "$out" | grep -qi '^x-github-request-id:' && github=yes
-  case "$1:$rc" in (git:0|ssh:0) code=200;; esac   # git listed the refs
+  case "$1" in
+    (url) code="$(printf '%s\n' "$out" | sed -n 's/^HTTP-CODE \([0-9][0-9][0-9]\).*/\1/p' | tail -1)"
+          [ "$code" = 000 ] && code="" ;;
+    (*)   code="$(printf '%s\n' "$out" | sed -n 's/^HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p' | tail -1)" ;;
+  esac
+  case "$1:$rc:$github:$code" in
+    (git:0:*|ssh:0:*) code=200;;          # git listed the refs
+    (git:*:no:[23]??) code="";;           # a tunnel's answer, or no git server's
+  esac
   if [ -z "$code" ]; then
     case "$1:$rc" in
       (*:124|url:28) code=held;;
@@ -163,7 +173,7 @@ boundary_probe() { # <target>
       (git|ssh) out="$( { GIT_TERMINAL_PROMPT=0 GIT_TRACE_CURL=1 GIT_TRACE_CURL_NO_DATA=1 GIT_SSH_COMMAND="$_BB_SSH" \
               _bb_timeout 25 git ls-remote "$target" HEAD </dev/null 2>&1 >/dev/null; echo "rc=$?"; } | sed -n 's/.*<= Recv header: //p; /Permission denied/p; /cannot run ssh/p; /^rc=/p')"
             label="boundary:$kind:${target%%\?*}" ;;
-      (url) out="$({ curl -s -o /dev/null -D - --max-time 20 --max-filesize 1 "$target" </dev/null 2>/dev/null; c=$?; echo; echo "rc=$c"; })" ;;
+      (url) out="$({ curl -s -o /dev/null -D - --max-time 20 --max-filesize 1 -w '\nHTTP-CODE %{http_code}\n' "$target" </dev/null 2>/dev/null; c=$?; echo; echo "rc=$c"; })" ;;
       (*)   continue ;;
     esac
     read -r code github <<<"$(_bb_answer "$kind" "$out")"
