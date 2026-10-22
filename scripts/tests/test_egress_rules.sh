@@ -41,12 +41,16 @@ printf '%s\n' "$cmds" | grep -q 'are left out' && { echo "  assertion failed: no
 # rule the kit already holds nothing, any other host through its approval prompt.
 kit '  - host: g.example' '    pathPattern: "/*"' '    verdict: deny' \
     '  - host: g.example' '    method: GET' '    pathPattern: "/ok/v*/f.yaml"' \
+    '  - host: g.example' '    method: GET' '    pathPattern: "/k/*"' \
+    '  - host: g.example' '    method: GET' '    pathPattern: "/k/*/*"' '    verdict: deny' \
     '  - host: "*.h.example"' '    pathPattern: "/*"' '    verdict: deny'
 cat > "$QI_PROFILE_DIR/profile.json" <<'J'
 {"schema":"qi-profile/v1","product":"Stub","app":{"url":"http://localhost:8080"},
  "egress":[{"host":"cdn.example.com","method":"GET","path":"/a/*","why":"assets $(x)"},
            {"host":"g.example","method":"GET","path":"/other/*","why":"under the deny"},
            {"host":"g.example","method":"GET","path":"/ok/v1/f.yaml","why":"the kit's"},
+           {"host":"g.example","method":"GET","path":"/k/a","why":"the kit's allow"},
+           {"host":"g.example","method":"GET","path":"/k/a/b","why":"a longer kit deny beside it"},
            {"host":"x.h.example","method":"GET","why":"under the wildcard deny"},
            {"host":"g.example","verdict":"deny","path":"/bad/*"}]}
 J
@@ -54,6 +58,8 @@ out="$(bash "$DEF/scripts/egress-rules.sh" --json)"
 assert_eq "how each profile rule lands" "prompt cdn.example.com /a/* assets \$(x)
 by-hand g.example /other/* under the deny
 kit g.example /ok/v1/f.yaml the kit's
+kit g.example /k/a the kit's allow
+by-hand g.example /k/a/b a longer kit deny beside it
 by-hand x.h.example * under the wildcard deny
 by-hand g.example /bad/* " "$(jq -r '.rules[] | select(.source == "profile") | "\(.how) \(.host) \(.path) \(.why)"' <<<"$out")"
 bash "$DEF/scripts/egress-rules.sh" | grep -E '(^| )(dam|curl|gh) ' && { echo "  assertion failed: no CLI command in the list"; FAILED=1; }
@@ -65,6 +71,8 @@ bash "$DEF/scripts/egress-rules.sh" | grep -qF '| prompt | allow | GET | `cdn.ex
 # closed set passes — a literal owner/repo, never the target's or the backup's; a GitHub
 # App's endpoints are not in it. Under the kit's deny, an accepted one lands by hand.
 kit '  - host: api.github.com' '    pathPattern: "/*"' '    verdict: deny' \
+    '  - host: api.github.com' '    method: GET' '    pathPattern: "/repos/*/*"' \
+    '  - host: api.github.com' '    method: GET' '    pathPattern: "/repos/*/*/*"' '    verdict: deny' \
     '  - host: github.com' '    pathPattern: "/*"' '    verdict: deny'
 cat > "$QI_PROFILE_DIR/profile.json" <<'J'
 {"schema":"qi-profile/v1","product":"Stub","app":{"url":"http://localhost:8080"},
@@ -77,6 +85,7 @@ cat > "$QI_PROFILE_DIR/profile.json" <<'J'
            {"host":"api.github.com","method":"POST","path":"/repos/*/qa/issues","why":"wildcard owner"},
            {"host":"api.github.com","method":"POST","path":"/repos/my_org/qa/issues","why":"underscore"},
            {"host":"api.github.com","method":"POST","path":"/repos/sb/qa","why":"no rest"},
+           {"host":"api.github.com","method":"GET","path":"/repos/{profile.sb_repo}/pulls?*","why":"under the kit's longer deny"},
            {"host":"github.com","method":"GET","path":"/{profile.sb_repo}.git/info/refs?service=git-upload-pack","why":"clone"},
            {"host":"github.com","method":"POST","path":"/{profile.sb_repo}.git/git-upload-pack","why":"clone"},
            {"host":"github.com","method":"GET","path":"/{profile.sb_repo}/info/refs?service=git-receive-pack","why":"push, no .git"},
@@ -114,6 +123,7 @@ refused POST api.github.com /repos/ACME/x/issues
 refused POST api.github.com /repos/*/qa/issues
 refused POST api.github.com /repos/my_org/qa/issues
 refused POST api.github.com /repos/sb/qa
+by-hand GET api.github.com /repos/qa-sandbox/e2e-playground/pulls?*
 by-hand GET github.com /qa-sandbox/e2e-playground.git/info/refs?service=git-upload-pack
 by-hand POST github.com /qa-sandbox/e2e-playground.git/git-upload-pack
 by-hand GET github.com /qa-sandbox/e2e-playground/info/refs?service=git-receive-pack
