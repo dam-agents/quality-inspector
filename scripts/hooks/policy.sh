@@ -53,7 +53,8 @@
 #                                          or one plain read-only grep|rg|cat|head|tail|wc|ls|git log…
 #                    Write Edit … (channel turn)  content naming github.sh
 #   module-set       Bash (scheduled)      a command naming modules.sh, CLAUDE_CODE_SESSION_ID or CLAUDE_CONFIG_DIR
-#                                          in any spelling bash reads literally (as channel-write) — unless
+#                                          in any spelling bash reads literally, $'…' decoded, a glob
+#                                          of `*` alone left out (mod_names) — unless
 #                                          it is one plain `[bash] "$HOME/scripts/modules.sh"
 #                                          status|due|ran|focus-done|check|value|schedules <args>` or one plain
 #                                          read-only command: the modules' settings, the focus queue and
@@ -351,6 +352,11 @@ names_words() { # <text> <word>… — 0 when a word bash reads literally from <
   for w in ${ws[@]+"${ws[@]}"}; do
     for ch in "$@"; do [ "$w" = "$ch" ] || [ "${w##*/}" = "$ch" ] && return 0; done
     case "$w" in (*[*?[{]*) ;; (*) continue;; esac
+    if [ -n "$NW_STAR_FREE" ]; then # module-set: a last segment of `*` alone (or `{a..b}`), with an
+      ch="${w##*/}"                  # optional extension, picks no one file among its siblings
+      while [[ "$ch" =~ \{[^{}]*\.\.[^{}]*\} ]]; do ch="${ch/"${BASH_REMATCH[0]}"/*}"; done
+      [[ "$ch" =~ ^\*+(\.[A-Za-z0-9]+)?$ ]] && continue
+    fi
     for ch in "$@"; do
       glob_ere "${w##*/}"; [[ "$ch" =~ ^($ERE)$ ]]; [ $? = 1 ] || return 0
       glob_ere "$w"; [[ "$ch" =~ ^($ERE)$ ]]; [ $? = 1 ] || return 0
@@ -361,7 +367,32 @@ names_words() { # <text> <word>… — 0 when a word bash reads literally from <
 chan_names() { # <text> [github-only]
   if [ -n "${2:-}" ]; then names_words "$1" github.sh; else names_words "$1" github.sh comment comments unlabel; fi
 }
+NW_STAR_FREE=""
 # module-set — the same closed set for the testing modules in a scheduled or channel turn.
+# Which commands it judges (mod_names) is narrower than chan_names, because it applies to
+# every scheduled run: each $'…' span is read as bash decodes it, and also as a plain '…'
+# span, and a glob word whose last segment is `*` alone with an optional extension does not
+# count. Limit: such a word, or a name a run builds at run time, can still reach modules.sh;
+# modules.sh itself then refuses set|focus|dismiss outside the direct session.
+RE_ANSI_C='\$'"'"'(([^'"'"'\]|\\.)*)'"'"
+ansi_c_decoded() { # <text> → $X: every $'…' span replaced by the text bash makes of it
+  local t="$1" out="" d=""
+  while [[ "$t" =~ $RE_ANSI_C ]]; do
+    out="$out${t%%"${BASH_REMATCH[0]}"*}"
+    # Safe: the span holds no unescaped quote, and $'…' expands nothing.
+    eval "d=\$'${BASH_REMATCH[1]}'"
+    out="$out$d"; t="${t#*"${BASH_REMATCH[0]}"}"
+  done
+  X="$out$t"
+}
+mod_names() { # <text> — 0 when it names modules.sh or a session variable direct_session reads
+  local t="$1" dq="\$'" sq="'" r=1
+  ansi_c_decoded "$t"; NW_STAR_FREE=1
+  names_words "$X" modules.sh CLAUDE_CODE_SESSION_ID CLAUDE_CONFIG_DIR && r=0
+  [ "$r" = 0 ] || { names_words "${t//"$dq"/$sq}" modules.sh CLAUDE_CODE_SESSION_ID CLAUDE_CONFIG_DIR && r=0; }
+  NW_STAR_FREE=""
+  return "$r"
+}
 RE_MOD_PLAIN='^[ 	]*(bash[ 	]+)?("?(\$HOME|\$\{HOME\}|/home/agent)/scripts/modules\.sh"?|~/scripts/modules\.sh|scripts/modules\.sh)[ 	]+(status|due|ran|focus-done|check|value|schedules)(([ 	]+'"$RE_CH_W"')*)([ 	]+2>&1)?[ 	]*$'
 check_module_cmd() { # <raw command> — it names modules.sh or a session variable (names_words)
   local c="$1" ok=0
@@ -413,7 +444,7 @@ check_bash() {
   case "$CMD" in (*work-backup.sh*) scheduled && deny backup-direct "" "a scheduled run or a channel turn never backs up by hand — the Stop hook does";; esac
   case "$CMD" in (*QI_TARGET_REPO*) deny github "QI_TARGET_REPO" "the target comes from work/CONFIG.md alone";; esac
   chan_names "$CMD" && channel_turn && check_channel_writes "$CMD"
-  names_words "$CMD" modules.sh CLAUDE_CODE_SESSION_ID CLAUDE_CONFIG_DIR && scheduled && check_module_cmd "$CMD"
+  mod_names "$CMD" && scheduled && check_module_cmd "$CMD"
   case "$CMD" in (*'<<'*) strip_heredocs "$CMD"; CMD="$X";; esac
   while IFS= read -r seg; do check_simple "$seg"; done <<<"$(printf '%s\n' "$CMD" | tr ';&|()' '\n\n\n\n\n')"
   case "$CMD" in (*node_modules/*)
