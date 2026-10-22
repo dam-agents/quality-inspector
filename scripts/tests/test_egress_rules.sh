@@ -150,7 +150,8 @@ assert_eq "the work backup's owner is refused" "refused" \
 sed -i.bak '/^- profile.sb_repo:/d; /^- work_repo:/d' "$WORK_DIR/CONFIG.md"
 
 # A GitHub Enterprise Server target is one host for the API (under /api/v3) and the pages:
-# each shape passes there as on github.com, and the API shape only under its prefix.
+# each shape passes there as on github.com, and the API shape only under its prefix. Each
+# accepted one lands by hand: the host's shared GitHub deny refuses it at once, no prompt.
 cat > "$QI_PROFILE_DIR/profile.json" <<'J'
 {"schema":"qi-profile/v1","product":"Stub","app":{"url":"http://localhost:8080"},
  "egress":[{"host":"ghe.acme.io","method":"GET","path":"/login?*","why":"oauth"},
@@ -159,16 +160,34 @@ cat > "$QI_PROFILE_DIR/profile.json" <<'J'
            {"host":"ghe.acme.io","method":"POST","path":"/api/v3/repos/sb/qa/issues","why":"api"},
            {"host":"ghe.acme.io","method":"POST","path":"/repos/sb/qa/issues","why":"api without its prefix"},
            {"host":"ghe.acme.io","method":"GET","path":"/sb/qa/blob/HEAD/x","why":"a page"},
-           {"host":"ghe.acme.io","method":"POST","path":"/api/v3/repos/acme/x/issues","why":"the target's owner"}]}
+           {"host":"ghe.acme.io","method":"POST","path":"/api/v3/repos/acme/x/issues","why":"the target's owner"},
+           {"host":"ghe.acme.io","method":"POST","path":"/api/v3/repos/sb/qa","why":"api without its rest"}]}
 J
-ghes="$(QI_TARGET_REPO=ghe.acme.io/acme/widgets bash "$DEF/scripts/egress-rules.sh" --json | jq -r '.rules[] | select(.source == "profile") | "\(.how == "refused") \(.method) \(.path)"')"
-assert_eq "GHES: the sandbox shapes on the one host" "false GET /login?*
-false POST /session
-false POST /sb/qa.git/git-upload-pack
-false POST /api/v3/repos/sb/qa/issues
-true POST /repos/sb/qa/issues
-true GET /sb/qa/blob/HEAD/x
-true POST /api/v3/repos/acme/x/issues" "$ghes"
+ghes="$(QI_TARGET_REPO=ghe.acme.io/acme/widgets bash "$DEF/scripts/egress-rules.sh" --json | jq -r '.rules[] | select(.source == "profile") | "\(.how) \(.method) \(.path)"')"
+assert_eq "GHES: the sandbox shapes on the one host, each by hand" "by-hand GET /login?*
+by-hand POST /session
+by-hand POST /sb/qa.git/git-upload-pack
+by-hand POST /api/v3/repos/sb/qa/issues
+refused POST /repos/sb/qa/issues
+refused GET /sb/qa/blob/HEAD/x
+refused POST /api/v3/repos/acme/x/issues
+refused POST /api/v3/repos/sb/qa" "$ghes"
+assert_eq "GHES: the reason names the API shape of the one host" \
+  "not /api/v3/repos/<owner>/<repo>/<rest>, git's /<owner>/<repo>.git requests or the OAuth sign-in" \
+  "$(QI_TARGET_REPO=ghe.acme.io/acme/widgets bash "$DEF/scripts/egress-rules.sh" --json | jq -r '.rules[] | select(.source == "profile" and .path == "/api/v3/repos/sb/qa") | .why | sub(" — a profile defect.*"; "")')"
+# A ghe.com target: the API on api.<host>, the pages on <host>; each under its shared deny.
+cat > "$QI_PROFILE_DIR/profile.json" <<'J'
+{"schema":"qi-profile/v1","product":"Stub","app":{"url":"http://localhost:8080"},
+ "egress":[{"host":"acme.ghe.com","method":"GET","path":"/login?*","why":"oauth"},
+           {"host":"acme.ghe.com","method":"GET","path":"/sb/qa.git/info/refs?service=git-upload-pack","why":"git"},
+           {"host":"api.acme.ghe.com","method":"POST","path":"/repos/sb/qa/issues","why":"api"},
+           {"host":"api.acme.ghe.com","method":"GET","path":"/login?*","why":"oauth on the API host"}]}
+J
+assert_eq "ghe.com: the sandbox shapes, each by hand" "by-hand GET acme.ghe.com /login?*
+by-hand GET acme.ghe.com /sb/qa.git/info/refs?service=git-upload-pack
+by-hand POST api.acme.ghe.com /repos/sb/qa/issues
+refused GET api.acme.ghe.com /login?*" \
+  "$(QI_TARGET_REPO=acme.ghe.com/acme/widgets bash "$DEF/scripts/egress-rules.sh" --json | jq -r '.rules[] | select(.source == "profile") | "\(.how) \(.method) \(.host) \(.path)"')"
 
 # verify-onboarding.sh --egress: one GET per profile rule; a held request is a warning, a
 # refused connection a FAIL naming the rule to add by hand, a 403 a warning (the gateway or

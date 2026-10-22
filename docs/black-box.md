@@ -133,7 +133,8 @@ denies on its `raw.` and `codeload.` hosts). `--kit` lists the kit's own rules, 
 created by hand or from a kit before 3.0.0, whose rules a kit never updates. Each row says how it
 lands: `prompt` — no kit rule covers the host, so its first request in a direct session is held
 and the operator approves the prompt (`verify-onboarding.sh --egress` makes those requests);
-`by-hand` — under a kit deny a request is refused at once and no prompt ever appears, and a deny
+`by-hand` — under a kit deny (for a GitHub Enterprise target, also a deny of its shared GitHub
+rules) a request is refused at once and no prompt ever appears, and a deny
 or a set that must land whole is never left to prompts: the operator adds it in the agent's
 network settings; `kit` — already allowed; `refused` — never added: a profile allow outside the
 sandbox shapes on a GitHub host, or a `{profile.<key>}` with no plain value (**Sandbox
@@ -182,8 +183,9 @@ with exactly this method and path — no other method, no wildcard but the query
 
 None names an owner or a repository, and a query never changes the page GitHub serves; the
 redirect after the sign-in to anything else (a repository page in `return_to`) meets the
-host's deny. `_` in `access_token` is a pattern wildcard and opens `/login/oauth/access?token`
-too, a page that does not exist — the stated limit. The probes request the target's web
+host's deny. `_` in `access_token` is a pattern wildcard for any one character and opens
+`/login/oauth/access?token`, `/login/oauth/access/token` and the like too, pages that do not
+exist — the stated limit. The probes request the target's web
 pages (`blob`, `raw`, and a `blob` behind an encoded dot segment out of the authorize page),
 which a browser signed in this way would render. The identity lookup after the exchange
 (`GET /user` on the API host) the kit already allows. A device-verification e-mail, a passkey

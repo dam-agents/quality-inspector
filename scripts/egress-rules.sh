@@ -12,7 +12,8 @@
 #            `verify-onboarding.sh --egress` makes that request. A wildcard host prompts
 #            once per host it reaches.
 #   by-hand  the operator adds it in the agent's network settings: it falls under a kit
-#            deny (refused at once, no prompt ever appears), it is a deny, or it belongs to
+#            deny or, for a GitHub Enterprise target, a deny of that host's shared GitHub
+#            rules (refused at once, no prompt ever appears), it is a deny, or it belongs to
 #            a set that must land whole (the kit's own, the work backup, GitHub Enterprise).
 #   kit      the kit already allows it — nothing to do.
 #   refused  never to be added: a profile allow on a GitHub host outside the closed set
@@ -92,7 +93,8 @@ _github_host() { # <host>
 # exact path with its one method. Only the login form (its return_to) and the authorize page
 # take a query, and a query never changes the page GitHub serves; no path names an owner or
 # a repository, and a redirect to one meets the host's deny. '_' in access_token is a pattern
-# wildcard: it also opens /login/oauth/access?token, a page that does not exist.
+# wildcard for any one character: it also opens /login/oauth/access?token,
+# /login/oauth/access/token and the like, pages that do not exist.
 _github_oauth() { # <method> <path>
   case "$1 $2" in
     ('GET /login'|'GET /login?*'|'POST /session') return 0;;
@@ -125,8 +127,11 @@ _github_refusal() { # <method> <host> <path>
     esac
   fi
   if [ -z "$rest" ]; then
-    if [ "$is_web" = 1 ]; then echo "a GitHub host other than its API, but for git's /<owner>/<repo>.git requests and the OAuth sign-in"
-    else echo "not $pre/repos/<owner>/<repo>/<rest>"; fi
+    case "$is_api$is_web" in
+      (11) echo "not $pre/repos/<owner>/<repo>/<rest>, git's /<owner>/<repo>.git requests or the OAuth sign-in";;
+      (01) echo "a GitHub host other than its API, but for git's /<owner>/<repo>.git requests and the OAuth sign-in";;
+      (*)  echo "not $pre/repos/<owner>/<repo>/<rest>";;
+    esac
     return
   fi
   o="${rest%%/*}"; rest="${rest#*/}"; r="${rest%%/*}"
@@ -153,7 +158,8 @@ _subst() { # <text>
   done
   printf '%s\n' "$t"
 }
-# How a profile rule gets onto the agent, against the kit's rules.
+# How a profile rule gets onto the agent, against the kit's rules — and, for a target on
+# GitHub Enterprise, the shared GitHub rules on that host, whose denies land by hand too.
 _how() { # <verdict> <method> <host> <path>
   local v m h p
   [ "$1" = deny ] && { echo by-hand; return; }
@@ -164,7 +170,7 @@ _how() { # <verdict> <method> <host> <path>
   done < <(kit_rules)
   while read -r v m h p; do
     [ "$v" = deny ] && _host_covers "$h" "$3" && { [ "$4" = '*' ] || _covers "$p" "$4"; } && { echo by-hand; return; }
-  done < <(kit_rules)
+  done < <(kit_rules; [ -n "${T:-}" ] && [ "$(_bb_host "$T")" != github.com ] && github_rules "$(_bb_host "$T")")
   echo prompt
 }
 

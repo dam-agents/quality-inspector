@@ -13,8 +13,10 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 1. Nothing to run for the kit: the black-box probes gain the target's web pages on the next
    run ([docs/black-box.md](docs/black-box.md) → The gate).
 2. Only where the profile's sandbox now lists git requests to its repository or the OAuth sign-in on `github.com`
+   or the target's GitHub Enterprise host
    ([docs/black-box.md](docs/black-box.md) → Sandbox accounts): `bash "$HOME/scripts/egress-rules.sh"`
-   and have the operator add its `by-hand` rows in the agent's network settings, then
+   and have the operator add its `by-hand` rows in the agent's network settings (on a GitHub
+   Enterprise target every such row is `by-hand`, under that host's shared deny), then
    `bash "$HOME/scripts/sandbox.sh" template` for the new credential lines, which the operator
    fills in `work/env/credentials.env` — never in chat.
 
