@@ -17,6 +17,30 @@ cfg() { sed -n "s/^- $1:[[:space:]]*//p" "$CONFIG" 2>/dev/null | head -1 \
         | sed -e 's/[[:space:]]*#.*$//' -e 's/[[:space:]]*$//' \
               -e 's/^[`"'"'"']//' -e 's/[`"'"'"']$//'; }
 
+# The testing modules' registry (lib/modules.json, docs/modules.md) — the one home of its keys'
+# types and ranges. `reg <key>` is how every script reads such a key: the bullet when it fits its
+# type, else the default — never the raw bullet. Exit 2 for a key the registry does not name.
+QI_REGISTRY="${BASH_SOURCE[0]%/*}/modules.json"
+reg_spec() { jq -c --arg k "$1" '[.global, (.modules[].settings)] | add | .[$k] // empty' "$QI_REGISTRY" 2>/dev/null; }
+reg_valid() { # <spec-json> <value> -> 0 when the value fits the spec's type
+  local t v="$2" p w h; t="$(jq -r .type <<<"$1")"
+  case "$t" in
+    enum) jq -e --arg v "$v" '.values | index($v) != null' <<<"$1" >/dev/null ;;
+    cadence) jq -e --arg v "$v" '.cadences | index($v) != null' "$QI_REGISTRY" >/dev/null ;;
+    int) case "$v" in (''|*[!0-9]*) return 1;; esac
+         [ "${#v}" -le 6 ] && jq -e --argjson v "$v" '$v >= .min and $v <= .max' <<<"$1" >/dev/null ;;
+    viewports) [[ "$v" =~ ^[0-9]{3,4}x[0-9]{3,4}(\ *,\ *[0-9]{3,4}x[0-9]{3,4}){0,3}$ ]] || return 1
+         for p in ${v//,/ }; do w="${p%x*}"; h="${p#*x}"
+           [ "$w" -ge 320 ] && [ "$w" -le 3840 ] && [ "$h" -ge 480 ] && [ "$h" -le 2400 ] || return 1; done ;;
+    *) return 1 ;;
+  esac
+}
+reg_of() { # <key> <spec-json> — the effective value
+  local v; v="$(cfg "$1")"
+  if [ -n "$v" ] && reg_valid "$2" "$v"; then printf '%s\n' "$v"; else jq -r '.default' <<<"$2"; fi
+}
+reg() { local s; s="$(reg_spec "${1:-}")"; [ -n "$s" ] || return 2; reg_of "$1" "$s"; }
+
 # Keys a version dropped: a restore deletes their lines (work-backup.sh), the verifier warns
 # about one left behind. Space-separated.
 CONFIG_OBSOLETE_KEYS="profile_source_path"

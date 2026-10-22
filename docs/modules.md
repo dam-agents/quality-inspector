@@ -2,8 +2,10 @@
 
 Every kind of testing this agent does is a **module** with a switch, a cadence or schedule,
 settings and its own findings. `scripts/lib/modules.json` is the closed registry: the
-modules, the `work/CONFIG.md` keys each one owns, their types, ranges and defaults. The
-dashboard ([catalog.md](catalog.md)) shows it; `bash "$HOME/scripts/modules.sh" status` prints it.
+modules, the `work/CONFIG.md` keys each one owns, their types, ranges and defaults. Every script
+reads such a key through `reg <key>` (`scripts/lib/config.sh`): a value outside its type reads as
+the default, and `verify-onboarding.sh` fails it. The dashboard ([catalog.md](catalog.md)) shows
+the registry; `bash "$HOME/scripts/modules.sh" status` prints it.
 
 | Module | Kind | Runs | Home |
 | --- | --- | --- | --- |

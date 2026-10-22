@@ -60,7 +60,7 @@ if (!build) { console.error(`stress: no --build and the map names none\n${usage}
 // ------------------------------------------------------------------ the plan (pure) ----
 const notes = [];
 const num = (flag, key, dflt) => {
-  const raw = flags[flag] ?? (key ? sh(`cfg ${key}`) : '');
+  const raw = flags[flag] ?? (key ? sh(`reg ${key}`) : ''); // a registry key: out of range reads as its default
   const n = Math.floor(Number(raw));
   if (raw !== undefined && raw !== '' && !(Number.isFinite(n) && n >= 0)) notes.push(`--${flag}/${key ?? '-'} "${raw}" is not a number: default ${dflt}`);
   return raw !== undefined && raw !== '' && Number.isFinite(n) && n >= 0 ? n : dflt;

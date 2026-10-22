@@ -7,8 +7,8 @@
       "what": "Freezes each labelled issue's acceptance criteria and checks them red-green against the last release.",
       "settings": {
         "max_issues_per_run": { "type": "int", "min": 1, "max": 20, "default": 1 },
-        "max_wallclock_min_per_issue": { "type": "int", "min": 30, "max": 1440, "default": 150 },
-        "max_model_steps_per_issue": { "type": "int", "min": 50, "max": 5000, "default": 400 } } },
+        "max_wallclock_min_per_issue": { "type": "int", "min": 1, "max": 1440, "default": 150 },
+        "max_model_steps_per_issue": { "type": "int", "min": 1, "max": 5000, "default": 400 } } },
     { "id": "edge-cases", "title": "Edge cases", "kind": "config", "doc": "docs/explorations.md", "log": "ISSUES",
       "what": "Checks beyond each criterion: invalid input, persistence, roles, idempotence, boundaries. Never a verdict.",
       "switch": "explorations",
@@ -60,7 +60,7 @@
       "settings": {
         "stress_checks": { "type": "cadence", "default": "disabled" },
         "stress_max_concurrency": { "type": "int", "min": 1, "max": 50, "default": 10 },
-        "stress_duration_s": { "type": "int", "min": 10, "max": 300, "default": 60 } } },
+        "stress_duration_s": { "type": "int", "min": 1, "max": 300, "default": 60 } } },
     { "id": "feature-focus", "title": "Feature focus", "kind": "queue", "doc": "docs/modules.md", "log": "MODULES",
       "what": "Tests one area of the product in depth, once, on request.",
       "settings": {

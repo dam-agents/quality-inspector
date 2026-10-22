@@ -184,8 +184,8 @@ cmd_summary() { local f="$SUITE/.e2e/runs/${1:?label}/report.json"; [ -f "$f" ] 
 # written since then (the environment lock makes those runs this issue's).
 cmd_budget() { # <claim-iso>
   local since="${1:-}" wall cap se el f m n=0 steps=0 k
-  wall="$(cfg max_wallclock_min_per_issue)"; case "$wall" in (''|*[!0-9]*) wall=150;; esac
-  cap="$(cfg max_model_steps_per_issue)"; case "$cap" in (''|*[!0-9]*) cap=400;; esac
+  wall="$(reg max_wallclock_min_per_issue)"; case "$wall" in (''|*[!0-9]*) wall=150;; esac
+  cap="$(reg max_model_steps_per_issue)"; case "$cap" in (''|*[!0-9]*) cap=400;; esac
   se="$(date -u -d "$since" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$since" +%s 2>/dev/null)"
   [ -n "$se" ] || { echo "suite: budget needs the claim time as ISO UTC, got '$since'" >&2; exit 2; }
   el=$(( ($(date -u +%s) - se) / 60 ))

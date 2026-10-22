@@ -517,7 +517,7 @@ const data = {
   product, target: target || null,
   issue_url: target ? `https://${host}/${target.split('/').slice(-2).join('/')}/issues/{n}` : null,
   builds, collections, items, pages, uncovered_nav: uncoveredNav, nights, runs,
-  modules, design, findings, areas, interactive: cfg('dashboard_interactive') === 'enabled', images,
+  modules, design, findings, areas, interactive: modules?.global?.dashboard_interactive?.value === 'enabled', images,
 };
 const hash = createHash('sha256').update(JSON.stringify(data)).digest('hex').slice(0, 12);
 data.generated_utc = new Date().toISOString().replace(/\.\d+Z$/, 'Z');

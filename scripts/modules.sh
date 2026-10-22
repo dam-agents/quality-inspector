@@ -56,27 +56,8 @@ iso2epoch() { date -d "$1" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ'
 # The settings of one module (or `global`) as {key: spec}.
 specs() { if [ "$1" = global ]; then jq -c '.global' "$REG"; else jq -c --arg id "$1" '.modules[] | select(.id == $id) | .settings' "$REG"; fi; }
 
-# valid <spec-json> <value> -> exit 0 when the value fits the type.
-valid() {
-  local t v="$2"; t="$(jq -r .type <<<"$1")"
-  case "$t" in
-    enum) jq -e --arg v "$v" '.values | index($v) != null' <<<"$1" >/dev/null ;;
-    cadence) jq -e --arg v "$v" '.cadences | index($v) != null' "$REG" >/dev/null ;;
-    int) case "$v" in (''|*[!0-9]*) return 1;; esac
-         [ "${#v}" -le 6 ] && jq -e --argjson v "$v" '$v >= .min and $v <= .max' <<<"$1" >/dev/null ;;
-    viewports) [[ "$v" =~ ^[0-9]{3,4}x[0-9]{3,4}(,[0-9]{3,4}x[0-9]{3,4}){0,3}$ ]] || return 1
-         local p w h
-         for p in ${v//,/ }; do w="${p%x*}"; h="${p#*x}"
-           [ "$w" -ge 320 ] && [ "$w" -le 3840 ] && [ "$h" -ge 480 ] && [ "$h" -le 2400 ] || return 1; done ;;
-    *) return 1 ;;
-  esac
-}
-
-# The effective value: the CONFIG.md bullet when it fits the type, else the default.
-value_of() { # <key> <spec-json>
-  local v; v="$(cfg "$1")"
-  if [ -n "$v" ] && valid "$2" "$v"; then printf '%s' "$v"; else jq -r '.default' <<<"$2"; fi
-}
+valid() { reg_valid "$@"; }        # lib/config.sh: the one judge of a registry value
+value_of() { reg_of "$1" "$2" | tr -d '\n'; }
 
 # The last finished run in a module's log: {utc, candidate|null}, or null.
 last_run() { # <id> <log|null> <ran-marker>
@@ -218,13 +199,9 @@ cmd_ran() {
   printf '%s ran module=%s candidate=%s%s\n' "$NOW_ISO" "$id" "$cand" "${*:+ $*}" >> "$WORK/MODULES.log" || die 1 "cannot write MODULES.log"
 }
 
-spec_of() { jq -c --arg k "$1" '[.global, (.modules[].settings)] | add | .[$k] // empty' "$REG"; }
+spec_of() { reg_spec "$1"; }
 
-cmd_value() {
-  local spec; spec="$(spec_of "${1:-}")"
-  [ -n "$spec" ] || die 2 "modules.sh: '${1:-}' is not a registry key"
-  value_of "$1" "$spec"; echo
-}
+cmd_value() { reg "${1:-}" || die 2 "modules.sh: '${1:-}' is not a registry key"; }
 
 cmd_dismiss() {
   local id="${1:-}" f="$WORK/design/DISMISSED.md"
