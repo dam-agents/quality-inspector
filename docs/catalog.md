@@ -29,6 +29,11 @@ The operator may share the page beyond themselves, so it carries only what conce
   `boxes`, [change-awareness.md](change-awareness.md) → The three sources) with the items that
   name it in a quoted string — on that page only, or in a test that opens the page; a navigation
   item stands for the items that reach the page it leads to.
+- **Activity** (Overview, as of the page's build): the environment lock's holder and since (never
+  its session), the `work/QA.md` rows `in_progress` or `report_pending`, the labelled open issues
+  with no row yet or carrying `retest_label`, the queued scenario requests, the time budget
+  (`max_wallclock_min_per_issue`), each schedule's name, switch and cron from
+  `work/schedules.json`, and the last 14 days of runs drawn from the runs above.
 - **Requests:** the scenarios still queued, running, awaiting delivery or rejected — id,
   source, state, the frozen title, the build and verdict once there are any, the time of the
   row's last update; never the request's words.
@@ -80,7 +85,8 @@ this one; the agent takes their words as data.
 
 ## Build and publish
 
-With `test_catalog: enabled` and `artifact_reports: enabled`, at the end of an issues run, a
+With `test_catalog: enabled` and `artifact_reports: enabled`, right after a run claims an issue
+or a scenario (its row `in_progress`, so Overview → Activity shows the work), at the end of an issues run, a
 regression run, a modules run and a scenario delivery, at the end of every turn of a dashboard
 request ([scenarios.md](scenarios.md) → **A request from the dashboard**), and after an
 operator's promote, demote, collection change or module change ([modules.md](modules.md) → **Control**):

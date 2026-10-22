@@ -108,7 +108,11 @@ T
 mkdir -p "$W/inventory/c3"
 echo '{"routes":{"/":{"title":"Home","navigates":{"Projects":"/projects","Files":"/files"},"viewport":[1000,500],"boxes":[["nav","Projects",0,0,100,20],["headings","Welcome home",200,100,300,40]]},
  "/projects":{"title":"Projects","buttons":["Rename"],"viewport":[1000,500],"boxes":[["buttons","Rename",100,50,200,25]]},"/files":{"title":"Files"}}}' > "$W/inventory/c3/inventory.json"
-echo '[{"number":42,"title":"Rename <b>projects</b>","state":"closed","labels":[{"name":"area:projects"}]}]' > "$STUB_DIR/issues.json"
+echo '[{"number":42,"title":"Rename <b>projects</b>","state":"closed","labels":[{"name":"area:projects"}]},{"number":57,"title":"Upload progress","state":"open","labels":[]},{"number":63,"title":"Bulk delete","state":"open","labels":[]}]' > "$STUB_DIR/issues.json"
+# Overview → Activity: the lock (never its session), the rows on their way, the waiting issues, the schedules.
+mkdir -p "$W/env"; echo 'issues 2026-10-22T19:35:00Z SESSION-SECRET-ID' > "$W/env/LOCK"
+printf '| 57 | def | c4 | b1 | - | in_progress | 2026-10-22T19:50:00Z |\n' >> "$W/QA.md"
+echo '{"taken_utc":"2026-10-22T15:00:00Z","schedules":{"quality-inspector-issues-1h":{"enabled":true,"cron":"7 * * * *","task":"TASK-SECRET"},"other-agent-job":{"enabled":true,"cron":"0 1 * * *"}}}' > "$W/schedules.json"
 
 mkdir -p "$W/catalog/thumbs"; echo old > "$W/catalog/thumbs/issue-99-ac-1.jpg"
 out="$(node "$SCRIPTS/catalog.mjs")"; rc=$?
@@ -135,6 +139,11 @@ cmd="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const
 const t=["open the report abc123", "open the report 9f1c-AB_2", "open the report ../x", "open the report a b", `open the report ${"a".repeat(65)}`, "open the report "];
 process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "open the report: an artifact id only" 110000 "$cmd"
+assert "activity: lock without its session, rows on their way, waiting issues, own schedules only" '.activity.lock == {"owner":"issues","since":"2026-10-22T19:35:00Z"}
+  and ([.activity.issues[] | {issue, status, build}] == [{"issue":57,"status":"in_progress","build":"c4"}])
+  and .activity.waiting == [{"issue":63,"title":"Bulk delete","kind":"new"}] and .activity.budget_min == 150
+  and .activity.schedules.list == [{"name":"quality-inspector-issues-1h","enabled":true,"cron":"7 * * * *"}]' "$data"
+case "$html" in (*SESSION-SECRET-ID*|*TASK-SECRET*) echo "  the lock's session or a schedule's task reached the page"; FAILED=1;; esac
 assert "schema and header" '.schema == "qi-catalog/v1" and .agent.display_name == "QA Bot" and .target == "acme/widgets" and .issue_url == "https://github.com/acme/widgets/issues/{n}"' "$data"
 i='.items[] | select(.key == "issue-42/AC-1")'
 assert "AC-1 from criteria, test and SUITE" "$i"' | .tier == "regression" and .then == "the project shows its new name with the task" and .area == "projects"

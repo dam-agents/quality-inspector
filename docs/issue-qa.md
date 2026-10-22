@@ -29,7 +29,7 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    environment: end this entry untouched, log it). Write the row as `in_progress` with
    this run's `ac_hash`, `candidate`, `baseline`, verdict `-`, now — the claim time the
    budgets count from. Remember the previous row — an abort restores it. Log `issue_start issue=<n> kind=<kind>`
-   ([logging.md](logging.md)).
+   ([logging.md](logging.md)), then the catalog ([catalog.md](catalog.md) → **Build and publish**) — its Overview shows the claim.
 2. **Re-check at action time.** `bash "$HOME/scripts/github.sh" issue <n>` — its text, labels and
    author; with `include_comments: enabled`, `github.sh comments <n>` too (never `gh` or a URL:
    [black-box.md](black-box.md) → **GitHub**). The issue must still carry `qa_label` (or `retest_label`). Gone →

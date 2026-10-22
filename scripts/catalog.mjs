@@ -405,6 +405,25 @@ const findings = {
     checks: (stress.checks ?? []).map((c) => ({ id: c.id, target: c.target, status: c.status, severity: c.severity, evidence: c.evidence ?? null, reason: c.reason ?? null })) } : null,
   security: sec ? { candidate: sec.candidate ?? null, utc: sec.generated_utc ?? null, counts: sec.counts ?? null, report: artRef(dirname(secFile)) } : null,
 };
+// What the agent does now, what waits, and when it runs (Overview → Activity): the lock's holder
+// and since (never its session), the rows in progress or awaiting delivery, the labelled open
+// issues with no row yet, the queued scenario requests, and the schedules' name, switch and cron.
+const lockLine = (read(join(work, 'env', 'LOCK')) ?? '').trim().split(/\s+/);
+const qaRows = rows(join(work, 'QA.md')).filter(([n]) => /^\d+$/.test(n));
+const qaRow = ([n, , candidate, baseline, verdict, status, utc]) => ({ issue: +n, title: issueMeta.get(n)?.title ?? null, build: candidate && candidate !== '-' ? candidate : null,
+  baseline: baseline && baseline !== '-' ? baseline : null, verdict: verdict && verdict !== '-' ? verdict : null, status, utc: utc || null });
+const retestLabel = cfg('retest_label') || 'qa:retest';
+const sched = readJson(join(work, 'schedules.json'));
+const activity = {
+  lock: /^[A-Za-z][A-Za-z0-9-]{0,40}$/.test(lockLine[0] ?? '') && /^\d{4}-\d\d-\d\dT[\d:]{8}Z$/.test(lockLine[1] ?? '') ? { owner: lockLine[0], since: lockLine[1] } : null,
+  issues: qaRows.filter(([, , , , , st]) => st === 'in_progress' || st === 'report_pending').map(qaRow),
+  waiting: [...issueMeta].filter(([n, m]) => m.state === 'open' && (!qaRows.some(([q]) => q === n) || (m.labels ?? []).includes(retestLabel)))
+    .map(([n, m]) => ({ issue: +n, title: m.title ?? null, kind: qaRows.some(([q]) => q === n) ? 'retest' : 'new' })).sort((a, b) => a.issue - b.issue).slice(0, 50),
+  budget_min: +cfg('max_wallclock_min_per_issue') > 0 ? +cfg('max_wallclock_min_per_issue') : 150,
+  schedules: sched && typeof sched.schedules === 'object' ? { taken_utc: sched.taken_utc ?? null,
+    list: Object.entries(sched.schedules).filter(([n]) => /^quality-inspector-[a-z0-9-]+$/.test(n))
+      .map(([name, x]) => ({ name, enabled: x?.enabled !== false, cron: typeof x?.cron === 'string' && /^[0-9*,/ -]{9,40}$/.test(x.cron) ? x.cron : null })) } : null,
+};
 const areas = [...new Set([...items.map((i) => i.area).filter(Boolean), ...pages.map((p) => p.nav).filter(Boolean)].map(String))]
   .filter((a) => /^[A-Za-z0-9][A-Za-z0-9 _./-]{0,39}$/.test(a)).sort();
 
@@ -525,7 +544,7 @@ const data = {
   product, target: target || null,
   issue_url: target ? `https://${host}/${target.split('/').slice(-2).join('/')}/issues/{n}` : null,
   builds, collections, items, pages, uncovered_nav: uncoveredNav, nights, runs,
-  modules, design, findings, areas, interactive: modules?.global?.dashboard_interactive?.value === 'enabled', images,
+  modules, design, findings, activity, areas, interactive: modules?.global?.dashboard_interactive?.value === 'enabled', images,
 };
 const hash = createHash('sha256').update(JSON.stringify(data)).digest('hex').slice(0, 12);
 data.generated_utc = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
