@@ -1065,10 +1065,10 @@ function viewFindings() {
   const fo = arr(F.focus).filter((x) => x && typeof x === 'object');
   v.append(sec2('Feature focus', fo.length ? `${fo.length} newest focus run(s)` : null, !fo.length ? h('p', { class: 'muted-t' }, 'No area has been tested in depth yet — queue one in Modules.')
     : fo.map((x) => h('div', { style: 'margin-top:8px' }, h('h3', {}, `${str(x.area) || str(x.run)}${x.build ? ` · ${str(x.build)}` : ''}${x.utc ? ` · ${fmtDate(x.utc)}` : ''}`),
-      tableOf(['Check', 'Heuristic', 'Expected', 'Result', 'Severity'], arr(x.checks).map((c) => [h('code', {}, str(c.id)), str(c.heuristic), str(c.expected), badge(str(c.verdict)), c.severity ? sevB(c.severity) : ''])))))));
+      tableOf(['Check', 'Heuristic', 'Expected', 'Result', 'Severity'], arr(x.checks).map((c) => [h('code', {}, str(c.id)), str(c.heuristic), str(c.expected), badge(str(c.verdict)), c.severity ? sevB(c.severity) : '']))))));
   v.append(sec2('Security', sec ? `Build ${str(sec.candidate)} · ${fmtDate(sec.utc)} — the findings stay in the private report` : null,
     !sec ? h('p', { class: 'muted-t' }, 'The security run has not run yet.') : h('div', {}, h('p', {}, ['critical', 'high', 'medium', 'low', 'info', 'skipped'].map((k) =>
-      h('span', { style: 'margin-right:10px' }, sevB(k), ` ${+((sec.counts || {})[k]) || 0}`))), h('p', {}, artLink(sec.report)))));
+      h('span', { style: 'margin-right:10px' }, sevB(k), ` ${+((sec.counts || {})[k]) || 0}`))), h('p', {}, sec.report ? artLink(sec.report) : h('span', { class: 'muted-t' }, 'No report reference recorded for this run.')))));
 }
 
 // ------------------------------------------------------------------ design

@@ -118,6 +118,10 @@ assert "summary" '.items == 5 and .changed == true and (.hash | test("^[0-9a-f]{
 html="$(cat "$W/catalog/index.html")"
 page_data() { node -e 'const h=require("fs").readFileSync(process.argv[1],"utf8");const m=h.match(/<script type="application\/json" id="qi-catalog-data">([\s\S]*?)<\/script>/);process.stdout.write(m[1])' "$W/catalog/index.html"; }
 data="$(page_data)"
+# The viewer's script parses: no test drives the page, so a syntax error would ship silently.
+node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");require("fs").writeFileSync(process.argv[2],[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((x)=>x[1]).join("\n"))' \
+  "$SCRIPTS/catalog/viewer.html" "$SANDBOX/viewer.js" && node --check "$SANDBOX/viewer.js" 2>/dev/null
+assert_eq "the viewer's script parses" 0 "$?"
 assert "schema and header" '.schema == "qi-catalog/v1" and .agent.display_name == "QA Bot" and .target == "acme/widgets" and .issue_url == "https://github.com/acme/widgets/issues/{n}"' "$data"
 i='.items[] | select(.key == "issue-42/AC-1")'
 assert "AC-1 from criteria, test and SUITE" "$i"' | .tier == "regression" and .then == "the project shows its new name with the task" and .area == "projects"
