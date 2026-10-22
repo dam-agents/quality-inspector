@@ -17,9 +17,10 @@ type Case = {
 };
 // The locator surface this file uses; the fixture's screen is Playwright-like.
 type Loc = {
-  first(): Loc; or(o: Loc): Loc; count(): Promise<number>; isVisible(): Promise<boolean>; fill(v: string): Promise<void>;
+  first(): Loc; or(o: Loc): Loc; count(): Promise<number>; fill(v: string): Promise<void>;
   check(): Promise<void>; uncheck(): Promise<void>; selectOption(v: string): Promise<unknown>; inputValue(o?: { timeout?: number }): Promise<string>;
   click(o?: { timeout?: number }): Promise<void>; dblclick(o?: { timeout?: number }): Promise<void>; allInnerTexts(): Promise<string[]>;
+  filter(o: { visible?: boolean }): Loc;
   evaluate<R>(f: (el: any) => R, arg?: unknown, o?: { timeout?: number }): Promise<R>;
   getByLabel(n: string | RegExp, o?: { exact?: boolean }): Loc; getByPlaceholder(n: string | RegExp, o?: { exact?: boolean }): Loc;
   getByRole(r: string, o?: { name?: string | RegExp; exact?: boolean }): Loc; getByText(t: string | RegExp, o?: { exact?: boolean }): Loc;
@@ -67,6 +68,21 @@ const fieldOf = (scope: Loc, label: string) => {
   const re = new RegExp(`^\\s*${esc(label)}\\s*\\*?\\s*$`);
   return scope.getByLabel(re).or(scope.getByPlaceholder(label, { exact: true })).first();
 };
+// What a refusal shows: the alerts on the page (getByRole leaves hidden ones out) and the
+// visible refusal-like texts in the form's scope, each text with how often it shows. Taken
+// before the case's input and after the submit: only a text that shows more often after is
+// a refusal, so a static "Required fields are marked *" or an older alert never counts.
+type Shown = { alerts: Map<string, number>; refusals: Map<string, number> };
+const tally = (texts: string[]) => {
+  const m = new Map<string, number>();
+  for (const t of texts.map((x) => x.replace(/\s+/g, ' ').trim()).filter(Boolean)) m.set(t, (m.get(t) ?? 0) + 1);
+  return m;
+};
+const shown = async (page: Loc, scope: Loc): Promise<Shown> => ({
+  alerts: tally(await page.getByRole('alert').allInnerTexts().catch(() => [] as string[])),
+  refusals: tally(await scope.getByText(REFUSAL).filter({ visible: true }).allInnerTexts().catch(() => [] as string[])),
+});
+const grew = (before: Map<string, number>, after: Map<string, number>) => [...after].some(([t, n]) => n > (before.get(t) ?? 0));
 // A run-unique filler, so a second run's objects do not collide with the first's.
 const fresh = (v: string) => v.replace(/^qa-val-(\d+)/, `qa-val-$1-${stamp}`);
 
@@ -96,12 +112,16 @@ for (const c of cases) {
       let field = null as Loc | null;
       let typed = null as string | null;
       let inputRefused = false as boolean;
+      let scope: Loc = s;
+      let before = null as Shown | null;
       await oracle('setup', async () => {
         await app.open(c.example);
         await settle(browser);
         const named = s.getByRole('form', { name: c.form, exact: true });
-        const scope = (await named.count()) === 1 ? named : s;
+        if ((await named.count()) === 1) scope = named;
         for (const [label, v] of Object.entries(c.fill)) await put(fieldOf(scope, label), v);
+        // Before the case's input: a message its typing brings up is a refusal of it too.
+        before = await shown(s, scope);
         if (c.field !== null) {
           field = fieldOf(scope, c.field);
           if (c.type === 'checkbox') await field.uncheck();
@@ -126,7 +146,8 @@ for (const c of cases) {
       await oracle('no-error-page', async () => { await expect(screen.getByText(ERROR_PAGE)).toHaveCount(0); });
 
       // Refused visibly: the field is marked invalid (aria-invalid, or natively where the form
-      // validates natively), the input itself refused or capped the value, or a message shows.
+      // validates natively), the input itself refused or capped the value, or a new alert or
+      // refusal text shows that was not there before the input (shown/grew above).
       const refused = async (): Promise<boolean> => {
         if (inputRefused) return true;
         if (c.kind === 'max-len+1' && typed !== null && c.maxlength != null && typed.length <= c.maxlength) return true;
@@ -135,8 +156,9 @@ for (const c of cases) {
             || (typeof el.checkValidity === 'function' && !(el.form && el.form.noValidate) && !el.checkValidity()), undefined, { timeout: 3_000 }).catch(() => false);
           if (invalid) return true;
         }
-        if (await s.getByRole('alert').first().isVisible().catch(() => false)) return true;
-        return s.getByText(REFUSAL).first().isVisible().catch(() => false);
+        const was = before ?? { alerts: new Map<string, number>(), refusals: new Map<string, number>() };
+        const now = await shown(s, scope);
+        return grew(was.alerts, now.alerts) || grew(was.refusals, now.refusals);
       };
 
       if (c.oracle === 'refused-visibly') {

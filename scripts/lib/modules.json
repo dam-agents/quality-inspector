@@ -6,9 +6,9 @@
     { "id": "issues", "title": "Issue criteria", "kind": "core", "doc": "docs/issue-qa.md", "log": "ISSUES",
       "what": "Freezes each labelled issue's acceptance criteria and checks them red-green against the last release.",
       "settings": {
-        "max_issues_per_run": { "type": "int", "min": 1, "max": 5, "default": 1 },
-        "max_wallclock_min_per_issue": { "type": "int", "min": 30, "max": 170, "default": 150 },
-        "max_model_steps_per_issue": { "type": "int", "min": 50, "max": 1000, "default": 400 } } },
+        "max_issues_per_run": { "type": "int", "min": 1, "max": 20, "default": 1 },
+        "max_wallclock_min_per_issue": { "type": "int", "min": 30, "max": 1440, "default": 150 },
+        "max_model_steps_per_issue": { "type": "int", "min": 50, "max": 5000, "default": 400 } } },
     { "id": "edge-cases", "title": "Edge cases", "kind": "config", "doc": "docs/explorations.md", "log": "ISSUES",
       "what": "Checks beyond each criterion: invalid input, persistence, roles, idempotence, boundaries. Never a verdict.",
       "switch": "explorations",
@@ -20,19 +20,19 @@
       "what": "Replays the promoted tests on every new build, aware of what changed.",
       "settings": {
         "confirm_regressions": { "type": "enum", "values": ["disabled", "enabled"], "default": "disabled" },
-        "bisect_max_steps": { "type": "int", "min": 0, "max": 6, "default": 0 } } },
+        "bisect_max_steps": { "type": "int", "min": 0, "max": 20, "default": 0 } } },
     { "id": "security", "title": "Security checks", "kind": "schedule", "doc": "docs/security.md", "log": "SECURITY",
       "schedule": "quality-inspector-security-weekly", "switch": "security_checks",
       "what": "Black-box OWASP checks of the nested product. Findings stay in a private report.",
       "settings": {
         "security_checks": { "type": "enum", "values": ["enabled", "disabled"], "default": "enabled" },
-        "security_failed_logins": { "type": "int", "min": 3, "max": 50, "default": 10 } } },
+        "security_failed_logins": { "type": "int", "min": 1, "max": 100, "default": 10 } } },
     { "id": "discovery", "title": "Scenario discovery", "kind": "schedule", "doc": "docs/scenarios.md", "log": "DISCOVERY",
       "schedule": "quality-inspector-scenarios-weekly", "switch": "scenario_discovery",
       "what": "Proposes user flows nobody asked for yet, and tests them when allowed.",
       "settings": {
         "scenario_discovery": { "type": "enum", "values": ["disabled", "propose", "run"], "default": "disabled" },
-        "max_scenarios_per_run": { "type": "int", "min": 0, "max": 10, "default": 3 } } },
+        "max_scenarios_per_run": { "type": "int", "min": 0, "max": 50, "default": 3 } } },
     { "id": "benchmark", "title": "Benchmark", "kind": "schedule", "doc": "docs/benchmark.md", "log": null,
       "schedule": "quality-inspector-benchmark-monthly",
       "what": "Scores this agent's own verdicts on cases with a known answer.",
@@ -67,7 +67,7 @@
         "focus_max_checks": { "type": "int", "min": 1, "max": 30, "default": 12 } } }
   ],
   "global": {
-    "modules_max_wallclock_min": { "type": "int", "min": 15, "max": 170, "default": 90 },
+    "modules_max_wallclock_min": { "type": "int", "min": 15, "max": 1440, "default": 90 },
     "dashboard_interactive": { "type": "enum", "values": ["disabled", "enabled"], "default": "disabled" }
   }
 }

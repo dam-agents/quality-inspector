@@ -70,8 +70,8 @@ interactive page opened beside the agent's chat its button sends it as the opera
 ## Build and publish
 
 With `test_catalog: enabled` and `artifact_reports: enabled`, at the end of an issues run, a
-regression run and a scenario delivery, and after an operator's promote, demote or collection
-change:
+regression run, a modules run and a scenario delivery, and after an operator's promote, demote,
+collection change or module change ([modules.md](modules.md) → **Control**):
 
 1. `node "$HOME/scripts/design-findings.mjs" merge --noticed-only` (the run's "noticed in passing"
    items into the design register, [ui-sweep.md](ui-sweep.md)), then

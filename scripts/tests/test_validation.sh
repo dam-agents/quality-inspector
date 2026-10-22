@@ -119,4 +119,18 @@ assert "results.json beside the plan" '.run == "v1" and (.cases[1] | .result == 
 jq -nc --arg b "${ids[1]}" '{run:{results:[{tags:["validation",$b], status:"passed", attempts:[{}]},{tags:["validation",$b], status:"failed", attempts:[{}]}]}}' > "$QI_RUNS_ROOT/v1c/report.json"
 assert "a confirmation that passes once makes it flaky" '.major == 0 and .flaky == 1' "$(node "$R" "$PL" --run v1 --confirm v1c)"
 node "$R" "$PL" >/dev/null 2>&1; assert_eq "no run label -> usage" 2 "$?"
+# A run that never reached the tests is no result: exit 1, nothing written.
+rm -f "$WORK_DIR/validation/1.2.3/results.json"
+e="$(node "$R" "$PL" --run v-missing)"
+assert_eq "no report.json -> exit 1" 1 "$?"
+assert "no report.json -> the error says so" '.error | test("v-missing: no readable report.json")' "$e"
+mkdir -p "$QI_RUNS_ROOT/v2"; echo 'not json' > "$QI_RUNS_ROOT/v2/report.json"
+node "$R" "$PL" --run v2 >/dev/null; assert_eq "an unreadable report.json -> exit 1" 1 "$?"
+jq -nc '{run:{results:[{tags:["smoke"], status:"failed", attempts:[{error:{message:"sign-in failed"}}]}]}}' > "$QI_RUNS_ROOT/v2/report.json"
+e="$(node "$R" "$PL" --run v2)"
+assert_eq "no val-* result while the plan has cases -> exit 1" 1 "$?"
+assert "no val-* result -> the error says so" '.error | test("no val-\\* result for the plan.s 4 cases")' "$e"
+[ ! -e "$WORK_DIR/validation/1.2.3/results.json" ] || { echo "  a run that never reached the tests must not write results.json"; FAILED=1; }
+jq '.cases = []' "$PL" > "$SANDBOX/empty-plan.json"
+assert "an empty plan with a readable report is a result" '.cases == 0 and .blocked == 0' "$(node "$R" "$SANDBOX/empty-plan.json" --run v2)"
 exit $FAILED

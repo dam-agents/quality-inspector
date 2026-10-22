@@ -39,7 +39,8 @@
 #                                          the live definition included: a change to it is a patch
 #                                          (docs/self-modification.md §8)
 #   run-mode         Write Edit …          work/env/RUN_MODE (only the Precheck writes it)
-#   scheduled-def    Write Edit … (sched.) work/CONFIG.md, work/OPERATOR.md (the operator's standing preferences)
+#   scheduled-def    Write Edit … (sched.) work/CONFIG.md, work/OPERATOR.md (the operator's standing preferences),
+#                                          work/FOCUS.md, work/design/DISMISSED.md (docs/modules.md)
 #   scheduled-git    Bash (scheduled)      git commit
 #   policy-tamper    Bash (scheduled)      any command naming RUN_MODE, scripts/hooks/ or .claude/settings
 #   channel-write    Bash (channel turn)   a command naming github.sh, comment or unlabel in any spelling
@@ -51,10 +52,14 @@
 #                                          this one, or -) and the work/QA.md row of <n> is report_pending)
 #                                          or one plain read-only grep|rg|cat|head|tail|wc|ls|git log…
 #                    Write Edit … (channel turn)  content naming github.sh
-#   module-set       Bash (scheduled)      scripts/modules.sh set|focus — the testing modules' settings are
-#                                          the operator's word (docs/modules.md → Control); the script
-#                                          refuses them outside the direct session itself, this is the
-#                                          lexical second layer
+#   module-set       Bash (scheduled)      a command naming modules.sh, CLAUDE_CODE_SESSION_ID or CLAUDE_CONFIG_DIR
+#                                          in any spelling bash reads literally (as channel-write) — unless
+#                                          it is one plain `[bash] "$HOME/scripts/modules.sh"
+#                                          status|due|ran|focus-done|check|value|schedules <args>` or one plain
+#                                          read-only command: the modules' settings, the focus queue and
+#                                          dismissals are the operator's word (docs/modules.md → Control);
+#                                          the script refuses them outside the direct session itself, and
+#                                          the session variables it judges that by are never set by hand
 #   backup-override  Bash                  a command naming QI_WORK_BACKUP_ (the offline tests' remote and clone
 #                                          overrides): the backup's destination is work_repo alone
 #   backup-direct    Bash (scheduled)      scripts/work-backup.sh — there the Stop hook alone backs up
@@ -337,20 +342,36 @@ glob_ere() { # <glob or brace word> → $ERE matching every word it can expand t
     esac
   done
 }
-chan_names() { # <text> [github-only]
-  local bsnl=$'\\\n' t="$1" w ch ws=()
+names_words() { # <text> <word>… — 0 when a word bash reads literally from <text>, or its
+  # last path segment, is one of the words (a glob or brace word that can expand to one counts)
+  local bsnl=$'\\\n' t="$1" w ch ws=(); shift
   case "$t" in (*"\$'"*) return 0;; esac # $'\143…' spells a name in escapes
   t="${t//"$bsnl"/}"; t="${t//\$\"/\"}"; t="${t//[\"\'\\]/}"
   read -ra ws <<<"$(printf '%s' "$t" | tr ';&|()<>`=\n\t' '           ')"
   for w in ${ws[@]+"${ws[@]}"}; do
-    case "${w##*/}" in (github.sh) return 0;; esac
-    [ -n "${2:-}" ] || case "$w" in (comment|comments|unlabel) return 0;; esac
+    for ch in "$@"; do [ "$w" = "$ch" ] || [ "${w##*/}" = "$ch" ] && return 0; done
     case "$w" in (*[*?[{]*) ;; (*) continue;; esac
-    glob_ere "${w##*/}"; [[ "github.sh" =~ ^($ERE)$ ]]; [ $? = 1 ] || return 0
-    [ -n "${2:-}" ] && continue
-    glob_ere "$w"; for ch in comment comments unlabel; do [[ "$ch" =~ ^($ERE)$ ]]; [ $? = 1 ] || return 0; done
+    for ch in "$@"; do
+      glob_ere "${w##*/}"; [[ "$ch" =~ ^($ERE)$ ]]; [ $? = 1 ] || return 0
+      glob_ere "$w"; [[ "$ch" =~ ^($ERE)$ ]]; [ $? = 1 ] || return 0
+    done
   done
   return 1
+}
+chan_names() { # <text> [github-only]
+  if [ -n "${2:-}" ]; then names_words "$1" github.sh; else names_words "$1" github.sh comment comments unlabel; fi
+}
+# module-set — the same closed set for the testing modules in a scheduled or channel turn.
+RE_MOD_PLAIN='^[ 	]*(bash[ 	]+)?("?(\$HOME|\$\{HOME\}|/home/agent)/scripts/modules\.sh"?|~/scripts/modules\.sh|scripts/modules\.sh)[ 	]+(status|due|ran|focus-done|check|value|schedules)(([ 	]+'"$RE_CH_W"')*)([ 	]+2>&1)?[ 	]*$'
+check_module_cmd() { # <raw command> — it names modules.sh or a session variable (names_words)
+  local c="$1" ok=0
+  shopt -u nocasematch
+  if [[ "$c" =~ $RE_MOD_PLAIN ]]; then ok=1
+  elif [[ "$c" =~ $RE_RO_PLAIN ]] && ! [[ "${c//[\"\']/}" =~ $RE_RO_RUNS ]]; then ok=1
+  fi
+  shopt -s nocasematch
+  [ "$ok" = 1 ] || deny module-set "scripts/modules.sh" "the testing modules' settings, the focus queue and dismissals change only on the operator's word in the direct session (docs/modules.md)"
+  return 0
 }
 check_channel_writes() { # <raw command, heredoc bodies included> — it names one (chan_names)
   local c="$1" ok=0 a=()
@@ -389,11 +410,10 @@ check_bash() {
   case "$CMD" in (*RUN_MODE*|*scripts/hooks/*|*.claude/settings*)
     scheduled && deny policy-tamper "" "a scheduled run never touches the policy or its run marker";; esac
   case "$CMD" in (*QI_WORK_BACKUP_*) deny backup-override "" "the backup's destination comes from work_repo alone";; esac
-  case "$CMD" in (*modules.sh*) [[ "$CMD" =~ modules\.sh[^\;\&\|]*[[:space:]](set|focus)([[:space:]]|$) ]] \
-    && scheduled && deny module-set "scripts/modules.sh" "the testing modules' settings change only on the operator's word in the direct session";; esac
   case "$CMD" in (*work-backup.sh*) scheduled && deny backup-direct "" "a scheduled run or a channel turn never backs up by hand — the Stop hook does";; esac
   case "$CMD" in (*QI_TARGET_REPO*) deny github "QI_TARGET_REPO" "the target comes from work/CONFIG.md alone";; esac
   chan_names "$CMD" && channel_turn && check_channel_writes "$CMD"
+  names_words "$CMD" modules.sh CLAUDE_CODE_SESSION_ID CLAUDE_CONFIG_DIR && scheduled && check_module_cmd "$CMD"
   case "$CMD" in (*'<<'*) strip_heredocs "$CMD"; CMD="$X";; esac
   while IFS= read -r seg; do check_simple "$seg"; done <<<"$(printf '%s\n' "$CMD" | tr ';&|()' '\n\n\n\n\n')"
   case "$CMD" in (*node_modules/*)
@@ -416,8 +436,8 @@ check_write() {
     && deny channel-write "$p" "a channel turn writes no file that names github.sh (docs/slack.md)"
   [ "$p" = "$WORK/env/RUN_MODE" ] && deny run-mode "$p" "only the schedule's Precheck writes the run marker"
   if under "$p" "$WORK"; then
-    case "$p" in ("$WORK/CONFIG.md"|"$WORK/OPERATOR.md")
-      scheduled && deny scheduled-def "$p" "a scheduled run or a channel turn never changes the configuration or the operator's preferences";; esac
+    case "$p" in ("$WORK/CONFIG.md"|"$WORK/OPERATOR.md"|"$WORK/FOCUS.md"|"$WORK/design/DISMISSED.md")
+      scheduled && deny scheduled-def "$p" "a scheduled run or a channel turn never changes the configuration, the operator's preferences, the focus queue or the dismissed findings";; esac
     return 0
   fi
   in_tmp_qi "$p" && return 0

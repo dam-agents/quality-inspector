@@ -36,6 +36,19 @@ node "$SCRIPTS/ui-sweep.mjs" "$SANDBOX/inv.json" --build ../x --dry-run >/dev/nu
 assert_eq "a build that is not a plain id is refused" 2 "$?"
 [ ! -e "$D/c2" ] || { echo "  a dry run wrote its out dir"; FAILED=1; }
 
+# No browser is the module's failure (exit 3), never the environment's (exit 1: sign-in).
+mkdir -p "$SANDBOX/nopw" "$SANDBOX/pw/node_modules/playwright-core"
+echo '{"name":"suite"}' > "$SANDBOX/nopw/package.json"; cp "$SANDBOX/nopw/package.json" "$SANDBOX/pw/package.json"
+echo '{"name":"playwright-core","main":"index.js"}' > "$SANDBOX/pw/node_modules/playwright-core/package.json"
+echo 'module.exports = { chromium: { launch: async () => { throw new Error("Executable does not exist") } } };' > "$SANDBOX/pw/node_modules/playwright-core/index.js"
+o="$(QI_PLAYWRIGHT_FROM="$SANDBOX/nopw/package.json" node "$SCRIPTS/ui-sweep.mjs" "$SANDBOX/inv.json" --build c2 --out "$SANDBOX/sw" 2>/dev/null)"
+assert_eq "no playwright-core: exit 3" 3 "$?"
+assert "no playwright-core: a JSON error" '.error | startswith("no browser: playwright-core")' "$o"
+o="$(QI_PLAYWRIGHT_FROM="$SANDBOX/pw/package.json" node "$SCRIPTS/ui-sweep.mjs" "$SANDBOX/inv.json" --build c2 --out "$SANDBOX/sw" 2>/dev/null)"
+assert_eq "chromium does not launch: exit 3" 3 "$?"
+assert "chromium does not launch: a JSON error" '.error == "no browser: Executable does not exist"' "$o"
+[ ! -e "$SANDBOX/sw" ] || { echo "  a sweep without a browser wrote its out dir"; FAILED=1; }
+
 # ---------------------------------------------------------------- review plan
 S1="$D/b1"; mkdir -p "$S1/shots"
 cat > "$S1/sweep.json" <<'J'
@@ -92,13 +105,14 @@ assert "a sentence for a sweep finding" '.findings[0].saw == "Text of “Save ch
 assert "review: source, suspect from confidence" '[.findings[] | select(.source=="review") | [.check, .suspect]] == [["review:alignment",false],["review:legibility",true]]' "$reg"
 assert "noticed: where as pattern, viewport -, minor, shot resolved beside its file" '[.findings[] | select(.source=="noticed") | [.pattern, .viewport, .check, .severity, .shot]] == [["/projects/:id","-","noticed","minor",null],["/settings","-","noticed","minor","scenarios/S-3/shot.png"]]' "$reg"
 case "$reg" in *SECRET*|*judge*) echo "  a verdicts file's notes or a judge file reached the register"; FAILED=1;; esac
-T="$(jq -r '.findings[0].first_seen' <<<"$reg")"
 assert "real UTC timestamps" '.updated_utc | test("^20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z$")' "$reg"
+assert "first and last seen are builds: the sweep's, a noticed item's file name's" 'all(.findings[]; .first_seen == "b1" and .last_seen == "b1")' "$reg"
 
 # Second merge of the same sweep: same ids, nothing new, first_seen kept.
+cp "$D/findings.json" "$SANDBOX/reg1.json"
 m="$(node "$SCRIPTS/design-findings.mjs" merge "$S1/sweep.json" --review "$SANDBOX/review.json" --no-render)"
 assert "second merge: stable" '.findings == 9 and .new == 0 and .open == 9' "$m"
-assert_eq "first_seen kept" "$T" "$(jq -r '.findings[0].first_seen' "$D/findings.json")"
+cmp -s "$SANDBOX/reg1.json" "$D/findings.json" || { echo "  a merge that saw nothing new changed findings.json"; FAILED=1; }
 
 # The next build: / @1440x900 swept clean, / @390x844 not swept, projects @390x844 with one finding left.
 S2="$D/b2"; mkdir -p "$S2/shots"
@@ -112,6 +126,8 @@ assert "a page not swept is untouched" '[.findings[] | select(.pattern=="/" and 
 assert "no review this merge: review findings untouched" '[.findings[] | select(.source=="review") | .status] == ["open","open"]' "$reg"
 assert "noticed never resolved" '[.findings[] | select(.source=="noticed") | .status] == ["open","open"]' "$reg"
 assert "counts" '.resolved == 2 and .new == 0' "$m"
+assert "seen again in b2: last_seen b2, first_seen kept" '[.findings[] | select(.check=="no-name") | [.first_seen, .last_seen]] == [["b1","b2"]]' "$reg"
+assert "not seen in b2: last_seen kept" '[.findings[] | select(.id=="D-1" or .source=="noticed") | .last_seen] | all(. == "b1")' "$reg"
 
 # A review of b2 covering / @1440x900 without the alignment finding resolves it.
 echo '[]' > "$SANDBOX/empty.json"
@@ -145,7 +161,44 @@ m="$(node "$SCRIPTS/design-findings.mjs" merge --noticed-only --no-render)"
 reg="$(cat "$D/findings.json")"
 assert "noticed-only: one new, next id, nothing resolved" '.new == 1 and .findings == 10' "$m"
 assert "the new id is D-10" '.findings[-1].id == "D-10" and .findings[-1].source == "noticed" and .next_id == 11' "$reg"
+assert "a noticed item's builds from its verdicts file name" '.findings[-1] | .first_seen == "b2" and .last_seen == "b2"' "$reg"
 [ ! -e "$D/crops/D-77.jpg" ] || { echo "  the crop of an id not in the register was kept"; FAILED=1; }
+# Two noticed-only merges in a row: the second does not rewrite the register.
+cp "$D/findings.json" "$SANDBOX/reg2.json"; touch -t 202001010000 "$D/findings.json"; touch -t 202101010000 "$SANDBOX/mark"
+node "$SCRIPTS/design-findings.mjs" merge --noticed-only --no-render >/dev/null
+cmp -s "$SANDBOX/reg2.json" "$D/findings.json" || { echo "  a second noticed-only merge changed findings.json"; FAILED=1; }
+[ -n "$(find "$D/findings.json" ! -newer "$SANDBOX/mark")" ] || { echo "  a second noticed-only merge rewrote findings.json"; FAILED=1; }
+# A noticed item seen again in a later build: last_seen moves, first_seen stays.
+cat > "$WORK_DIR/issues/12/verdicts-abc-b3.json" <<'J'
+{"noticed":[{"where":"/","saw":"The logo is blurry","shot":null}]}
+J
+touch -t 203001010000 "$WORK_DIR/issues/12/verdicts-abc-b3.json"
+node "$SCRIPTS/design-findings.mjs" merge --noticed-only --no-render >/dev/null
+assert "noticed again in b3" '.findings[] | select(.id=="D-10") | .first_seen == "b2" and .last_seen == "b3"' "$(cat "$D/findings.json")"
+rm "$WORK_DIR/issues/12/verdicts-abc-b3.json"
+
+# A check resolves only where it ran: a11y only where axe ran on the page; an errored page resolves nothing.
+S4="$D/b4"; mkdir -p "$S4/shots"
+cat > "$S4/sweep.json" <<'J'
+{"build":"b4","viewports":["1440x900","390x844"],"axe":true,"pages":[
+  {"pattern":"/forms","viewport":"1440x900","shot":"shots/forms@1440x900.png","axe":true,"cls":0,"findings":[
+    {"check":"a11y:label","severity":"major","target":"“Email” input","box":null,"detail":"Form elements must have labels"},
+    {"check":"contrast","severity":"minor","target":"“Hint” span","box":null,"detail":"contrast 2.10:1"}]},
+  {"pattern":"/forms","viewport":"390x844","shot":"shots/forms@390x844.png","axe":true,"cls":0,"findings":[
+    {"check":"a11y:label","severity":"major","target":"“Email” input","box":null,"detail":"Form elements must have labels"}]},
+  {"pattern":"/err","viewport":"1440x900","shot":"shots/err@1440x900.png","axe":true,"cls":0,"findings":[
+    {"check":"clipped-text","severity":"minor","target":"“Title” heading","box":null,"detail":"cut"}]}]}
+J
+m="$(node "$SCRIPTS/design-findings.mjs" merge "$S4/sweep.json" --no-render)"
+assert "b4: four new" '.new == 4' "$m"
+jq '.build="b5" | .axe=false | .pages |= map(.findings=[] | if .pattern=="/err" then .error="timeout" elif .viewport=="1440x900" then .axe=false else . end)' \
+  "$S4/sweep.json" > "$SANDBOX/b5.json"
+node "$SCRIPTS/design-findings.mjs" merge "$SANDBOX/b5.json" --no-render >/dev/null
+reg="$(cat "$D/findings.json")"
+assert "axe did not run on the page: its a11y finding stays open" '.findings[] | select(.pattern=="/forms" and .viewport=="1440x900" and .check=="a11y:label") | .status == "open" and .resolved_build == null' "$reg"
+assert "another check on that page resolves" '.findings[] | select(.pattern=="/forms" and .check=="contrast") | .status == "resolved" and .resolved_build == "b5"' "$reg"
+assert "axe ran on the page: its a11y finding resolves" '.findings[] | select(.pattern=="/forms" and .viewport=="390x844") | .status == "resolved"' "$reg"
+assert "an errored page resolves nothing" '.findings[] | select(.pattern=="/err") | .status == "open" and .last_seen == "b4"' "$reg"
 node "$SCRIPTS/design-findings.mjs" merge >/dev/null 2>&1
 assert_eq "merge without a sweep or --noticed-only is a usage error" 2 "$?"
 ls "$D"/*.tmp >/dev/null 2>&1 && { echo "  a tmp file was left"; FAILED=1; }

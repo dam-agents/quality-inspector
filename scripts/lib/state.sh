@@ -13,6 +13,7 @@ COVERAGE_HEADER='| page | title | tests | covered |'   # written by scripts/cove
 SCENARIOS_HEADER='| id | source | requester | thread | spec_hash | build | verdict | status | updated_utc |'
 CATALOG_HEADER='| collection | members |'   # work/CATALOG.md, the operator's collections (docs/catalog.md)
 FOCUS_HEADER='| area | queued_utc | status | build |'   # work/FOCUS.md, written by scripts/modules.sh (docs/modules.md)
+DISMISSED_HEADER='| id | dismissed_utc |'   # work/design/DISMISSED.md, written by scripts/modules.sh dismiss (docs/ui-sweep.md)
 
 # Data rows of a markdown table file (everything after the header + separator).
 table_rows() { grep '^|' "$1" 2>/dev/null | tail -n +3; }

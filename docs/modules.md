@@ -24,14 +24,19 @@ Only the operator, in the direct session, changes a module (CLAUDE.md → trust 
 | --- | --- |
 | `module <id> set <key>=<value>` (or the same in words) | `modules.sh set <id> <key>=<value>` — `global` for `modules_max_wallclock_min` and `dashboard_interactive` |
 | `module <id> on` / `off` (a schedule kind) | the platform's schedule tools: enable or disable its schedule; then `modules.sh schedules` with the new `list_schedules` answer |
-| `module <id> run now` | the modules run below for that module only, ignoring "already ran"; a schedule kind: its own on-demand command ([on-demand.md](on-demand.md)) |
+| `module <id> run now` | a `modules` kind: the modules run below for that module only, ignoring "already ran". A schedule kind: `regression` — "run the regression now", `security` — "run the security checks", `discovery` — "propose scenarios" ([on-demand.md](on-demand.md)); `benchmark` — [benchmark.md](benchmark.md) → the run; `audit` — [audit.md](audit.md), now |
 | `focus <area>` | `modules.sh focus <area>` — the next modules run takes it |
-| `dismiss D-<k>` | a row `\| D-<k> \| <ISO> \|` in `work/design/DISMISSED.md` ([ui-sweep.md](ui-sweep.md)) |
+| `dismiss D-<k>` | `modules.sh dismiss D-<k>` — a row in `work/design/DISMISSED.md` ([ui-sweep.md](ui-sweep.md)) |
 
-`modules.sh set` and `focus` write only registry keys with valid values and refuse to run
-outside the direct session (`lib/config.sh` → `direct_session`; the policy hook's
-`module-set` is the second layer). After any change: one line to the operator with the old
-and new value, then rebuild and publish the catalog.
+`modules.sh set`, `focus` and `dismiss` write only registry keys with valid values, an area name
+or a finding id, and refuse to run outside the direct session (`lib/config.sh` →
+`direct_session`). The policy hook is the second layer: in a scheduled or channel turn it
+allows `modules.sh` only as one plain `status|due|ran|focus-done|check|value|schedules` call,
+refuses a command naming the session variables `direct_session` reads, and refuses edits of
+`work/CONFIG.md`, `work/FOCUS.md` and `work/design/DISMISSED.md` (`module-set`, `scheduled-def`).
+**Limit:** a schedule is switched through the platform's tools, which the policy hook does not
+see — only this rule keeps it the operator's. After any change: one line to the operator with
+the old and new value, then rebuild and publish the catalog.
 
 **From the dashboard.** Each control on the page shows the command it stands for. On an
 interactive dashboard opened beside the agent's chat, its button sends exactly that command
@@ -54,9 +59,11 @@ candidate), `focus[]`, `inventory` (the candidate's UI map or `null`), `max_wall
    **Building the context**, first command only).
 4. Each due module in this order — `ui-sweep`, `validation`, then the focus areas, `stress`
    last — by its doc. Before each one: the wall-clock since the claim against
-   `max_wallclock_min`; over it → skip the rest, each logged `skip=budget`. After each:
-   `modules.sh ran <id> <candidate> <counts…>`; a module that failed gets an `ERROR:` line
-   instead, never `ran`.
+   `max_wallclock_min`; over it → skip the rest, each logged `skip=budget` (the budget bounds
+   the modules; bringing the product up and the closing reset come on top). After each:
+   `modules.sh ran <id> <candidate> <counts…>`; a module whose script failed (exit 3: no
+   browser; any other non-zero but the documented environment failure) gets
+   `<ISO> ERROR: module=<id> candidate=<c> <reason>` in `work/MODULES.log` instead, never `ran`.
 5. `env.sh reset` — form input and load must not reach the next run.
 6. The catalog ([catalog.md](catalog.md) → **Build and publish**): the dashboard is the
    report of this run.
@@ -83,8 +90,10 @@ map. For each queued area, on the candidate:
    judged as explorations are; run `--strict --evidence failures`.
 4. `ui-sweep.mjs` and `validation-plan.mjs` with the inventory cut to those pages, all
    viewports — their findings go to their usual places.
-5. `work/focus/<area-slug>-<candidate>/results.json`: the explorations' result shape.
-   `modules.sh focus-done <area> <candidate>`, `modules.sh ran feature-focus <candidate> area=<area-slug>`.
+5. `work/focus/<area-slug>-<candidate>/results.json`: `{area, build, generated_utc, checks: [...]}`,
+   each check in the explorations' result shape without its `note` (the dashboard's Findings
+   view shows them). `modules.sh focus-done <area> <candidate>` (exit 2: no such queued area),
+   `modules.sh ran feature-focus <candidate> area=<area-slug>`.
 
 ## Cost
 

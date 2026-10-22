@@ -24,7 +24,10 @@ assert "status lists every module with its defaults" \
    and (.modules[] | select(.id == "edge-cases") | .state == "enabled") and (.modules[] | select(.id == "issues") | .state == "on")
    and .global.dashboard_interactive.value == "disabled" and .focus == [] and .schedules_as_of == null' "$st"
 echo "- ui_sweep: hourly" >> "$WORK_DIR/CONFIG.md"
-assert "an invalid value reads as the default" '.modules[] | select(.id == "ui-sweep") | .state == "disabled"' "$(bash "$M" status)"
+assert "an invalid value reads as the default, flagged" '.modules[] | select(.id == "ui-sweep") | .state == "disabled" and .settings.ui_sweep.raw == "hourly" and .settings.ui_sweep.invalid == true' "$(bash "$M" status)"
+assert_eq "value: the effective value" "disabled" "$(bash "$M" value ui_sweep)"
+assert_eq "value: a default" "90" "$(bash "$M" value modules_max_wallclock_min)"
+bash "$M" value target_repo >/dev/null 2>&1; assert_eq "value: only registry keys" 2 "$?"
 
 # ---------------------------------------------------------------- set: the closed set
 before="$(cat "$WORK_DIR/CONFIG.md")"
@@ -57,6 +60,15 @@ rm -f "$WORK_DIR/env/RUN_MODE"
 CLAUDE_CODE_SESSION_ID=unknown bash "$M" set stress stress_checks=per-build >/dev/null 2>&1; assert_eq "no transcript fails closed" 2 "$?"
 grep -q '^- stress_checks:' "$WORK_DIR/CONFIG.md"; assert_eq "nothing was written" 1 "$?"
 
+# ---------------------------------------------------------------- dismiss
+bash "$M" dismiss 'D-1; rm -rf ~' >/dev/null 2>&1; assert_eq "a finding id is D-<k>" 2 "$?"
+assert "dismiss seeds the table" '.dismissed == true' "$(bash "$M" dismiss D-4)"
+assert "dismissed twice is one row" '.dismissed == false' "$(bash "$M" dismiss D-4)"
+assert_eq "header, separator, one row" "3 | D-4 |" "$(wc -l < "$WORK_DIR/design/DISMISSED.md" | tr -d ' ') $(tail -1 "$WORK_DIR/design/DISMISSED.md" | cut -c1-7)"
+printf 'scheduled %s -\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$WORK_DIR/env/RUN_MODE"
+bash "$M" dismiss D-5 >/dev/null 2>&1; assert_eq "a scheduled turn cannot dismiss" 2 "$?"
+rm -f "$WORK_DIR/env/RUN_MODE"
+
 # ---------------------------------------------------------------- focus queue
 bash "$M" focus 'Upload; rm -rf ~' >/dev/null 2>&1; assert_eq "an area name is a plain name" 2 "$?"
 assert "focus queued" '.queued == true' "$(bash "$M" focus Upload)"
@@ -64,6 +76,7 @@ assert "queued twice is one row" '.queued == false' "$(bash "$M" focus Upload)"
 assert "status shows the queue" '.focus == [{area:"Upload", queued_utc:.focus[0].queued_utc, status:"queued", build:null}]' "$(bash "$M" status)"
 assert "a queued area is due" '.focus == ["Upload"]' "$(bash "$M" due c1)"
 bash "$M" focus-done Upload c1 >/dev/null
+bash "$M" focus-done Upload c1 >/dev/null 2>&1; assert_eq "focus-done without a queued row says so" 2 "$?"
 assert "done leaves the queue" '.focus == []' "$(bash "$M" due c1)"
 assert "the row keeps its build" '.focus[0].status == "done" and .focus[0].build == "c1"' "$(bash "$M" status)"
 
@@ -87,6 +100,7 @@ printf '[{"name":"quality-inspector-regression-nightly","enabled":false,"cron":"
   | bash "$M" schedules - >/dev/null
 assert "only name, enabled and cron are kept" '(.schedules | length) == 2 and (tostring | test("SECRET") | not)' "$(cat "$WORK_DIR/schedules.json")"
 st="$(bash "$M" status)"
+assert "a schedule nobody listed is unknown, never on" '.modules[] | select(.id == "audit") | .state == "unknown"' "$(bash "$M" status)"
 assert "a module whose schedule is off is off" '(.modules[] | select(.id == "regression") | .state == "off" and .schedule.enabled == false)
   and (.modules[] | select(.id == "security") | .state == "enabled" and .schedule.cron == "0 4 * * 0") and .schedules_as_of != null' "$st"
 echo 'not json' | bash "$M" schedules - >/dev/null 2>&1; assert_eq "a non-listing is refused" 2 "$?"
@@ -117,4 +131,9 @@ printf '%s\n' "$v" | grep -q "^FAIL cfg:stress_checks — 'always' is not one of
 printf '%s\n' "$v" | grep -q "^FAIL cfg:dashboard_interactive "; assert_eq "verify fails a bad global" 0 "$?"
 printf '%s\n' "$v" | grep -q "^FAIL cfg:ui_sweep "; assert_eq "verify passes a good cadence" 1 "$?"
 printf '%s\n' "$v" | grep -qi "unknown.*ui_sweep_viewports"; assert_eq "registry keys are known keys" 1 "$?"
+seed_work; printf -- '- bisect_max_steps: 99\n- explorations: maybe\n- lock_ttl_min: 60\n- modules_max_wallclock_min: 90\n' >> "$WORK_DIR/CONFIG.md"
+v="$(bash "$SCRIPTS/verify-onboarding.sh" --config 2>/dev/null)"
+printf '%s\n' "$v" | grep -q "^FAIL cfg:bisect_max_steps — '99' is not one of: 0..20"; assert_eq "every registry key is judged, the older ones too" 0 "$?"
+printf '%s\n' "$v" | grep -q "^FAIL cfg:explorations "; assert_eq "an older enum, by the registry" 0 "$?"
+printf '%s\n' "$v" | grep -q "^FAIL cfg:lock_vs_modules "; assert_eq "the lock outlives the modules budget" 0 "$?"
 exit $FAILED

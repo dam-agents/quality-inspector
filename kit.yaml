@@ -117,7 +117,7 @@ schedules:
       Weekly self-audit. Run `bash "$HOME/scripts/preflight.sh" audit`, then follow
       CLAUDE.md → "Audit run": read docs/audit.md and report.
   - name: quality-inspector-modules-nightly
-    cron: "30 1 * * *"
+    cron: "30 4 * * *"
     sessionMode: fresh
     precheck: 'bash "$HOME/scripts/precheck.sh" modules'
     task: >-

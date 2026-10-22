@@ -13,10 +13,12 @@
 // Default --out: work/design/<build>; --viewports: config `ui_sweep_viewports`, else the above
 // (WxH, at most 4; a viewport under 600 px wide is a touch phone). Writes <out>/sweep.json
 // ({build, generated_utc, base, viewports, axe, pages:[{pattern, example, viewport, shot,
-// changed, diff, cls, findings}], counts:{major, minor, pages}, notes}) and <out>/shots/;
-// prints {sweep, pages, findings, major, minor, changed, new, notes}. `changed` is null for a
-// page the previous sweep has no shot of. Exit 2: usage, or a base off localhost; exit 1: the
-// owner cannot sign in.
+// changed, diff, cls, axe, findings, error?}], counts:{major, minor, pages}, notes}) and
+// <out>/shots/; prints {sweep, pages, findings, major, minor, changed, new, notes}. `changed`
+// is null for a page the previous sweep has no shot of; a page's `axe` is true only when
+// axe-core ran on it (the top-level `axe`: axe-core was available). Exit 2: usage, or a base
+// off localhost; exit 1: the owner cannot sign in (an environment failure); exit 3: no browser
+// (playwright-core missing or Chromium does not launch) — {error: "no browser: …"} on stdout.
 //
 // Signs in as the owner (E2E_USER_OWNER_*, env or work/env/credentials.env; kept in memory),
 // then only navigates: it never clicks, types or submits.
@@ -111,15 +113,19 @@ const credFile = (() => {
 const user = process.env.E2E_USER_OWNER_USERNAME ?? credFile.E2E_USER_OWNER_USERNAME;
 const pass = process.env.E2E_USER_OWNER_PASSWORD ?? credFile.E2E_USER_OWNER_PASSWORD;
 
+const msg = (e) => String(e?.message ?? e).split('\n')[0].slice(0, 160);
+// No browser is this module's failure, not the environment's: exit 3, never 1.
+const noBrowser = (e) => { console.log(JSON.stringify({ error: `no browser: ${msg(e)}` })); process.exit(3); };
 const req = createRequire(process.env.QI_PLAYWRIGHT_FROM ?? join(WORK, 'suite', 'package.json'));
 let pw;
-try { pw = req('playwright-core'); } catch { pw = createRequire(req.resolve('@e2e-dev/web'))('playwright-core'); }
+try {
+  try { pw = req('playwright-core'); } catch { pw = createRequire(req.resolve('@e2e-dev/web'))('playwright-core'); }
+} catch { noBrowser('playwright-core is not installed in work/suite (scripts/suite.sh init installs it)'); }
 let axeSource = null;
 try { axeSource = createRequire(join(WORK, 'suite', 'package.json'))('axe-core').source; } catch { notes.push('axe-core unavailable: no a11y rules run (scripts/suite.sh init installs it)'); }
 // The checks are one self-contained browser function, loaded as text so no module flavour matters.
 const qiUiChecks = new Function(`${readFileSync(join(here, 'lib', 'ui-checks.mjs'), 'utf8').replace(/^export\s+(?=(?:async\s+)?function\s+qiUiChecks\b)/m, '')}\nreturn qiUiChecks;`)();
 
-const msg = (e) => String(e?.message ?? e).split('\n')[0].slice(0, 160);
 const sameOrigin = (u) => { try { return new URL(u).origin === base.origin; } catch { return false; } };
 // Volatile parts of a console line collapse as in ui-inventory.mjs (URLs to their pattern, ids,
 // numbers): one target per error kind, and no query string (a token) is carried over.
@@ -129,7 +135,8 @@ const vol = (s) => String(s ?? '')
   .replace(/\b(?=[0-9a-f]*\d)[0-9a-f]{8,}\b/gi, ':id')
   .replace(/\d+/g, 'N').replace(/\s+/g, ' ').trim().slice(0, 200);
 
-const browser = await pw.chromium.launch({ headless: true });
+let browser;
+try { browser = await pw.chromium.launch({ headless: true }); } catch (e) { noBrowser(e); }
 const settle = async (page) => { await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); await page.waitForTimeout(500); };
 const pwdVisible = async (page) => (await page.locator('input[type=password]').filter({ visible: true }).count()) > 0;
 // Cumulative layout shift, as the web-vitals session windows (gap < 1 s, window <= 5 s).
@@ -225,7 +232,7 @@ for (const vp of viewports) {
     if (sig && sameOrigin(r.url()) && !/ERR_ABORTED/.test(err)) sig.requests.set(`${r.method()} ${pattern(new URL(r.url()))} → failed`, err);
   });
   for (const v of visits.filter((x) => x.vp === vp)) {
-    const entry = { pattern: v.pattern, example: v.example, viewport: vp.id, shot: null, changed: null, diff: null, cls: null, findings: [] };
+    const entry = { pattern: v.pattern, example: v.example, viewport: vp.id, shot: null, changed: null, diff: null, cls: null, axe: false, findings: [] };
     results.push(entry);
     sig = { errors: new Set(), requests: new Map() };
     try {
@@ -237,7 +244,8 @@ for (const vp of viewports) {
       const f = await page.evaluate(qiUiChecks, { mobile, minTap: 24 });
       entry.cls = await page.evaluate(() => (window.__qiCls == null ? null : Math.round(window.__qiCls * 1000) / 1000));
       if (entry.cls > 0.1) f.push({ check: 'layout-shift', severity: 'minor', target: 'the page', text: '', box: null, detail: `CLS ${entry.cls}` });
-      if (axeSource) { try { f.push(...await axe(page)); } catch (e) { notes.push(`axe on ${v.pattern} @${vp.id}: ${msg(e)}`); } }
+      // entry.axe: the a11y checks ran here — only then can a sweep resolve an a11y finding of this page.
+      if (axeSource) { try { f.push(...await axe(page)); entry.axe = true; } catch (e) { notes.push(`axe on ${v.pattern} @${vp.id}: ${msg(e)}`); } }
       await page.screenshot({ path: join(out, v.shot), fullPage: true, animations: 'disabled' });
       entry.shot = v.shot;
       for (const e of [...sig.errors].sort().slice(0, 20)) f.push({ check: 'console-error', severity: 'minor', target: `console: ${e.slice(0, 120)}`, text: e, box: null, detail: e });

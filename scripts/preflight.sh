@@ -81,6 +81,10 @@ retention_sweep() {
     local owner; owner="$(dirname "$(dirname "$d")")"
     if [ -f "$owner/artifact.id" ] || [ "$art" = disabled ]; then rm -rf "$d" && n=$((n+1)); fi
   done < <(find "$WORK/issues" "$WORK/scenarios" "$WORK/regression" "$WORK/security" -mindepth 3 -maxdepth 3 -type d -name media -mtime +"$MEDIA_DAYS" 2>/dev/null)
+  # The UI sweep's full-page shots (docs/ui-sweep.md): the newest two builds' stay for the next
+  # sweep's comparison; the findings keep their crops.
+  while IFS= read -r d; do rm -rf "$d" && n=$((n+1)); done < <(ls -1dt "$WORK"/design/*/shots 2>/dev/null | tail -n +3 \
+    | while IFS= read -r d; do [ -n "$(find "$d" -maxdepth 0 -mtime +"$MEDIA_DAYS" 2>/dev/null)" ] && printf '%s\n' "$d"; done)
   [ "$n" -gt 0 ] && log "retention: removed $n media directories older than ${MEDIA_DAYS}d"
   return 0
 }
@@ -614,7 +618,7 @@ mode_modules() {
     jq -nc --arg c "$candidate" --argjson logs "$(logs_json)" '{mode:"modules", nothing_to_do:true, candidate:$c, logs:$logs}'; return
   fi
   inv="$WORK/inventory/$candidate/inventory.json"; [ -f "$inv" ] || inv=""
-  budget="$(cfg modules_max_wallclock_min)"; case "$budget" in (''|*[!0-9]*) budget=90;; esac
+  budget="$(bash "$SCRIPT_DIR/modules.sh" value modules_max_wallclock_min 2>/dev/null)"; case "$budget" in (''|*[!0-9]*) budget=90;; esac
   log "candidate $candidate: due $(jq -r '.due | join(",")' <<<"$d")$(jq -r 'if (.focus|length) > 0 then " focus " + (.focus | join(",")) else "" end' <<<"$d")"
   runlog MODULES "due candidate=$candidate modules=$(jq -r '.due | join(",")' <<<"$d") focus=$(jq -r '.focus | length' <<<"$d")"
   jq -nc --arg c "$candidate" --arg b "$baseline" --arg inv "$inv" --argjson d "$d" --argjson budget "$budget" --argjson logs "$(logs_json)" \

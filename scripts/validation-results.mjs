@@ -8,7 +8,9 @@
 //     -> {"results", "cases", "ok", "major", "minor", "blocked", "flaky"}
 //
 // A case without a result in the run is `blocked` ("not run"). A finding whose confirmation
-// run passed at least once is `flaky`, not a finding.
+// run passed at least once is `flaky`, not a finding. A run that cannot have reached the
+// tests — its report.json missing or unreadable, or no val-* result while the plan has
+// cases — is no result: exit 1, {"error"}, nothing written.
 
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -27,9 +29,10 @@ const plan = readJson(planPath);
 if (!plan || !Array.isArray(plan.cases)) { console.error(`validation-results: ${planPath} is not a plan`); process.exit(2); }
 
 // Results of one run by case tag (val-<k>): every attempt's status and the last error message.
-const byTag = (lbl) => {
+const report = (lbl) => readJson(join(runsRoot, lbl, 'report.json'));
+const byTag = (rep) => {
   const m = new Map();
-  for (const r of readJson(join(runsRoot, lbl, 'report.json'))?.run?.results ?? []) {
+  for (const r of Array.isArray(rep?.run?.results) ? rep.run.results : []) {
     const tag = (r.tags ?? []).find((t) => /^val-\d+$/.test(t));
     if (!tag) continue;
     const e = m.get(tag) ?? { statuses: [], message: null };
@@ -40,8 +43,12 @@ const byTag = (lbl) => {
   }
   return m;
 };
-const main = byTag(label);
-const confirms = many('confirm').map(byTag);
+const fail = (error) => { console.log(JSON.stringify({ error })); process.exit(1); };
+const mainReport = report(label);
+if (!Array.isArray(mainReport?.run?.results)) fail(`run ${label}: no readable report.json under ${join(runsRoot, label)} — the run did not finish`);
+const main = byTag(mainReport);
+if (plan.cases.length && !main.size) fail(`run ${label}: no val-* result for the plan's ${plan.cases.length} cases — the run did not reach the tests`);
+const confirms = many('confirm').map((l) => byTag(report(l)));
 
 const SEVERITY = { 'no-server-error': 'major', 'no-uncaught-error': 'major', 'no-error-page': 'major',
   'value-intact': 'major', 'single-effect': 'major', 'refused-visibly': 'minor' };

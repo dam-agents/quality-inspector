@@ -45,7 +45,11 @@ finding. Each failure message opens with the oracle that broke:
 
 `node "$HOME/scripts/validation-results.mjs" work/validation/<c>/plan.json --run validation-<c> [--confirm <label>]…`
 → `work/validation/<c>/results.json`: per case `result` `ok` | `finding` | `flaky` | `blocked`,
-`severity` from the table, `message` (the failure's first line). Then
+`severity` from the table, `message` (the failure's first line); a case the run has no
+result for is `blocked` ("not run"). Exit 1 (`{"error"}`, nothing written) = the run never
+reached the tests: its `report.json` is missing or unreadable, or holds no `val-*` result
+while the plan has cases. The module failed — an `<ISO> ERROR: module=validation candidate=<c>
+<error>` line in `work/MODULES.log`, never `ran`. Otherwise
 `modules.sh ran validation <c> cases=<n> major=<n> minor=<n> blocked=<n>`.
 
 Passing cases and double submits create `qa-val-*` objects; the run's closing `env.sh reset`

@@ -77,8 +77,29 @@ assert "the product answers after the load" "$(c STRESS-HEALTH-1 / pass)" "$r"
 assert "no previous -> p95 comparison skipped" '[.checks[] | select(.id=="STRESS-API-3") | .status] | unique == ["skipped"]' "$r"
 assert "no Playwright -> ui skipped with the reason" '[.checks[] | select(.id | startswith("STRESS-UI-")) | .reason] == ["playwright unavailable","playwright unavailable"]' "$r"
 assert "metrics per endpoint" '.metrics.api | (keys == ["GET /api/flaky","GET /api/ok","GET /api/slow"]) and (.["GET /api/slow"].p95 >= 1200) and (.["GET /api/flaky"].s5xx >= 1) and (.["GET /api/ok"].count > 0)' "$r"
-assert "the run shape" '.build == "c1" and .config == {concurrency:3,duration_s:2,pages:5,requests_cap:20000} and (.counts | keys == ["critical","high","low","medium","passed","skipped"]) and .counts.high == 2 and .counts.critical == 0' "$r"
+assert "the run shape" '.build == "c1" and .config == {concurrency:3,duration_s:2,pages:5,requests_cap:20000} and (.counts | keys == ["critical","flaky","high","low","medium","passed","skipped"]) and .counts.high == 2 and .counts.critical == 0 and .counts.flaky == 0 and (has("confirms") | not)' "$r"
 assert "no write was replayed" '.metrics.api | keys | map(select(startswith("POST"))) == []' "$r"
+# The confirmation: the first run is kept, a check that failed there and passes now is flaky.
+jq '(.checks[] | select(.id=="STRESS-API-1" and .target=="GET /api/ok")) |= (.status = "fail" | .reason = "error rate 5.0% > 1%")' \
+  "$SANDBOX/s1/stress.json" > "$SANDBOX/s1/stress.first.json"
+o="$(QI_PLAYWRIGHT_FROM="$SANDBOX/no-pw/package.json" node "$SCRIPTS/stress.mjs" "$SANDBOX/live.json" --base "http://127.0.0.1:$PORT" \
+      --skip-signin --duration 2 --concurrency 3 --out "$SANDBOX/s1" --confirm "$SANDBOX/s1/stress.first.json")"
+r="$(cat "$SANDBOX/s1/stress.json")"
+assert "failed first, passes now -> flaky with both reasons" '[.checks[] | select(.id=="STRESS-API-1" and .target=="GET /api/ok") | [.status, (.reason | test("first run \\(error rate 5.0%"))]] == [["flaky",true]]' "$r"
+assert "failed first, fails again -> still fail" "$(c STRESS-API-1 'GET /api/flaky' fail)" "$r"
+assert "passed first -> not flaky" "$(c STRESS-API-1 'GET /api/slow' pass)" "$r"
+assert "flaky counted apart, not a finding" '.counts.flaky == 1 and .counts.high == 2 and (.confirms | endswith("stress.first.json"))' "$r"
+assert "the summary counts flaky" '.flaky == 1 and .failed == 2' "$o"
+assert "the first run is kept" '[.checks[] | select(.status=="flaky")] == []' "$(cat "$SANDBOX/s1/stress.first.json")"
+QI_PLAYWRIGHT_FROM="$SANDBOX/no-pw/package.json" node "$SCRIPTS/stress.mjs" "$SANDBOX/live.json" --base "http://127.0.0.1:$PORT" \
+  --skip-signin --duration 1 --concurrency 3 --out "$SANDBOX/s1" --confirm "$SANDBOX/s1/stress.first.json" --pages 0 >/dev/null
+assert "other settings than the first run -> a note" '.notes | map(select(test("other settings"))) | length == 1' "$(cat "$SANDBOX/s1/stress.json")"
+jq '.build = "c0"' "$SANDBOX/s1/stress.first.json" > "$SANDBOX/other.json"
+node "$SCRIPTS/stress.mjs" "$SANDBOX/live.json" --base "http://127.0.0.1:$PORT" --skip-signin --out "$SANDBOX/s4" --confirm "$SANDBOX/other.json" >/dev/null 2>&1
+assert_eq "--confirm of another build is refused" 2 "$?"
+node "$SCRIPTS/stress.mjs" "$SANDBOX/live.json" --base "http://127.0.0.1:$PORT" --skip-signin --out "$SANDBOX/s4" --confirm "$SANDBOX/missing.json" >/dev/null 2>&1
+assert_eq "an unreadable --confirm is refused" 2 "$?"
+[ ! -e "$SANDBOX/s4/stress.json" ] || { echo "  a refused --confirm must not write a result"; FAILED=1; }
 echo '{"metrics":{"api":{"GET /api/ok":{"p95":5000},"GET /api/slow":{"p95":100}},"ui":{}}}' > "$SANDBOX/prev.json"
 QI_PLAYWRIGHT_FROM="$SANDBOX/no-pw/package.json" node "$SCRIPTS/stress.mjs" "$SANDBOX/live.json" --base "http://127.0.0.1:$PORT" \
   --skip-signin --duration 2 --concurrency 3 --pages 0 --previous "$SANDBOX/prev.json" --out "$SANDBOX/s2" >/dev/null
@@ -87,7 +108,15 @@ assert "slow endpoint: p95 > 2x and +1000 ms -> fail" "$(c STRESS-API-3 'GET /ap
 assert "ok endpoint: faster than before -> pass" "$(c STRESS-API-3 'GET /api/ok' pass)" "$r"
 assert "not in the previous run -> skipped" "$(c STRESS-API-3 'GET /api/flaky' skipped)" "$r"
 assert "--pages 0 -> ui skipped, no pages" '[.checks[] | select(.id | startswith("STRESS-UI-")) | .reason] == ["no pages","no pages"]' "$r"
-node "$SCRIPTS/stress.mjs" "$SANDBOX/live.json" --base "http://127.0.0.1:$PORT" --duration 1 --out "$SANDBOX/s3" >/dev/null 2>&1
-assert_eq "no OWNER sign-in -> exit 1" 1 "$?"
-[ ! -e "$SANDBOX/s3/stress.json" ] || { echo "  a failed sign-in must not write a result"; FAILED=1; }
+o="$(QI_PLAYWRIGHT_FROM="$SANDBOX/no-pw/package.json" node "$SCRIPTS/stress.mjs" "$SANDBOX/live.json" --base "http://127.0.0.1:$PORT" \
+      --duration 1 --out "$SANDBOX/s3" 2>/dev/null)"
+assert_eq "no browser for the sign-in -> exit 3, the module failed" 3 "$?"
+assert "the reason is printed" '.error | startswith("no browser: playwright unavailable")' "$o"
+[ ! -e "$SANDBOX/s3/stress.json" ] || { echo "  a run without a browser must not write a result"; FAILED=1; }
+# Exit 1 needs a running browser whose sign-in failed: wherever Playwright launches here.
+if node -e "require('module').createRequire('$WORK_DIR/suite/package.json')('playwright-core')" 2>/dev/null; then
+  node "$SCRIPTS/stress.mjs" "$SANDBOX/live.json" --base "http://127.0.0.1:$PORT" --duration 1 --out "$SANDBOX/s5" >/dev/null 2>&1
+  rc=$?; [ "$rc" = 3 ] || assert_eq "no OWNER account in a running browser -> exit 1" 1 "$rc"
+  [ ! -e "$SANDBOX/s5/stress.json" ] || { echo "  a failed sign-in must not write a result"; FAILED=1; }
+fi
 exit $FAILED

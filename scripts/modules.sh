@@ -16,18 +16,22 @@
 #                                          work/CONFIG.md; refuses a key outside the module, a
 #                                          value outside its type, every write when one is bad
 #   modules.sh focus <area>                queue an area for the next modules run
-#   modules.sh focus-done <area> <build>   mark the queued area done
+#   modules.sh focus-done <area> <build>   mark the queued area done (exit 2 when none is queued)
+#   modules.sh dismiss D-<k>               the operator's "not a defect": a row in
+#                                          work/design/DISMISSED.md (docs/ui-sweep.md)
+#   modules.sh value <key>                 a registry key's effective value: the CONFIG.md bullet
+#                                          when it fits its type, else the default — what a script
+#                                          that runs a module reads
 #   modules.sh ran <id> <candidate> [k=v…] append `<ISO> ran module=<id> candidate=<c> k=v…`
 #                                          to work/MODULES.log (what `due` keys on)
-#   modules.sh check                       [{key, value, ok, allowed}] for every key of the
-#                                          modules run and `global` set in CONFIG.md — what
-#                                          verify-onboarding.sh judges
+#   modules.sh check                       [{key, value, ok, allowed}] for every registry key set
+#                                          in CONFIG.md — what verify-onboarding.sh judges
 #   modules.sh schedules <file|->          keep name, enabled and cron of each listed schedule
 #                                          (the platform's list_schedules answer) in
 #                                          work/schedules.json, with the time it was taken
 #
 # The registry (lib/modules.json) is the closed set: a key it does not name, or a value
-# outside its type, is never written. `set` and `focus` are the operator's word: they run in
+# outside its type, is never written. `set`, `focus` and `dismiss` are the operator's word: they run in
 # the direct session only (lib/config.sh → direct_session) — never in a scheduled turn, a
 # Slack turn or a dashboard viewer's turn. Exit 2 = refused input, 1 = failed write.
 
@@ -88,22 +92,24 @@ last_run() { # <id> <log|null> <ran-marker>
 focus_rows() { table_rows "$WORK/FOCUS.md"; }
 
 cmd_status() {
-  local out='[]' id kind log ran sw specs_j settings key spec val state sched last
+  local out='[]' id kind log ran sw specs_j settings key spec val raw state sched last
   local schedules='{}' as_of=null
   [ -r "$WORK/schedules.json" ] && schedules="$(jq -c '.schedules // {}' "$WORK/schedules.json" 2>/dev/null || echo '{}')" \
     && as_of="$(jq -c '.taken_utc // null' "$WORK/schedules.json" 2>/dev/null || echo null)"
   while IFS=$'\x1f' read -r id kind log ran sw; do   # not a tab: empty fields would collapse
     specs_j="$(specs "$id")"; settings='{}'
     for key in $(jq -r 'keys_unsorted[]' <<<"$specs_j"); do
-      spec="$(jq -c --arg k "$key" '.[$k]' <<<"$specs_j")"; val="$(value_of "$key" "$spec")"
-      settings="$(jq -c --arg k "$key" --arg v "$val" --argjson s "$spec" '. + {($k): ($s + {value: $v})}' <<<"$settings")"
+      spec="$(jq -c --arg k "$key" '.[$k]' <<<"$specs_j")"; val="$(value_of "$key" "$spec")"; raw="$(cfg "$key")"
+      # A bullet outside its type reads as the default here; `raw` shows what CONFIG.md says (verify-onboarding fails it).
+      settings="$(jq -c --arg k "$key" --arg v "$val" --arg r "$raw" --argjson s "$spec" \
+        '. + {($k): ($s + {value: $v} + (if $r != "" and $r != $v then {raw: $r, invalid: true} else {} end))}' <<<"$settings")"
     done
     sched="$(jq -c --arg id "$id" --argjson s "$schedules" '.modules[] | select(.id == $id) | .schedule as $n
       | if $n == null then null else {name:$n} + ($s[$n] // {enabled:null, cron:null}) end' "$REG")"
     # on/off: the switch key's value; a scheduled module is off while its schedule is.
     state="on"
     [ -n "$sw" ] && state="$(jq -r --arg k "$sw" '.[$k].value' <<<"$settings")"
-    [ "$kind" = schedule ] && [ "$(jq -r '.enabled' <<<"$sched")" = false ] && state="off"
+    if [ "$kind" = schedule ]; then case "$(jq -r '.enabled' <<<"$sched")" in (false) state="off";; (null) state="unknown";; esac; fi
     last="$(last_run "$id" "$log" "${ran:- ran }")"
     out="$(jq -c --arg id "$id" --arg st "$state" --argjson set "$settings" --argjson sc "$sched" --argjson lr "$last" \
       --argjson m "$(jq -c --arg id "$id" '.modules[] | select(.id == $id) | {id,title,kind,what,doc}' "$REG")" \
@@ -196,8 +202,9 @@ cmd_focus_done() {
   [ -n "$area" ] && [ -n "$build" ] || die 2 "usage: modules.sh focus-done <area> <build>"
   [ -f "$WORK/FOCUS.md" ] || die 2 "modules.sh: no FOCUS.md"
   awk -F'|' -v a="$area" -v b="$build" 'BEGIN{OFS="|"} { x=$2; gsub(/^[ \t]+|[ \t]+$/,"",x); s=$4; gsub(/^[ \t]+|[ \t]+$/,"",s) }
-    !done && NR > 2 && x == a && s == "queued" { $4=" done "; $5=" " b " "; done=1 } { print }' "$WORK/FOCUS.md" > "$tmp" \
-    && mv "$tmp" "$WORK/FOCUS.md" || die 1 "modules.sh: cannot write FOCUS.md"
+    !done && NR > 2 && x == a && s == "queued" { $4=" done "; $5=" " b " "; done=1 } { print } END { exit !done }' "$WORK/FOCUS.md" > "$tmp" \
+    || { rm -f "$tmp"; die 2 "modules.sh: no queued focus on '$area'"; }
+  mv "$tmp" "$WORK/FOCUS.md" || die 1 "modules.sh: cannot write FOCUS.md"
   jq -nc --arg a "$area" --arg b "$build" '{area:$a, done:$b}'
 }
 
@@ -211,16 +218,38 @@ cmd_ran() {
   printf '%s ran module=%s candidate=%s%s\n' "$NOW_ISO" "$id" "$cand" "${*:+ $*}" >> "$WORK/MODULES.log" || die 1 "cannot write MODULES.log"
 }
 
+spec_of() { jq -c --arg k "$1" '[.global, (.modules[].settings)] | add | .[$k] // empty' "$REG"; }
+
+cmd_value() {
+  local spec; spec="$(spec_of "${1:-}")"
+  [ -n "$spec" ] || die 2 "modules.sh: '${1:-}' is not a registry key"
+  value_of "$1" "$spec"; echo
+}
+
+cmd_dismiss() {
+  local id="${1:-}" f="$WORK/design/DISMISSED.md"
+  operator_only dismiss
+  [[ "$id" =~ ^D-[0-9]{1,6}$ ]] || die 2 "modules.sh: '$id' is not a design finding id (D-<k>)"
+  mkdir -p "$WORK/design" || die 1 "modules.sh: cannot create work/design"
+  [ -f "$f" ] || printf '%s\n| --- | --- |\n' "$DISMISSED_HEADER" > "$f" || die 1 "modules.sh: cannot write $f"
+  if table_rows "$f" | while IFS= read -r r; do [ "$(cell "$r" 1)" = "$id" ] && exit 3; done; [ $? = 3 ]; then
+    jq -nc --arg id "$id" '{id:$id, dismissed:false, reason:"already dismissed"}'; return
+  fi
+  printf '| %s | %s |\n' "$id" "$NOW_ISO" >> "$f" || die 1 "modules.sh: cannot write $f"
+  logev info module_set "module=ui-sweep key=dismiss old=- new=$id"
+  jq -nc --arg id "$id" '{id:$id, dismissed:true}'
+}
+
 cmd_check() {
   local out='[]' key spec v
   while IFS= read -r key; do
-    spec="$(jq -c --arg k "$key" '[.global, (.modules[] | select(.kind == "modules" or .kind == "queue") | .settings)] | add | .[$k]' "$REG")"
+    spec="$(spec_of "$key")"
     v="$(cfg "$key")"; [ -n "$v" ] || continue
     out="$(jq -c --arg k "$key" --arg v "$v" --argjson ok "$(valid "$spec" "$v" && echo true || echo false)" --argjson s "$spec" \
       --argjson c "$(jq -c .cadences "$REG")" \
       '. + [{key:$k, value:$v, ok:$ok, allowed:(if $s.type == "cadence" then ($c | join(" ")) elif $s.type == "enum" then ($s.values | join(" "))
         elif $s.type == "int" then "\($s.min)..\($s.max)" else "up to 4 WxH, comma-separated" end)}]' <<<"$out")"
-  done < <(jq -r '[.global, (.modules[] | select(.kind == "modules" or .kind == "queue") | .settings)] | add | keys_unsorted[]' "$REG")
+  done < <(jq -r '[.global, (.modules[].settings)] | add | keys_unsorted[]' "$REG")
   printf '%s\n' "$out"
 }
 
@@ -244,6 +273,8 @@ case "${1:-}" in
   focus-done) shift; cmd_focus_done "$@" ;;
   ran) shift; cmd_ran "$@" ;;
   check) cmd_check ;;
+  value) shift; cmd_value "$@" ;;
+  dismiss) shift; cmd_dismiss "$@" ;;
   schedules) shift; cmd_schedules "$@" ;;
-  *) die 2 "usage: modules.sh status | due [<candidate>] | set <id|global> <key>=<value>… | focus <area> | focus-done <area> <build> | ran <id> <candidate> [k=v…] | check | schedules <file|->" ;;
+  *) die 2 "usage: modules.sh status | due [<candidate>] | set <id|global> <key>=<value>… | focus <area> | focus-done <area> <build> | dismiss D-<k> | value <key> | ran <id> <candidate> [k=v…] | check | schedules <file|->" ;;
 esac

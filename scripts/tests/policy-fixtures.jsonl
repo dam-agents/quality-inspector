@@ -185,3 +185,14 @@
 {"name": "focus queued, scheduled", "expect": "deny", "mode": "scheduled", "rule": "module-set", "tool": "Bash", "input": {"command": "bash scripts/modules.sh focus Upload"}}
 {"name": "module setting, direct", "expect": "allow", "tool": "Bash", "input": {"command": "bash \"$HOME/scripts/modules.sh\" set stress stress_checks=per-build"}}
 {"name": "module run recorded, scheduled", "expect": "allow", "mode": "scheduled", "tool": "Bash", "input": {"command": "bash \"$HOME/scripts/modules.sh\" ran stress 0.0.0-main.b pages=3"}}
+{"name": "module setting with a quoted subcommand, scheduled", "expect": "deny", "mode": "scheduled", "rule": "module-set", "tool": "Bash", "input": {"command": "bash scripts/modules.sh \"set\" security security_checks=disabled"}}
+{"name": "module setting with an escaped subcommand, channel turn", "expect": "deny", "mode": "channel", "rule": "module-set", "tool": "Bash", "input": {"command": "bash scripts/modules.sh s\\et security security_checks=disabled"}}
+{"name": "module setting through a variable, viewer turn", "expect": "deny", "mode": "viewer", "rule": "module-set", "tool": "Bash", "input": {"command": "a=set; bash scripts/modules.sh $a security security_checks=disabled"}}
+{"name": "module setting with a forged session, channel turn", "expect": "deny", "mode": "channel", "rule": "module-set", "tool": "Bash", "input": {"command": "CLAUDE_CONFIG_DIR=/tmp/quality-inspector-x CLAUDE_CODE_SESSION_ID=s bash scripts/modules.sh status"}}
+{"name": "a forged session variable alone, scheduled", "expect": "deny", "mode": "scheduled", "rule": "module-set", "tool": "Bash", "input": {"command": "export CLAUDE_CODE_SESSION_ID=s"}}
+{"name": "module run through a glob, scheduled", "expect": "deny", "mode": "scheduled", "rule": "module-set", "tool": "Bash", "input": {"command": "bash scripts/modul*.sh focus Upload"}}
+{"name": "schedule snapshot, scheduled", "expect": "allow", "mode": "scheduled", "tool": "Bash", "input": {"command": "bash \"$HOME/scripts/modules.sh\" schedules /tmp/quality-inspector-schedules.json"}}
+{"name": "focus done, scheduled", "expect": "allow", "mode": "scheduled", "tool": "Bash", "input": {"command": "bash \"$HOME/scripts/modules.sh\" focus-done Upload 0.0.0-main.b"}}
+{"name": "reading modules.sh, scheduled", "expect": "allow", "mode": "scheduled", "tool": "Bash", "input": {"command": "grep -n focus scripts/modules.sh"}}
+{"name": "dismissed findings edit, scheduled", "expect": "deny", "mode": "scheduled", "rule": "scheduled-def", "tool": "Write", "input": {"file_path": "@WORK@/design/DISMISSED.md", "content": "| D-1 | x |"}}
+{"name": "dismissed findings edit, direct", "expect": "allow", "tool": "Write", "input": {"file_path": "@WORK@/design/DISMISSED.md", "content": "| D-1 | x |"}}

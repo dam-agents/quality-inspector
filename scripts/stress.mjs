@@ -4,12 +4,17 @@
 // health probe. The one exception to docs/security.md → Out of scope (load and DoS); the
 // oracles, caps and reading are frozen in docs/stress.md. No model calls.
 //
-//   node stress.mjs <inventory.json> --build <c> [--out <dir>] [--previous <stress.json>] [--concurrency N]
-//                   [--duration S] [--pages N] [--base URL] [--skip-signin] [--dry-run]
+//   node stress.mjs <inventory.json> --build <c> [--out <dir>] [--previous <stress.json>] [--confirm <stress.json>]
+//                   [--concurrency N] [--duration S] [--pages N] [--base URL] [--skip-signin] [--dry-run]
 //
 // Writes <out>/stress.json ({build, generated_utc, base, config, counts, checks:[{id, target, status,
-// severity, evidence, reason}], metrics:{api, ui}, notes}) and prints {stress, checks, failed, notes}.
+// severity, evidence, reason}], metrics:{api, ui}, notes}) and prints {stress, checks, failed, flaky, notes}.
 // Default <out>: work/stress/<build>. --dry-run prints the plan: no network, no browser.
+// --confirm <first stress.json> makes this run the confirmation of that one (same build, read
+// before the run): a check (id + target) that failed there and passes now is `flaky`.
+//
+// Exit 0 written; 1 the owner's sign-in failed in a running browser (an environment failure);
+// 2 usage or refusal; 3 no browser for the sign-in (the module failed): prints {error}, writes nothing.
 //
 // Only GETs are replayed — never a write. Hard caps hold whatever the flags or the config say:
 // concurrency <= 50, duration <= 300 s, <= 20 000 requests, <= 5 browser contexts. Signs in as
@@ -31,7 +36,7 @@ for (let i = 2; i < process.argv.length; i++) {
   else if (a.startsWith('--')) flags[a.slice(2)] = process.argv[++i];
   else pos.push(a);
 }
-const usage = 'usage: stress.mjs <inventory.json> --build C [--out DIR] [--previous stress.json] [--concurrency N] [--duration S] [--pages N] [--base URL] [--skip-signin] [--dry-run]';
+const usage = 'usage: stress.mjs <inventory.json> --build C [--out DIR] [--previous stress.json] [--confirm stress.json] [--concurrency N] [--duration S] [--pages N] [--base URL] [--skip-signin] [--dry-run]';
 if (!pos[0]) { console.error(usage); process.exit(2); }
 
 const CAP = { concurrency: 50, duration_s: 300, requests: 20000, contexts: 5, endpoints: 30 };
@@ -102,6 +107,15 @@ const previous = (() => {
   if (!flags.previous) return null;
   try { return JSON.parse(readFileSync(flags.previous, 'utf8')).metrics ?? null; } catch (e) { notes.push(`--previous unreadable (${e.message.split('\n')[0]}): no comparison`); return null; }
 })();
+// The first run this one confirms, read now: --confirm may name the file this run overwrites.
+const firstRun = (() => {
+  if (!flags.confirm) return null;
+  let f;
+  try { f = JSON.parse(readFileSync(flags.confirm, 'utf8')); } catch (e) { console.error(`stress: --confirm ${flags.confirm} unreadable: ${e.message.split('\n')[0]}`); process.exit(2); }
+  if (!Array.isArray(f?.checks)) { console.error(`stress: --confirm ${flags.confirm} is not a stress.json`); process.exit(2); }
+  if (f.build !== build) { console.error(`stress: --confirm ${flags.confirm} is build ${f.build}, not ${build}`); process.exit(2); }
+  return f;
+})();
 
 // ------------------------------------------------------------------ the run ----
 const SEV = { 'STRESS-API-1': 'high', 'STRESS-API-2': 'high', 'STRESS-API-3': 'medium', 'STRESS-UI-1': 'high', 'STRESS-UI-2': 'medium', 'STRESS-HEALTH-1': 'critical' };
@@ -111,6 +125,9 @@ const msg = (e) => String(e?.message ?? e).split('\n')[0].slice(0, 160);
 const pct = (a, p) => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.ceil((p / 100) * s.length) - 1)]; };
 const sameOrigin = (u) => { try { return new URL(u).origin === base.origin; } catch { return false; } };
 const local = (u) => { try { const x = new URL(u); return !/^https?:$/.test(x.protocol) || LOCAL.includes(x.hostname); } catch { return false; } };
+// Every browser context, the sign-in's too: a request to any host but localhost is aborted.
+let blocked = 0;
+const fence = (context) => context.route('**/*', (r) => (local(r.request().url()) ? r.continue() : (blocked++, r.abort())));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Playwright only when a sign-in or the ui phase needs it.
@@ -132,8 +149,14 @@ const launch = async () => {
 };
 
 // Owner sign-in, as security-checks.mjs does it: cookies and the authorization header kept in memory.
+// No browser to sign in with is this module's failure (exit 3), not the environment's: exit 1
+// means a browser ran and the owner could not sign in.
 let session = null;
 if (!flags.skipSignin) {
+  try { await launch(); } catch (e) {
+    console.log(JSON.stringify({ error: `no browser: ${msg(e)}` }));
+    process.exit(3);
+  }
   try {
     const credFile = (() => {
       const o = {};
@@ -148,8 +171,8 @@ if (!flags.skipSignin) {
     const user = process.env.E2E_USER_OWNER_USERNAME ?? credFile.E2E_USER_OWNER_USERNAME;
     const pass = process.env.E2E_USER_OWNER_PASSWORD ?? credFile.E2E_USER_OWNER_PASSWORD;
     if (!user || !pass) throw new Error('no OWNER account (E2E_USER_OWNER_*)');
-    const b = await launch();
-    const context = await b.newContext({ viewport: { width: 1280, height: 800 } });
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    await fence(context);
     const page = await context.newPage();
     const settle = async () => { await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); await page.waitForTimeout(500); };
     const pwdVisible = async () => (await page.locator('input[type=password]').filter({ visible: true }).count()) > 0;
@@ -237,10 +260,9 @@ if (!uiSkip) {
   try {
     const b = await launch();
     const end = Date.now() + Math.max(1, Math.round(duration / 3)) * 1000;
-    let blocked = 0;
     const runner = async (k) => {
       const context = await b.newContext({ viewport: { width: 1280, height: 800 }, ...(session ? { storageState: session.state } : {}) });
-      await context.route('**/*', (r) => (local(r.request().url()) ? r.continue() : (blocked++, r.abort())));
+      await fence(context);
       const page = await context.newPage();
       let cur = null;
       page.on('response', (r) => { if (cur && r.status() >= 500 && sameOrigin(r.url())) ui[cur].s5xx++; });
@@ -257,7 +279,6 @@ if (!uiSkip) {
       await context.close();
     };
     await Promise.all(Array.from({ length: contexts }, (_, k) => runner(k)));
-    if (blocked) notes.push(`${blocked} requests to hosts other than localhost were blocked in the ui phase`);
   } catch (e) { uiSkip = msg(e).startsWith('playwright unavailable') ? 'playwright unavailable' : `ui phase failed: ${msg(e)}`; }
 }
 const metricsUi = Object.fromEntries(Object.entries(ui).map(([k, m]) => [k,
@@ -273,6 +294,7 @@ else {
   }
 }
 await browser?.close().catch(() => {});
+if (blocked) notes.push(`${blocked} browser requests to hosts other than localhost were blocked`);
 
 // Phase health — 5 s after the load, the app root must answer 2xx/3xx within 10 s.
 await sleep(5000);
@@ -287,16 +309,29 @@ await sleep(5000);
   }
 }
 
+// The confirmation: a check that failed in the first run and passes in this one is flaky, not a finding.
+if (firstRun) {
+  const failedFirst = new Map(firstRun.checks.filter((c) => c?.status === 'fail').map((c) => [`${c.id}\t${c.target}`, c]));
+  for (const c of checks) {
+    const f = failedFirst.get(`${c.id}\t${c.target}`);
+    if (f && c.status === 'pass') { c.status = 'flaky'; c.reason = `failed in the first run (${f.reason ?? 'no reason'}), passed on the confirmation`; }
+  }
+  const set = (x) => JSON.stringify({ concurrency: x?.concurrency, duration_s: x?.duration_s, pages: x?.pages });
+  if (set(firstRun.config) !== set(config)) notes.push('the confirmation ran with other settings than the first run');
+}
+
 // ------------------------------------------------------------------ output ----
 const counts = Object.fromEntries(['critical', 'high', 'medium', 'low'].map((s) => [s, checks.filter((c) => c.status === 'fail' && c.severity === s).length]));
+counts.flaky = checks.filter((c) => c.status === 'flaky').length;
 counts.skipped = checks.filter((c) => c.status === 'skipped').length;
 counts.passed = checks.filter((c) => c.status === 'pass').length;
 const out = flags.out ?? join(WORK, 'stress', build);
 mkdirSync(out, { recursive: true });
 const file = join(out, 'stress.json');
 const doc = { build, generated_utc: new Date().toISOString().replace(/\.\d+Z$/, 'Z'), base: base.origin,
-  config: { concurrency, duration_s: duration, pages: pagesN, requests_cap: CAP.requests }, counts, checks,
-  metrics: { api: metricsApi, ui: metricsUi }, notes };
+  config: { concurrency, duration_s: duration, pages: pagesN, requests_cap: CAP.requests }, ...(firstRun ? { confirms: flags.confirm } : {}),
+  counts, checks, metrics: { api: metricsApi, ui: metricsUi }, notes };
 writeFileSync(`${file}.tmp`, `${JSON.stringify(doc, null, 2)}\n`);
 renameSync(`${file}.tmp`, file);
-console.log(JSON.stringify({ stress: file, checks: checks.length, failed: checks.filter((c) => c.status === 'fail').length, notes }));
+console.log(JSON.stringify({ stress: file, checks: checks.length, failed: checks.filter((c) => c.status === 'fail').length,
+  flaky: counts.flaky, notes }));

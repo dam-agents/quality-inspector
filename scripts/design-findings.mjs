@@ -14,13 +14,18 @@
 // [{pattern, viewport, check: review:<alignment|spacing|typography|layout|truncation|legibility|other>,
 // severity: major|minor, saw, box: {x,y,w,h}|null, confidence: 0..1}] about this sweep's pages;
 // an entry that breaks it is rejected with a note, confidence < 0.6 is `suspect`. A sweep resolves
-// the sweep findings of every page+viewport it swept and did not find again; a review resolves
-// the review findings of the pages it covered (the review plan's and the ones it names). One
-// seen again reopens. `dismissed` comes only from work/design/DISMISSED.md (| id | dismissed_utc |,
-// the operator's), re-applied on every merge. Noticed items (work/issues/*/ and
-// work/scenarios/*/verdicts-*.json → noticed[]) join as source `noticed` — only where, saw and
-// shot are read — and are never resolved by a sweep. Crops of open findings render to
-// work/design/crops/<id>.jpg by the suite's playwright-core (none without it; --no-render skips).
+// a sweep finding it did not find again only where its check ran: on a page+viewport it swept
+// without an error, `a11y:*` only where axe-core ran on that page (pages[].axe), `layout-shift`
+// only where CLS was measured. A review resolves the review findings of the pages it covered
+// (the review plan's and the ones it names). One seen again reopens. `dismissed` comes only from
+// work/design/DISMISSED.md (| id | dismissed_utc |, the operator's), re-applied on every merge.
+// Noticed items (work/issues/*/verdicts-<ac_hash>-<candidate>.json and
+// work/scenarios/*/verdicts-<spec_hash>-<build>.json → noticed[]) join as source `noticed` — only
+// where, saw and shot are read — and are never resolved by a sweep. `first_seen`, `last_seen` and
+// `resolved_build` are build ids: the sweep's `build`, a noticed item's from its file name. A merge
+// that changes nothing leaves findings.json untouched (not rewritten, `updated_utc` kept). Crops
+// of open findings render to work/design/crops/<id>.jpg by the suite's playwright-core (none
+// without it; --no-render skips).
 
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -57,13 +62,15 @@ const atomic = (p, s) => { mkdirSync(dirname(p), { recursive: true }); writeFile
 // Paths in the register are relative to work/ when they lie in it: the backup restores them anywhere.
 const rel = (p) => { if (!p) return null; const r = relative(WORK, resolve(p)); return r.startsWith('..') || isAbsolute(r) ? resolve(p) : r; };
 const abs = (p) => (!p ? null : isAbsolute(p) ? p : join(WORK, p));
+// A build id (as ui-sweep.mjs accepts one); an ISO timestamp is never one (':' is not allowed).
+const BUILD = /^(?!\.)[A-Za-z0-9._+-]+$/;
 const str = (s, n) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 
 const [cmd, sweepPath] = pos;
 if (!['review-plan', 'merge'].includes(cmd)) die();
 if (!sweepPath && !(cmd === 'merge' && flags['noticed-only'])) die();
 const sweep = sweepPath ? readJson(sweepPath) : null;
-if (sweepPath && (!sweep || !Array.isArray(sweep.pages))) die(`${sweepPath} is not a sweep.json`);
+if (sweepPath && (!sweep || !Array.isArray(sweep.pages) || !BUILD.test(String(sweep.build ?? '')))) die(`${sweepPath} is not a sweep.json`);
 const sweepDir = sweepPath ? dirname(resolve(sweepPath)) : null;
 const swept = (sweep?.pages ?? []).filter((p) => p.shot && !p.error);
 
@@ -86,6 +93,7 @@ if (cmd === 'review-plan') {
 
 // ------------------------------------------------------------------ merge ----
 const notes = [];
+const before = (() => { try { return readFileSync(REGISTER, 'utf8'); } catch { return null; } })();
 const reg = readJson(REGISTER) ?? { schema: 'qi-design/v1', updated_utc: null, next_id: 1, findings: [] };
 if (reg.schema !== 'qi-design/v1' || !Array.isArray(reg.findings)) die(`${REGISTER} is not a qi-design/v1 register`);
 const idNum = (id) => Number(String(id).replace(/^D-/, '')) || 0;
@@ -93,7 +101,6 @@ reg.next_id = Math.max(Number(reg.next_id) || 1, ...reg.findings.map((f) => idNu
 const byFp = new Map(reg.findings.map((f) => [f.fingerprint, f]));
 const fp = (...parts) => createHash('sha1').update(parts.join('|')).digest('hex').slice(0, 12);
 const norm = (s) => String(s ?? '').toLowerCase().replace(/\d+/g, '#').replace(/\s+/g, ' ').trim();
-const stamp = now();
 const build = sweep?.build ?? null;
 const seenFp = new Set();
 let added = 0;
@@ -118,30 +125,30 @@ const sawOf = (f) => str((SAW[f.check] ?? ((x) => `${cap1(x.target)}: ${x.detail
 const okBox = (b) => b && ['x', 'y', 'w', 'h'].every((k) => Number.isFinite(b[k])) && b.w > 0 && b.h > 0
   ? { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) } : null;
 
-function upsert(source, x) {
+// seen: the build it was seen in; first: the earliest build of this merge that saw it.
+function upsert(source, x, seen, first = seen) {
   if (seenFp.has(x.fingerprint)) return;
   seenFp.add(x.fingerprint);
   let f = byFp.get(x.fingerprint);
   if (!f) {
     f = { id: `D-${reg.next_id++}`, fingerprint: x.fingerprint, source, check: x.check, severity: x.severity, suspect: false,
       pattern: x.pattern, viewport: x.viewport, target: null, saw: '', box: null, shot: null, crop: null,
-      first_seen: stamp, last_seen: stamp, status: 'open', resolved_build: null };
+      first_seen: first, last_seen: seen, status: 'open', resolved_build: null };
     reg.findings.push(f); byFp.set(f.fingerprint, f); added++;
-  }
+  } else if (!BUILD.test(String(f.first_seen ?? ''))) f.first_seen = first; // a register of wall-clock times: the build now
   const newer = f.shot !== x.shot;
-  Object.assign(f, { severity: x.severity, suspect: !!x.suspect, target: x.target ?? null, saw: x.saw, box: x.box ?? null, shot: x.shot ?? null, last_seen: stamp });
+  Object.assign(f, { severity: x.severity, suspect: !!x.suspect, target: x.target ?? null, saw: x.saw, box: x.box ?? null, shot: x.shot ?? null, last_seen: seen });
   if (newer && f.crop) f.crop = null; // a newer shot: its crop is rendered again
   f.resolved_build = null; // seen again: open (a dismissal stays the operator's)
   if (f.status !== 'dismissed') f.status = 'open';
 }
 
 // Sweep findings: one per page, viewport, check and normalised target.
-const sweptKeys = new Set(swept.map((p) => `${p.pattern}|${p.viewport}`));
 for (const p of swept) {
   for (const x of p.findings ?? []) {
     if (!x?.check || !x.target) continue;
     upsert('sweep', { fingerprint: fp(p.pattern, p.viewport, x.check, norm(x.target)), check: x.check, severity: x.severity === 'major' ? 'major' : 'minor',
-      pattern: p.pattern, viewport: p.viewport, target: str(x.target, 200), saw: sawOf(x), box: okBox(x.box), shot: rel(join(sweepDir, p.shot)) });
+      pattern: p.pattern, viewport: p.viewport, target: str(x.target, 200), saw: sawOf(x), box: okBox(x.box), shot: rel(join(sweepDir, p.shot)) }, build);
   }
 }
 
@@ -170,32 +177,45 @@ if (flags.review) {
       reviewed.add(key);
       const bucket = box ? `${Math.floor((box.x + box.w / 2) / 160)},${Math.floor((box.y + box.h / 2) / 160)}` : 'page';
       upsert('review', { fingerprint: fp(r.pattern, r.viewport, r.check, bucket), check: r.check, severity: r.severity, suspect: c < 0.6,
-        pattern: r.pattern, viewport: r.viewport, target: null, saw: str(r.saw, 300), box, shot: rel(join(sweepDir, pageOf.get(key).shot)) });
+        pattern: r.pattern, viewport: r.viewport, target: null, saw: str(r.saw, 300), box, shot: rel(join(sweepDir, pageOf.get(key).shot)) }, build);
     });
   }
 }
 
 // Noticed in passing: only where, saw and shot of each item — nothing else of a verdicts file.
+// Its build is the file name's (verdicts-<hash>-<build>.json); files oldest first, so an item in
+// several files is first seen in the oldest and last seen in the newest.
+const vfiles = [];
 for (const kind of ['issues', 'scenarios']) {
   for (const d of ls(join(WORK, kind))) {
     for (const f of ls(join(WORK, kind, d)).filter((x) => /^verdicts-.*\.json$/.test(x))) {
-      const v = readJson(join(WORK, kind, d, f));
-      for (const n of Array.isArray(v?.noticed) ? v.noticed : []) {
-        const where = str(n?.where, 200); const saw = str(n?.saw, 300);
-        if (!where || !saw) continue;
-        const shot = typeof n.shot === 'string' && n.shot ? (isAbsolute(n.shot) ? n.shot : join(WORK, kind, d, n.shot)) : null;
-        upsert('noticed', { fingerprint: fp(where, '-', 'noticed', norm(saw)), check: 'noticed', severity: 'minor', pattern: where, viewport: '-',
-          target: null, saw, box: null, shot: shot && existsSync(shot) ? rel(shot) : null });
-      }
+      const m = /^verdicts-[^-]+-(.+)\.json$/.exec(f);
+      if (!m || !BUILD.test(m[1])) { notes.push(`${kind}/${d}/${f}: not verdicts-<hash>-<build>.json — its noticed items skipped`); continue; }
+      vfiles.push({ kind, d, f, b: m[1], t: mtime(join(WORK, kind, d, f)) });
     }
   }
 }
+const noticed = new Map();
+for (const { kind, d, f, b } of vfiles.sort((x, y) => x.t - y.t || `${x.kind}/${x.d}/${x.f}`.localeCompare(`${y.kind}/${y.d}/${y.f}`))) {
+  const v = readJson(join(WORK, kind, d, f));
+  for (const n of Array.isArray(v?.noticed) ? v.noticed : []) {
+    const where = str(n?.where, 200); const saw = str(n?.saw, 300);
+    if (!where || !saw) continue;
+    const shot = typeof n.shot === 'string' && n.shot ? (isAbsolute(n.shot) ? n.shot : join(WORK, kind, d, n.shot)) : null;
+    const x = { fingerprint: fp(where, '-', 'noticed', norm(saw)), check: 'noticed', severity: 'minor', pattern: where, viewport: '-',
+      target: null, saw, box: null, shot: shot && existsSync(shot) ? rel(shot) : null };
+    noticed.set(x.fingerprint, { x, first: noticed.get(x.fingerprint)?.first ?? b, last: b });
+  }
+}
+for (const { x, first, last } of noticed.values()) upsert('noticed', x, last, first);
 
-// Resolution: not seen again on a page+viewport this merge covered.
+// Resolution: not seen again on a page+viewport this merge covered, by a check that ran there.
+const sweptPage = new Map(swept.map((p) => [`${p.pattern}|${p.viewport}`, p]));
+const ran = (p, check) => (String(check).startsWith('a11y:') ? p.axe === true : check === 'layout-shift' ? p.cls != null : true);
 for (const f of reg.findings) {
   if (seenFp.has(f.fingerprint) || f.source === 'noticed') continue;
   const k = `${f.pattern}|${f.viewport}`;
-  const covered = f.source === 'sweep' ? sweptKeys.has(k) : f.source === 'review' ? reviewed.has(k) : false;
+  const covered = f.source === 'sweep' ? sweptPage.has(k) && ran(sweptPage.get(k), f.check) : f.source === 'review' ? reviewed.has(k) : false;
   if (!covered || f.resolved_build || f.status === 'resolved') continue;
   f.resolved_build = build;
   if (f.status !== 'dismissed') f.status = 'resolved';
@@ -262,7 +282,8 @@ const crops = flags['no-render'] ? 0 : await renderCrops(jobs);
 const ids = new Set(reg.findings.map((f) => f.id));
 for (const x of ls(CROPS)) if (!ids.has(x.replace(/\.jpg(\.tmp)?$/, ''))) { try { rmSync(join(CROPS, x)); } catch { /* next merge */ } }
 
-reg.updated_utc = now();
-atomic(REGISTER, `${JSON.stringify(reg, null, 2)}\n`);
+// Written only when something changed: the catalog's hash of it stays put across idle merges.
+const text = (u) => `${JSON.stringify({ ...reg, updated_utc: u }, null, 2)}\n`;
+if (text(reg.updated_utc ?? null) !== before) atomic(REGISTER, text(now()));
 const count = (s) => reg.findings.filter((f) => f.status === s).length;
 console.log(JSON.stringify({ findings: reg.findings.length, open: count('open'), resolved: count('resolved'), dismissed: count('dismissed'), new: added, crops, notes }));

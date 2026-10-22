@@ -10,7 +10,10 @@ register, `work/design/findings.json`, which the dashboard's **Design** view sho
 
 `node "$HOME/scripts/ui-sweep.mjs" "$HOME/work/inventory/<c>/inventory.json" --build <c> [--previous "$HOME/work/design/<p>"]`
 → `work/design/<c>/sweep.json` and a full-page shot per page and viewport (`shots/`). `<p>` is
-the worklist's `previous.ui-sweep`. Exit 1 = the owner could not sign in: an environment failure.
+the worklist's `previous.ui-sweep`. Exit 1 = the owner could not sign in: an environment failure
+([modules.md](modules.md) step 2). Exit 3 = the module failed — no browser (playwright-core missing
+or Chromium does not launch; `{error: "no browser: …"}` on stdout): an `ERROR:` line in
+`work/MODULES.log`, never `ran`.
 
 | Check | Finds | Severity |
 | --- | --- | --- |
@@ -28,8 +31,9 @@ the worklist's `previous.ui-sweep`. Exit 1 = the owner could not sign in: an env
 | `console-error`, `failed-request` | an error in the console, a same-origin request answered ≥ 400 | minor |
 
 Each page also gets `changed` against the previous build's shot of the same page and viewport
-(`null` = a new page). axe-core comes with the suite (`suite.sh init`); without it the `a11y`
-checks are skipped with a note.
+(`null` = a new page), and `axe`: whether axe-core ran on it. axe-core comes with the suite
+(`suite.sh init`); without it, or where it fails on a page, the `a11y` checks are skipped with a
+note — and that page's `a11y` findings stay as they are.
 
 ## 2. Model review (you, within `ui_sweep_review_pages`)
 
@@ -60,11 +64,15 @@ updates `work/design/findings.json` and renders a crop with the finding marked
 `modules.sh ran ui-sweep <c> pages=<n> major=<n> minor=<n> new=<n>`.
 
 - `D-<k>` ids are stable: the same check on the same element of the same page and viewport is
-  the same finding on every build. `first_seen`, `last_seen`; `open` → `resolved` when a build
-  swept that page and viewport without it (a review finding: only where the review looked);
-  seen again → `open`.
+  the same finding on every build. `first_seen`, `last_seen` and `resolved_build` are build ids
+  (a sweep's `build`; a noticed item's from its `verdicts-<hash>-<build>.json`), never times.
+  `open` → `resolved` when a build swept that page and viewport without an error and its check
+  ran there without finding it — an `a11y:*` finding only where axe-core ran on that page,
+  `layout-shift` only where CLS was measured (a review finding: only where the review looked);
+  seen again → `open`. A merge that changes nothing leaves `findings.json` untouched.
 - **Noticed in passing** ([explorations.md](explorations.md)) joins as source `noticed` on
   every merge (`merge --noticed-only` without a sweep, before every catalog build); never
   resolved automatically.
-- **Dismissed** — the operator's "dismiss D-`<k>`" adds `| D-<k> | <ISO> |` to
-  `work/design/DISMISSED.md` (header `| id | dismissed_utc |`); removing the row reopens it.
+- **Dismissed** — the operator's "dismiss D-`<k>`": `modules.sh dismiss D-<k>` adds a row to
+  `work/design/DISMISSED.md` (direct session only, [modules.md](modules.md) → Control);
+  removing the row reopens it.

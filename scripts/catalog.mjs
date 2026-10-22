@@ -377,7 +377,19 @@ const stressFile = newestOf('stress', 'stress.json');
 const stress = stressFile ? readJson(stressFile) : null;
 const secFile = newestOf('security', 'verdicts.json');
 const sec = secFile ? readJson(secFile) : null;
+// The feature focus runs (docs/modules.md → Feature focus): the newest five, each check's verdict —
+// never its note.
+const focus = ls(join(work, 'focus')).map((d) => ({ d, f: join(work, 'focus', d, 'results.json') })).filter((x) => existsSync(x.f))
+  .sort((a, b) => mtime(b.f) - mtime(a.f)).slice(0, 5).map(({ d, f }) => {
+    const r = readJson(f) ?? {};
+    return { run: d, area: r.area ?? null, build: r.build ?? r.candidate ?? null, utc: r.generated_utc ?? null,
+      checks: (Array.isArray(r) ? r : r.checks ?? r.explorations ?? []).filter((c) => c && c.id).map((c) => ({ id: c.id, heuristic: c.heuristic ?? null,
+        given: c.given ?? null, when: c.when ?? null, expected: c.expected ?? null, verdict: c.verdict ?? null, severity: c.severity ?? null })) };
+  });
+const sweepFile = newestOf('design', 'sweep.json');
 const findings = {
+  focus,
+  design_build: sweepFile ? readJson(sweepFile)?.build ?? null : null,
   validation: val ? { build: val.build ?? null, run: val.run ?? null, utc: val.generated_utc ?? null,
     cases: (val.cases ?? []).map((c) => ({ id: c.id, page: c.page, form: c.form, field: c.field ?? null, kind: c.kind, oracle: c.oracle,
       result: c.result, severity: c.severity ?? null, message: c.message ?? null })) } : null,

@@ -978,7 +978,8 @@ function settingRow(id, key, spec) {
       want(id, `module ${id} set ${key}=${v}`);
     } }, 'Change'), msg];
   } else ctl = h('code', {}, val);
-  return [h('dt', { title: str(spec.default) ? `default ${str(spec.default)}` : null }, key), h('dd', {}, ctl)];
+  return [h('dt', { title: str(spec.default) ? `default ${str(spec.default)}` : null }, key), h('dd', {}, ctl,
+    spec.invalid ? h('span', { class: 'badge bad', title: 'work/CONFIG.md holds a value outside this setting\'s range' }, `CONFIG says "${str(spec.raw)}" — invalid`) : null)];
 }
 function moduleCard(m) {
   const id = str(m.id); const sc = m.schedule && typeof m.schedule === 'object' ? m.schedule : null;
@@ -1061,6 +1062,10 @@ function viewFindings() {
     !st ? h('p', { class: 'muted-t' }, 'The stress module has not run yet.') : sf.length ? tableOf(['Check', 'Target', 'Status', 'Severity', 'Evidence'],
       sf.map((c) => [h('code', {}, str(c.id)), h('code', {}, str(c.target)), h('span', { class: `badge ${c.status === 'fail' ? 'bad' : 'muted'}` }, str(c.status)), sevB(c.severity),
         str(c.evidence || c.reason)])) : h('p', { class: 'muted-t' }, 'Every check passed.')));
+  const fo = arr(F.focus).filter((x) => x && typeof x === 'object');
+  v.append(sec2('Feature focus', fo.length ? `${fo.length} newest focus run(s)` : null, !fo.length ? h('p', { class: 'muted-t' }, 'No area has been tested in depth yet — queue one in Modules.')
+    : fo.map((x) => h('div', { style: 'margin-top:8px' }, h('h3', {}, `${str(x.area) || str(x.run)}${x.build ? ` · ${str(x.build)}` : ''}${x.utc ? ` · ${fmtDate(x.utc)}` : ''}`),
+      tableOf(['Check', 'Heuristic', 'Expected', 'Result', 'Severity'], arr(x.checks).map((c) => [h('code', {}, str(c.id)), str(c.heuristic), str(c.expected), badge(str(c.verdict)), c.severity ? sevB(c.severity) : ''])))))));
   v.append(sec2('Security', sec ? `Build ${str(sec.candidate)} · ${fmtDate(sec.utc)} — the findings stay in the private report` : null,
     !sec ? h('p', { class: 'muted-t' }, 'The security run has not run yet.') : h('div', {}, h('p', {}, ['critical', 'high', 'medium', 'low', 'info', 'skipped'].map((k) =>
       h('span', { style: 'margin-right:10px' }, sevB(k), ` ${+((sec.counts || {})[k]) || 0}`))), h('p', {}, artLink(sec.report)))));
@@ -1080,7 +1085,7 @@ function viewDesign() {
   const pass = (d) => (!DS.st || d.status === DS.st) && (!DS.sev || d.severity === DS.sev) && (!DS.vp || str(d.viewport) === DS.vp) && (!DS.ck || dCheck(d) === DS.ck)
     && (!DS.pg || str(d.pattern) === DS.pg) && (!DS.q || [d.id, d.saw, d.target, d.pattern, d.check].map(str).join(' ').toLowerCase().includes(DS.q.toLowerCase()));
   const list = design.filter(pass).sort((a, b) => (a.severity === 'major' ? 0 : 1) - (b.severity === 'major' ? 0 : 1) || str(a.pattern).localeCompare(str(b.pattern)) || num(a.id) - num(b.id));
-  const newest = design.map((d) => str(d.last_seen)).sort().pop();
+  const newest = str(F.design_build); // the newest sweep's build: ids need not sort in build order
   const open = design.filter((d) => d.status === 'open');
   v.append(h('div', { class: 'grid-kpi' }, [['Open', open.length], ['Open · major', open.filter((d) => d.severity === 'major').length],
     ['New in the newest build', open.filter((d) => str(d.first_seen) === newest).length], ['Suspect (model unsure)', open.filter((d) => d.suspect).length],

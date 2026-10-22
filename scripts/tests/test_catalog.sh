@@ -64,7 +64,8 @@ echo '{"scenario":"S-7","candidate":"c1","generated_utc":"2026-10-04T10:00:00Z",
 echo 'https://claude.ai/artifact/s7' > "$W/scenarios/S-7/artifact.id"
 echo '{"candidate":"c1","counts":{"critical":0,"high":2,"medium":1},"findings":[{"id":"SEC-SECRET","explanation":"SEC-SECRET recipe"}]}' > "$W/security/c1/verdicts.json"
 # The control center's sources: design findings with a crop, validation results, stress results.
-mkdir -p "$W/design/crops" "$W/validation/c3" "$W/stress/c3"
+mkdir -p "$W/design/crops" "$W/validation/c3" "$W/stress/c3" "$W/focus/upload-c3"
+echo '{"area":"Upload","build":"c3","checks":[{"id":"FX-1","heuristic":"negative-path","expected":"refused visibly","verdict":"observation","severity":"minor","note":"FOCUS-NOTE-SECRET"}]}' > "$W/focus/upload-c3/results.json"
 echo '{"schema":"qi-design/v1","next_id":3,"findings":[{"id":"D-1","source":"sweep","check":"clipped-text","severity":"minor","suspect":false,"pattern":"/projects","viewport":"390x844","target":"“Rename” button","saw":"Text of “Rename” button is clipped","box":{"x":1,"y":2,"w":3,"h":4},"shot":"design/c3/shots/x.png","crop":"design/crops/D-1.jpg","first_seen":"c3","last_seen":"c3","status":"open","resolved_build":null},
  {"id":"D-2","source":"noticed","check":"noticed","severity":"minor","pattern":"/files","viewport":"-","saw":"An empty state says undefined","first_seen":"c2","last_seen":"c2","status":"dismissed"},{"id":"evil","saw":"x"}]}' > "$W/design/findings.json"
 echo jpg > "$W/design/crops/D-1.jpg"
@@ -148,10 +149,11 @@ assert "design findings: register fields, a crop, nothing else" '(.design | leng
   and .design[1].status == "dismissed" and .design[1].crop == null' "$data"
 assert "findings: validation and stress as they are, security only counted" '.findings.validation.cases[0].message == "[value-intact] changed" and .findings.stress.checks[0].id == "STRESS-API-2"
   and .findings.security == {"candidate":"c1","utc":null,"counts":{"critical":0,"high":2,"medium":1},"report":null}' "$data"
+assert "a focus run, its checks without their notes" '.findings.focus == [{"run":"upload-c3","area":"Upload","build":"c3","utc":null,"checks":[{"id":"FX-1","heuristic":"negative-path","given":null,"when":null,"expected":"refused visibly","verdict":"observation","severity":"minor"}]}]' "$data"
 assert "areas for a focus" '.areas | index("projects") != null and index("files") != null' "$data"
 assert "coverage pages" '[.pages[] | {pattern, covered, nav}] | (map(select(.pattern == "/projects"))[0] == {"pattern":"/projects","covered":"regression","nav":"Projects"})
   and (map(select(.pattern == "/files"))[0].covered == "exploratory")' "$data"
-for secret in U0SECRETUSER C0SECRET REQUEST-SECRET SOURCE-SECRET NOTE-SECRET EXPLAIN-SECRET LESSON-SECRET SEC-SECRET; do
+for secret in U0SECRETUSER C0SECRET REQUEST-SECRET SOURCE-SECRET NOTE-SECRET EXPLAIN-SECRET LESSON-SECRET SEC-SECRET FOCUS-NOTE-SECRET; do
   case "$html" in (*"$secret"*) echo "  not test-related, must not be in the page: $secret"; FAILED=1;; esac
 done
 case "$html" in (*'<b>projects'*|*'<i>large'*) echo "  data not escaped inside the page"; FAILED=1;; esac
