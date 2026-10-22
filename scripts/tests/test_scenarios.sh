@@ -107,8 +107,9 @@ assert_eq "concurrent writers lose no row" 9 "$(table_rows "$WORK_DIR/SCENARIOS.
 assert_eq "one row per id" "| S-20 | slack | U0123ABCD | C0123ABCD/1.2 | abc | c1 | passed | reported |" "$(row S-20 | sed 's/ [0-9T:Z-]* |$//')"
 [ ! -d "$WORK_DIR/scenarios/.lock" ] || { echo "  the row lock was left behind"; FAILED=1; }
 bash "$S" set P-sign-in source=profile status=retired >/dev/null
+bash "$SCRIPTS/scenarios.sh" set S-11 source=dashboard status=queued requester=- thread=- spec_hash=d11 >/dev/null
 v="$(HOME="$SANDBOX" bash "$SCRIPTS/verify-onboarding.sh" 2>/dev/null | grep ' scenarios_rows ')"
-case "$v" in (ok*) ;; (*) echo "  rows written by set fail the verifier: $v"; FAILED=1;; esac
+case "$v" in (ok*) ;; (*) echo "  rows written by set fail the verifier (a dashboard row among them): $v"; FAILED=1;; esac
 echo "| S-29 | slack | - | - | xyz | c1 | verified | reported | $(iso_ago 1) |" >> "$WORK_DIR/SCENARIOS.md"
 v="$(HOME="$SANDBOX" bash "$SCRIPTS/verify-onboarding.sh" 2>/dev/null | grep ' scenarios_rows ')"
 case "$v" in (FAIL*S-29*) ;; (*) echo "  a verified row passes the verifier: $v"; FAILED=1;; esac

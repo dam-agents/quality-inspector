@@ -61,9 +61,7 @@ cmd_new() {
 }
 
 # Columns of a row, in SCENARIOS_HEADER order, and the values each one takes.
-SOURCES='slack|operator|discovery|dashboard|profile'
-STATUSES='proposed|queued|in_progress|report_pending|reported|rejected|retired'
-VERDICTS='passed|failed|regression|needs-review|blocked|flaky|not-testable|-'
+SOURCES="$SCEN_SOURCES"; STATUSES="$SCEN_STATUSES"; VERDICTS="$SCEN_VERDICTS"   # lib/state.sh
 one_of() { case "|$2|" in (*"|$1|"*) return 0;; esac; return 1; }
 
 # A scenario id: S-<k> (a request or a proposal), or P-<slug> (the profile's scenarios/<slug>.md).
