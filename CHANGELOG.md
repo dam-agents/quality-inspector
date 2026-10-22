@@ -10,12 +10,11 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 ## 3.9.1 — 2026-10-22
 
 **Upgrade:**
-1. Only where the profile lists `egress` or the target is on GitHub Enterprise:
-   `bash "$HOME/scripts/egress-rules.sh"` and have the operator add each `by-hand` profile row
-   the agent's network settings do not hold yet ([docs/black-box.md](docs/black-box.md) → Egress
-   rules). New `by-hand` rows: a row that said `kit` but falls under a longer kit deny (a
-   sandbox repository's `GET /repos/<owner>/<repo>/<rest>`), and on GitHub Enterprise a row
-   that said `prompt` but falls under the shared rules' deny — no prompt appears for either.
+1. Only where the profile lists `egress`: `bash "$HOME/scripts/egress-rules.sh"` and have the
+   operator add each `by-hand` profile row the agent's network settings do not hold yet
+   ([docs/black-box.md](docs/black-box.md) → Egress rules). New `by-hand` row: one that said
+   `kit` but falls under a longer kit deny (a sandbox repository's
+   `GET /repos/<owner>/<repo>/<rest>`) — no prompt appears for it.
 2. Nothing to run for the suite: a test removes its sandbox leftovers only after its last
    criterion passes ([docs/test-authoring.md](docs/test-authoring.md) → Clean up only after a
    pass); a repair of a sandbox test follows it from the next run.
