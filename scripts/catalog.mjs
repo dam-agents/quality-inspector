@@ -16,6 +16,9 @@
 // generation time; `changed` = it differs from work/catalog/published.hash, which the agent
 // writes after a publish. Stills and page shots are cached as small JPEGs in
 // work/catalog/thumbs/ (rendered by the suite's own playwright-core; none without it).
+// `runs` lists every night, issue run and scenario run with its build, verdicts and report
+// reference — the page is the way into all of them; `pages[].hotspots` are the controls of the
+// newest UI map with the items that name them (the product map).
 
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -24,6 +27,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSy
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { controlRe, esc, matchable, pageRe } from './lib/match.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
@@ -34,7 +38,10 @@ const IMG_BUDGET = Number(process.env.QI_CATALOG_IMG_BUDGET ?? 6 * 1024 * 1024);
 const PAGE_MAX = 9 * 1024 * 1024; // the platform renders a page up to 10 MiB; images give way first
 const notes = [];
 const THUMB_W = 360;
+const MAP_W = 720; // a page shot of the product map: wide enough to click a control on it
 const HISTORY_MAX = 30; // newest history entries per item: the page stays a few MB at a year of nights
+const RUNS_MAX = 400; // newest runs of the Runs view
+const HOTSPOTS_MAX = 120; // controls per page of the product map
 
 const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
@@ -118,6 +125,7 @@ function parseTestFile(src) {
       steps: steps.map(({ kind, text }) => ({ kind, text })),
       checks: { expects: (inBlock.match(/\bexpect\(/g) ?? []).length, agent_asserts: (body.match(/\bagent\.assert\(/g) ?? []).length },
       pages: [...new Set(steps.filter((x) => x.kind === 'open' && x.text.startsWith('/')).map((x) => x.text.replace(/\?.*$/, '')))],
+      body,
     };
   });
   return { summary, area, tests };
@@ -129,14 +137,23 @@ const addHist = (key, h) => { if (!h.value) return; (history.get(key) ?? history
 const stillRuns = new Map(); // item key -> [{label, utc}] candidate runs, newest last
 const evidence = new Map(); // origin key -> artifact reference
 const titles = new Map(); // origin key -> title from a verdicts file
+const runs = []; // every run: nights, issue runs, scenario runs (the Runs view)
+// artifact.id holds the platform's reference; a link when it is one.
+const artRef = (dir) => { const a = read(join(dir, 'artifact.id'))?.trim(); return a ? (/^https:\/\/\S+$/.test(a) ? a : `platform://artifacts/${a}`) : null; };
 
-function readVerdicts(dir, okey, run) {
+const WORST = ['regression', 'failed', 'needs-review', 'flaky', 'inconclusive', 'partial', 'blocked', 'not-testable', 'passed', 'verified'];
+const rank = (v) => (WORST.includes(v) ? WORST.indexOf(v) : WORST.length);
+function readVerdicts(dir, okey, run, ref) {
   for (const f of ls(dir).filter((x) => /^verdicts-.*\.json$/.test(x))) {
     const v = readJson(join(dir, f));
     if (!v) continue;
     const utc = v.generated_utc ?? new Date(mtime(join(dir, f))).toISOString().replace(/\.\d+Z$/, 'Z');
     const build = v.candidate ?? v.build ?? null;
     if (v.title) titles.set(okey, v.title);
+    // A scenario's file has no top verdict: its worst criterion stands for the run.
+    const worst = (v.acs ?? []).map((e) => e?.verdict).filter(Boolean).sort((a, b) => rank(a) - rank(b))[0] ?? null;
+    runs.push({ type: run, ref, build, baseline: v.baseline ?? null, utc, verdict: v.verdict ?? worst, report: artRef(dir),
+      entries: [...(v.acs ?? []), ...(v.explorations ?? [])].filter((e) => e?.id && e.verdict).map((e) => ({ key: `${okey}/${e.id}`, value: e.verdict })) });
     for (const ac of v.acs ?? []) {
       const key = `${okey}/${ac.id}`;
       addHist(key, { build, run, value: ac.verdict, utc });
@@ -148,27 +165,21 @@ function readVerdicts(dir, okey, run) {
       if (v.explorations_run) (stillRuns.get(key) ?? stillRuns.set(key, []).get(key)).push({ label: v.explorations_run, utc });
     }
   }
-  const art = read(join(dir, 'artifact.id'))?.trim();
-  if (art) evidence.set(okey, `platform://artifacts/${art}`);
+  if (artRef(dir)) evidence.set(okey, artRef(dir));
 }
-for (const n of ls(join(work, 'issues')).filter((x) => /^\d+$/.test(x))) readVerdicts(join(work, 'issues', n), `issue-${n}`, 'issue');
-for (const s of ls(join(work, 'scenarios')).filter((x) => /^(S-\d+|P-[a-z0-9][a-z0-9-]*)$/.test(x))) readVerdicts(join(work, 'scenarios', s), scenKey(s), 'scenario');
+for (const n of ls(join(work, 'issues')).filter((x) => /^\d+$/.test(x))) readVerdicts(join(work, 'issues', n), `issue-${n}`, 'issue', `#${n}`);
+for (const s of ls(join(work, 'scenarios')).filter((x) => /^(S-\d+|P-[a-z0-9][a-z0-9-]*)$/.test(x))) readVerdicts(join(work, 'scenarios', s), scenKey(s), 'scenario', s);
 
 // Nightly runs: REGRESSION.log `ran candidate=` lines, and per run the criteria that were not
 // unchanged (work/regression/<candidate>/verdicts.json); every other regression-tier item of
-// that night counts as unchanged.
+// that night counts as unchanged. A night whose environment failed is a run without results.
 const nights = [];
-for (const line of (read(join(work, 'REGRESSION.log')) ?? '').split('\n')) {
-  const m = line.match(/^(\S+) ran candidate=(\S+)(.*)$/);
-  if (!m) continue;
-  const counts = {};
-  for (const [, k, v] of m[3].matchAll(/(\w[\w-]*)=(\d+)/g)) counts[k.replace(/_/g, '-')] = +v;
-  nights.push({ build: m[2], utc: m[1], counts });
-}
 const nightOutcomes = new Map(); // build -> Map(item key -> value)
+const nightFile = new Map(); // build -> its verdicts.json
 for (const c of ls(join(work, 'regression'))) {
   const v = readJson(join(work, 'regression', c, 'verdicts.json'));
   if (!v) continue;
+  nightFile.set(c, v);
   const per = new Map();
   for (const e of v.acs ?? v.entries ?? []) {
     const okey = e.scenario ? scenKey(e.scenario) : `issue-${e.issue}`;
@@ -176,6 +187,30 @@ for (const c of ls(join(work, 'regression'))) {
   }
   nightOutcomes.set(c, per);
 }
+const TOP = ['regression', 'needs-review', 'healed', 'relearned'];
+for (const line of (read(join(work, 'REGRESSION.log')) ?? '').split('\n')) {
+  const env = line.match(/^(\S+) ERROR: environment candidate=(\S+)/);
+  if (env) { runs.push({ type: 'regression', ref: null, build: env[2], utc: env[1], verdict: 'environment', report: null, entries: [] }); continue; }
+  const m = line.match(/^(\S+) ran candidate=(\S+)(.*)$/);
+  if (!m) continue;
+  const counts = {};
+  for (const [, k, v] of m[3].matchAll(/(\w[\w-]*)=(\d+)/g)) counts[k.replace(/_/g, '-')] = +v;
+  nights.push({ build: m[2], utc: m[1], counts });
+  // What the night's report says beside its entries: the change context's issues, the UI diff's
+  // text and the signals' counts — never an entry's explanation.
+  const v = nightFile.get(m[2]);
+  const ctx = v?.context ?? {};
+  const signals = Object.fromEntries(Object.entries(ctx.signals ?? {}).map(([k, x]) => [k, Array.isArray(x) ? x.length : +x || 0]));
+  runs.push({ type: 'regression', ref: null, build: m[2], utc: m[1], counts,
+    verdict: v?.verdict ?? TOP.find((k) => counts[k] > 0) ?? 'unchanged',
+    previous: ctx.previous ?? nights.at(-2)?.build ?? null, window: ctx.window ?? null,
+    issues: (ctx.issues ?? []).filter((x) => x?.number != null).slice(0, 60).map((x) => ({ number: x.number, title: x.title ?? null })),
+    ui_diff: typeof ctx.ui_diff === 'string' ? ctx.ui_diff.slice(0, 4000) : null, signals,
+    report: artRef(join(work, 'regression', m[2])),
+    entries: [...(nightOutcomes.get(m[2]) ?? new Map())].map(([key, value]) => ({ key, value })) });
+}
+runs.sort((a, b) => String(b.utc).localeCompare(String(a.utc)));
+runs.splice(RUNS_MAX);
 
 // ------------------------------------------------------------------------ issues
 // One paginated GET of the labelled issues for labels, state and title (best effort).
@@ -257,7 +292,7 @@ for (const okey of [...origins].sort((a, b) => a.localeCompare(b, 'en', { numeri
       heals: heals.filter((h) => h.test === file && h.ac === id).map(({ utc, build, basis }) => ({ utc, build, basis })),
       flaky: flaky.filter((f) => f.test === file && f.ac === id).map(({ utc, build, runs, passes }) => ({ utc, build, runs, passes })),
       duration_ms: perfKey ? (perf[perfKey].samples ?? []).map((s) => s.ms).filter(Number.isFinite) : [],
-      still: null, evidence: evidence.get(okey) ?? null,
+      still: null, evidence: evidence.get(okey) ?? null, _body: t?.body ?? null,
     });
   }
 }
@@ -276,6 +311,33 @@ if (newestMap) {
     const rootNav = Object.entries(inv?.routes?.['/']?.navigates ?? {});
     const noGolden = new Set((cov.nav_without_golden_path ?? []).map((n) => n.target));
     uncoveredNav = (cov.nav_without_golden_path ?? []).map((n) => n.item);
+    // A control's label shown on one page only names that page; shared chrome needs the page opened.
+    const onPages = new Map();
+    for (const [pat, r] of Object.entries(inv?.routes ?? {})) for (const b of r?.boxes ?? []) {
+      const k = String(b[1]).toLowerCase(); onPages.set(k, (onPages.get(k) ?? new Set()).add(pat));
+    }
+    // A navigation item stands for the page it leads to: the items that reach that page.
+    const routes = Object.entries(inv?.routes ?? {});
+    const routeOf = (path) => path && routes.map(([pat]) => pat)
+      .find((pat) => new RegExp(`^${pat.split('/').map((x) => (x === ':id' ? '[^/]+' : esc(x))).join('/')}/?$`).test(path));
+    const navTarget = (name) => routes.map(([, r]) => r?.navigates?.[name]).find(Boolean)
+      ?? routeOf(routes.flatMap(([, r]) => r?.links ?? []).map((l) => String(l).split(' → ')).find(([n]) => n === name)?.[1]);
+    const reach = (files) => items.filter((i) => i.file && files.some((f) => f === i.file || f.endsWith(`/${i.file}`))).map((i) => i.key);
+    const reachOf = new Map((cov.pages ?? []).map((p) => [p.pattern, reach((p.tests ?? []).map((x) => x.test))]));
+    const hotspots = (pat) => {
+      const r = inv?.routes?.[pat]; const [vw, vh] = Array.isArray(r?.viewport) ? r.viewport : [0, 0];
+      if (!(vw > 0 && vh > 0)) return [];
+      const opens = pageRe(pat);
+      const f = (n) => Math.round(n * 10000) / 10000;
+      return (r.boxes ?? []).filter((b) => Array.isArray(b) && matchable(String(b[1]))).slice(0, HOTSPOTS_MAX).map(([kind, name, x, y, w, h]) => {
+        const box = [f(x / vw), f(y / vh), f(w / vw), f(h / vh)];
+        const to = kind === 'nav' ? navTarget(name) : null;
+        if (to) return { kind, name, box, to, items: reachOf.get(to) ?? [] };
+        const re = controlRe(String(name), { quoted: true });
+        const only = onPages.get(String(name).toLowerCase())?.size === 1;
+        return { kind, name, box, items: items.filter((i) => i._body && re.test(i._body) && (only || opens.test(i._body))).map((i) => i.key) };
+      });
+    };
     pages = (cov.pages ?? []).map((p) => {
       const files = (p.tests ?? []).map((x) => x.test);
       const seg = p.pattern.split('/')[1] ?? '';
@@ -283,8 +345,9 @@ if (newestMap) {
       return {
         pattern: p.pattern, title: p.title ?? null, nav,
         covered: p.covered ? 'regression' : files.length ? 'exploratory' : 'none',
-        items: items.filter((i) => i.file && files.some((f) => f === i.file || f.endsWith(`/${i.file}`))).map((i) => i.key),
+        items: reachOf.get(p.pattern) ?? [],
         shot: null, golden_path: !noGolden.has(p.pattern), _shot: inv?.routes?.[p.pattern]?.shot ?? null,
+        viewport: inv?.routes?.[p.pattern]?.viewport ?? null, hotspots: hotspots(p.pattern),
       };
     });
   } catch { notes.push(`coverage unavailable (coverage.mjs failed on ${maps.at(-1)})`); }
@@ -314,17 +377,17 @@ const thumbOf = (name) => join(thumbsDir, `${slug(name)}.jpg`);
 for (const item of items) {
   const dst = thumbOf(item.key);
   const src = stillSource(item);
-  if (src && mtime(src) > mtime(dst)) jobs.push({ src, dst });
+  if (src && mtime(src) > mtime(dst)) jobs.push({ src, dst, w: THUMB_W });
   item._thumb = dst;
 }
 for (const p of pages) {
-  const dst = thumbOf(`page-${p.pattern}`);
+  const dst = thumbOf(`map-${p.pattern}`);
   const src = p._shot ? join(newestMap, p._shot) : null;
-  if (src && existsSync(src) && mtime(src) > mtime(dst)) jobs.push({ src, dst });
+  if (src && existsSync(src) && mtime(src) > mtime(dst)) jobs.push({ src, dst, w: MAP_W });
   p._thumb = dst;
 }
 
-// A browser draws each image onto a canvas THUMB_W wide (tall shots cropped) and returns a JPEG.
+// A browser draws each image onto a canvas `w` wide (tall shots cropped) and returns a JPEG.
 async function renderThumbs(list) {
   if (!list.length) return 'none due';
   let pw;
@@ -339,7 +402,7 @@ async function renderThumbs(list) {
     await page.route('**', (r) => r.abort());
     mkdirSync(thumbsDir, { recursive: true });
     let n = 0;
-    for (const { src, dst } of list) {
+    for (const { src, dst, w } of list) {
       const mime = src.endsWith('.png') ? 'image/png' : 'image/jpeg';
       const data = `data:${mime};base64,${readFileSync(src).toString('base64')}`;
       const out = await page.evaluate(async ({ data, w }) => {
@@ -350,7 +413,7 @@ async function renderThumbs(list) {
         const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
         g.drawImage(img, 0, 0, img.naturalWidth * s, img.naturalHeight * s);
         return c.toDataURL('image/jpeg', 0.62);
-      }, { data, w: THUMB_W }).catch(() => null);
+      }, { data, w }).catch(() => null);
       if (!out) continue;
       writeFileSync(`${dst}.tmp`, Buffer.from(out.split(',')[1], 'base64')); renameSync(`${dst}.tmp`, dst); n++;
     }
@@ -365,10 +428,11 @@ const wanted = new Set([...items, ...pages].map((x) => x._thumb));
 for (const f of ls(thumbsDir).filter((x) => x.endsWith('.jpg'))) if (!wanted.has(join(thumbsDir, f))) { try { rmSync(join(thumbsDir, f)); } catch { /* next run */ } }
 
 // Embed within the budget — what the data leaves of PAGE_MAX, at most IMG_BUDGET: regression
-// items first, then promotable, exploratory, the rest, newest verdict first; then page shots.
+// items' stills first, then the product map's page shots (pages tests reach first), then the
+// other stills by tier, newest verdict first. A page without its shot still shows its controls.
 const images = {};
 let used = 0; let dropped = 0; let seq = 0;
-const base = Buffer.byteLength(JSON.stringify({ items, pages, nights }, (k, v) => (k.startsWith('_') ? undefined : v)))
+const base = Buffer.byteLength(JSON.stringify({ items, pages, nights, runs }, (k, v) => (k.startsWith('_') ? undefined : v)))
   + Buffer.byteLength(read(join(HERE, 'catalog', 'viewer.html')) ?? '');
 const budget = Math.max(0, Math.min(IMG_BUDGET, PAGE_MAX - base));
 if (budget < IMG_BUDGET) notes.push(`image budget cut to ${Math.round(budget / 1024)} KiB by the size of the data`);
@@ -379,10 +443,13 @@ const embed = (path) => {
   used += uri.length; const id = `i${seq++}`; images[id] = uri; return id;
 };
 const RANK = { regression: 0, promotable: 1, exploratory: 2 };
-for (const item of items.slice().sort((a, b) => (RANK[a.tier] ?? 3) - (RANK[b.tier] ?? 3)
-  || String(b.verdict?.utc ?? '').localeCompare(String(a.verdict?.utc ?? '')))) item.still = embed(item._thumb);
-for (const p of pages) p.shot = embed(p._thumb);
-for (const x of [...items, ...pages]) { delete x._thumb; delete x._shot; }
+const byRank = items.slice().sort((a, b) => (RANK[a.tier] ?? 3) - (RANK[b.tier] ?? 3)
+  || String(b.verdict?.utc ?? '').localeCompare(String(a.verdict?.utc ?? '')));
+for (const item of byRank.filter((i) => i.tier === 'regression')) item.still = embed(item._thumb);
+const COV = { regression: 0, exploratory: 1 };
+for (const p of pages.slice().sort((a, b) => (COV[a.covered] ?? 2) - (COV[b.covered] ?? 2))) p.shot = embed(p._thumb);
+for (const item of byRank.filter((i) => i.tier !== 'regression')) item.still = embed(item._thumb);
+for (const x of [...items, ...pages]) { delete x._thumb; delete x._shot; delete x._body; }
 
 // ------------------------------------------------------------------------ output
 const builds = [...new Map([...items.flatMap((i) => i.history), ...nights].filter((h) => h.build)
@@ -399,7 +466,7 @@ const data = {
   agent: { display_name: cfg('display_name') || 'Quality Inspector', version: (read(join(HERE, '..', 'VERSION')) ?? '').trim() || null },
   product, target: target || null,
   issue_url: target ? `https://${host}/${target.split('/').slice(-2).join('/')}/issues/{n}` : null,
-  builds, collections, items, pages, uncovered_nav: uncoveredNav, nights, images,
+  builds, collections, items, pages, uncovered_nav: uncoveredNav, nights, runs, images,
 };
 const hash = createHash('sha256').update(JSON.stringify(data)).digest('hex').slice(0, 12);
 data.generated_utc = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
