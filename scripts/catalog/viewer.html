@@ -237,7 +237,7 @@ const ALL = arr(D.items).filter((x) => x && typeof x === 'object' && x.key).map(
   const hist = arr(x.history).filter((e) => e && typeof e === 'object');
   const it = {
     ...x, origin: o, full: hist, verdict0: x.verdict && typeof x.verdict === 'object' ? x.verdict : hist[hist.length - 1] || null, steps: arr(x.steps).filter((e) => e && typeof e === 'object'),
-    heals: arr(x.heals), flaky: arr(x.flaky), pages: arr(x.pages).map(str), duration_ms: arr(x.duration_ms).filter(Number.isFinite),
+    healsAll: arr(x.heals), flakyAll: arr(x.flaky), pages: arr(x.pages).map(str), duration_ms: arr(x.duration_ms).filter(Number.isFinite),
     tier: x.tier || 'untracked', kind: x.kind === 'exploration' ? 'exploration' : 'criterion', checks: x.checks && typeof x.checks === 'object' ? x.checks : null,
   };
   it.ref = str(o.ref) || str(x.key).split('/')[0];
@@ -249,8 +249,8 @@ const ALL = arr(D.items).filter((x) => x && typeof x === 'object' && x.key).map(
 const byKey = new Map(ALL.map((i) => [i.key, i]));
 const builds = arr(D.builds).filter((b) => b && b.id).map((b) => ({ id: str(b.id), utc: str(b.utc) }));
 
-// "As of a build": every verdict, flag and count as it stood when that build was last run; an
-// item without a verdict by then is left out. Files, tiers and steps stay today's.
+// "As of a build": every verdict, heal, flaky confirmation, flag and count as it stood when that
+// build was last run; an item without a verdict by then is left out. Files, tiers and steps stay today's.
 let items = ALL;
 let presentSet = new Set();
 let derivedAt;
@@ -262,7 +262,10 @@ function derive() {
   const upto = at ? at.utc : null;
   items = [];
   for (const it of ALL) {
-    it.history = upto ? it.full.filter((e) => str(e.utc) <= upto) : it.full;
+    const then = (e) => !upto || (e && str(e.utc) <= upto);
+    it.history = it.full.filter(then);
+    it.heals = it.healsAll.filter(then);
+    it.flaky = it.flakyAll.filter(then);
     it.verdict = upto ? it.history[it.history.length - 1] || null : it.verdict0;
     it.latest = it.verdict ? str(it.verdict.value) : '';
     it.cls = vClass(it.latest);
