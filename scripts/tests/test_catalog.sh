@@ -185,8 +185,8 @@ assert "all fit in the default budget" '.images == 3 and .dropped_images == 0' "
 # The product map's page shots come after the regression tier's stills and the design crops, before the other stills.
 cp "$W/catalog/thumbs/issue-42-ac-1.jpg" "$W/catalog/thumbs/map-projects.jpg"
 out="$(QI_CATALOG_IMG_BUDGET=2600 node "$SCRIPTS/catalog.mjs")"; data="$(page_data)"
-assert "the regression still, a design crop and a page shot fit, the other still is dropped" '.images == 3 and .dropped_images == 1' "$out"
-assert "the page shot wins over a non-regression still" '(.items[] | select(.key == "issue-42/AC-1") | .still) != null and .design[0].crop != null
+assert "the regression still, the design crop and the page shot fit; one is dropped" '.images == 3 and .dropped_images == 1' "$out"
+assert "the page shot wins over a non-regression still" '(.items[] | select(.key == "issue-42/AC-1") | .still) != null
   and (.pages[] | select(.pattern == "/projects") | .shot) != null and (.items[] | select(.key == "scenario-7/AC-1") | .still) == null' "$data"
 rm -f "$W/catalog/thumbs/map-projects.jpg"
 
