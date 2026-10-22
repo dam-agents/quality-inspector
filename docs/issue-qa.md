@@ -33,7 +33,7 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
 2. **Re-check at action time.** `bash "$HOME/scripts/github.sh" issue <n>` — its text, labels and
    author; with `include_comments: enabled`, `github.sh comments <n>` too (never `gh` or a URL:
    [black-box.md](black-box.md) → **GitHub**). The issue must still carry `qa_label` (or `retest_label`). Gone →
-   restore the previous row, unlock, log `issue_abort`, next entry. Recompute nothing by
+   restore the previous row, unlock, log `issue_abort`, the catalog, next entry. Recompute nothing by
    hand: the pre-flight's `ac_hash` is authoritative for this run. Then start
    `bash "$HOME/scripts/env.sh" up <candidate>` as a harness background task and go on —
    it does not look at the product, so the freeze below stays blind.
@@ -46,7 +46,7 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    ([nested-env.md](nested-env.md) → Shape) — then
    `bash "$HOME/scripts/suite.sh" run smoke-<candidate> --tag smoke`. Either failing is
    an **environment failure** ([nested-env.md](nested-env.md) → Failures): restore the
-   previous row, unlock, log `issue_abort reason=environment`, end the run's issue work —
+   previous row, unlock, log `issue_abort reason=environment`, the catalog, end the run's issue work —
    an environment problem never becomes a verdict.
 5. **Author** `work/suite/tests/issue-<n>.e2e.ts` per [test-authoring.md](test-authoring.md):
    one test per testable AC, AC blocks written from the criteria file, steps found by
@@ -91,7 +91,9 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    `promotable` (or auto-promoted) file in the run's chat summary.
 10. **Release.** `env.sh unlock issues` (it refuses while the background install runs:
     `env.sh wait <candidate>` first); log `issue_done issue=<n> verdict=<v> minutes=<m> model_steps=<k>`,
-    `m` and `k` the `elapsed_min` and `model_steps` of `suite.sh budget <claim time>`.
+    `m` and `k` the `elapsed_min` and `model_steps` of `suite.sh budget <claim time>`. Then the
+    catalog ([catalog.md](catalog.md) → **Build and publish**) — on every path, an operator's or a
+    Slack "test #N" included, so Overview no longer shows the issue as working.
 
 A failure between steps 5 and 8 that is not an environment failure → finish with the
 evidence you have: the ACs you could not judge are `blocked` with the reason. Never

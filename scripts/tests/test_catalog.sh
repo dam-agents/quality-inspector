@@ -106,13 +106,13 @@ test('S-7 AC-1: the upload finishes', { session: 'owner', tags: ['scenario-7', '
   async ({ app, agent }) => { await app.open('/files'); await agent.act('upload a large file'); });
 T
 mkdir -p "$W/inventory/c3"
-echo '{"routes":{"/":{"title":"Home","navigates":{"Projects":"/projects","Files":"/files"},"viewport":[1000,500],"boxes":[["nav","Projects",0,0,100,20],["headings","Welcome home",200,100,300,40]]},
+echo '{"routes":{"/":{"title":"Home","navigates":{"Projects":"/projects","Files":"/files"},"links":["All files → /files"],"viewport":[1000,500],"boxes":[["nav","Projects",0,0,100,20],["headings","Welcome home",200,100,300,40],["links","All files",400,300,100,20]]},
  "/projects":{"title":"Projects","buttons":["Rename"],"viewport":[1000,500],"boxes":[["buttons","Rename",100,50,200,25]]},"/files":{"title":"Files"}}}' > "$W/inventory/c3/inventory.json"
-echo '[{"number":42,"title":"Rename <b>projects</b>","state":"closed","labels":[{"name":"area:projects"}]},{"number":57,"title":"Upload progress","state":"open","labels":[]},{"number":63,"title":"Bulk delete","state":"open","labels":[]}]' > "$STUB_DIR/issues.json"
+echo '[{"number":42,"title":"Rename <b>projects</b>","state":"closed","labels":[{"name":"area:projects"}]},{"number":57,"title":"Upload progress","state":"open","labels":[]},{"number":63,"title":"Bulk delete","state":"open","labels":[]},{"number":65,"title":"A labelled pull request","state":"open","labels":[],"pull_request":{"url":"x"}},{"number":67,"title":"Retest in progress","state":"open","labels":[{"name":"qa:retest"}]}]' > "$STUB_DIR/issues.json"
 # Overview → Activity: the lock (never its session), the rows on their way, the waiting issues, the schedules.
 mkdir -p "$W/env"; echo 'issues 2026-10-22T19:35:00Z SESSION-SECRET-ID' > "$W/env/LOCK"
-printf '| 57 | def | c4 | b1 | - | in_progress | 2026-10-22T19:50:00Z |\n' >> "$W/QA.md"
-echo '{"taken_utc":"2026-10-22T15:00:00Z","schedules":{"quality-inspector-issues-1h":{"enabled":true,"cron":"7 * * * *","task":"TASK-SECRET"},"other-agent-job":{"enabled":true,"cron":"0 1 * * *"}}}' > "$W/schedules.json"
+printf '| 57 | def | c4 | b1 | - | in_progress | 2026-10-22T19:50:00Z |\n| 67 | jkl | c4 | b1 | - | in_progress | 2026-10-22T19:40:00Z |\n' >> "$W/QA.md"
+echo '{"taken_utc":"2026-10-22T15:00:00Z","schedules":{"quality-inspector-issues-1h":{"enabled":true,"cron":"7 * * * *","task":"TASK-SECRET"},"quality-inspector-audit-weekly":{"enabled":null,"cron":"0 7 * * 5"},"other-agent-job":{"enabled":true,"cron":"0 1 * * *"}}}' > "$W/schedules.json"
 
 mkdir -p "$W/catalog/thumbs"; echo old > "$W/catalog/thumbs/issue-99-ac-1.jpg"
 out="$(node "$SCRIPTS/catalog.mjs")"; rc=$?
@@ -140,9 +140,10 @@ const t=["open the report abc123", "open the report 9f1c-AB_2", "open the report
 process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "open the report: an artifact id only" 110000 "$cmd"
 assert "activity: lock without its session, rows on their way, waiting issues, own schedules only" '.activity.lock == {"owner":"issues","since":"2026-10-22T19:35:00Z"}
-  and ([.activity.issues[] | {issue, status, build}] == [{"issue":57,"status":"in_progress","build":"c4"}])
-  and .activity.waiting == [{"issue":63,"title":"Bulk delete","kind":"new"}] and .activity.budget_min == 150
-  and .activity.schedules.list == [{"name":"quality-inspector-issues-1h","enabled":true,"cron":"7 * * * *"}]' "$data"
+  and ([.activity.issues[] | {issue, status, build}] == [{"issue":57,"status":"in_progress","build":"c4"},{"issue":67,"status":"in_progress","build":"c4"}])
+  and .activity.budget_min == 150
+  and .activity.schedules.list == [{"name":"quality-inspector-issues-1h","enabled":true,"cron":"7 * * * *"},{"name":"quality-inspector-audit-weekly","enabled":null,"cron":"0 7 * * 5"}]' "$data"
+assert "activity: waiting holds the open issues only — no pull request, no issue already in progress" '.activity.waiting == [{"issue":63,"title":"Bulk delete","kind":"new"}]' "$data"
 case "$html" in (*SESSION-SECRET-ID*|*TASK-SECRET*) echo "  the lock's session or a schedule's task reached the page"; FAILED=1;; esac
 assert "schema and header" '.schema == "qi-catalog/v1" and .agent.display_name == "QA Bot" and .target == "acme/widgets" and .issue_url == "https://github.com/acme/widgets/issues/{n}"' "$data"
 i='.items[] | select(.key == "issue-42/AC-1")'
@@ -167,8 +168,9 @@ assert "an issue run: its verdicts and report; a scenario run: its link" '(.runs
   and (.items[] | select(.key == "scenario-7/AC-1") | .evidence) == "https://claude.ai/artifact/s7"' "$data"
 assert "hotspots: a page-only control names its tests; a nav item stands for its page" '(.pages[] | select(.pattern == "/projects") | .viewport == [1000,500]
   and .hotspots[0] == {"kind":"buttons","name":"Rename","box":[0.1,0.1,0.2,0.05],"items":["issue-42/AC-1","issue-42/EX-1"]})
-  and (.pages[] | select(.pattern == "/") | .hotspots == [{"kind":"nav","name":"Projects","box":[0,0,0.1,0.04],"to":"/projects","items":["issue-42/AC-1","issue-42/EX-1"]},
-    {"kind":"headings","name":"Welcome home","box":[0.2,0.2,0.3,0.08],"items":[]}]) and (.pages[] | select(.pattern == "/files") | .hotspots == [])' "$data"
+  and (.pages[] | select(.pattern == "/") | .hotspots[0:2] == [{"kind":"nav","name":"Projects","box":[0,0,0.1,0.04],"to":"/projects","items":["issue-42/AC-1","issue-42/EX-1"]},
+    {"kind":"headings","name":"Welcome home","box":[0.2,0.2,0.3,0.08],"items":[]}])
+  and (.pages[] | select(.pattern == "/") | .hotspots[2] | .kind == "links" and .name == "All files" and .to == "/files") and (.pages[] | select(.pattern == "/files") | .hotspots == [])' "$data"
 assert "collections" '.collections == [{"name":"Upload","members":["#42","S-7 AC-1"]}]' "$data"
 assert "control center: the modules' state" '(.modules.modules | length) == 11 and (.modules.modules[] | select(.id == "ui-sweep") | .state == "disabled") and .interactive == false and (.modules | has("generated_utc") | not)' "$data"
 assert "design findings: register fields, a crop, nothing else" '(.design | length) == 2 and (.design[0] | .id == "D-1" and .saw == "Text of “Rename” button is clipped" and (.crop | test("^i[0-9]+$")) and (has("shot") | not) and (has("box") | not))

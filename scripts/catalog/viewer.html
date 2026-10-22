@@ -698,9 +698,12 @@ function activitySchedule() {
   if (!list.length) { card.append(h('p', { class: 'muted-t' }, 'The schedules appear after the agent next lists them (a module change, or the version check).')); return card; }
   const key = (n) => str(n).replace(/^quality-inspector-/, '');
   const order = Object.keys(SCHED);
-  card.append(h('ul', { class: 'sched' }, list.slice().sort((a, b) => (b.enabled - a.enabled) || order.indexOf(key(a.name)) - order.indexOf(key(b.name))).map((x) =>
-    h('li', { class: x.enabled ? '' : 'off' }, h('span', { class: `sw-dot ${x.enabled ? 'on' : ''}`, 'aria-hidden': 'true' }),
-      h('span', { class: 'sname' }, SCHED[key(x.name)] || key(x.name)), h('span', { class: 'meta' }, x.enabled ? (x.cron ? cronText(x.cron) : 'on') : 'off')))),
+  // enabled: true, false, or null when the platform's listing did not say (shown as unknown).
+  const rank = (x) => (x.enabled === true ? 2 : x.enabled === false ? 0 : 1);
+  card.append(h('ul', { class: 'sched' }, list.slice().sort((a, b) => (rank(b) - rank(a)) || order.indexOf(key(a.name)) - order.indexOf(key(b.name))).map((x) =>
+    h('li', { class: x.enabled === true ? '' : 'off' }, h('span', { class: `sw-dot ${x.enabled === true ? 'on' : ''}`, 'aria-hidden': 'true' }),
+      h('span', { class: 'sname' }, SCHED[key(x.name)] || key(x.name)),
+      h('span', { class: 'meta' }, x.enabled === true ? (x.cron ? cronText(x.cron) : 'on') : x.enabled === false ? 'off' : `unknown${x.cron ? ` · ${cronText(x.cron)}` : ''}`)))),
   h('p', { class: 'meta' }, `Times in the platform's time zone${sc.taken_utc ? ` · listed ${rel(sc.taken_utc)}` : ''}.`));
   return card;
 }

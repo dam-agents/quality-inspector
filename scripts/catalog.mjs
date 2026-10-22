@@ -227,12 +227,13 @@ if (target && process.env.QI_CATALOG_OFFLINE !== '1') {
   try {
     const out = execFileSync('gh', ['api', ...(host ? ['--hostname', host] : []), '--paginate', '-X', 'GET', `repos/${repo}/issues`,
       '-f', `labels=${cfg('qa_label') || 'qa:ready'}`, '-f', 'state=all', '-f', 'per_page=100',
-      '--jq', '.[] | {number, title, state, labels: [.labels[]? | .name? // .]} | tojson'],
+      // GitHub lists pull requests among the issues; no run ever claims one (scripts/github.sh).
+      '--jq', '.[] | select(has("pull_request") | not) | {number, title, state, labels: [.labels[]? | .name? // .]} | tojson'],
     { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 60000 });
     for (const line of out.split('\n').filter(Boolean)) {
       let x; try { x = JSON.parse(line); } catch { continue; }
       for (const i of [x].flat()) {
-        if (i?.number != null) issueMeta.set(String(i.number), { title: i.title ?? null, labels: (i.labels ?? []).map((l) => l?.name ?? l), state: i.state ?? null });
+        if (i?.number != null && !i.pull_request) issueMeta.set(String(i.number), { title: i.title ?? null, labels: (i.labels ?? []).map((l) => l?.name ?? l), state: i.state ?? null });
       }
     }
     issuesListed = true;
@@ -420,13 +421,16 @@ const activity = {
   lock: /^[A-Za-z][A-Za-z0-9-]{0,40}$/.test(lockLine[0] ?? '') && /^\d{4}-\d\d-\d\dT[\d:]{8}Z$/.test(lockLine[1] ?? '') ? { owner: lockLine[0], since: lockLine[1] } : null,
   issues: qaRows.filter(([, , , , , st]) => st === 'in_progress' || st === 'report_pending').map(qaRow),
   // null: the listing failed or did not run — unknown, not empty.
-  waiting: !issuesListed ? null : [...issueMeta].filter(([n, m]) => m.state === 'open' && (!qaRows.some(([q]) => q === n) || (m.labels ?? []).includes(retestLabel)))
+  // A row in progress or awaiting delivery is shown as such, never also as waiting.
+  waiting: !issuesListed ? null : [...issueMeta].filter(([n, m]) => m.state === 'open'
+    && !qaRows.some(([q, , , , , st]) => q === n && (st === 'in_progress' || st === 'report_pending'))
+    && (!qaRows.some(([q]) => q === n) || (m.labels ?? []).includes(retestLabel)))
     .map(([n, m]) => ({ issue: +n, title: m.title ?? null, kind: qaRows.some(([q]) => q === n) ? 'retest' : 'new' })).sort((a, b) => a.issue - b.issue).slice(0, 50),
   // Through the registry (modules.sh status), so an out-of-range value reads as its default.
   budget_min: (() => { const v = +(modules?.modules ?? []).find((m) => m?.id === 'issues')?.settings?.max_wallclock_min_per_issue?.value; return v > 0 ? v : 150; })(),
   schedules: sched && typeof sched.schedules === 'object' ? { taken_utc: sched.taken_utc ?? null,
     list: Object.entries(sched.schedules).filter(([n]) => /^quality-inspector-[a-z0-9-]+$/.test(n))
-      .map(([name, x]) => ({ name, enabled: x?.enabled !== false, cron: typeof x?.cron === 'string' && /^[0-9*,/ -]{9,40}$/.test(x.cron) ? x.cron : null })) } : null,
+      .map(([name, x]) => ({ name, enabled: typeof x?.enabled === 'boolean' ? x.enabled : null, cron: typeof x?.cron === 'string' && /^[0-9*,/ -]{9,40}$/.test(x.cron) ? x.cron : null })) } : null,
 };
 const areas = [...new Set([...items.map((i) => i.area).filter(Boolean), ...pages.map((p) => p.nav).filter(Boolean)].map(String))]
   .filter((a) => /^[A-Za-z0-9][A-Za-z0-9 _./-]{0,39}$/.test(a)).sort();

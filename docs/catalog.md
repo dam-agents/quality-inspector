@@ -89,7 +89,12 @@ With `test_catalog: enabled` and `artifact_reports: enabled`, right after a run 
 or a scenario (its row `in_progress`, so Overview → Activity shows the work), at the end of an issues run, a
 regression run, a modules run and a scenario delivery, at the end of every turn of a dashboard
 request ([scenarios.md](scenarios.md) → **A request from the dashboard**), and after an
-operator's promote, demote, collection change or module change ([modules.md](modules.md) → **Control**):
+operator's promote, demote, collection change or module change ([modules.md](modules.md) → **Control**).
+Apart from the claim, a run publishes only after its unlock, so Activity never shows a finished run
+as working. A run that published at its claim publishes again after its unlock on every path: its
+release ([issue-qa.md](issue-qa.md) step 10, also for an operator's or a Slack "test #N"), an abort
+([issue-qa.md](issue-qa.md) steps 2 and 4, [scenarios.md](scenarios.md) step 6) and its delivery.
+The steps:
 
 1. `node "$HOME/scripts/design-findings.mjs" merge --noticed-only` (the run's "noticed in passing"
    items into the design register, [ui-sweep.md](ui-sweep.md)), then

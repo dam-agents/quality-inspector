@@ -71,11 +71,11 @@ candidate), `focus[]`, `inventory` (the candidate's UI map or `null`), `max_wall
    browser; any other non-zero but the documented environment failure) gets
    `<ISO> ERROR: module=<id> candidate=<c> <reason>` in `work/MODULES.log` instead, never `ran`.
 5. `env.sh reset` — form input and load must not reach the next run.
-6. The catalog ([catalog.md](catalog.md) → **Build and publish**): the dashboard is the
-   report of this run.
-7. `env.sh unlock modules`. Log `modules_run`. Chat summary: per module one line (counts by
+6. `env.sh unlock modules`. Log `modules_run`. Chat summary: per module one line (counts by
    severity, the newest major findings by id); a stress `critical` or a new `major` design
    finding first.
+7. The catalog ([catalog.md](catalog.md) → **Build and publish**), after the unlock: the
+   dashboard is the report of this run.
 
 Findings of a module never change an issue verdict, never become a comment, an issue or a
 label, and are never `verified`. Security findings keep their own private report
