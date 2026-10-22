@@ -261,7 +261,9 @@ file → keep its values, show them once, and ask only for the keys it lacks. As
 10. Everything else — defaults; show them and change only what the operator asks for. Offer
    `lend_model: enabled` when the profile's `SKILL.md` names criteria only a real model makes
    testable (tokens per product AI step), and `live_browser` when `/etc/AGENTS.md` names the
-   shared browser's CDP endpoint.
+   shared browser's CDP endpoint. Offer the testing modules ([docs/modules.md](docs/modules.md)), all off
+   by default, and `dashboard_interactive: enabled` when the operator has Interactive artifacts on
+   in the platform (the dashboard's buttons then send commands to this chat).
 
 Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s keys):
 
@@ -311,6 +313,17 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - live_browser: disabled
 - slack_channel:
 - slack_tests_per_day: 3
+- ui_sweep: disabled
+- ui_sweep_viewports: 1440x900,768x1024,390x844
+- ui_sweep_review_pages: 10
+- validation_checks: disabled
+- validation_max_cases: 60
+- stress_checks: disabled
+- stress_max_concurrency: 10
+- stress_duration_s: 60
+- focus_max_checks: 12
+- modules_max_wallclock_min: 90
+- dashboard_interactive: disabled
 
 - profile.chart_ref: oci://quay.io/dam-agents/charts/platform
 - profile.mock_image: quay.io/dam-agents/mock:<sha>
@@ -373,15 +386,17 @@ the criteria files and the replay cache are not reconstructable.
 Start from `mcp__platform-outbound__list_schedules`. Expected: `quality-inspector-issues-1h`,
 `quality-inspector-regression-nightly`, `quality-inspector-benchmark-monthly`,
 `quality-inspector-security-weekly`, `quality-inspector-scenarios-weekly`,
-`quality-inspector-audit-weekly`.
+`quality-inspector-audit-weekly`, `quality-inspector-modules-nightly`.
 
-- Present → leave alone, including its enabled state; every schedule but the issues one
-  arrives switched off on purpose — offer to turn them on, never flip them unasked.
+- Present → leave alone, including its enabled state; every schedule but the issues and the
+  modules one arrives switched off on purpose — offer to turn them on, never flip them unasked
+  (the modules run declines while every module is off).
 - Missing → create it with the name, cron, `sessionMode: fresh`, `precheck` and task text
   of its `kit.yaml` entry, verbatim.
 - Present but unknown (another definition version) → report; never delete.
 
-Save the final listing to `/tmp/quality-inspector-schedules.json` for Step 7.
+Save the final listing to `/tmp/quality-inspector-schedules.json` for Step 7, and keep its
+switches for the dashboard: `bash "$HOME/scripts/modules.sh" schedules /tmp/quality-inspector-schedules.json`.
 
 ## Step 6 — Smoke-test the nested product
 

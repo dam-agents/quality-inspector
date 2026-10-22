@@ -12,7 +12,7 @@
 #   .nothing_to_do == true  -> the agent ends the run immediately.
 #   otherwise               -> the agent processes the arrays per CLAUDE.md + docs/.
 #
-# Modes: issues (default) | regression | discovery | audit | benchmark | security | slack.
+# Modes: issues (default) | regression | discovery | audit | benchmark | security | modules | slack.
 # Requires: bash, jq, gh, curl, sed/grep/awk, GNU date (Linux pod).
 
 set -u
@@ -593,6 +593,36 @@ mode_security() {
       inventory:(if $inv=="" then null else $inv end), roles:$roles, deployment_checks:$dep, logs:$logs}'
 }
 
+# ============================================================ MODULES MODE ====
+# The testing modules of the `modules` run (docs/modules.md): each switched-on module once per
+# candidate (`weekly`: at most once in 7 days) keyed on `ran module=<id> candidate=` in
+# MODULES.log, plus the queued feature-focus areas. The decision lives in modules.sh due.
+mode_modules() {
+  local versions candidate baseline d inv budget
+  d="$(bash "$SCRIPT_DIR/modules.sh" due 2>/dev/null)" || fail_out "modules.sh due failed"
+  if [ "$(jq -r '(.on | length) + (.focus | length)' <<<"$d")" = 0 ]; then
+    log "no testing module is switched on and no focus is queued"; runlog MODULES "skip=disabled"
+    jq -nc --argjson logs "$(logs_json)" '{mode:"modules", nothing_to_do:true, logs:$logs}'; return
+  fi
+  env_busy_out MODULES
+  versions="$(versions_json 2>/dev/null)" || fail_out "cannot resolve the candidate build"
+  candidate="$(printf '%s' "$versions" | jq -r .candidate)"
+  baseline="$(printf '%s' "$versions" | jq -r '.baseline // empty')"
+  d="$(bash "$SCRIPT_DIR/modules.sh" due "$candidate" 2>/dev/null)" || fail_out "modules.sh due failed"
+  if [ "$(jq -r '(.due | length) + (.focus | length)' <<<"$d")" = 0 ]; then
+    log "candidate $candidate: every switched-on module already ran on it, no focus queued"; runlog MODULES "skip=same-candidate candidate=$candidate"
+    jq -nc --arg c "$candidate" --argjson logs "$(logs_json)" '{mode:"modules", nothing_to_do:true, candidate:$c, logs:$logs}'; return
+  fi
+  inv="$WORK/inventory/$candidate/inventory.json"; [ -f "$inv" ] || inv=""
+  budget="$(cfg modules_max_wallclock_min)"; case "$budget" in (''|*[!0-9]*) budget=90;; esac
+  log "candidate $candidate: due $(jq -r '.due | join(",")' <<<"$d")$(jq -r 'if (.focus|length) > 0 then " focus " + (.focus | join(",")) else "" end' <<<"$d")"
+  runlog MODULES "due candidate=$candidate modules=$(jq -r '.due | join(",")' <<<"$d") focus=$(jq -r '.focus | length' <<<"$d")"
+  jq -nc --arg c "$candidate" --arg b "$baseline" --arg inv "$inv" --argjson d "$d" --argjson budget "$budget" --argjson logs "$(logs_json)" \
+    '{mode:"modules", nothing_to_do:false, candidate:$c, baseline:(if $b == "" then null else $b end),
+      modules_due:$d.due, previous:$d.previous, focus:$d.focus,
+      inventory:(if $inv == "" then null else $inv end), max_wallclock_min:$budget, logs:$logs}'
+}
+
 # ============================================================= SLACK MODE ====
 # What a Slack turn needs before it answers (docs/slack.md): who holds the environment and
 # how many Slack tests already started today (UTC) against slack_tests_per_day. Never idle.
@@ -641,12 +671,13 @@ boundary_gate() {
   return 1
 }
 
-case "$MODE" in (slack|benchmark|security|issues|regression|discovery) boundary_gate || exit 0;; esac
+case "$MODE" in (slack|benchmark|security|issues|regression|discovery|modules) boundary_gate || exit 0;; esac
 
 case "$MODE" in
   slack)      mode_slack ;;
   benchmark)  mode_benchmark ;;
   security)   mode_security ;;
+  modules)    mode_modules ;;
   issues)     mode_issues ;;
   regression) mode_regression ;;
   discovery)  mode_discovery ;;

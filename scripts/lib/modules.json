@@ -1,0 +1,73 @@
+{
+  "schema": "qi-modules/v1",
+  "about": "The closed registry of testing modules (docs/modules.md). The only keys `modules.sh set` may write, with their only values; read by preflight.sh, catalog.mjs and verify-onboarding.sh.",
+  "cadences": ["disabled", "per-build", "weekly"],
+  "modules": [
+    { "id": "issues", "title": "Issue criteria", "kind": "core", "doc": "docs/issue-qa.md", "log": "ISSUES",
+      "what": "Freezes each labelled issue's acceptance criteria and checks them red-green against the last release.",
+      "settings": {
+        "max_issues_per_run": { "type": "int", "min": 1, "max": 5, "default": 1 },
+        "max_wallclock_min_per_issue": { "type": "int", "min": 30, "max": 170, "default": 150 },
+        "max_model_steps_per_issue": { "type": "int", "min": 50, "max": 1000, "default": 400 } } },
+    { "id": "edge-cases", "title": "Edge cases", "kind": "config", "doc": "docs/explorations.md", "log": "ISSUES",
+      "what": "Checks beyond each criterion: invalid input, persistence, roles, idempotence, boundaries. Never a verdict.",
+      "switch": "explorations",
+      "settings": {
+        "explorations": { "type": "enum", "values": ["enabled", "disabled"], "default": "enabled" },
+        "max_explorations_per_ac": { "type": "int", "min": 0, "max": 5, "default": 3 } } },
+    { "id": "regression", "title": "Nightly regression", "kind": "schedule", "doc": "docs/regression.md", "log": "REGRESSION",
+      "schedule": "quality-inspector-regression-nightly",
+      "what": "Replays the promoted tests on every new build, aware of what changed.",
+      "settings": {
+        "confirm_regressions": { "type": "enum", "values": ["disabled", "enabled"], "default": "disabled" },
+        "bisect_max_steps": { "type": "int", "min": 0, "max": 6, "default": 0 } } },
+    { "id": "security", "title": "Security checks", "kind": "schedule", "doc": "docs/security.md", "log": "SECURITY",
+      "schedule": "quality-inspector-security-weekly", "switch": "security_checks",
+      "what": "Black-box OWASP checks of the nested product. Findings stay in a private report.",
+      "settings": {
+        "security_checks": { "type": "enum", "values": ["enabled", "disabled"], "default": "enabled" },
+        "security_failed_logins": { "type": "int", "min": 3, "max": 50, "default": 10 } } },
+    { "id": "discovery", "title": "Scenario discovery", "kind": "schedule", "doc": "docs/scenarios.md", "log": "DISCOVERY",
+      "schedule": "quality-inspector-scenarios-weekly", "switch": "scenario_discovery",
+      "what": "Proposes user flows nobody asked for yet, and tests them when allowed.",
+      "settings": {
+        "scenario_discovery": { "type": "enum", "values": ["disabled", "propose", "run"], "default": "disabled" },
+        "max_scenarios_per_run": { "type": "int", "min": 0, "max": 10, "default": 3 } } },
+    { "id": "benchmark", "title": "Benchmark", "kind": "schedule", "doc": "docs/benchmark.md", "log": null,
+      "schedule": "quality-inspector-benchmark-monthly",
+      "what": "Scores this agent's own verdicts on cases with a known answer.",
+      "settings": {} },
+    { "id": "audit", "title": "Audit", "kind": "schedule", "doc": "docs/audit.md", "log": "AUDIT", "ran": " ok=",
+      "schedule": "quality-inspector-audit-weekly",
+      "what": "Weekly health check of the agent: schedules, logs, costs, the suite.",
+      "settings": {} },
+    { "id": "ui-sweep", "title": "UI sweep", "kind": "modules", "doc": "docs/ui-sweep.md", "log": "MODULES",
+      "switch": "ui_sweep",
+      "what": "Walks every mapped page at several screen sizes and finds layout, visual and accessibility defects for design.",
+      "settings": {
+        "ui_sweep": { "type": "cadence", "default": "disabled" },
+        "ui_sweep_viewports": { "type": "viewports", "default": "1440x900,768x1024,390x844" },
+        "ui_sweep_review_pages": { "type": "int", "min": 0, "max": 30, "default": 10 } } },
+    { "id": "validation", "title": "Form validation", "kind": "modules", "doc": "docs/validation.md", "log": "MODULES",
+      "switch": "validation_checks",
+      "what": "Fills every mapped form with empty, too long, wrong-type, unicode and duplicate input.",
+      "settings": {
+        "validation_checks": { "type": "cadence", "default": "disabled" },
+        "validation_max_cases": { "type": "int", "min": 1, "max": 200, "default": 60 } } },
+    { "id": "stress", "title": "Stress", "kind": "modules", "doc": "docs/stress.md", "log": "MODULES",
+      "switch": "stress_checks",
+      "what": "Bounded concurrent load on the local product: errors, slowdowns, and whether it stays up.",
+      "settings": {
+        "stress_checks": { "type": "cadence", "default": "disabled" },
+        "stress_max_concurrency": { "type": "int", "min": 1, "max": 50, "default": 10 },
+        "stress_duration_s": { "type": "int", "min": 10, "max": 300, "default": 60 } } },
+    { "id": "feature-focus", "title": "Feature focus", "kind": "queue", "doc": "docs/modules.md", "log": "MODULES",
+      "what": "Tests one area of the product in depth, once, on request.",
+      "settings": {
+        "focus_max_checks": { "type": "int", "min": 1, "max": 30, "default": 12 } } }
+  ],
+  "global": {
+    "modules_max_wallclock_min": { "type": "int", "min": 15, "max": 170, "default": 90 },
+    "dashboard_interactive": { "type": "enum", "values": ["disabled", "enabled"], "default": "disabled" }
+  }
+}

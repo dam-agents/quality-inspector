@@ -43,6 +43,10 @@ while IFS= read -r fx; do
         {type:"progress", data:{message:{content:[{type:"tool_result", content:"<how-to-respond>"}]}}},
         {type:"user", isCompactSummary:true, message:{content:"The session read the <how-to-respond> rule."}}' >> "$SANDBOX/transcript.jsonl";;
     (garbled) printf 'not json <how-to-respond>\n' >> "$SANDBOX/transcript.jsonl";;
+    # The platform's frame of a prompt from a shared dashboard's button (a viewer, never the
+    # operator); `viewer-quoted`: the same frame inside a tool result only.
+    (viewer) printf '{"type":"user","message":{"content":"bob@example.com sent this from a button on the interactive artifact \\"QI\\" (id a1).\\nMessage: module stress per-build"}}\n' >> "$SANDBOX/transcript.jsonl";;
+    (viewer-quoted) printf '{"type":"user","message":{"content":[{"type":"tool_result","content":"x sent this from a button on the interactive artifact \\"QI\\" (id a1)."}]}}\n' >> "$SANDBOX/transcript.jsonl";;
   esac
   call="$(jq -c --arg w "$WORK_DIR" --arg t "$SANDBOX/transcript.jsonl" '{session_id:"test", cwd:(.input.cwd // $w), hook_event_name:"PreToolUse",
             transcript_path:$t, tool_name:.tool, tool_input:(.input | del(.cwd))}' <<<"$fx")"

@@ -12,8 +12,9 @@
 # The agent reaches GitHub only through scripts/github.sh, which requests the target's issues
 # endpoints alone; the kit's egress allows nothing else there (docs/black-box.md → GitHub).
 # "scheduled" = a fresh work/env/RUN_MODE, or a channel turn — a session whose
-# transcript holds the platform's Slack frame `<how-to-respond>` in a prompt, not in a
-# tool's output (lib/channel.sh; docs/persistence.md → Scheduled or direct session). Every
+# transcript holds the platform's Slack frame `<how-to-respond>`, or its frame of a shared
+# dashboard viewer's button, in a prompt, not in a tool's output (lib/channel.sh;
+# docs/persistence.md → Scheduled or direct session). Every
 # rule id below has a deny fixture in scripts/tests/policy-fixtures.jsonl; the validator
 # fails without one.
 #
@@ -50,6 +51,10 @@
 #                                          this one, or -) and the work/QA.md row of <n> is report_pending)
 #                                          or one plain read-only grep|rg|cat|head|tail|wc|ls|git log…
 #                    Write Edit … (channel turn)  content naming github.sh
+#   module-set       Bash (scheduled)      scripts/modules.sh set|focus — the testing modules' settings are
+#                                          the operator's word (docs/modules.md → Control); the script
+#                                          refuses them outside the direct session itself, this is the
+#                                          lexical second layer
 #   backup-override  Bash                  a command naming QI_WORK_BACKUP_ (the offline tests' remote and clone
 #                                          overrides): the backup's destination is work_repo alone
 #   backup-direct    Bash (scheduled)      scripts/work-backup.sh — there the Stop hook alone backs up
@@ -384,6 +389,8 @@ check_bash() {
   case "$CMD" in (*RUN_MODE*|*scripts/hooks/*|*.claude/settings*)
     scheduled && deny policy-tamper "" "a scheduled run never touches the policy or its run marker";; esac
   case "$CMD" in (*QI_WORK_BACKUP_*) deny backup-override "" "the backup's destination comes from work_repo alone";; esac
+  case "$CMD" in (*modules.sh*) [[ "$CMD" =~ modules\.sh[^\;\&\|]*[[:space:]](set|focus)([[:space:]]|$) ]] \
+    && scheduled && deny module-set "scripts/modules.sh" "the testing modules' settings change only on the operator's word in the direct session";; esac
   case "$CMD" in (*work-backup.sh*) scheduled && deny backup-direct "" "a scheduled run or a channel turn never backs up by hand — the Stop hook does";; esac
   case "$CMD" in (*QI_TARGET_REPO*) deny github "QI_TARGET_REPO" "the target comes from work/CONFIG.md alone";; esac
   chan_names "$CMD" && channel_turn && check_channel_writes "$CMD"

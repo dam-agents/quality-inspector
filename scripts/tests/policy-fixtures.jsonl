@@ -179,3 +179,9 @@
 {"name": "operator notes, scheduled", "mode": "scheduled", "expect": "deny", "rule": "scheduled-def", "tool": "Edit", "input": {"file_path": "@WORK@/OPERATOR.md"}}
 {"name": "operator notes, channel turn", "mode": "channel", "expect": "deny", "rule": "scheduled-def", "tool": "Write", "input": {"file_path": "@WORK@/OPERATOR.md"}}
 {"name": "harness memory", "expect": "deny", "rule": "write-outside", "tool": "Write", "input": {"file_path": "@HOME@/.claude/projects/-home-agent/memory/egress.md"}}
+{"name": "config edit, dashboard viewer turn", "expect": "deny", "mode": "viewer", "rule": "scheduled-def", "tool": "Edit", "input": {"file_path": "@WORK@/CONFIG.md"}}
+{"name": "config edit, viewer frame only quoted in a tool result", "expect": "allow", "mode": "viewer-quoted", "tool": "Edit", "input": {"file_path": "@WORK@/CONFIG.md"}}
+{"name": "module setting, dashboard viewer turn", "expect": "deny", "mode": "viewer", "rule": "module-set", "tool": "Bash", "input": {"command": "bash \"$HOME/scripts/modules.sh\" set stress stress_checks=per-build"}}
+{"name": "focus queued, scheduled", "expect": "deny", "mode": "scheduled", "rule": "module-set", "tool": "Bash", "input": {"command": "bash scripts/modules.sh focus Upload"}}
+{"name": "module setting, direct", "expect": "allow", "tool": "Bash", "input": {"command": "bash \"$HOME/scripts/modules.sh\" set stress stress_checks=per-build"}}
+{"name": "module run recorded, scheduled", "expect": "allow", "mode": "scheduled", "tool": "Bash", "input": {"command": "bash \"$HOME/scripts/modules.sh\" ran stress 0.0.0-main.b pages=3"}}

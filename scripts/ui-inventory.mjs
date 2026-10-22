@@ -14,12 +14,15 @@
 // while a page is visited; --timing-samples > 1 reloads the page for more timing samples.
 // Every same-origin API request the signed-in pages make is recorded once per method and
 // path shape (`api_requests`) — method and path only, never headers or bodies — for the
-// security run's replay (docs/security.md).
+// security run's replay (docs/security.md). Each page's forms (`forms`: name, submit button,
+// fields with their DOM constraints) are read from attributes only, for the validation planner
+// (validation-plan.mjs, docs/validation.md).
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { examplePath, pattern, STATIC } from './lib/url-pattern.mjs';
+import { DANGER } from './lib/danger.mjs';
 
 const args = process.argv.slice(2);
 const out = args.find((a) => !a.startsWith('--') && !/^\d+$/.test(a) && !a.startsWith('http'));
@@ -128,9 +131,51 @@ const extract = () => {
   };
 };
 
+// Forms and their fields' constraints, from DOM attributes only (never typed into or submitted),
+// for validation-plan.mjs. Label and repeated-data rules as in extract(), but a field labelled
+// only by its name attribute is left out: a test cannot reach it by label. A trailing required
+// asterisk is dropped from a label. A dialog without a <form> whose fields share one primary
+// button counts as a form too.
+const extractForms = () => {
+  const vis = (e) => e.checkVisibility?.({ visibilityProperty: true, opacityProperty: true }) ?? !!e.offsetParent;
+  const clean = (s) => (s ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const name = (e) => clean(e.getAttribute('aria-label') || (e.getAttribute('aria-labelledby') && document.getElementById(e.getAttribute('aria-labelledby'))?.innerText) || e.innerText || e.getAttribute('title') || e.getAttribute('placeholder') || e.value);
+  const card = (e) => { const c = e.closest('button,[role=button],a'); return !!c && !!c.querySelector('h1,h2,h3,h4,[role=heading]'); };
+  const inData = (e) => !e.closest('nav,[role=navigation]') && (!!e.closest('li,tr,[role=row],[role=listitem],[role=gridcell],[role=option],[role=article],[role=group]') || card(e));
+  const label = (e) => clean((e.id && document.querySelector(`label[for="${CSS.escape(e.id)}"]`)?.innerText) || e.getAttribute('aria-label') || e.getAttribute('placeholder')).replace(/\s*\*+$/, '');
+  const num = (v) => (v == null || v === '' ? null : Number.isFinite(Number(v)) ? Number(v) : v);
+  const FIELD = 'input:not([type=hidden]):not([type=submit]):not([type=file]):not([type=button]):not([type=reset]):not([type=image]),textarea,select';
+  const fields = (root) => [...root.querySelectorAll(FIELD)].filter((e) => vis(e) && !inData(e) && label(e)).map((e) => {
+    const len = (k) => { const v = Number(e.getAttribute(k)); return e.hasAttribute(k) && v >= 0 ? v : null; };
+    return { label: label(e), type: e.tagName === 'INPUT' ? (e.getAttribute('type') || 'text').toLowerCase() : e.tagName.toLowerCase(),
+      name: e.getAttribute('name') || null, required: e.required || e.getAttribute('aria-required') === 'true', minlength: len('minlength'), maxlength: len('maxlength'),
+      min: num(e.getAttribute('min')), max: num(e.getAttribute('max')), step: num(e.getAttribute('step')), pattern: e.getAttribute('pattern') || null };
+  });
+  const buttons = (root) => [...root.querySelectorAll('button,[role=button],input[type=submit]')].filter(vis);
+  const submitOf = (f) => {
+    const own = buttons(f).concat(f.id ? [...document.querySelectorAll(`[form="${CSS.escape(f.id)}"]`)].filter(vis) : []);
+    const s = own.filter((b) => (b.tagName === 'BUTTON' && (b.getAttribute('type') ?? 'submit') === 'submit') || b.matches('input[type=submit]'));
+    const b = s.length ? s[0] : own.length === 1 ? own[0] : null;
+    return b ? name(b) || null : null;
+  };
+  const title = (f, i) => clean(f.getAttribute('aria-label') || (f.getAttribute('aria-labelledby') && document.getElementById(f.getAttribute('aria-labelledby'))?.innerText)
+    || f.querySelector('h1,h2,h3,h4,legend,[role=heading]')?.innerText) || `form-${i}`;
+  const out = [];
+  [...document.querySelectorAll('form,[role=form]')].filter((f) => vis(f) && !f.parentElement?.closest('form,[role=form]')).forEach((f) => {
+    const fs = fields(f);
+    if (fs.length) out.push({ name: title(f, out.length + 1), submit: submitOf(f), fields: fs });
+  });
+  for (const d of [...document.querySelectorAll('dialog[open],[role=dialog],[role=alertdialog]')].filter(vis)) {
+    if (d.querySelector('form,[role=form]')) continue;
+    const fs = fields(d);
+    const primary = buttons(d).filter((b) => !/cancel|close|back|dismiss|^×$|^x$/i.test(name(b)) && name(b));
+    if (fs.length && primary.length === 1) out.push({ name: title(d, out.length + 1), submit: name(primary[0]), fields: fs, dialog: true });
+  }
+  return out;
+};
+
 // Navigation items and tabs: clicked once per distinct name, from the page they appear on.
 const NAV = 'nav button,[role=navigation] button,nav [role=link],[role=navigation] [role=link],[role=tab],[role=menuitem]';
-const DANGER = /(log ?out|sign ?out|delete|remove|revoke|reset|disconnect|uninstall)/i;
 const clicked = new Set();
 // An item that opens a new window leaves the app (external docs): close it, keep crawling.
 context.on('page', (p) => { if (p !== page) p.close().catch(() => {}); });
@@ -193,6 +238,7 @@ while (queue.length && Object.keys(routes).length < maxPages) {
   routes[pat] = { example: url.pathname, landed: landed.pathname === url.pathname ? undefined : landed.pathname, ...rest, shot: `shots/${s}.png`, aria: `aria/${s}.yml`,
     console_errors: [...sig.errors].sort(), failed_requests: [...sig.requests].sort().map((x) => JSON.parse(x)),
     timing: { dom_content_loaded_ms: med('dcl'), load_ms: med('load'), first_content_ms: med('first'), samples: times.length } };
+  routes[pat].forms = await page.evaluate(extractForms).catch(() => []);
   sig = null;
   if (depth >= maxDepth) continue;
   for (const [u, via] of await discover(url)) {
