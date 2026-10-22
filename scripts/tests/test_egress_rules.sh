@@ -160,8 +160,9 @@ assert_eq "the work backup's owner is refused" "refused" \
 sed -i.bak '/^- profile.sb_repo:/d; /^- work_repo:/d' "$WORK_DIR/CONFIG.md"
 
 # A GitHub Enterprise Server target is one host for the API (under /api/v3) and the pages:
-# each shape passes there as on github.com, and the API shape only under its prefix. Each
-# accepted one lands by hand: the host's shared GitHub deny refuses it at once, no prompt.
+# each shape passes there as on github.com, and the API shape only under its prefix. Under
+# the shared GitHub rules' deny on that host, which the same list adds by hand, an accepted
+# one lands by hand too: no prompt appears there.
 cat > "$QI_PROFILE_DIR/profile.json" <<'J'
 {"schema":"qi-profile/v1","product":"Stub","app":{"url":"http://localhost:8080"},
  "egress":[{"host":"ghe.acme.io","method":"GET","path":"/login?*","why":"oauth"},
@@ -174,7 +175,7 @@ cat > "$QI_PROFILE_DIR/profile.json" <<'J'
            {"host":"ghe.acme.io","method":"POST","path":"/api/v3/repos/sb/qa","why":"api without its rest"}]}
 J
 ghes="$(QI_TARGET_REPO=ghe.acme.io/acme/widgets bash "$DEF/scripts/egress-rules.sh" --json | jq -r '.rules[] | select(.source == "profile") | "\(.how) \(.method) \(.path)"')"
-assert_eq "GHES: the sandbox shapes on the one host, each by hand" "by-hand GET /login?*
+assert_eq "GHES: the sandbox shapes on the one host, by hand under its deny" "by-hand GET /login?*
 by-hand POST /session
 by-hand POST /sb/qa.git/git-upload-pack
 by-hand POST /api/v3/repos/sb/qa/issues

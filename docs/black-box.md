@@ -133,12 +133,12 @@ denies on its `raw.` and `codeload.` hosts). `--kit` lists the kit's own rules, 
 created by hand or from a kit before 3.0.0, whose rules a kit never updates. Each row says how it
 lands: `prompt` — no kit rule covers the host, so its first request in a direct session is held
 and the operator approves the prompt (`verify-onboarding.sh --egress` makes those requests);
-`by-hand` — under a kit deny (for a GitHub Enterprise target, also a deny of its shared GitHub
-rules) a request is refused at once and no prompt ever appears, and a deny
-or a set that must land whole is never left to prompts: the operator adds it in the agent's
-network settings; `kit` — already allowed; `refused` — never added: a profile allow outside the
-sandbox shapes on a GitHub host, or a `{profile.<key>}` with no plain value (**Sandbox
-accounts**, below). A held request in a scheduled run is refused.
+`by-hand` — under a deny of the kit or of a GitHub Enterprise target's shared rules a request is
+refused at once and no prompt ever appears, and a deny or a set that must land whole is never
+left to prompts: the operator adds it in the agent's network settings; `kit` — already allowed
+(the rule the platform picks for it, by the order above, is a kit allow); `refused` — never
+added: a profile allow outside the sandbox shapes on a GitHub host, or a `{profile.<key>}` with
+no plain value (**Sandbox accounts**, below). A held request in a scheduled run is refused.
 Missing ones fail the gate, never open the code: any host no rule matches is **held** for
 approval on the operator's Home — approve nothing on the deny side; a held probe shows as
 `warn` until it is an explicit deny.
