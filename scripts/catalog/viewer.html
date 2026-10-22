@@ -253,6 +253,7 @@ const builds = arr(D.builds).filter((b) => b && b.id).map((b) => ({ id: str(b.id
 // build was last run; an item without a verdict by then is left out. Files, tiers and steps stay today's.
 let items = ALL;
 let presentSet = new Set();
+let nightsAt = []; let runsAt = []; let buildsAt = builds; // the nights, runs and builds up to that build
 let derivedAt;
 function derive() {
   const at = S.at ? builds.find((b) => b.id === S.at) : null;
@@ -260,9 +261,9 @@ function derive() {
   if (derivedAt === S.at) return;
   derivedAt = S.at;
   const upto = at ? at.utc : null;
+  const then = (e) => !upto || (e && str(e.utc) <= upto);
   items = [];
   for (const it of ALL) {
-    const then = (e) => !upto || (e && str(e.utc) <= upto);
     it.history = it.full.filter(then);
     it.heals = it.healsAll.filter(then);
     it.flaky = it.flakyAll.filter(then);
@@ -281,6 +282,7 @@ function derive() {
     if (!upto || it.history.length) items.push(it);
   }
   presentSet = new Set(items.map((i) => i.key));
+  nightsAt = nights.filter(then); runsAt = runs.filter(then); buildsAt = builds.filter(then);
 }
 const present = (k) => presentSet.has(k);
 
@@ -522,7 +524,7 @@ function viewOverview() {
   const t = (x) => items.filter((i) => i.tier === x).length;
   const origins = new Set(items.map((i) => `${i.origin.kind}:${i.ref}`));
   const cov = pagesData.filter((p) => p.covered === 'regression').length;
-  const last = nights[nights.length - 1];
+  const last = nightsAt[nightsAt.length - 1];
   const lastTxt = last ? (last.counts && +last.counts.regression ? `${last.counts.regression} regression(s)` : 'no regression') : 'no night yet';
   v.append(h('div', { class: 'grid-kpi' },
     [['Regression tier', t('regression'), { tier: ['regression'] }], ['Promotable', t('promotable'), { tier: ['promotable'] }], ['Exploratory', t('exploratory'), { tier: ['exploratory'] }],
@@ -534,18 +536,18 @@ function viewOverview() {
       .map(([label, val, f]) => h(f ? 'button' : 'div', { class: 'kpi', type: f ? 'button' : null, style: f ? 'text-align:left;cursor:pointer' : null,
         onclick: typeof f === 'function' ? f : f ? () => { S.f = JSON.parse(JSON.stringify(f)); S.v = 'catalog'; writeHash(); render(); } : null }, h('b', {}, String(val)), h('span', {}, label)))));
   const att = items.filter((i) => i.flags.includes('needs attention')).sort((a, b) => SEV[a.cls] - SEV[b.cls] || str(b.verdict && b.verdict.utc).localeCompare(str(a.verdict && a.verdict.utc)));
-  const labels = builds.map((b) => fmtDate(b.utc) || b.id);
-  const all = builds.map((b) => items.filter((i) => i.file && i.history.length && str(i.history[0].utc) <= b.utc).length);
-  const reg = builds.map((b) => items.filter((i) => i.promoted_utc && str(i.promoted_utc) <= b.utc && i.tier === 'regression').length);
+  const labels = buildsAt.map((b) => fmtDate(b.utc) || b.id);
+  const all = buildsAt.map((b) => items.filter((i) => i.file && i.history.length && str(i.history[0].utc) <= b.utc).length);
+  const reg = buildsAt.map((b) => items.filter((i) => i.promoted_utc && str(i.promoted_utc) <= b.utc && i.tier === 'regression').length);
   const dist = {}; for (const i of items) dist[i.latest || 'none'] = (dist[i.latest || 'none'] || 0) + 1;
   v.append(h('div', { class: 'panels' },
     h('section', { class: 'panel' }, h('h2', {}, `Needs attention (${att.length})`), att.length ? h('ul', { class: 'att' }, att.slice(0, 14).map((i) => h('li', {}, badge(i.latest || (i.flags.includes('drift') ? 'drift' : '')), ' ',
       h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key) }, `${i.label} — ${str(i.name)}`)))) : h('p', { class: 'muted-t' }, 'Nothing needs attention.')),
-    h('section', { class: 'panel' }, h('h2', {}, 'Suite size over builds'), builds.length ? lineChart([{ name: 'tests', color: 'var(--link)', values: all }, { name: 'regression tier', color: 'var(--ok)', values: reg }], labels) : h('p', { class: 'muted-t' }, 'No builds yet.')),
-    h('section', { class: 'panel' }, h('h2', {}, 'Latest runs'), runs.length ? [h('ul', { class: 'att' }, runs.slice(0, 8).map((r) => h('li', {}, badge(r.verdict), ' ',
+    h('section', { class: 'panel' }, h('h2', {}, 'Suite size over builds'), buildsAt.length ? lineChart([{ name: 'tests', color: 'var(--link)', values: all }, { name: 'regression tier', color: 'var(--ok)', values: reg }], labels) : h('p', { class: 'muted-t' }, 'No builds yet.')),
+    h('section', { class: 'panel' }, h('h2', {}, 'Latest runs'), runsAt.length ? [h('ul', { class: 'att' }, runsAt.slice(0, 8).map((r) => h('li', {}, badge(r.verdict), ' ',
       h('button', { class: 'linkish', type: 'button', onclick: () => openRun(r) }, `${fmtDate(r.utc)} · ${runName(r)}`)))),
       h('button', { class: 'linkish', type: 'button', onclick: () => go({ v: 'runs' }) }, `All ${runs.length} runs →`)] : h('p', { class: 'muted-t' }, 'No run yet.')),
-    h('section', { class: 'panel' }, h('h2', {}, `Nightly outcomes (${Math.min(30, nights.length)} nights)`), nights.length ? nightsChart(nights.slice(-30)) : h('p', { class: 'muted-t' }, 'The nightly regression has not run yet.')),
+    h('section', { class: 'panel' }, h('h2', {}, `Nightly outcomes (${Math.min(30, nightsAt.length)} nights)`), nightsAt.length ? nightsChart(nightsAt.slice(-30)) : h('p', { class: 'muted-t' }, 'The nightly regression has not run yet.')),
     h('section', { class: 'panel' }, h('h2', {}, 'Latest verdicts'), h('ul', { class: 'att' }, Object.entries(dist).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
       h('li', {}, h('button', { class: 'linkish', type: 'button', onclick: () => { S.f = { verdict: [k] }; S.v = 'catalog'; writeHash(); render(); } }, badge(k === 'none' ? '' : k)), ` ${n}`))))));
 }
@@ -660,7 +662,7 @@ function viewCoverage() {
     v.append(h('section', { class: 'navgroup' }, h('h3', {}, str(nav), h('span', { class: 'bar', title: `regression ${c.regression} · exploratory ${c.exploratory} · none ${c.none}` },
       ['regression', 'exploratory', 'none'].map((k, n) => (c[k] ? h('i', { class: ['ok', 'warn', 'bad'][n], style: `width:${(100 * c[k]) / ps.length}%` }) : null))), h('span', { class: 'count' }, `${ps.length} pages`)),
     h('div', { class: 'pages' }, ps.map((p) => {
-      const src = img(p.shot); const its = arr(p.items).filter((k) => byKey.has(k));
+      const src = img(p.shot); const its = arr(p.items).filter(present);
       return h('div', { class: `page cov-${p.covered in c ? p.covered : 'none'}`, role: 'button', tabindex: 0, title: 'Show this page on the product map',
         onclick: () => go({ v: 'map', pg: p.pattern, hs: null }), onkeydown: (e) => { if (e.key === 'Enter') go({ v: 'map', pg: p.pattern, hs: null }); } },
       src ? h('img', { src, alt: str(p.title), loading: 'lazy' }) : null, h('b', {}, str(p.title) || str(p.pattern)), h('code', {}, str(p.pattern)),

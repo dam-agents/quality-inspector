@@ -162,6 +162,13 @@ out="$(QI_CATALOG_IMG_BUDGET=2000 node "$SCRIPTS/catalog.mjs")"; data="$(page_da
 assert "one image fits, one is dropped" '.images == 1 and .dropped_images == 1' "$out"
 assert "the regression-tier still wins the budget" '(.items[] | select(.key == "issue-42/AC-1") | .still) != null and (.items[] | select(.key == "scenario-7/AC-1") | .still) == null' "$data"
 assert "both fit in the default budget" '.images == 2 and .dropped_images == 0' "$(node "$SCRIPTS/catalog.mjs")"
+# The product map's page shots come after the regression tier's stills, before the other stills.
+cp "$W/catalog/thumbs/issue-42-ac-1.jpg" "$W/catalog/thumbs/map-projects.jpg"
+out="$(QI_CATALOG_IMG_BUDGET=2600 node "$SCRIPTS/catalog.mjs")"; data="$(page_data)"
+assert "two images fit, one is dropped" '.images == 2 and .dropped_images == 1' "$out"
+assert "the page shot wins over a non-regression still" '(.items[] | select(.key == "issue-42/AC-1") | .still) != null
+  and (.pages[] | select(.pattern == "/projects") | .shot) != null and (.items[] | select(.key == "scenario-7/AC-1") | .still) == null' "$data"
+rm -f "$W/catalog/thumbs/map-projects.jpg"
 
 # A credential value or a token in the data refuses the page; the last page stays.
 cp "$W/catalog/index.html" "$SANDBOX/last.html"
