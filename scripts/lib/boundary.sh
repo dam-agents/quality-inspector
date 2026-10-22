@@ -156,7 +156,7 @@ _bb_gql() { printf 'query{repository(owner:"%s",name:"%s"){object(expression:"HE
 # fail whatever its status — the egress let the request through, and only the token's
 # permissions stood between it and the code. A probe that sent nothing proves nothing.
 boundary_probe() { # <target>
-  local h r ha=() issue kind target out code github label
+  local h r ha=() issue kind target out code github label client
   h="$(_bb_host "$1")"; r="$(_bb_repo "$1")"
   [ "$h" = github.com ] || ha=(--hostname "$h")
   issue="$(_bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} "repos/$r/issues?state=all&per_page=1" --jq '.[0].number // empty' 2>/dev/null)"
@@ -184,7 +184,8 @@ boundary_probe() { # <target>
       (*:yes:*) echo "fail $label source surface reachable (HTTP $code from GitHub itself: the egress let the request through, only the token's permissions stopped it)";;
       (403:*|none:*) echo "ok $label refused";;
       (held:*)  echo "warn $label request held for approval — make it an explicit deny so nobody approves it by accident";;
-      (nocli:*) echo "warn $label not probed: the VM has no ${kind/gql/gh} client — the deny is unproven";;
+      (nocli:*) case "$kind" in (url) client=curl;; (gql) client=gh;; (*) client="$kind";; esac
+                echo "warn $label not probed: the VM has no $client client — the deny is unproven";;
       (noauth:*) echo "warn $label not probed: gh has no token, so no request left the VM — the deny is unproven";;
       (sshd:*)  echo "warn $label an SSH server answered (it refused the VM's key) — only a missing key keeps the code out; ask the platform to block SSH to code hosts";;
       (*)       echo "warn $label answered HTTP $code, not the gateway's refusal — the deny is unproven";;

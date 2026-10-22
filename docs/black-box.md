@@ -76,7 +76,7 @@ reaches nothing on GitHub but issues.
 ## The gate
 
 `scripts/preflight.sh` runs the boundary probes and `scripts/hooks/install.sh --check` (the
-policy hook and the deny list still registered, hooks not disabled) before the work of every
+policy and backup hooks and the deny list still registered, hooks not disabled) before the work of every
 mode but the audit — once a day, and again after a definition or target change — and keeps
 the result in `work/env/boundary.json`. A `fail` line or a missing hook stops the run: no
 install, no test, no delivery. The first run that finds a breach (or a different one) returns

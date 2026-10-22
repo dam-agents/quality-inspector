@@ -224,6 +224,7 @@ S
 cat > "$BIN/curl" <<'S'
 #!/usr/bin/env bash
 url="${*: -1}"
+[ -n "${STUB_CURL_RC:-}" ] && exit "$STUB_CURL_RC"
 printf 'HTTP/1.1 200 Connection established\r\n\r\n'
 if [ -n "${STUB_HELD:-}" ] && printf '%s' "$url" | grep -qE "$STUB_HELD"; then printf '\nHTTP-CODE 000\n'; exit 28; fi
 if [ -n "${STUB_TLS_FAIL:-}" ] && printf '%s' "$url" | grep -qE "$STUB_TLS_FAIL"; then printf '\nHTTP-CODE 000\n'; exit 35; fi
@@ -313,11 +314,13 @@ printf '%s\n' "$out" | grep -qxF 'fail boundary:git:https://github.com/acme/widg
   || { echo "  assertion failed: a git ls-remote that lists refs fails"; FAILED=1; }
 assert_eq "an SSH server that answers warns, per SSH host" "2" "$(printf '%s\n' "$out" | grep -c '^warn boundary:ssh:.* an SSH server answered')"
 # A probe that sent nothing proves nothing: no client, or gh without a token.
-out="$(STUB_OPEN="$PROFILE_OPEN" STUB_GH_RC=4 STUB_GIT_RC=127 probe)"
+out="$(STUB_OPEN="$PROFILE_OPEN" STUB_GH_RC=4 STUB_GIT_RC=127 STUB_CURL_RC=127 probe)"
 printf '%s\n' "$out" | grep -qxF 'warn boundary:graphql not probed: gh has no token, so no request left the VM — the deny is unproven' \
   || { echo "  assertion failed: gh without a token warns"; FAILED=1; }
 printf '%s\n' "$out" | grep -qxF 'warn boundary:git:https://github.com/acme/widgets.git not probed: the VM has no git client — the deny is unproven' \
   || { echo "  assertion failed: no git client warns"; FAILED=1; }
+printf '%s\n' "$out" | grep -qxF 'warn boundary:https://gitlab.com/ not probed: the VM has no curl client — the deny is unproven' \
+  || { echo "  assertion failed: no curl client warns, naming curl"; FAILED=1; }
 printf '%s\n' "$out" | grep -q '^ok boundary:\(repos\|graphql\|git\|ssh\)' && { echo "  assertion failed: an unsent probe passed"; FAILED=1; }
 
 out="$(STUB_OPEN='^repos/.*/contents/$|archive/|contents/\.quality-inspector(/\.\.|\?ref=HEAD)$' STUB_404='timeline$' STUB_HELD='gitlab' probe)"
