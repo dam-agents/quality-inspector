@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.10.0 — 2026-10-23
+## 3.10.0 — 2026-10-22
 
 **Upgrade:**
 Nothing to run. On the dashboard's next build: Overview opens with **Activity** — what the agent
@@ -17,6 +17,29 @@ also published when a run claims an issue or a scenario. A report opens through 
 (the command `open the report <id>`, answered with the report's chip in the chat), and the Product
 map draws every control — dashed where no test names it — with navigation items and links walking
 to the page they lead to.
+
+## 3.9.2 — 2026-10-22
+
+**Upgrade:**
+Nothing to run — scripts are re-read per run. A profile's `bin/<cmd>` now counts without its
+exec bit and starts through the interpreter its `#!` line names (`bash` when it has none).
+On a profile installed as plain files, its own `bin/env`, `bin/versions`, `bin/build-time` and
+`bin/sandbox` now run where the engine's commands (or nothing, for `sandbox`) ran before:
+1. `bash "$HOME/scripts/verify-onboarding.sh" --config` and read the `profile_bin:*` lines —
+   each names the command that now runs.
+2. `bash "$HOME/scripts/verify-onboarding.sh" --live` once to see the sandbox accounts checked.
+
+## 3.9.1 — 2026-10-22
+
+**Upgrade:**
+1. Only where the profile lists `egress`: `bash "$HOME/scripts/egress-rules.sh"` and have the
+   operator add each `by-hand` profile row the agent's network settings do not hold yet
+   ([docs/black-box.md](docs/black-box.md) → Egress rules). New `by-hand` row: one that said
+   `kit` but falls under a longer kit deny (a sandbox repository's
+   `GET /repos/<owner>/<repo>/<rest>`) — no prompt appears for it.
+2. Nothing to run for the suite: a test removes its sandbox leftovers only after its last
+   criterion passes ([docs/test-authoring.md](docs/test-authoring.md) → Clean up only after a
+   pass); a repair of a sandbox test follows it from the next run.
 
 ## 3.9.0 — 2026-10-22
 

@@ -58,6 +58,22 @@ echo "FAIL slack token $E2E_SANDBOX_SLACK_HUMAN_TOKEN refused"
 exit 1
 S
 chmod +x "$QI_PROFILE_DIR/bin/sandbox"
+chmod -x "$QI_PROFILE_DIR/bin/sandbox"
+SB check >/dev/null; assert_eq "a bin/sandbox without its exec bit still runs (its #! names bash)" 1 "$?"
+# Without the exec bit the #! line picks the interpreter, not bash; no #! line → bash.
+cp "$QI_PROFILE_DIR/bin/sandbox" "$SANDBOX/sandbox.sh.bak"
+printf '#!/usr/bin/env node\nconsole.log("ok node ran"); process.exit(0)\n' > "$QI_PROFILE_DIR/bin/sandbox"
+assert_eq "a plain-file bin/sandbox with a node #! runs through node" "ok node ran" "$(SB check)"
+printf 'echo "ok no shebang"; [ -n "$BASH_VERSION" ] || exit 9\n' > "$QI_PROFILE_DIR/bin/sandbox"
+assert_eq "a plain-file bin/sandbox with no #! runs through bash" "ok no shebang" "$(SB check)"
+printf '#!\necho no\n' > "$QI_PROFILE_DIR/bin/sandbox"
+SB check >/dev/null 2>&1; assert_eq "a #! line with no interpreter is refused" 3 "$?"
+mv "$SANDBOX/sandbox.sh.bak" "$QI_PROFILE_DIR/bin/sandbox"
+mv "$QI_PROFILE_DIR/bin/sandbox" "$SANDBOX/sandbox-real"
+ln -s "$SANDBOX/sandbox-real" "$QI_PROFILE_DIR/bin/sandbox"; chmod +x "$SANDBOX/sandbox-real"
+SB check >/dev/null 2>&1; assert_eq "a symlinked bin/sandbox does not count → exit 3" 3 "$?"
+rm -f "$QI_PROFILE_DIR/bin/sandbox"; mv "$SANDBOX/sandbox-real" "$QI_PROFILE_DIR/bin/sandbox"
+chmod +x "$QI_PROFILE_DIR/bin/sandbox"
 out="$(SB check)"; rc=$?
 assert_eq "a failing check exits non-zero" 1 "$rc"
 assert_eq "its output is masked (a value under 4 characters is not)" "ok github app 42
