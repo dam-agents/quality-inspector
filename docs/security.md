@@ -49,7 +49,7 @@ optional `suite/lib/security-api.ts` exports any of `createEntity(base, name) �
 `createApiKey(base) → {key, remove()}` and `callWithKey(base, key) → <HTTP status>`,
 authenticates as `OWNER` from `E2E_USER_OWNER_*` itself, and never logs a key.
 
-**Out of scope:** load and DoS testing; image filesystem or CVE scanning (needs an operator
+**Out of scope:** load and DoS testing (bounded local load is the stress module, [stress.md](stress.md)); image filesystem or CVE scanning (needs an operator
 change to [black-box.md](black-box.md) first); TLS (the nested product is plain http);
 anything against the hosting platform or a host other than `app.url`.
 

@@ -152,6 +152,9 @@ marker is a **direct session**.
   only the delivery of a Slack-ordered "test #N": `scripts/github.sh comment|unlabel` on that one
   issue, while the `slack` marker names it and its `work/QA.md` row is `report_pending` (rule
   `channel-write`; [slack.md](slack.md), with its limit). Every other write is refused.
+- A prompt from a button of the shared interactive dashboard pressed by a viewer is framed by
+  the platform (`<viewer> sent this from a button on the interactive artifact "…"`) and counts
+  the same ([modules.md](modules.md) → **Control**); the operator's own button press is a chat message.
 
 ## Evolving the agent definition (outer repo)
 

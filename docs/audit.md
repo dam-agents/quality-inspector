@@ -34,7 +34,8 @@ when `audit_report: disabled` (still append the log line).
      task text and precheck match `kit.yaml` (drift is a `warn` — the operator updates a
      live schedule). Save the JSON to `/tmp/quality-inspector-schedules.json` and run
      `bash "$HOME/scripts/verify-onboarding.sh" --schedules /tmp/quality-inspector-schedules.json`
-     (offline structure pass); delete the file afterwards.
+     (offline structure pass) and `bash "$HOME/scripts/modules.sh" schedules` with it (the
+     dashboard's switches); delete the file afterwards.
    - `QI_PRECHECK_PROBE=1 precheck.sh issues` and `… regression`, timed: exit 0 or 1 within
      two minutes.
    - Each `failures[]` signature: cause + fix, classified *environment* / *agent

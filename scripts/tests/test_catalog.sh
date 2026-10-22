@@ -62,7 +62,15 @@ printf '# S-7 — upload a <i>large</i> file\n\n## AC-1 — the upload finishes\
 echo 'REQUEST-SECRET please test the upload, my boss asked' > "$W/scenarios/S-7/request.md"
 echo '{"scenario":"S-7","candidate":"c1","generated_utc":"2026-10-04T10:00:00Z","acs":[{"id":"AC-1","verdict":"passed"}],"notes":["NOTE-SECRET"]}' > "$W/scenarios/S-7/verdicts-s1-c1.json"
 echo 'https://claude.ai/artifact/s7' > "$W/scenarios/S-7/artifact.id"
-echo '{"findings":[{"id":"SEC-SECRET"}]}' > "$W/security/c1/verdicts.json"
+echo '{"candidate":"c1","counts":{"critical":0,"high":2,"medium":1},"findings":[{"id":"SEC-SECRET","explanation":"SEC-SECRET recipe"}]}' > "$W/security/c1/verdicts.json"
+# The control center's sources: design findings with a crop, validation results, stress results.
+mkdir -p "$W/design/crops" "$W/validation/c3" "$W/stress/c3" "$W/focus/upload-c3"
+echo '{"area":"Upload","build":"c3","checks":[{"id":"FX-1","heuristic":"negative-path","expected":"refused visibly","verdict":"observation","severity":"minor","note":"FOCUS-NOTE-SECRET"}]}' > "$W/focus/upload-c3/results.json"
+echo '{"schema":"qi-design/v1","next_id":3,"findings":[{"id":"D-1","source":"sweep","check":"clipped-text","severity":"minor","suspect":false,"pattern":"/projects","viewport":"390x844","target":"“Rename” button","saw":"Text of “Rename” button is clipped","box":{"x":1,"y":2,"w":3,"h":4},"shot":"design/c3/shots/x.png","crop":"design/crops/D-1.jpg","first_seen":"c3","last_seen":"c3","status":"open","resolved_build":null},
+ {"id":"D-2","source":"noticed","check":"noticed","severity":"minor","pattern":"/files","viewport":"-","saw":"An empty state says undefined","first_seen":"c2","last_seen":"c2","status":"dismissed"},{"id":"evil","saw":"x"}]}' > "$W/design/findings.json"
+echo jpg > "$W/design/crops/D-1.jpg"
+echo '{"build":"c3","run":"validation-c3","cases":[{"id":"VAL-1","page":"/projects","form":"New project","field":"Name","kind":"html","oracle":"refused-or-intact","result":"finding","severity":"major","message":"[value-intact] changed"},{"id":"VAL-2","page":"/projects","form":"New project","field":"Name","kind":"unicode","oracle":"refused-or-intact","result":"ok","severity":null,"message":null}]}' > "$W/validation/c3/results.json"
+echo '{"build":"c3","config":{"concurrency":10,"duration_s":60},"counts":{"critical":0,"high":1},"checks":[{"id":"STRESS-API-2","target":"GET /api/projects","status":"fail","severity":"high","evidence":"3 of 900 answered 5xx"}]}' > "$W/stress/c3/stress.json"
 cat > "$W/suite/tests/issue-42.e2e.ts" <<'T'
 /** @qi-summary Renaming a project keeps its tasks.
  *  @qi-area projects */
@@ -110,6 +118,10 @@ assert "summary" '.items == 5 and .changed == true and (.hash | test("^[0-9a-f]{
 html="$(cat "$W/catalog/index.html")"
 page_data() { node -e 'const h=require("fs").readFileSync(process.argv[1],"utf8");const m=h.match(/<script type="application\/json" id="qi-catalog-data">([\s\S]*?)<\/script>/);process.stdout.write(m[1])' "$W/catalog/index.html"; }
 data="$(page_data)"
+# The viewer's script parses: no test drives the page, so a syntax error would ship silently.
+node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");require("fs").writeFileSync(process.argv[2],[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((x)=>x[1]).join("\n"))' \
+  "$SCRIPTS/catalog/viewer.html" "$SANDBOX/viewer.js" && node --check "$SANDBOX/viewer.js" 2>/dev/null
+assert_eq "the viewer's script parses" 0 "$?"
 assert "schema and header" '.schema == "qi-catalog/v1" and .agent.display_name == "QA Bot" and .target == "acme/widgets" and .issue_url == "https://github.com/acme/widgets/issues/{n}"' "$data"
 i='.items[] | select(.key == "issue-42/AC-1")'
 assert "AC-1 from criteria, test and SUITE" "$i"' | .tier == "regression" and .then == "the project shows its new name with the task" and .area == "projects"
@@ -136,9 +148,16 @@ assert "hotspots: a page-only control names its tests; a nav item stands for its
   and (.pages[] | select(.pattern == "/") | .hotspots == [{"kind":"nav","name":"Projects","box":[0,0,0.1,0.04],"to":"/projects","items":["issue-42/AC-1","issue-42/EX-1"]},
     {"kind":"headings","name":"Welcome home","box":[0.2,0.2,0.3,0.08],"items":[]}]) and (.pages[] | select(.pattern == "/files") | .hotspots == [])' "$data"
 assert "collections" '.collections == [{"name":"Upload","members":["#42","S-7 AC-1"]}]' "$data"
+assert "control center: the modules' state" '(.modules.modules | length) == 11 and (.modules.modules[] | select(.id == "ui-sweep") | .state == "disabled") and .interactive == false and (.modules | has("generated_utc") | not)' "$data"
+assert "design findings: register fields, a crop, nothing else" '(.design | length) == 2 and (.design[0] | .id == "D-1" and .saw == "Text of “Rename” button is clipped" and (.crop | test("^i[0-9]+$")) and (has("shot") | not) and (has("box") | not))
+  and .design[1].status == "dismissed" and .design[1].crop == null' "$data"
+assert "findings: validation and stress as they are, security only counted" '.findings.validation.cases[0].message == "[value-intact] changed" and .findings.stress.checks[0].id == "STRESS-API-2"
+  and .findings.security == {"candidate":"c1","utc":null,"counts":{"critical":0,"high":2,"medium":1},"report":null}' "$data"
+assert "a focus run, its checks without their notes" '.findings.focus == [{"run":"upload-c3","area":"Upload","build":"c3","utc":null,"checks":[{"id":"FX-1","heuristic":"negative-path","given":null,"when":null,"expected":"refused visibly","verdict":"observation","severity":"minor"}]}]' "$data"
+assert "areas for a focus" '.areas | index("projects") != null and index("files") != null' "$data"
 assert "coverage pages" '[.pages[] | {pattern, covered, nav}] | (map(select(.pattern == "/projects"))[0] == {"pattern":"/projects","covered":"regression","nav":"Projects"})
   and (map(select(.pattern == "/files"))[0].covered == "exploratory")' "$data"
-for secret in U0SECRETUSER C0SECRET REQUEST-SECRET SOURCE-SECRET NOTE-SECRET EXPLAIN-SECRET LESSON-SECRET SEC-SECRET; do
+for secret in U0SECRETUSER C0SECRET REQUEST-SECRET SOURCE-SECRET NOTE-SECRET EXPLAIN-SECRET LESSON-SECRET SEC-SECRET FOCUS-NOTE-SECRET; do
   case "$html" in (*"$secret"*) echo "  not test-related, must not be in the page: $secret"; FAILED=1;; esac
 done
 case "$html" in (*'<b>projects'*|*'<i>large'*) echo "  data not escaped inside the page"; FAILED=1;; esac
@@ -159,13 +178,14 @@ assert "a drifted test's skipped night is drift, its run nights stay" "$i"' | .d
 # Images within the budget, the regression tier first; the rest is dropped.
 head -c 900 /dev/zero | tr '\0' 'x' > "$W/catalog/thumbs/issue-42-ac-1.jpg"; cp "$W/catalog/thumbs/issue-42-ac-1.jpg" "$W/catalog/thumbs/scenario-7-ac-1.jpg"
 out="$(QI_CATALOG_IMG_BUDGET=2000 node "$SCRIPTS/catalog.mjs")"; data="$(page_data)"
-assert "one image fits, one is dropped" '.images == 1 and .dropped_images == 1' "$out"
+assert "the regression still and a design crop fit, the other still is dropped" '.images == 2 and .dropped_images == 1' "$out"
+assert "a design crop comes before the other tiers' stills" '.design[0].crop != null' "$data"
 assert "the regression-tier still wins the budget" '(.items[] | select(.key == "issue-42/AC-1") | .still) != null and (.items[] | select(.key == "scenario-7/AC-1") | .still) == null' "$data"
-assert "both fit in the default budget" '.images == 2 and .dropped_images == 0' "$(node "$SCRIPTS/catalog.mjs")"
-# The product map's page shots come after the regression tier's stills, before the other stills.
+assert "all fit in the default budget" '.images == 3 and .dropped_images == 0' "$(node "$SCRIPTS/catalog.mjs")"
+# The product map's page shots come after the regression tier's stills and the design crops, before the other stills.
 cp "$W/catalog/thumbs/issue-42-ac-1.jpg" "$W/catalog/thumbs/map-projects.jpg"
 out="$(QI_CATALOG_IMG_BUDGET=2600 node "$SCRIPTS/catalog.mjs")"; data="$(page_data)"
-assert "two images fit, one is dropped" '.images == 2 and .dropped_images == 1' "$out"
+assert "the regression still, the design crop and the page shot fit; one is dropped" '.images == 3 and .dropped_images == 1' "$out"
 assert "the page shot wins over a non-regression still" '(.items[] | select(.key == "issue-42/AC-1") | .still) != null
   and (.pages[] | select(.pattern == "/projects") | .shot) != null and (.items[] | select(.key == "scenario-7/AC-1") | .still) == null' "$data"
 rm -f "$W/catalog/thumbs/map-projects.jpg"

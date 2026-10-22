@@ -76,14 +76,15 @@ if [ "$MODELS" = 1 ]; then
   exit $any
 fi
 
-SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-benchmark-monthly quality-inspector-security-weekly quality-inspector-audit-weekly quality-inspector-scenarios-weekly"
+SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-benchmark-monthly quality-inspector-security-weekly quality-inspector-audit-weekly quality-inspector-scenarios-weekly quality-inspector-modules-nightly"
 KNOWN_KEYS="profile target_repo display_name qa_label retest_label marker_prefix candidate_channel
 baseline_channel issue_comments artifact_reports include_comments max_issues_per_run lock_ttl_min
 e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback profile_source_path
 explorations max_explorations_per_ac auto_promote security_checks security_failed_logins
 confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi
 scenario_discovery scenario_channel profile_scenarios regression_channel max_scenarios_per_run max_scenarios_per_day work_repo test_catalog
-lend_model live_browser slack_channel slack_tests_per_day github_login"
+lend_model live_browser slack_channel slack_tests_per_day github_login
+$(jq -r '[.global, (.modules[] | select(.kind == "modules" or .kind == "queue") | .settings)] | add | keys[]' "$SCRIPT_DIR/lib/modules.json" 2>/dev/null)"
 
 if [ "$STRUCTURE" = 1 ]; then
   # ------------------------------------------------------------- definition
@@ -182,9 +183,8 @@ if [ -f "$CONFIG" ]; then
     case " $2 " in (*" $v "*) ok "cfg:$1" "$v";; (*) fail "cfg:$1" "'$v' is not one of: $2" "set a documented value (CLAUDE.md → Runtime configuration)";; esac; }
   enum issue_comments "enabled disabled"; enum artifact_reports "enabled disabled"
   enum include_comments "enabled disabled"; enum audit_report "enabled disabled"; enum log_level "info debug"
-  enum spec_feedback "enabled disabled"; enum explorations "enabled disabled"; enum auto_promote "disabled verified"
-  enum security_checks "enabled disabled"; enum confirm_regressions "enabled disabled"; enum lend_model "enabled disabled"
-  enum scenario_discovery "disabled propose run"; enum test_catalog "enabled disabled"
+  enum spec_feedback "enabled disabled"; enum auto_promote "disabled verified"; enum lend_model "enabled disabled"
+  enum test_catalog "enabled disabled"
   v="$(cfg scenario_channel)"
   if [ -z "$v" ]; then ok cfg:scenario_channel "empty — proposals stay in the chat UI"
   elif printf '%s' "$v" | grep -qE '^[CDG][A-Z0-9]{6,}$'; then ok cfg:scenario_channel "$v"
@@ -200,17 +200,25 @@ if [ -f "$CONFIG" ]; then
   case "$(cfg live_browser)" in (''|disabled) ok cfg:live_browser "disabled";;
     (http://127.0.0.1:[0-9]*|http://localhost:[0-9]*) ok cfg:live_browser "$(cfg live_browser)";;
     (*) fail cfg:live_browser "'$(cfg live_browser)' is not a CDP endpoint on this VM" "http://127.0.0.1:<port> from /etc/AGENTS.md, or disabled (docs/test-authoring.md → Watching live)";; esac
-  for k in max_issues_per_run lock_ttl_min media_retention_days max_explorations_per_ac security_failed_logins bisect_max_steps \
-           max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi max_scenarios_per_run max_scenarios_per_day slack_tests_per_day; do
+  for k in lock_ttl_min media_retention_days min_free_disk_gi max_scenarios_per_day slack_tests_per_day; do
     v="$(cfg "$k")"; case "$v" in (''|*[!0-9]*) [ -z "$v" ] && ok "cfg:$k" "default" || fail "cfg:$k" "'$v' is not a number" "set a positive integer";; (*) ok "cfg:$k" "$v";; esac
   done
-  case "$(cfg bisect_max_steps)" in (''|0|*[!0-9]*) ;; (*) [ "$(cfg confirm_regressions)" = enabled ] \
+  # The keys of the testing modules' registry, judged by it (one home: scripts/lib/modules.json, docs/modules.md).
+  mc="$(bash "$SCRIPT_DIR/modules.sh" check 2>/dev/null)" || mc=""
+  if [ -z "$mc" ]; then fail cfg:modules "scripts/modules.sh check failed" "restore scripts/modules.sh and scripts/lib/modules.json from origin/main"
+  else while IFS=$'\x1f' read -r k v okv allowed; do
+      [ "$okv" = true ] && ok "cfg:$k" "$v" || fail "cfg:$k" "'$v' is not one of: $allowed" "set a documented value (docs/modules.md)"
+    done < <(jq -r '.[] | [.key, .value, (.ok | tostring), .allowed] | join("\u001f")' <<<"$mc"); fi
+  case "$(reg bisect_max_steps)" in (0) ;; (*) [ "$(reg confirm_regressions)" = enabled ] \
     || warn cfg:bisect_max_steps "set, but bisection runs only with confirm_regressions: enabled (docs/triage.md)";; esac
   # A live run must never look stale: the lock outlives the wall-clock budget (docs/nested-env.md → Budgets).
   ttl="$(cfg lock_ttl_min)"; case "$ttl" in (''|*[!0-9]*) ttl=180;; esac
-  wall="$(cfg max_wallclock_min_per_issue)"; case "$wall" in (''|*[!0-9]*) wall=150;; esac
+  wall="$(reg max_wallclock_min_per_issue)"; case "$wall" in (''|*[!0-9]*) wall=150;; esac
   [ "$ttl" -gt "$wall" ] && ok cfg:lock_vs_budget "lock_ttl_min $ttl > max_wallclock_min_per_issue $wall" \
     || fail cfg:lock_vs_budget "lock_ttl_min $ttl is not above max_wallclock_min_per_issue $wall" "raise lock_ttl_min or lower the budget"
+  wall="$(reg modules_max_wallclock_min)"; case "$wall" in (''|*[!0-9]*) wall=90;; esac
+  [ "$ttl" -gt "$wall" ] && ok cfg:lock_vs_modules "lock_ttl_min $ttl > modules_max_wallclock_min $wall" \
+    || fail cfg:lock_vs_modules "lock_ttl_min $ttl is not above modules_max_wallclock_min $wall" "raise lock_ttl_min or lower the modules budget"
   # ---------------------------------------------------------------- profile
   if pd="$(profile_dir)"; then
     ok profile "$(profile_field '.product') at $pd"
@@ -359,7 +367,7 @@ if [ "$LIVE" = 1 ]; then
   st="$(bash "$SCRIPT_DIR/env.sh" status 2>/dev/null)"
   printf '%s' "$st" | jq -e '.running and (.ui_http | test("^[23]"))' >/dev/null 2>&1 \
     && ok product_env "$(printf '%s' "$st" | jq -r .build)" || warn product_env "not up: $st (docs/nested-env.md)"
-  for m in issues regression discovery; do
+  for m in issues regression discovery modules; do
     out="$(bash "$SCRIPT_DIR/preflight.sh" "$m" 2>/dev/null)"
     if printf '%s' "$out" | jq -e 'type == "object"' >/dev/null 2>&1; then
       err="$(printf '%s' "$out" | jq -r '.error // empty')"

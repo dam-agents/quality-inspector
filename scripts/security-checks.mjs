@@ -47,7 +47,7 @@ const base = new URL(flags.base ?? process.env.APP_URL ?? profile.app?.url ?? 'h
 if (!['localhost', '127.0.0.1'].includes(base.hostname)) { console.error(`refusing ${base.origin}: only the nested product on localhost`); process.exit(2); }
 const inv = JSON.parse(readFileSync(pos[0], 'utf8'));
 const build = flags.build ?? inv.build ?? 'unknown';
-const failedLogins = Math.max(3, Number(flags['failed-logins'] ?? (sh('cfg security_failed_logins') || 10)) || 10);
+const failedLogins = Math.max(3, Number(flags['failed-logins'] ?? (sh('reg security_failed_logins') || 10)) || 10);
 
 // Roles (docs/profile-contract.md → The bin/ contract): env first, then credentials.env.
 const credFile = (() => {

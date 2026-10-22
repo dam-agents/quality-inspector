@@ -9,11 +9,16 @@ mkdir -p "$WORK_DIR/suite/.e2e/runs/issue-2-candidate"
 old "$WORK_DIR/issues/1/report-a-c/media"; touch "$WORK_DIR/issues/1/artifact.id"; touch -t 202001010000 "$WORK_DIR/issues/1/report-a-c/media"
 old "$WORK_DIR/issues/2/report-b-c/media"
 old "$WORK_DIR/security/c1/report/media"; touch "$WORK_DIR/security/c1/artifact.id"; touch -t 202001010000 "$WORK_DIR/security/c1/report/media"
+# UI sweep shots: the two newest builds stay for the next comparison, older ones past the window go.
+mkdir -p "$WORK_DIR/design/b1/shots" "$WORK_DIR/design/b2/shots" "$WORK_DIR/design/b3/shots"
+touch -t 202001010000 "$WORK_DIR/design/b1/shots"; touch -t 202001020000 "$WORK_DIR/design/b2/shots"; touch -t 202001030000 "$WORK_DIR/design/b3/shots"
 out="$(bash "$SCRIPTS/preflight.sh" issues)"
+[ ! -d "$WORK_DIR/design/b1/shots" ] || { echo "  an old third sweep's shots kept"; FAILED=1; }
+[ -d "$WORK_DIR/design/b2/shots" ] && [ -d "$WORK_DIR/design/b3/shots" ] || { echo "  the two newest sweeps' shots deleted"; FAILED=1; }
 [ ! -d "$WORK_DIR/suite/.e2e/runs/issue-1-candidate" ] || { echo "  old raw run kept"; FAILED=1; }
 [ -d "$WORK_DIR/suite/.e2e/runs/issue-2-candidate" ] || { echo "  fresh raw run deleted"; FAILED=1; }
 [ ! -d "$WORK_DIR/issues/1/report-a-c/media" ] || { echo "  delivered old media kept"; FAILED=1; }
 [ -d "$WORK_DIR/issues/2/report-b-c/media" ] || { echo "  undelivered evidence deleted"; FAILED=1; }
 [ ! -d "$WORK_DIR/security/c1/report/media" ] || { echo "  delivered old security media kept"; FAILED=1; }
-assert "sweep is logged" '.logs | map(select(test("retention: removed 3"))) | length == 1' "$out"
+assert "sweep is logged" '.logs | map(select(test("retention: removed 4"))) | length == 1' "$out"
 exit $FAILED

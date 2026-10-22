@@ -121,6 +121,7 @@ screenshots — an error page, a console error on screen, a broken layout, a wro
 one `noticed` item in `verdicts-<ac_hash>-<candidate>.json`:
 `"noticed": [{"where": "<page or step>", "saw": "<what a user sees>", "shot": "<screenshot path>" | null}]`.
 It costs nothing extra: no test, no re-run, no chase, no verdict. `render-report.mjs` lists
-it as "Noticed in passing — not tested" and adds one count line to `comment.md`. Something
+it as "Noticed in passing — not tested" and adds one count line to `comment.md`; the design
+findings register takes it in too ([ui-sweep.md](ui-sweep.md) → Register). Something
 that looks like a security weakness is never a `noticed` item: it goes to the operator's
 chat only ([security.md](security.md)).

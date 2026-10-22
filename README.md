@@ -40,6 +40,10 @@ library for evidence, the skill catalog for profiles, sub-agents for independent
   operator's "promote all pending". A weekly discovery run (off by default) proposes
   scenarios of its own from uncovered pages and completed issues, and can test them too
   (docs/scenarios.md, docs/judge.md).
+- **Testing modules** (nightly, each off by default) — switchable from the dashboard: a UI
+  sweep that walks every page at several screen sizes and lists layout, visual and
+  accessibility defects for design; form validation; bounded stress of the local product;
+  and a one-off deep test of a chosen area (docs/modules.md).
 - **Weekly audit** (off by default) — health, the black-box boundary probes, assertion
   drift, cache efficiency, and the week's speed and cost per issue (docs/audit.md).
 - **From Slack** (off by default) — a person in the bound channel asks "test #N" and gets
@@ -193,6 +197,8 @@ configuration.
 | `explorations`, `max_explorations_per_ac` | defaults (`enabled`, `3`) | Agent-designed checks beyond the criteria, reported apart from the verdict ([docs/explorations.md](docs/explorations.md)). |
 | `security_checks`, `security_failed_logins` | defaults (`enabled`, `10`) | The security run ([docs/security.md](docs/security.md)); its schedule ships off. |
 | `max_wallclock_min_per_issue`, `max_model_steps_per_issue`, `min_free_disk_gi` | defaults | Per-issue budgets and the free disk an install needs. |
+| `ui_sweep`, `validation_checks`, `stress_checks` and their tunables, `focus_max_checks`, `modules_max_wallclock_min` | offered, default `disabled` | The testing modules of the nightly modules run; registry `scripts/lib/modules.json` ([docs/modules.md](docs/modules.md)). |
+| `dashboard_interactive` | offered, default `disabled` | The dashboard's buttons send their command to the agent's chat (needs the platform's Interactive artifacts). |
 | `slack_channel`, `slack_tests_per_day` | asked (optional), default `3` | Slack test requests ([docs/slack.md](docs/slack.md)). |
 | `lend_model`, `live_browser` | offered, default `disabled` | The product calls the agent's model by placeholder; exploration in the browser the operator watches. |
 

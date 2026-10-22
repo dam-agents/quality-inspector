@@ -116,6 +116,15 @@ schedules:
     task: >-
       Weekly self-audit. Run `bash "$HOME/scripts/preflight.sh" audit`, then follow
       CLAUDE.md → "Audit run": read docs/audit.md and report.
+  - name: quality-inspector-modules-nightly
+    cron: "30 4 * * *"
+    sessionMode: fresh
+    precheck: 'bash "$HOME/scripts/precheck.sh" modules'
+    task: >-
+      Testing modules run. Run `bash "$HOME/scripts/preflight.sh" modules` first unless
+      its worklist is already appended below. If its JSON says nothing_to_do, report its
+      logs in one line and end the run. Otherwise follow CLAUDE.md → "Modules run": read
+      docs/modules.md and run every due module against the worklist's candidate.
 
 # The black-box boundary, the same for every target (docs/black-box.md → Egress rules): GitHub
 # is deny-by-default, and what opens opens for every repository alike — the issues endpoints,

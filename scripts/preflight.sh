@@ -12,7 +12,7 @@
 #   .nothing_to_do == true  -> the agent ends the run immediately.
 #   otherwise               -> the agent processes the arrays per CLAUDE.md + docs/.
 #
-# Modes: issues (default) | regression | discovery | audit | benchmark | security | slack.
+# Modes: issues (default) | regression | discovery | audit | benchmark | security | modules | slack.
 # Requires: bash, jq, gh, curl, sed/grep/awk, GNU date (Linux pod).
 
 set -u
@@ -47,7 +47,7 @@ RETEST_LABEL="$(cfg retest_label)"; RETEST_LABEL="${RETEST_LABEL:-qa:retest}"
 versions_json() { # [baseline-channel override, e.g. none]
   QI_BASELINE_OVERRIDE="${1:-}" profile_run versions | jq -ce 'select(.candidate != null and .candidate != "")' 2>/dev/null
 }
-MAX_ISSUES="$(cfg max_issues_per_run)"; MAX_ISSUES="${MAX_ISSUES:-1}"
+MAX_ISSUES="$(reg max_issues_per_run)"; MAX_ISSUES="${MAX_ISSUES:-1}"
 LOCK_TTL_MIN="$(cfg lock_ttl_min)"; LOCK_TTL_MIN="${LOCK_TTL_MIN:-180}"
 case "$MAX_ISSUES" in (''|*[!0-9]*) MAX_ISSUES=1;; esac
 case "$LOCK_TTL_MIN" in (''|*[!0-9]*) LOCK_TTL_MIN=180;; esac
@@ -81,6 +81,10 @@ retention_sweep() {
     local owner; owner="$(dirname "$(dirname "$d")")"
     if [ -f "$owner/artifact.id" ] || [ "$art" = disabled ]; then rm -rf "$d" && n=$((n+1)); fi
   done < <(find "$WORK/issues" "$WORK/scenarios" "$WORK/regression" "$WORK/security" -mindepth 3 -maxdepth 3 -type d -name media -mtime +"$MEDIA_DAYS" 2>/dev/null)
+  # The UI sweep's full-page shots (docs/ui-sweep.md): the newest two builds' stay for the next
+  # sweep's comparison; the findings keep their crops.
+  while IFS= read -r d; do rm -rf "$d" && n=$((n+1)); done < <(ls -1dt "$WORK"/design/*/shots 2>/dev/null | tail -n +3 \
+    | while IFS= read -r d; do [ -n "$(find "$d" -maxdepth 0 -mtime +"$MEDIA_DAYS" 2>/dev/null)" ] && printf '%s\n' "$d"; done)
   [ "$n" -gt 0 ] && log "retention: removed $n media directories older than ${MEDIA_DAYS}d"
   return 0
 }
@@ -197,7 +201,7 @@ profile_scenarios_work() {
       [ "$(cell "$r" 2)" = profile ] || continue
       printf '%s\t%s\t%s\t%s\n' "$(cell "$r" 1)" "$(cell "$r" 5)" "$(cell "$r" 8)" "$(cell "$r" 7)"
     done | jq -R 'split("\t") | {id: .[0], spec_hash: .[1], status: .[2], verdict: .[3]}' | jq -sc .)"
-  per="$(cfg max_scenarios_per_run)"; case "$per" in (''|*[!0-9]*) per=3;; esac
+  per="$(reg max_scenarios_per_run)"; case "$per" in (''|*[!0-9]*) per=3;; esac
   adopt="$(jq -nc --argjson f "$files" --argjson r "$rows" '
     ($r | map({key: .id, value: .}) | from_entries) as $by
     | [$f[] | ("P-" + .slug) as $id | $by[$id] as $row
@@ -250,7 +254,7 @@ mode_regression() {
   [ -n "$drift" ] || drift='null'
   [ "$drift" = null ] && log "WARN: assertion drift check could not run"
   # Reverse red-green and bisection (docs/triage.md → Order of work, steps 5–6): off unless set.
-  confirm="$(cfg confirm_regressions)"; bisect="$(cfg bisect_max_steps)"
+  confirm="$(reg confirm_regressions)"; bisect="$(reg bisect_max_steps)"
   case "$confirm" in (enabled) confirm=true;; (''|disabled) confirm=false;;
     (*) log "WARN: confirm_regressions '$confirm' is not enabled|disabled — treated as disabled"; confirm=false;; esac
   case "$bisect" in (''|*[!0-9]*) [ -n "$bisect" ] && log "WARN: bisect_max_steps '$bisect' is not a number — treated as 0"; bisect=0;; esac
@@ -523,7 +527,7 @@ mode_audit() {
 # `run`) today's scenario cap leaves room. docs/scenarios.md → Discovery.
 mode_discovery() {
   local mode versions candidate baseline last per runs budget
-  mode="$(cfg scenario_discovery)"
+  mode="$(reg scenario_discovery)"
   case "$mode" in
     (propose|run) ;;
     (*) log "scenario discovery is disabled (scenario_discovery: ${mode:-disabled})"; runlog DISCOVERY "skip=disabled"
@@ -538,7 +542,7 @@ mode_discovery() {
     log "candidate $candidate already explored"; runlog DISCOVERY "skip=same-candidate candidate=$candidate"
     jq -nc --arg c "$candidate" --argjson logs "$(logs_json)" '{mode:"discovery", nothing_to_do:true, candidate:$c, logs:$logs}'; return
   fi
-  per="$(cfg max_scenarios_per_run)"; case "$per" in (''|*[!0-9]*) per=3;; esac
+  per="$(reg max_scenarios_per_run)"; case "$per" in (''|*[!0-9]*) per=3;; esac
   budget="$per"
   if [ "$mode" = run ]; then
     runs="$(scenario_runs_today)"
@@ -567,7 +571,7 @@ mode_benchmark() {
 # =========================================================== SECURITY MODE ====
 # Due once per candidate build (docs/security.md). Keyed on `ran candidate=` in SECURITY.log.
 mode_security() {
-  if [ "$(cfg security_checks)" = disabled ]; then
+  if [ "$(reg security_checks)" = disabled ]; then
     log "security checks are disabled (security_checks: disabled)"; runlog SECURITY "skip=disabled"
     jq -nc --argjson logs "$(logs_json)" '{mode:"security", nothing_to_do:true, logs:$logs}'; return
   fi
@@ -591,6 +595,36 @@ mode_security() {
   jq -nc --arg c "$candidate" --arg p "$last" --arg inv "$inv" --argjson roles "${roles:-[]}" --argjson dep "$dep" --argjson logs "$(logs_json)" \
     '{mode:"security", nothing_to_do:false, candidate:$c, previous_candidate:(if $p=="" then null else $p end),
       inventory:(if $inv=="" then null else $inv end), roles:$roles, deployment_checks:$dep, logs:$logs}'
+}
+
+# ============================================================ MODULES MODE ====
+# The testing modules of the `modules` run (docs/modules.md): each switched-on module once per
+# candidate (`weekly`: at most once in 7 days) keyed on `ran module=<id> candidate=` in
+# MODULES.log, plus the queued feature-focus areas. The decision lives in modules.sh due.
+mode_modules() {
+  local versions candidate baseline d inv budget
+  d="$(bash "$SCRIPT_DIR/modules.sh" due 2>/dev/null)" || fail_out "modules.sh due failed"
+  if [ "$(jq -r '(.on | length) + (.focus | length)' <<<"$d")" = 0 ]; then
+    log "no testing module is switched on and no focus is queued"; runlog MODULES "skip=disabled"
+    jq -nc --argjson logs "$(logs_json)" '{mode:"modules", nothing_to_do:true, logs:$logs}'; return
+  fi
+  env_busy_out MODULES
+  versions="$(versions_json 2>/dev/null)" || fail_out "cannot resolve the candidate build"
+  candidate="$(printf '%s' "$versions" | jq -r .candidate)"
+  baseline="$(printf '%s' "$versions" | jq -r '.baseline // empty')"
+  d="$(bash "$SCRIPT_DIR/modules.sh" due "$candidate" 2>/dev/null)" || fail_out "modules.sh due failed"
+  if [ "$(jq -r '(.due | length) + (.focus | length)' <<<"$d")" = 0 ]; then
+    log "candidate $candidate: every switched-on module already ran on it, no focus queued"; runlog MODULES "skip=same-candidate candidate=$candidate"
+    jq -nc --arg c "$candidate" --argjson logs "$(logs_json)" '{mode:"modules", nothing_to_do:true, candidate:$c, logs:$logs}'; return
+  fi
+  inv="$WORK/inventory/$candidate/inventory.json"; [ -f "$inv" ] || inv=""
+  budget="$(reg modules_max_wallclock_min)"; case "$budget" in (''|*[!0-9]*) budget=90;; esac
+  log "candidate $candidate: due $(jq -r '.due | join(",")' <<<"$d")$(jq -r 'if (.focus|length) > 0 then " focus " + (.focus | join(",")) else "" end' <<<"$d")"
+  runlog MODULES "due candidate=$candidate modules=$(jq -r '.due | join(",")' <<<"$d") focus=$(jq -r '.focus | length' <<<"$d")"
+  jq -nc --arg c "$candidate" --arg b "$baseline" --arg inv "$inv" --argjson d "$d" --argjson budget "$budget" --argjson logs "$(logs_json)" \
+    '{mode:"modules", nothing_to_do:false, candidate:$c, baseline:(if $b == "" then null else $b end),
+      modules_due:$d.due, previous:$d.previous, focus:$d.focus,
+      inventory:(if $inv == "" then null else $inv end), max_wallclock_min:$budget, logs:$logs}'
 }
 
 # ============================================================= SLACK MODE ====
@@ -649,12 +683,13 @@ boundary_gate() {
   return 1
 }
 
-case "$MODE" in (slack|benchmark|security|issues|regression|discovery) boundary_gate || exit 0;; esac
+case "$MODE" in (slack|benchmark|security|issues|regression|discovery|modules) boundary_gate || exit 0;; esac
 
 case "$MODE" in
   slack)      mode_slack ;;
   benchmark)  mode_benchmark ;;
   security)   mode_security ;;
+  modules)    mode_modules ;;
   issues)     mode_issues ;;
   regression) mode_regression ;;
   discovery)  mode_discovery ;;

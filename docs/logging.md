@@ -11,17 +11,18 @@ Two layers under `work/`, both append-only, never loaded whole into context (`ta
 | `work/REGRESSION.log` | pre-flight and you | `<ISO> due candidate=<c> tests=<n>` / `<ISO> ran candidate=<c> passed=… failed=… drift=… replayed=… handed_off=… missed=…` |
 | `work/SECURITY.log` | pre-flight and you | `<ISO> due candidate=<c> inventory=<yes\|no>` / `<ISO> ran candidate=<c> critical=<n> high=<n> medium=<n> low=<n> info=<n> skipped=<n>` |
 | `work/DISCOVERY.log` | pre-flight and you | `<ISO> due candidate=<c> budget=<n>` / `<ISO> ran candidate=<c> proposed=<n> rejected=<n> passed=<n> failed=<n> regression=<n>` |
+| `work/MODULES.log` | pre-flight and `scripts/modules.sh ran` | `<ISO> due candidate=<c> modules=<ids> focus=<n>` / `<ISO> ran module=<id> candidate=<c> <counts>` ([modules.md](modules.md)) |
 | `work/AUDIT.log` | you | `<ISO> ok=<n> warn=<n> red=<n> sent=chat` |
 
 A failure line starts `<ISO> ERROR: ` — one grep finds them. The pre-flight keys
-"already regression-tested", "already security-tested" and "already explored" on `ran candidate=`; never write
+"already regression-tested", "already security-tested", "already explored" and a module's "already ran" on `ran candidate=` / `ran module=`; never write
 that prefix for a run that did not finish.
 
 ## Structured events — `work/logs/events-YYYY-MM-DD.jsonl`
 
 Written through `scripts/log.sh` (`logev <level> <event> <msg>`), one JSON line
 `{ts, run, job, level, event, msg}`, secrets masked before writing. Set `LOG_JOB` to the
-run type (`issues`, `regression`, `security`, `scenario`, `discovery`, `audit`, `slack_test`, `session`).
+run type (`issues`, `regression`, `security`, `modules`, `scenario`, `discovery`, `audit`, `slack_test`, `session`).
 
 | Event | Writer | `msg` grammar (parsed) |
 | --- | --- | --- |
@@ -42,6 +43,9 @@ run type (`issues`, `regression`, `security`, `scenario`, `discovery`, `audit`, 
 | `scenario_injection_suspect` / `scenario_saved` / `scenario_declined` | you | `id=S-<k> sentences=<k>` / `id=S-<k> by=<user id>` / `intent=<intent>` |
 | `discovery_done` | you | `candidate=<c> proposed=<n> rejected=<n>` |
 | `security_run` | you | `candidate=<c> critical=<n> high=<n> medium=<n> low=<n> skipped=<n>` |
+| `modules_run` | you | `candidate=<c> modules=<ids> focus=<n> minutes=<m>` |
+| `module_set` | `scripts/modules.sh` | `module=<id> key=<k> old=<v> new=<v>` |
+| `artifact_viewer_declined` | you | `artifact=<id>` — a shared dashboard's viewer pressed a button ([modules.md](modules.md) → Control) |
 | `env_up` / `env_reset` / `env_failed` / `env_lock_takeover` | `scripts/env.sh` | free text; `env_up` ends `took_s=<seconds>` |
 | `slack_test` | you, when a Slack test starts | `issue=<n> user=<sender id>` — counted against `slack_tests_per_day` ([slack.md](slack.md)) |
 | `suite_run` / `suite_failed` | `scripts/suite.sh` | `<label> exit=<rc>` / free text |

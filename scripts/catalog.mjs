@@ -12,13 +12,16 @@
 //
 // Test-related content only — the page may be shared: never a scenario's request text, its
 // requester or thread, a verdict's notes, a triage explanation, LESSONS.md, the operator
-// conversation, or anything of work/security/ or work/env/. `hash` covers the data without its
+// conversation, a security finding, or anything of work/env/. `hash` covers the data without its
 // generation time; `changed` = it differs from work/catalog/published.hash, which the agent
 // writes after a publish. Stills and page shots are cached as small JPEGs in
 // work/catalog/thumbs/ (rendered by the suite's own playwright-core; none without it).
 // `runs` lists every night, issue run and scenario run with its build, verdicts and report
 // reference — the page is the way into all of them; `pages[].hotspots` are the controls of the
-// newest UI map with the items that name them (the product map).
+// newest UI map with the items that name them (the product map). `modules`, `design` and
+// `findings` make it the control center (docs/modules.md): the modules' state, the design
+// findings with their crops, the newest validation and stress results — of the security run its
+// counts and report reference only.
 
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -42,6 +45,7 @@ const MAP_W = 720; // a page shot of the product map: wide enough to click a con
 const HISTORY_MAX = 30; // newest history entries per item: the page stays a few MB at a year of nights
 const RUNS_MAX = 400; // newest runs of the Runs view
 const HOTSPOTS_MAX = 120; // controls per page of the product map
+const DESIGN_CROPS_MAX = 80; // design findings' crops embedded, open and major first
 
 const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
@@ -353,6 +357,49 @@ if (newestMap) {
   } catch { notes.push(`coverage unavailable (coverage.mjs failed on ${maps.at(-1)})`); }
 }
 
+// ------------------------------------------------------------- control center
+// The testing modules (docs/modules.md): their state from modules.sh status, the design findings
+// register (docs/ui-sweep.md), the newest validation and stress results, and of the security run
+// only its counts and its private report's reference — never a finding (docs/security.md).
+let modules = null;
+try {
+  modules = JSON.parse(execFileSync('bash', [join(HERE, 'modules.sh'), 'status'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
+  delete modules.generated_utc; // the hash covers state, not the time it was read
+} catch { notes.push('module state unavailable (modules.sh status failed)'); }
+const newestOf = (dir, file) => ls(join(work, dir)).map((b) => join(work, dir, b, file)).filter(existsSync)
+  .sort((a, b) => mtime(a) - mtime(b)).at(-1) ?? null;
+const DESIGN_KEYS = ['id', 'source', 'check', 'severity', 'suspect', 'pattern', 'viewport', 'target', 'saw', 'first_seen', 'last_seen', 'status', 'resolved_build'];
+const design = (readJson(join(work, 'design', 'findings.json'))?.findings ?? []).filter((f) => f && /^D-\d+$/.test(String(f.id)))
+  .map((f) => ({ ...Object.fromEntries(DESIGN_KEYS.map((k) => [k, f[k] ?? null])), crop: null, _crop: join(work, 'design', 'crops', `${f.id}.jpg`) }));
+const valFile = newestOf('validation', 'results.json');
+const val = valFile ? readJson(valFile) : null;
+const stressFile = newestOf('stress', 'stress.json');
+const stress = stressFile ? readJson(stressFile) : null;
+const secFile = newestOf('security', 'verdicts.json');
+const sec = secFile ? readJson(secFile) : null;
+// The feature focus runs (docs/modules.md → Feature focus): the newest five, each check's verdict —
+// never its note.
+const focus = ls(join(work, 'focus')).map((d) => ({ d, f: join(work, 'focus', d, 'results.json') })).filter((x) => existsSync(x.f))
+  .sort((a, b) => mtime(b.f) - mtime(a.f)).slice(0, 5).map(({ d, f }) => {
+    const r = readJson(f) ?? {};
+    return { run: d, area: r.area ?? null, build: r.build ?? r.candidate ?? null, utc: r.generated_utc ?? null,
+      checks: (Array.isArray(r) ? r : r.checks ?? r.explorations ?? []).filter((c) => c && c.id).map((c) => ({ id: c.id, heuristic: c.heuristic ?? null,
+        given: c.given ?? null, when: c.when ?? null, expected: c.expected ?? null, verdict: c.verdict ?? null, severity: c.severity ?? null })) };
+  });
+const sweepFile = newestOf('design', 'sweep.json');
+const findings = {
+  focus,
+  design_build: sweepFile ? readJson(sweepFile)?.build ?? null : null,
+  validation: val ? { build: val.build ?? null, run: val.run ?? null, utc: val.generated_utc ?? null,
+    cases: (val.cases ?? []).map((c) => ({ id: c.id, page: c.page, form: c.form, field: c.field ?? null, kind: c.kind, oracle: c.oracle,
+      result: c.result, severity: c.severity ?? null, message: c.message ?? null })) } : null,
+  stress: stress ? { build: stress.build ?? null, utc: stress.generated_utc ?? null, config: stress.config ?? null, counts: stress.counts ?? null,
+    checks: (stress.checks ?? []).map((c) => ({ id: c.id, target: c.target, status: c.status, severity: c.severity, evidence: c.evidence ?? null, reason: c.reason ?? null })) } : null,
+  security: sec ? { candidate: sec.candidate ?? null, utc: sec.generated_utc ?? null, counts: sec.counts ?? null, report: artRef(dirname(secFile)) } : null,
+};
+const areas = [...new Set([...items.map((i) => i.area).filter(Boolean), ...pages.map((p) => p.nav).filter(Boolean)].map(String))]
+  .filter((a) => /^[A-Za-z0-9][A-Za-z0-9 _./-]{0,39}$/.test(a)).sort();
+
 // ---------------------------------------------------------------------- stills
 // The AC still: the `app.screenshot('<id>: …')` of the item's newest candidate run.
 function stillSource(item) {
@@ -428,11 +475,11 @@ const wanted = new Set([...items, ...pages].map((x) => x._thumb));
 for (const f of ls(thumbsDir).filter((x) => x.endsWith('.jpg'))) if (!wanted.has(join(thumbsDir, f))) { try { rmSync(join(thumbsDir, f)); } catch { /* next run */ } }
 
 // Embed within the budget — what the data leaves of PAGE_MAX, at most IMG_BUDGET: regression
-// items' stills first, then the product map's page shots (pages tests reach first), then the
+// items' stills first, then the design crops, then the product map's page shots (pages tests reach first), then the
 // other stills by tier, newest verdict first. A page without its shot still shows its controls.
 const images = {};
 let used = 0; let dropped = 0; let seq = 0;
-const base = Buffer.byteLength(JSON.stringify({ items, pages, nights, runs }, (k, v) => (k.startsWith('_') ? undefined : v)))
+const base = Buffer.byteLength(JSON.stringify({ items, pages, nights, runs, modules, design, findings }, (k, v) => (k.startsWith('_') ? undefined : v)))
   + Buffer.byteLength(read(join(HERE, 'catalog', 'viewer.html')) ?? '');
 const budget = Math.max(0, Math.min(IMG_BUDGET, PAGE_MAX - base));
 if (budget < IMG_BUDGET) notes.push(`image budget cut to ${Math.round(budget / 1024)} KiB by the size of the data`);
@@ -446,10 +493,13 @@ const RANK = { regression: 0, promotable: 1, exploratory: 2 };
 const byRank = items.slice().sort((a, b) => (RANK[a.tier] ?? 3) - (RANK[b.tier] ?? 3)
   || String(b.verdict?.utc ?? '').localeCompare(String(a.verdict?.utc ?? '')));
 for (const item of byRank.filter((i) => i.tier === 'regression')) item.still = embed(item._thumb);
+const DSEV = { major: 0, minor: 1 };
+for (const f of design.slice().sort((a, b) => (a.status === 'open' ? 0 : 1) - (b.status === 'open' ? 0 : 1) || (DSEV[a.severity] ?? 2) - (DSEV[b.severity] ?? 2)
+  || String(b.last_seen ?? '').localeCompare(String(a.last_seen ?? ''))).slice(0, DESIGN_CROPS_MAX)) f.crop = embed(f._crop);
 const COV = { regression: 0, exploratory: 1 };
 for (const p of pages.slice().sort((a, b) => (COV[a.covered] ?? 2) - (COV[b.covered] ?? 2))) p.shot = embed(p._thumb);
 for (const item of byRank.filter((i) => i.tier !== 'regression')) item.still = embed(item._thumb);
-for (const x of [...items, ...pages]) { delete x._thumb; delete x._shot; delete x._body; }
+for (const x of [...items, ...pages, ...design]) { delete x._thumb; delete x._shot; delete x._body; delete x._crop; }
 
 // ------------------------------------------------------------------------ output
 const builds = [...new Map([...items.flatMap((i) => i.history), ...nights].filter((h) => h.build)
@@ -466,7 +516,8 @@ const data = {
   agent: { display_name: cfg('display_name') || 'Quality Inspector', version: (read(join(HERE, '..', 'VERSION')) ?? '').trim() || null },
   product, target: target || null,
   issue_url: target ? `https://${host}/${target.split('/').slice(-2).join('/')}/issues/{n}` : null,
-  builds, collections, items, pages, uncovered_nav: uncoveredNav, nights, runs, images,
+  builds, collections, items, pages, uncovered_nav: uncoveredNav, nights, runs,
+  modules, design, findings, areas, interactive: modules?.global?.dashboard_interactive?.value === 'enabled', images,
 };
 const hash = createHash('sha256').update(JSON.stringify(data)).digest('hex').slice(0, 12);
 data.generated_utc = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
