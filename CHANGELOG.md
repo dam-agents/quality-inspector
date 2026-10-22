@@ -7,6 +7,17 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.9.2 — 2026-10-22
+
+**Upgrade:**
+Nothing to run — scripts are re-read per run. A profile's `bin/<cmd>` now counts without its
+exec bit and starts through the interpreter its `#!` line names (`bash` when it has none).
+On a profile installed as plain files, its own `bin/env`, `bin/versions`, `bin/build-time` and
+`bin/sandbox` now run where the engine's commands (or nothing, for `sandbox`) ran before:
+1. `bash "$HOME/scripts/verify-onboarding.sh" --config` and read the `profile_bin:*` lines —
+   each names the command that now runs.
+2. `bash "$HOME/scripts/verify-onboarding.sh" --live` once to see the sandbox accounts checked.
+
 ## 3.9.1 — 2026-10-22
 
 **Upgrade:**

@@ -124,6 +124,11 @@ this contract (`--live` also lists its builds).
 
 ## The `bin/` contract
 
+A profile's `bin/<cmd>` counts as a regular file, never a symlink. It needs no exec bit: a
+profile installed through the platform arrives as plain files. Such a file starts through the
+interpreter its `#!` line names (`#!/usr/bin/env python3` → `/usr/bin/env python3 bin/<cmd>`),
+or through `bash` when it has no `#!` line. An engine's `bin/<cmd>` needs its exec bit.
+
 Every executable runs with cwd `$HOME/work`, and with:
 
 | Variable | Holds |
