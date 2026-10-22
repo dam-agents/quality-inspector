@@ -475,7 +475,7 @@ const wanted = new Set([...items, ...pages].map((x) => x._thumb));
 for (const f of ls(thumbsDir).filter((x) => x.endsWith('.jpg'))) if (!wanted.has(join(thumbsDir, f))) { try { rmSync(join(thumbsDir, f)); } catch { /* next run */ } }
 
 // Embed within the budget — what the data leaves of PAGE_MAX, at most IMG_BUDGET: regression
-// items' stills first, then the product map's page shots (pages tests reach first), then the
+// items' stills first, then the design crops, then the product map's page shots (pages tests reach first), then the
 // other stills by tier, newest verdict first. A page without its shot still shows its controls.
 const images = {};
 let used = 0; let dropped = 0; let seq = 0;
