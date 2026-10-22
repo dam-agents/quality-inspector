@@ -133,7 +133,8 @@ denies on its `raw.` and `codeload.` hosts). `--kit` lists the kit's own rules, 
 created by hand or from a kit before 3.0.0, whose rules a kit never updates. Each row says how it
 lands: `prompt` — no kit rule covers the host, so its first request in a direct session is held
 and the operator approves the prompt (`verify-onboarding.sh --egress` makes those requests);
-`by-hand` — under a kit deny a request is refused at once and no prompt ever appears, and a deny
+`by-hand` — under a kit deny (for a GitHub Enterprise target, also a deny of its shared GitHub
+rules) a request is refused at once and no prompt ever appears, and a deny
 or a set that must land whole is never left to prompts: the operator adds it in the agent's
 network settings; `kit` — already allowed; `refused` — never added: a profile allow outside the
 sandbox shapes on a GitHub host, or a `{profile.<key>}` with no plain value (**Sandbox
@@ -147,17 +148,48 @@ approval on the operator's Home — approve nothing on the deny side; a held pro
 A profile's sandbox accounts ([profile-contract.md](profile-contract.md) → `sandbox`) are
 throwaway accounts the nested product connects to — a GitHub organization of its own, a
 Slack workspace. Their egress is the profile's, landed by the operator, and on a GitHub host
-`egress-rules.sh` passes a profile allow only in a closed set, on the API host alone:
-`/repos/<owner>/<repo>/<rest>` with owner and repository literal `[A-Za-z0-9.-]` (no `*`;
-`_` is a pattern wildcard, so a sandbox name never holds one), the owner never the target's
-or the work backup's, `<rest>` not empty — a repository the nested product writes to with a
-token scoped to it (a fine-grained token; `GET /user`, its identity, the kit already allows).
-A GitHub App's endpoints (`/app/…`, `/installation/…`) are not in it. Anything else on `github.com`, `*.github.com`,
+`egress-rules.sh` passes a profile allow only in a closed set: on the API host
+`/repos/<owner>/<repo>/<rest>` (`/api/v3/repos/…` on a GitHub Enterprise Server, one host
+for both), `<rest>` not empty; on the web host git's four smart-HTTP
+requests to `/<owner>/<repo>[.git]/`, each with its own method (`GET
+info/refs?service=git-upload-pack` and `…=git-receive-pack`, `POST git-upload-pack` and
+`git-receive-pack`); owner and repository literal `[A-Za-z0-9.-]` (no `*`; `_` is a pattern
+wildcard, so a sandbox name never holds one), the owner never the target's or the work
+backup's — a repository the nested product clones and writes to with a token scoped to it
+(a fine-grained token; `GET /user`, its identity, the kit already allows). Besides those, the
+OAuth sign-in below. A GitHub App's endpoints (`/app/…`, `/installation/…`) are not in it.
+Anything else on `github.com`, `*.github.com`,
 `*.githubusercontent.com` or the target's host is `refused` — a profile defect,
 `verify-onboarding.sh` fails on it. Each such allow is longer than the kit's denies, so it
 opens that sandbox repository and nothing beside it; the black-box probes, which request the
-target's surfaces, prove the rest unchanged. A shape a new product needs (an OAuth sign-in
-on `github.com`) joins this set in the kit, never in a profile.
+target's surfaces, prove the rest unchanged. A shape a new product needs joins this set in
+the kit, never in a profile.
+
+**The OAuth sign-in** is such a shape: a sandbox user (a GitHub account of its own, with a
+password and a TOTP secret) connects GitHub to the nested product through the real sign-in on
+the web host (`github.com`, or the target's GitHub Enterprise host). These requests pass, each
+with exactly this method and path — no other method, no wildcard but the query of the two
+`GET`s that take one:
+
+| method | path | step |
+| --- | --- | --- |
+| `GET` | `/login`, `/login?*` | the login form (its `return_to` in the query) |
+| `POST` | `/session` | the password |
+| `GET` | `/sessions/two-factor/app` | the TOTP page |
+| `POST` | `/sessions/two-factor` | the TOTP code |
+| `GET` | `/login/oauth/authorize?*` | the authorize page |
+| `POST` | `/login/oauth/authorize` | the consent |
+| `POST` | `/login/oauth/access_token` | the product's server-side code exchange |
+
+None names an owner or a repository, and a query never changes the page GitHub serves; the
+redirect after the sign-in to anything else (a repository page in `return_to`) meets the
+host's deny. `_` in `access_token` is a pattern wildcard for any one character and opens
+`/login/oauth/access?token`, `/login/oauth/access/token` and the like too, pages that do not
+exist — the stated limit. The probes request the target's web
+pages (`blob`, `raw`, and a `blob` behind an encoded dot segment out of the authorize page),
+which a browser signed in this way would render. The identity lookup after the exchange
+(`GET /user` on the API host) the kit already allows. A device-verification e-mail, a passkey
+or a GitHub App's installation pages are not in the set: the sandbox user signs in with a TOTP.
 
 The agent itself still requests nothing there: the policy hook's `github` rule holds, the
 nested product and the profile's own helpers make those requests, and a test reaches a

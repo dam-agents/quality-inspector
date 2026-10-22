@@ -9,7 +9,15 @@ ROOT="$(cd "$SCRIPTS/.." && pwd)"
 cat > "$QI_PROFILE_DIR/profile.json" <<'J'
 {"schema":"qi-profile/v1","product":"Stub","app":{"url":"http://localhost:8080"},
  "egress":[{"host":"get.helm.sh","method":"GET","why":"helm"},
-           {"host":"*.quay.io","method":"GET","why":"image layers"}]}
+           {"host":"*.quay.io","method":"GET","why":"image layers"},
+           {"host":"github.com","method":"GET","path":"/login","why":"oauth"},
+           {"host":"github.com","method":"GET","path":"/login?*","why":"oauth"},
+           {"host":"github.com","method":"POST","path":"/session","why":"oauth"},
+           {"host":"github.com","method":"GET","path":"/sessions/two-factor/app","why":"oauth"},
+           {"host":"github.com","method":"POST","path":"/sessions/two-factor","why":"oauth"},
+           {"host":"github.com","method":"GET","path":"/login/oauth/authorize?*","why":"oauth"},
+           {"host":"github.com","method":"POST","path":"/login/oauth/authorize","why":"oauth"},
+           {"host":"github.com","method":"POST","path":"/login/oauth/access_token","why":"oauth"}]}
 J
 printf -- '- work_repo: acme/widgets-qa\n' >> "$WORK_DIR/CONFIG.md"
 export QI_DEFINITION_REPO=github.com/dam-agents/quality-inspector
@@ -162,6 +170,29 @@ allow POST https://github.com/acme/widgets-qa.git/git-receive-pack
 deny GET https://api.github.com/repos/acme/widgets-qa/contents/QA.md
 deny GET https://github.com/acme/widgets-qa/blob/main/QA.md
 deny GET https://github.com/acme/widgets-qa2.git/info/refs?service=git-upload-pack
+allow GET https://github.com/login?client_id=Ov23li&return_to=%2Flogin%2Foauth%2Fauthorize%3Fclient_id%3DOv23li
+allow POST https://github.com/session
+allow GET https://github.com/sessions/two-factor/app
+allow POST https://github.com/sessions/two-factor
+allow GET https://github.com/login/oauth/authorize?client_id=Ov23li&redirect_uri=http%3A%2F%2Flocalhost%3A4444%2Fapi%2Foauth%2Fcallback&state=x
+allow POST https://github.com/login/oauth/authorize
+allow POST https://github.com/login/oauth/access_token
+deny GET https://github.com/acme/widgets
+deny GET https://github.com/acme/widgets/raw/HEAD/README.md
+deny GET https://github.com/acme/widgets/tree/HEAD/src
+deny GET https://github.com/login/oauth/authorize/../../../acme/widgets/blob/HEAD/README.md
+deny GET https://github.com/login/oauth/authorize/%2e%2e/%2e%2e/%2e%2e/acme/widgets/blob/HEAD/README.md
+deny GET https://github.com/login/oauth/authorize%2F..%2F..%2F..%2Facme%2Fwidgets?x
+deny GET https://github.com/loginx?/acme/widgets
+deny GET https://github.com/session/acme/widgets
+deny GET https://github.com/sessions/two-factor/app/../../acme/widgets
+deny POST https://github.com/login/oauth/authorize/acme/widgets
+deny GET https://github.com/login/oauth/authorize
+deny GET https://github.com/sessions/two-factor
+deny POST https://github.com/sessions/two-factor/recovery
+deny GET https://github.com/settings/tokens
+deny GET https://github.com/acme/widgets?/login
+deny GET https://github.com/acme/widgets/blob/HEAD/README.md?/login/oauth/authorize?x
 R
 ))"
 assert_eq "every request meets its expected verdict" "" "$verdicts"
@@ -297,7 +328,10 @@ grep -qF 'repository(owner:"acme",name:"widgets"){object(expression:"HEAD:")' "$
   || { echo "  assertion failed: the GraphQL probe asks for the target's tree"; FAILED=1; }
 for want in 'ok boundary:git:https://github.com/acme/widgets.git refused' 'ok boundary:git:https://github.com/acme/widgets.wiki.git refused' \
             'ok boundary:ssh:ssh://git@github.com/acme/widgets.git refused' 'ok boundary:ssh:ssh://git@ssh.github.com:443/acme/widgets.git refused' \
-            'ok boundary:repos/acme/widgets/zipball/HEAD refused' 'ok boundary:repos/acme/widgets/git/trees/HEAD refused'; do
+            'ok boundary:repos/acme/widgets/zipball/HEAD refused' 'ok boundary:repos/acme/widgets/git/trees/HEAD refused' \
+            'ok boundary:https://github.com/acme/widgets/blob/HEAD/README.md refused' \
+            'ok boundary:https://github.com/acme/widgets/raw/HEAD/README.md refused' \
+            'ok boundary:https://github.com/login/oauth/authorize/%2e%2e/%2e%2e/%2e%2e/acme/widgets/blob/HEAD/README.md refused'; do
   printf '%s\n' "$out" | grep -qxF "$want" || { echo "  assertion failed: probed: $want"; FAILED=1; }
 done
 
