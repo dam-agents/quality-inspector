@@ -28,7 +28,7 @@ Only the operator, in the direct session, changes a module (CLAUDE.md → trust 
 | `module <id> on` / `off` (a schedule kind) | the platform's schedule tools: enable or disable its schedule; then `modules.sh schedules` with the new `list_schedules` answer |
 | `module <id> run now` | a `modules` kind: the modules run below for that module only, ignoring "already ran". A schedule kind: `regression` — "run the regression now", `security` — "run the security checks", `discovery` — "propose scenarios" ([on-demand.md](on-demand.md)); `benchmark` — [benchmark.md](benchmark.md) → the run; `audit` — [audit.md](audit.md), now |
 | `focus <area>` | `modules.sh focus <area>` — the next modules run takes it |
-| `dismiss D-<k>` / `dismiss D-<k> as <reason>` | `modules.sh dismiss D-<k> [<reason>]` — a row in `work/design/DISMISSED.md`; `<reason>` one of `false-positive`, `wont-fix`, `duplicate`, `by-design` ([ui-sweep.md](ui-sweep.md) → **Triage**) |
+| `dismiss D-<k>` / `dismiss D-<k> as <reason>` | `modules.sh dismiss D-<k> [<reason>]` — a row in `work/design/DISMISSED.md`; `<reason>` one of `false-positive`, `wont-fix`, `duplicate`, `by-design` ([ui-sweep.md](ui-sweep.md) → **4. Triage**) |
 | `reopen D-<k>` | `modules.sh reopen D-<k>` — its row off `DISMISSED.md`; the next merge decides open or resolved |
 | `categorize D-<k> <category>` | `modules.sh categorize D-<k> <category>` — a row in `work/design/CATEGORIES.md` (lower-case letters, digits, `-`, up to 30; `-` clears it) |
 
