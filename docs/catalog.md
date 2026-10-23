@@ -52,7 +52,7 @@ The operator may share the page beyond themselves, so it carries only what conce
 - A test is described by its criterion and its own steps, plus the file's doc comment
   ([test-authoring.md](test-authoring.md) → File and test shape): `@qi-summary` and `@qi-area`
   (without one, the first path segment the test opens).
-- **Facets**, automatic: tier, origin, kind, verdict, run type, surface, area, page, session,
+- **Facets**, automatic: tier, origin, the issue or scenario, kind, verdict, run type, surface, area, page, session,
   issue labels and state, flags (flaky, healed, drift, quarantined, `agent.assert`, still).
 - **Collections**, the operator's, in `work/CATALOG.md` — changed only on their word in the
   direct session ("add #42 and S-7 to the collection Upload"):
@@ -71,8 +71,23 @@ security counts, edge-case observations), Design (the design findings: crops, fi
 Markdown" for the design team), Runs, Product map (the page shots with every control clickable, coloured by
 its tests' worst verdict, dashed where no test names it; a drawn outline where a shot did not fit; a
 navigation item, tab, link or list row that leads to a mapped page opens that page, like a
-click-through wireframe, with a "back"), Catalog, Gallery, Coverage,
-History (item × build) and Lifecycle, plus a detail panel per item and per run. **As of a
+click-through wireframe, with a "back" to the page before), Catalog, Gallery, Coverage,
+History (item × build) and Lifecycle, plus a detail panel per item, per run and per origin (an
+issue's or a scenario's criteria and explorations, every run that judged them, its report).
+
+**Links and navigation.** Every reference is a link to its place: an issue or a scenario
+(`#42`, `S-7`) to its origin panel, a build to the runs on it (Runs filtered by build, with "as of
+this build"), a page a test opens to that page on the Product map, an area, a session, a surface,
+a label or a collection to the catalog filtered by it, a history cell or entry to its run, a
+design finding's page to the map, and from a map page to its design findings. Every report — the
+artifact with the video, the screenshots and the steps — is reachable wherever its run or its
+origin appears: the catalog's Report column, cards, Overview, the map's test lists, the runs in an
+item's and an origin's panel, the Runs view and the run panel. Every move to another place (a view,
+a panel, a map page, a build, "as of") is a history step: the browser's back and forward walk them,
+and the page's own **← Back** (under the title and in every panel) returns to the place before,
+named — in memory where the frame may not touch the browser history. A panel has previous and
+next (the item in the list it was opened from, the run before or after, the neighbouring origin)
+and breadcrumbs up to its origin; Close returns to the place under it. **As of a
 build** shows every view with the verdicts as they stood when that build last ran (files, tiers
 and steps stay today's); older catalogs are the artifact's earlier revisions. An action appears
 as a command for the direct session (`promote #42`, `module stress set stress_checks=weekly`) —

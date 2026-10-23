@@ -7,6 +7,12 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.16.0 — 2026-10-23
+
+**Upgrade:**
+Nothing — the next catalog build ([docs/catalog.md](docs/catalog.md) → Build and publish) ships the
+linked viewer with back navigation. An address of the old page still opens (its keys are unchanged).
+
 ## 3.15.1 — 2026-10-23
 
 **Upgrade:**
