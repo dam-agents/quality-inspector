@@ -72,7 +72,7 @@ Classify each message; several intents → handle each, then send **one** reply:
 | `correct` | "no, it should …" about a scenario | Append it to that `request.md`; the pipeline without step 2's `new` |
 | `accept` | "try S-14 and S-16" under a digest | Each named `proposed` row takes this message's sender and thread; step 1, then the pipeline from step 5 |
 | `save` | "save S-7", "keep testing this" | **Saving** |
-| `status` | "how did S-7 end?", "what is queued?" | Answer from `SCENARIOS.md` and the artifact links |
+| `status` | "how did S-7 end?", "what is queued?" | Answer from `SCENARIOS.md`, each with the link of [slack.md](slack.md) → **The answer in the thread** |
 | `issue` | "test #42", "status #42" in `slack_channel` | [slack.md](slack.md); elsewhere it is `other` |
 | `other` | configuration, "promote #42", a reset, a definition change, chatter | One line on what this agent does here and that the rest is the operator's; log `scenario_declined` |
 
@@ -143,12 +143,14 @@ in their own words ([catalog.md](catalog.md)); its button sends
     `judge` object to the verdicts file and render again.
 11. **Register** `tests/scenario-<k>.e2e.ts` in `work/SUITE.md` as `exploratory`, with
     `S-<k>` in the `issue` column; only **Saving** moves it on.
-12. **Deliver.** (Source `dashboard`: no reply here or at any other step — **A request from
-    the dashboard**.) The artifact as [reporting.md](reporting.md) → Delivery step 1 (disabled →
-    the link reads "evidence kept by the agent"), then `report_pending`, then **The
-    reply**, then `reported` as the next write; every send is ledgered. Log
-    `scenario_done id=S-<k> verdict=<v>`. `env.sh unlock S-<k>`. Then the catalog
-    ([catalog.md](catalog.md) → **Build and publish**).
+12. **Deliver.** The artifact as [reporting.md](reporting.md) → Delivery step 1 (with a
+    `thread`, its visibility per [slack.md](slack.md) → **The answer in the thread**), then
+    `report_pending`; log `scenario_done id=S-<k> verdict=<v>`; `env.sh unlock S-<k>`; the
+    catalog ([catalog.md](catalog.md) → **Build and publish**) — before the reply, so the run
+    is on the dashboard when the requester looks; then **The reply**, then `reported` as the
+    next write; every send is ledgered. Source `dashboard`: no reply here or at any other step
+    (**A request from the dashboard**) — `reported` right after `report_pending`, then the
+    unlock and the catalog.
 
 **Budgets** hold per scenario as per issue: `suite.sh budget <claim time>` at every step
 from 6 on ([nested-env.md](nested-env.md) → **Budgets**); exceeded → the remaining ACs
@@ -158,14 +160,18 @@ step 9. Any other failure in steps 7–11 → finish with the evidence you have,
 
 ## The reply
 
-From the report's `comment.md` (its `EVIDENCE_LINK` replaced), plus one line:
+From the report's `comment.md`, its `EVIDENCE_LINK` replaced by the link of
+[slack.md](slack.md) → **The answer in the thread** (no link → that section's sentence), plus one line:
 `failed` / `regression` lead with the judge's call; `passed` with the judge's agreement
-ends with "reply `save S-<k>` to keep it for the nightly regression". Use the requester's
-mention (`<@U…>`), never a bare id; no credentials or internal state.
+ends with "reply `save S-<k>` to keep it for the nightly regression". The picture of that
+section is the reply's `attachment` (`evidence.png` already in the report directory — a
+retried delivery — is reused). Use the requester's mention (`<@U…>`), never a bare id; no
+credentials or internal state.
 
 - In the requester's turn → `reply`.
 - From any other run → `reply` naming `thread`; refused → `send_channel_message` to that
-  conversation, opening with the mention and `S-<k>`; `thread: -` → the chat UI.
+  conversation, opening with the mention and `S-<k>`, the same attachment; `thread: -` → the
+  chat UI.
 - Each send is one ledger pair, surface `slack` ([logging.md](logging.md) → **Ledger of
   external writes**). A failed delivery stays `report_pending`; the next issues run retries
   the delivery only.
@@ -296,8 +302,9 @@ worklist carries `discovery`, `candidate`, `baseline`, `previous_candidate` and 
    Reply here with a mention: "try S-16", "save S-14", or "S-15: it should …".
    ```
 
-   A reply in its thread reaches the conversation's default agent with the digest as thread
-   history; `S-<k>` resolves it. Log `discovery_done candidate=<c> proposed=<n> rejected=<n>`.
+   `<evidence>` is the link of [slack.md](slack.md) → **The answer in the thread**, left out
+   where there is none. A reply in its thread reaches the conversation's default agent with
+   the digest as thread history; `S-<k>` resolves it. Log `discovery_done candidate=<c> proposed=<n> rejected=<n>`.
 7. Append `<ISO> ran candidate=<c> proposed=<n> rejected=<n> passed=<n> failed=<n> regression=<n>`
    to `work/DISCOVERY.log` — the pre-flight keys "already explored" on `ran candidate=` —
    then `env.sh unlock discovery`.

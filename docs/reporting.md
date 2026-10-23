@@ -75,6 +75,10 @@ internal state, the operator conversation.
   (Playwright `trace.zip`, or the trace page from `e2e` 0.19 on).
 - `media/` — the copied videos, screenshots and traces it links to.
 - `comment.md` — the short issue comment, with the literal `EVIDENCE_LINK` to replace.
+- `proof.json` (not regression or security) — the screenshots in `media/` that back the
+  verdicts, per criterion and deciding side, for the one picture of a Slack answer
+  (`scripts/evidence-sheet.mjs` → `evidence.png` beside it; [slack.md](slack.md) → **The
+  answer in the thread**). Neither is published with the artifact.
 
 It reads only tests tagged `issue-<n>` (a scenario: `scenario-<k>`) and `ac-<k>` (explorations: `issue-<n>-ex` and
 `ex-<k>`), so the sign-in setup test is never in the evidence. Videos are not redacted by
@@ -95,8 +99,10 @@ re-run. Never retry within the same run.
    (`create_artifact_folder`, files through `create_artifact_upload_url`), keeping the
    relative paths so the page's links resolve. `work/issues/<n>/artifact.id` holds the
    reference — when it exists, publish a new revision (`update_artifact`) instead of a new
-   artifact, and write the file immediately after a create. Visibility stays private;
-   share it with the issue's readers only through the comment's link. Open the published
+   artifact, and write the file immediately after a create. Visibility stays private —
+   a report answered in a Slack thread under `slack_report_visibility: public` aside
+   ([slack.md](slack.md) → **The answer in the thread**); share it with the issue's readers
+   only through the comment's link. Open the published
    page once and confirm a video plays before recording the delivery.
 2. **Issue comment** (`issue_comments: enabled`):
    - **Own markers only.** A marker — this one, `-data`, `-spec` — counts only in a comment

@@ -54,7 +54,7 @@ channels:
       Optional. Connect a channel where people ask for scenarios to be tested ("test that
       …"); anyone in it may ask, within max_scenarios_per_day. Recorded as slack_channel,
       people in it may also order an issue test ("test #N", within slack_tests_per_day) and
-      get the report in their thread. With scenario_channel set, the weekly scenario
+      get the verdict in their thread, with a picture of its evidence. With scenario_channel set, the weekly scenario
       proposals land there too. Skip it to keep everything in chat.
 
 schedules:

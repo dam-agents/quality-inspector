@@ -345,7 +345,32 @@ const comment = scenario ? [
   'Evidence (videos, screenshots, step traces): EVIDENCE_LINK',
 ].join('\n');
 writeFileSync(join(outDir, 'comment.md'), `${comment}\n`);
-console.log(JSON.stringify({ out: outDir, acs: acs.length, videos: acs.flatMap((a) => [a.cand?.video, a.base?.video]).filter(Boolean).length, screenshots: acs.flatMap((a) => [...(a.cand?.shots ?? []), ...(a.base?.shots ?? [])]).length,
+// proof.json: the screenshots that back the verdicts, for a channel answer's one picture
+// (scripts/evidence-sheet.mjs, docs/slack.md → The answer in the thread). Per criterion whose
+// verdict a screen can show: its AC still — else the screen at failure — on each side that
+// decides the verdict; a row needs the candidate's. Failures first, at most PROOF_MAX rows.
+const PROOF = scenario
+  ? { regression: ['baseline', 'candidate'], failed: ['candidate'], 'needs-review': ['candidate'], passed: ['candidate'] }
+  : { failed: ['candidate'], verified: ['baseline', 'candidate'], inconclusive: ['candidate'] };
+const PROOF_MAX = 4;
+const proofShot = (ac, ev) => (ev?.shots ?? []).find((s) => String(s.caption).startsWith(`${ac.id}:`))
+  ?? (ev?.shots ?? []).find((s) => s.caption === 'screen at failure') ?? null;
+const proofRows = regression ? [] : acs.filter((ac) => PROOF[ac.verdict]).map((ac) => ({
+  id: ac.id, name: ac.name, verdict: ac.verdict,
+  shots: PROOF[ac.verdict].map((side) => {
+    const ev = side === 'candidate' ? ac.cand : ac.base;
+    const s = proofShot(ac, ev);
+    return s && { side, build: (side === 'candidate' ? v.candidate : v.baseline) ?? null, state: ev.state, caption: s.caption, src: s.src };
+  }).filter(Boolean),
+})).filter((r) => r.shots.some((s) => s.side === 'candidate'))
+  .sort((a, b) => Number(!['failed', 'regression'].includes(a.verdict)) - Number(!['failed', 'regression'].includes(b.verdict)));
+if (!regression) {
+  writeFileSync(join(outDir, 'proof.json'), `${JSON.stringify({
+    mode: scenario ? 'scenario' : 'issue', subject: scenario ? String(v.scenario) : `#${v.issue}`, title: v.title ?? '', verdict: v.verdict ?? null,
+    candidate: v.candidate ?? null, baseline: v.baseline ?? null, rows: proofRows.slice(0, PROOF_MAX), left_out: Math.max(0, proofRows.length - PROOF_MAX),
+  }, null, 2)}\n`);
+}
+console.log(JSON.stringify({ out: outDir, acs: acs.length, ...(regression ? {} : { proof: Math.min(proofRows.length, PROOF_MAX) }), videos: acs.flatMap((a) => [a.cand?.video, a.base?.video]).filter(Boolean).length, screenshots: acs.flatMap((a) => [...(a.cand?.shots ?? []), ...(a.base?.shots ?? [])]).length,
   ...(exps.length ? { explorations: exps.length, observations, exploration_videos: exps.filter((e) => e.cand?.video).length } : {}),
   ...(noticed.length ? { noticed: noticed.length } : {}) }));
 
