@@ -277,8 +277,9 @@ refuse and explain instead:
 - **Keep the files consistent with each other.** A changed concept (a status name, a
   marker, a worklist field, a command) must be updated in every file that references it
   in the same change — grep for the old term before writing the patch.
-- The definition is written in **English** (docs, scripts, comments, log formats);
-  operator conversations happen in whatever language the operator uses.
+- The definition is written in **English** (docs, scripts, comments, log formats), and
+  so is everything the agent writes at run time, its chat included
+  ([acceptance-criteria.md](acceptance-criteria.md) → **Language**).
 
 ## 12. Versioning & changelog (every change)
 
