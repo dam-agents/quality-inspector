@@ -42,7 +42,7 @@ when `audit_report: disabled` (still append the log line).
      `bash "$HOME/scripts/verify-onboarding.sh" --schedules /tmp/quality-inspector-schedules.json`
      (offline structure pass) and `bash "$HOME/scripts/modules.sh" schedules` with it (the
      dashboard's switches); delete the file afterwards.
-   - `QI_PRECHECK_PROBE=1 precheck.sh issues` and `… regression`, timed: exit 0 or 1 within
+   - `precheck.sh issues` and `… regression`, timed: exit 0 or 1 within
      two minutes.
    - Each `failures[]` signature: cause + fix, classified *environment* / *agent
      mistake* / *definition bug*. A reproduced environment cause → `work/LESSONS.md`. A

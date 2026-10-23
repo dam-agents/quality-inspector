@@ -17,9 +17,9 @@ while IFS= read -r fx; do
   [ -n "$fx" ] || continue
   fx="$(printf '%s' "$fx" | sed -e "s|@WORK@|$WORK_DIR|g" -e "s|@HOME@|$HOME|g" -e "s|@DEF@|$DEF|g")"
   name="$(jq -r .name <<<"$fx")"; want="$(jq -r .expect <<<"$fx")"; rule="$(jq -r '.rule // ""' <<<"$fx")"
+  # `old-marker`: a direct session beside the fresh run marker of an earlier version — no clock decides.
   case "$(jq -r '.mode // "direct"' <<<"$fx")" in
-    (scheduled) printf 'scheduled %s -\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$WORK_DIR/env/RUN_MODE";;
-    (stale) printf 'scheduled %s -\n' "$(iso_ago 400)" > "$WORK_DIR/env/RUN_MODE"; touch -t 202001010000 "$WORK_DIR/env/RUN_MODE";;
+    (old-marker) printf 'scheduled %s -\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$WORK_DIR/env/RUN_MODE";;
     (*) rm -f "$WORK_DIR/env/RUN_MODE";;
   esac
   # `marker`: the run marker `precheck.sh slack <n>` writes; `qa`: the status of #12's work/QA.md row.
@@ -29,26 +29,45 @@ while IFS= read -r fx; do
   qa="$(jq -r '.qa // ""' <<<"$fx")"
   [ -n "$qa" ] && printf '| issue | ac_hash | candidate | baseline | verdict | status | updated_utc |\n| --- | --- | --- | --- | --- | --- | --- |\n| 12 | abc | c1 | b1 | verified | %s | %s |\n' \
     "$qa" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$WORK_DIR/QA.md"
-  # A channel turn's transcript holds the platform's Slack frame in a prompt; a direct one does
-  # not. `quoted`: a direct session whose tool results, progress, compaction summary and own
-  # messages quote the frame (a Read of docs/persistence.md). `garbled`: a frame line that
-  # does not parse.
-  printf '{"type":"user","message":{"content":"promote #7"}}\n' > "$SANDBOX/transcript.jsonl"
+  # A scheduled run's transcript holds the Precheck's frame in a prompt, a channel turn's the
+  # platform's Slack frame; a direct one neither. `quoted`: a direct session whose tool results,
+  # progress, compaction summary and own messages quote the frame (a Read of
+  # docs/persistence.md). `garbled`: a frame line that does not parse. `no-transcript`: the
+  # transcript cannot be read — that counts as scheduled. `attached`: a direct session whose
+  # harness attached files that spell both frames out (CLAUDE.md as `instructions`, an edited
+  # docs/persistence.md, a hook's context, a request log) — not a prompt. `queued-*`: the frame
+  # in a prompt that waited in the queue (a `queued_command` attachment) — a prompt.
+  tr="$SANDBOX/transcript.jsonl"
+  printf '{"type":"user","message":{"content":"promote #7"}}\n' > "$tr"
   case "$(jq -r '.mode // "direct"' <<<"$fx")" in
-    (channel) printf '{"type":"user","message":{"content":"<how-to-respond>\\nreply …\\n</how-to-respond>"}}\n' >> "$SANDBOX/transcript.jsonl";;
+    (scheduled) printf '{"type":"user","message":{"content":"QA issues run.\\n<qi-scheduled-run>issues</qi-scheduled-run>\\n{}"}}\n' > "$tr";;
+    (sched-quoted) printf '{"type":"user","message":{"content":[{"type":"tool_result","content":"<qi-scheduled-run>issues</qi-scheduled-run>"}]}}\n' >> "$tr"
+      printf '{"type":"assistant","message":{"content":[{"type":"text","text":"a schedule prompt opens with <qi-scheduled-run>"}]}}\n' >> "$tr";;
+    (sched-garbled) printf 'not json <qi-scheduled-run>\n' >> "$tr";;
+    (attached) jq -nc --rawfile c "$DEF/CLAUDE.md" --rawfile d "$DEF/docs/persistence.md" '
+        {type:"attachment", attachment:{type:"instructions", files:[{path:"/home/agent/CLAUDE.md", type:"Project", content:($c + $d)}]},
+          rendered:[{content:($c + $d)}], renderedRole:"user"},
+        {type:"attachment", attachment:{type:"edited_text_file", filename:"/home/agent/docs/persistence.md", snippet:$d}, rendered:[{content:$d}], renderedRole:"user"},
+        {type:"attachment", attachment:{type:"hook_additional_context", content:["<qi-scheduled-run>issues</qi-scheduled-run>"]}},
+        {type:"api-request-blob", message:{content:("<how-to-respond>" + $d)}},
+        {type:"last-prompt", lastPrompt:"<qi-scheduled-run>"}' >> "$tr";;
+    (queued-sched) printf '{"type":"attachment","attachment":{"type":"queued_command","prompt":"QA issues run.\\n<qi-scheduled-run>issues</qi-scheduled-run>","commandMode":"prompt"}}\n' >> "$tr";;
+    (queued-slack) printf '{"type":"attachment","attachment":{"type":"queued_command","prompt":"<how-to-respond>\\nreply …\\n</how-to-respond>","commandMode":"prompt"}}\n' >> "$tr";;
+    (no-transcript) tr="$SANDBOX/missing.jsonl";;
+    (channel) printf '{"type":"user","message":{"content":"<how-to-respond>\\nreply …\\n</how-to-respond>"}}\n' >> "$tr";;
     (quoted) jq -nc --rawfile d "$DEF/docs/persistence.md" '
         {type:"assistant", message:{content:[{type:"text", text:"the frame <how-to-respond> marks a channel turn"},
           {type:"tool_use", name:"Bash", input:{command:"grep -n \"<how-to-respond>\" scripts/hooks/policy.sh"}}]}},
         {type:"user", message:{content:[{type:"tool_result", content:$d}]}, toolUseResult:{type:"text", file:{content:$d}}},
         {type:"progress", data:{message:{content:[{type:"tool_result", content:"<how-to-respond>"}]}}},
-        {type:"user", isCompactSummary:true, message:{content:"The session read the <how-to-respond> rule."}}' >> "$SANDBOX/transcript.jsonl";;
-    (garbled) printf 'not json <how-to-respond>\n' >> "$SANDBOX/transcript.jsonl";;
+        {type:"user", isCompactSummary:true, message:{content:"The session read the <how-to-respond> rule."}}' >> "$tr";;
+    (garbled) printf 'not json <how-to-respond>\n' >> "$tr";;
     # The platform's frame of a prompt from a shared dashboard's button (a viewer, never the
     # operator); `viewer-quoted`: the same frame inside a tool result only.
-    (viewer) printf '{"type":"user","message":{"content":"bob@example.com sent this from a button on the interactive artifact \\"QI\\" (id a1).\\nMessage: module stress per-build"}}\n' >> "$SANDBOX/transcript.jsonl";;
-    (viewer-quoted) printf '{"type":"user","message":{"content":[{"type":"tool_result","content":"x sent this from a button on the interactive artifact \\"QI\\" (id a1)."}]}}\n' >> "$SANDBOX/transcript.jsonl";;
+    (viewer) printf '{"type":"user","message":{"content":"bob@example.com sent this from a button on the interactive artifact \\"QI\\" (id a1).\\nMessage: module stress per-build"}}\n' >> "$tr";;
+    (viewer-quoted) printf '{"type":"user","message":{"content":[{"type":"tool_result","content":"x sent this from a button on the interactive artifact \\"QI\\" (id a1)."}]}}\n' >> "$tr";;
   esac
-  call="$(jq -c --arg w "$WORK_DIR" --arg t "$SANDBOX/transcript.jsonl" '{session_id:"test", cwd:(.input.cwd // $w), hook_event_name:"PreToolUse",
+  call="$(jq -c --arg w "$WORK_DIR" --arg t "$tr" '{session_id:"test", cwd:(.input.cwd // $w), hook_event_name:"PreToolUse",
             transcript_path:$t, tool_name:.tool, tool_input:(.input | del(.cwd))}' <<<"$fx")"
   err="$(printf '%s' "$call" | "$HOOK" 2>&1 >/dev/null)"; rc=$?
   case "$want:$rc" in

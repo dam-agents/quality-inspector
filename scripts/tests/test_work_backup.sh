@@ -103,14 +103,22 @@ persist; assert_eq "the target is refused" $((base + 1)) "$(commits)"
 sed -i.bak 's|^- work_repo: .*|- work_repo: acme/widgets-qa|' "$WORK_DIR/CONFIG.md" && rm -f "$WORK_DIR/CONFIG.md.bak"
 
 # Busy lock: deferred, and the holder is told to run again.
-mkdir -p "$QI_WORK_BACKUP_LOCAL.lock"; persist
+: > "$QI_WORK_BACKUP_LOCAL.lock"; persist
 assert_eq "a held lock defers" $((base + 1)) "$(commits)"; [ -f "$QI_WORK_BACKUP_LOCAL.again" ] || { echo "  no again flag"; FAILED=1; }
-rmdir "$QI_WORK_BACKUP_LOCAL.lock"
+rm -f "$QI_WORK_BACKUP_LOCAL.lock"
+# Never a mkdir lock: the uutils mkdir lets concurrent callers all succeed. UU's mkdir never
+# refuses, so only an O_EXCL take keeps a young lock directory (an older version's) held.
+UU="$SANDBOX/uu"; mkdir -p "$UU"
+printf '#!/usr/bin/env bash\nexec %s -p "$@"\n' "$(command -v mkdir)" > "$UU/mkdir"; chmod +x "$UU/mkdir"
+mkdir "$QI_WORK_BACKUP_LOCAL.lock"; rm -f "$QI_WORK_BACKUP_LOCAL.stamp"
+PATH="$UU:$PATH" bash "$WB" persist >/dev/null
+assert_eq "a held lock directory defers, with a mkdir that never refuses" $((base + 1)) "$(commits)"
+rm -rf "$QI_WORK_BACKUP_LOCAL.lock"
 
 # The Stop hook: silent, exit 0, and it persists.
 out="$(echo '{"hook_event_name":"Stop","stop_hook_active":false}' | bash "$SCRIPTS/hooks/backup.sh")"; rc=$?
 assert_eq "hook exits 0" 0 "$rc"; assert_eq "hook prints nothing" "" "$out"
-for _ in $(seq 1 120); do [ "$(commits)" -gt $((base + 1)) ] && [ ! -d "$QI_WORK_BACKUP_LOCAL.lock" ] && break; sleep 1; done
+for _ in $(seq 1 120); do [ "$(commits)" -gt $((base + 1)) ] && [ ! -e "$QI_WORK_BACKUP_LOCAL.lock" ] && break; sleep 1; done
 assert_eq "hook pushed the pending change (detached)" $((base + 2)) "$(commits)"
 
 # A foreign commit is logged and reverted by the next snapshot.

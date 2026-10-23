@@ -262,6 +262,12 @@ else
     jq -e --arg r "$r" 'select(.expect == "deny" and .rule == $r)' "$FIX" 2>/dev/null | grep -q . \
       && pass "policy rule $r has a deny fixture" || fail "policy rule $r has no deny fixture in $FIX"
   done
+  # A session loads these files by itself; a frame spelled out there would make every session
+  # read as scheduled or as a channel turn (docs/persistence.md → Scheduled or direct session).
+  hits="$(grep -lE -e '<qi-scheduled-run>|<how-to-respond>| sent this from a button on the interactive artifact ' \
+    CLAUDE.md AGENTS.md skills/*/SKILL.md 2>/dev/null)"
+  [ -z "$hits" ] && pass "no session-kind frame in a file a session loads by itself" \
+    || fail "a session-kind frame spelled out in $(echo $hits) — every session would read as scheduled or channel"
   if [ -f scripts/tests/test_policy_hook.sh ] && bash scripts/tests/test_policy_hook.sh >/dev/null 2>&1; then
     pass "policy fixtures hold (scripts/tests/test_policy_hook.sh)"
   else

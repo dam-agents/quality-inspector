@@ -2,7 +2,7 @@
 
 The <fill: Product> profile for the quality-inspector agent — black-box QA that tests <fill: Product> through its UI, build by build, without reading its source.
 <fill: one sentence on what runs it, e.g. "It is data only: the inspector's `helm-k3s` engine installs the published chart in a nested k3s cluster inside the inspector's VM." or "Its own `bin/` scripts run the published image in …">
-Contract: quality-inspector `docs/profile-contract.md`.
+Contract: quality-inspector `docs/profile-contract.md`; needs quality-inspector <fill: the minimum version whose features this profile uses> or newer.
 
 - `profile.json` — <fill: the artifact, its channels, prerequisites, the owner account, egress, requirements, config keys>.
 - `SKILL.md` — <fill: Product> from a tester's point of view. User-facing only — never implementation detail.
@@ -30,11 +30,12 @@ The profile stays in `.quality-inspector/`: the one directory of a repository th
 
 ## Sandbox accounts
 
-TODO(profile): with `sandbox` in `profile.json`, one line per account — what the operator creates (its guide in `sandbox/`), the credentials it fills in `work/env/credentials.env` — or delete this section.
+TODO(profile): with `sandbox` in `profile.json`, one line per account — what the operator creates (its guide in `sandbox/`), the credentials it fills in `work/env/credentials.env` (never in chat), and that its overlay stays off until every one of them is filled — or delete this section.
 
 ## Egress
 
-Every entry of `profile.json` → `egress`, applied by the operator.
+Every entry of `profile.json` → `egress`. The inspector's `scripts/egress-rules.sh` lists how each lands: `prompt` rows the operator approves when the prompt appears, `by-hand` rows (under a kit deny, no prompt ever appears) the operator adds in the agent's network settings.
+TODO(profile): each host whose rule is host-wide on purpose and why (a websocket the gateway must not intercept), or delete this line.
 TODO(profile): one line per `boundary.urls` entry the operator must deny, or delete this line.
 
 ## Diagnosis (read-only)

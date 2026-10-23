@@ -27,32 +27,31 @@ MODE="${1:-}"
 HOME_DIR="${HOME:-/home/agent}"
 PREFLIGHT="$HOME_DIR/scripts/preflight.sh"
 
+# Only a schedule's prompt carries the frame, so the policy hook and the scripts tell a
+# scheduled run from the operator's session by the session's own transcript, never by a
+# clock (lib/channel.sh → transcript_is_scheduled; docs/persistence.md → Scheduled or direct
+# session). It is printed first, before anything that could fail. `slack` is no schedule: its
+# output is a tool result in a Slack turn, which the transcript tells apart by itself.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/lib/channel.sh" 2>/dev/null \
+  || SCHEDULED_FRAME='<qi-scheduled-run>' # lib/channel.sh missing: its value, so no run reads as direct
+FRAME_LINE="$SCHEDULED_FRAME${MODE:-?}</qi-scheduled-run>"
+[ "$MODE" = slack ] || printf '%s\n' "$FRAME_LINE"
+
 # The platform appends at most 8 KiB of stdout to the prompt and truncates the rest.
 # A worklist cut mid-JSON is worse than none — the turn would parse a fragment — so
 # an oversized result is replaced by its logs plus an instruction to re-derive it.
-MAX_CONTEXT=8192
+MAX_CONTEXT=$((8192 - ${#FRAME_LINE} - 1))
 
 allow() { [ -n "${1:-}" ] && printf '%s\n' "$1"; exit 0; }
-
-# Every exit that lets the turn run — a crash included — marks the session as scheduled
-# for the policy hook (docs/persistence.md → Scheduled or direct session). A decline wakes
-# no model and writes nothing; QI_PRECHECK_PROBE=1 (a timed health check) neither.
-mark_scheduled() {
-  [ "${QI_PRECHECK_PROBE:-0}" = 1 ] && return 0
-  [ "$MODE" = slack ] && return 0
-  local d="${WORK_DIR:-$HOME_DIR/work}/env"
-  mkdir -p "$d" 2>/dev/null && printf 'scheduled %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    "${PLATFORM_SCHEDULE_ID:--}" > "$d/RUN_MODE" 2>/dev/null || true
-}
-trap 'rc=$?; [ "$rc" = 1 ] || mark_scheduled' EXIT
 
 [ -n "$MODE" ] || allow "precheck: no mode given — run the pre-flight yourself."
 
 # `slack [<n>]` is no schedule and never declines — a person waits for the answer
 # (docs/slack.md). It prints the pre-flight's `slack` JSON. The policy hook knows a Slack
 # turn by itself; `slack <n>` adds the one issue a Slack-ordered "test #N" may deliver to:
-# when slack_channel is set, the environment is free and the day's quota is left, it writes
-# the run marker `slack <ISO> - <n> <session>` and adds `"marked": <n>` to the JSON.
+# when slack_channel is set, the environment is free, the day's quota is left and the shell
+# knows its session, it writes the marker `slack <ISO> - <n> <session>` and adds
+# `"marked": <n>` to the JSON. The marker binds that session alone, for no set time.
 if [ "$MODE" = slack ]; then
   out="$(bash "$PREFLIGHT" slack 2>/dev/null)"
   printf '%s' "$out" | jq -e 'type == "object"' >/dev/null 2>&1 || allow '{"mode":"slack","error":"the pre-flight failed"}'
@@ -61,8 +60,8 @@ if [ "$MODE" = slack ]; then
   case "$n" in ([1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9]|[1-9][0-9][0-9][0-9][0-9]|[1-9][0-9][0-9][0-9][0-9][0-9]) ;;
     (*) allow "$(printf '%s' "$out" | jq -c '. + {error: "precheck slack <n>: <n> is not an issue number", marked: null}')";; esac
   if printf '%s' "$out" | jq -e '.channel != null and .environment.busy == false and .quota_left > 0' >/dev/null 2>&1; then
-    d="${WORK_DIR:-$HOME_DIR/work}/env"; s="${CLAUDE_CODE_SESSION_ID:--}"
-    case "$s" in (*[!A-Za-z0-9_-]*) s=-;; esac
+    d="${WORK_DIR:-$HOME_DIR/work}/env"; s="${CLAUDE_CODE_SESSION_ID:-}"
+    case "$s" in (''|*[!A-Za-z0-9_-]*) allow "$(printf '%s' "$out" | jq -c '. + {error: "precheck slack <n>: this shell has no session id", marked: null}')";; esac
     mkdir -p "$d" 2>/dev/null && printf 'slack %s - %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$n" "$s" > "$d/RUN_MODE" 2>/dev/null \
       && allow "$(printf '%s' "$out" | jq -c --argjson n "$n" '. + {marked: $n}')"
   fi
@@ -70,7 +69,7 @@ if [ "$MODE" = slack ]; then
 fi
 
 # The audit always runs and its task runs the pre-flight itself (its probes take most of
-# the two minutes); the Precheck is there only for the marker.
+# the two minutes); the Precheck is there only for the frame.
 [ "$MODE" = audit ] && allow ""
 
 # A missing or unrunnable pre-flight degrades to a slower run, never a skipped one:

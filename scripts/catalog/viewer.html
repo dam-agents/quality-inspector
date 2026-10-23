@@ -1080,7 +1080,7 @@ function runDrawer(r) {
 }
 
 // --------------------------------------------------------------------- map
-const KIND = { nav: 'Navigation item', headings: 'Heading', tabs: 'Tab', buttons: 'Button', inputs: 'Field', links: 'Link' };
+const KIND = { nav: 'Navigation item', headings: 'Heading', tabs: 'Tab', buttons: 'Button', inputs: 'Field', links: 'Link', rows: 'List row' };
 const hsItems = (x) => x.items.filter(present).map((k) => byKey.get(k));
 const hsState = (its) => (!its.length ? 'none' : ['bad', 'warn', 'ok', 'muted'].find((c) => its.some((i) => i.cls === c)) || 'muted');
 function onMap(i) {
@@ -1152,7 +1152,7 @@ function viewMap() {
       its.length ? h('ul', { class: 'att' }, its.map(itemRow)) : h('p', { class: 'muted-t' }, x.to ? 'No test reaches that page.' : 'No test names this control.'),
       h('button', { class: 'linkish', type: 'button', onclick: () => go({ hs: null }) }, '← the whole page')]
       : [h('h3', {}, `Tests that reach this page (${pageItems.length})`), pageItems.length ? h('ul', { class: 'att' }, pageItems.map(itemRow)) : h('p', { class: 'muted-t' }, 'No test reaches this page.'),
-        h('p', { class: 'meta' }, p.hotspots.length ? 'Click any outlined control on the screenshot: its tests, or ask for a test of it. A navigation item or link (↗) opens the page it leads to.' : '')]);
+        h('p', { class: 'meta' }, p.hotspots.length ? 'Click any outlined control on the screenshot: its tests, or ask for a test of it. A control that leads to another page (↗) — a navigation item, tab, link, or a list\'s first row — opens that page.' : '')]);
   detail.append(askForm(p, x));
   v.append(h('div', { class: 'maplayout' }, list, h('div', { style: 'min-width:0' }, sel, head, stage), detail));
 }

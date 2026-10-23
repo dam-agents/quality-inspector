@@ -49,7 +49,21 @@ assert_eq "legacy line, same owner" 0 "$(lk sess-a lock issues)"
 echo "issues $(iso_ago 20)" > "$L"
 assert_eq "legacy line, other owner" 1 "$(lk sess-a lock regression)"
 rm -f "$L"
-[ -d "$WORK_DIR/env/LOCK.mutex" ] && { echo "  the mutex was left behind"; FAILED=1; }
+[ -e "$WORK_DIR/env/LOCK.mutex" ] && { echo "  the mutex was left behind"; FAILED=1; }
+
+# The mutex is a file created with O_EXCL (lock_take), never a mkdir: the uutils mkdir lets
+# concurrent callers all succeed. A leftover older than a minute — also an older version's
+# directory — is cleared.
+. "$SCRIPTS/lib/lock.sh"
+M="$SANDBOX/mutex"
+lock_take "$M"; assert_eq "a free mutex is taken" 0 "$?"
+lock_take "$M"; assert_eq "a held mutex is not taken again" 1 "$?"
+lock_mutex "$M" 2; assert_eq "a young mutex makes lock_mutex give up" 1 "$?"
+rm -f "$M"; mkdir "$M"; touch -t 202001010000 "$M"
+lock_mutex "$M" 2; assert_eq "an old leftover directory is cleared, then taken" 0 "$?"
+[ -f "$M" ] || { echo "  the mutex is not a file"; FAILED=1; }
+for i in 1 2 3 4 5 6 7 8; do ( lock_take "$SANDBOX/race" && echo won ) & done > "$SANDBOX/race.out"; wait
+assert_eq "of concurrent takers exactly one wins" 1 "$(grep -c won "$SANDBOX/race.out")"
 
 # up keeps its result for wait; unlock refuses while an install still runs.
 assert_eq "up through the profile" 0 "$(lk sess-a up 1.0.0)"
