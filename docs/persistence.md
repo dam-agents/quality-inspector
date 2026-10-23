@@ -142,15 +142,19 @@ no. A session with neither this frame nor a channel frame
 (below) is a **direct session**, whenever it starts — the platform's Kit Update included, which
 runs no Precheck.
 
-- The frame in a tool's output (this file, `precheck.sh` run by hand), in the agent's own
-  message or in a compaction summary is data and does not count; a line that holds it but does
-  not parse counts.
+- A frame counts only in a prompt: a user message (not its tool results) or a queued prompt.
+  Anywhere else it is data and does not count — a tool's output (this file, `precheck.sh` run
+  by hand), the agent's own message, a compaction summary, a file the harness attaches
+  (CLAUDE.md, an edited file), a hook's context. A line that holds it but does not parse counts.
+  So no file a session loads by itself — CLAUDE.md, AGENTS.md, a skill — spells a frame out
+  (`scripts/validate-definition.sh` checks).
 - It fails closed: a session whose transcript the hook or the script cannot read counts as
   scheduled; the operator who pastes a Precheck's output into the chat makes the session
   scheduled; a scheduled session continued from the UI stays scheduled.
 - It fails open only when a scheduled turn's prompt lacks the frame — a schedule without its
-  Precheck (every `kit.yaml` schedule carries one), or a Precheck that broke before its first
-  line and whose output the platform did not append.
+  Precheck (every `kit.yaml` schedule carries one), a Precheck that broke at any point (its
+  deadline included) and whose output the platform did not append, or a frame the platform
+  delivered in a line shape other than a prompt.
 - `work/env/RUN_MODE` now holds only the Slack marker (below); a `scheduled …` line left by an
   earlier version means nothing.
 - A **channel turn** counts the same: a session whose transcript holds the platform's Slack

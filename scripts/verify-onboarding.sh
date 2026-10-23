@@ -376,7 +376,7 @@ if [ "$LIVE" = 1 ]; then
     else
       fail "preflight:$m" "no JSON" "bash -x scripts/preflight.sh $m and fix"
     fi
-    s=$(date +%s); QI_PRECHECK_PROBE=1 bash "$SCRIPT_DIR/precheck.sh" "$m" >/dev/null 2>&1; rc=$?; d=$(( $(date +%s) - s ))
+    s=$(date +%s); bash "$SCRIPT_DIR/precheck.sh" "$m" >/dev/null 2>&1; rc=$?; d=$(( $(date +%s) - s ))
     case "$rc" in (0|1) [ "$d" -lt 90 ] && ok "precheck:$m" "exit $rc in ${d}s" || fail "precheck:$m" "took ${d}s" "make the $m pre-flight faster than 2 minutes";;
       (*) fail "precheck:$m" "exit $rc" "fix scripts/precheck.sh / preflight.sh $m";; esac
   done

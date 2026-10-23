@@ -61,7 +61,7 @@ if [ "$MODE" = slack ]; then
     (*) allow "$(printf '%s' "$out" | jq -c '. + {error: "precheck slack <n>: <n> is not an issue number", marked: null}')";; esac
   if printf '%s' "$out" | jq -e '.channel != null and .environment.busy == false and .quota_left > 0' >/dev/null 2>&1; then
     d="${WORK_DIR:-$HOME_DIR/work}/env"; s="${CLAUDE_CODE_SESSION_ID:-}"
-    case "$s" in (''|*[!A-Za-z0-9_-]*) allow "$(printf '%s' "$out" | jq -c '. + {marked: null}')";; esac
+    case "$s" in (''|*[!A-Za-z0-9_-]*) allow "$(printf '%s' "$out" | jq -c '. + {error: "precheck slack <n>: this shell has no session id", marked: null}')";; esac
     mkdir -p "$d" 2>/dev/null && printf 'slack %s - %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$n" "$s" > "$d/RUN_MODE" 2>/dev/null \
       && allow "$(printf '%s' "$out" | jq -c --argjson n "$n" '. + {marked: $n}')"
   fi

@@ -3,11 +3,14 @@
 # session). Sourced by scripts/hooks/policy.sh, lib/config.sh (direct_session, live_cdp) and
 # scripts/precheck.sh (the frame it prints). Pure bash + jq.
 #
-# The kind is read from the session's own transcript, never from a clock: a frame counts in a
-# prompt line only. A tool result (a Read of docs/persistence.md, an issue body), a tool's
-# progress, a compaction summary or the agent's own message quoting a frame is data. A line
-# that holds a frame but does not parse fails closed. A frame stays in a session continued
-# from the UI, so that session keeps its kind.
+# The kind is read from the session's own transcript, never from a clock. A frame counts in a
+# prompt only — a closed set of line shapes: the content of a `user` line other than its tool
+# results and a compaction summary, and the prompt of a `queued_command` attachment. Every
+# other line is not a prompt and is never read: a tool result (a Read of docs/persistence.md,
+# an issue body), the agent's own message, progress, a file the harness attaches (CLAUDE.md as
+# `instructions`, an edited file), a hook's context, a request log. The limit: a frame the
+# platform delivered in any other shape is not seen. A line that holds a frame but does not
+# parse counts. A frame stays in a session continued from the UI, so that session keeps its kind.
 
 # The platform's frames of a prompt someone other than the operator sent (a channel turn):
 # a Slack message (`<how-to-respond>`), and a press of a shared interactive artifact's button
@@ -28,10 +31,11 @@ transcript_prompt_has() {
   hits="$(grep -F "${pat[@]}" "$f" 2>/dev/null)" || return 1
   out="$(printf '%s\n' "$hits" | jq -Rr '$ARGS.positional as $fr | (fromjson? // "unparsable") as $l
     | if ($l | type) != "object" then "y"
-      elif ($l.type == "assistant" or $l.type == "progress" or $l.isCompactSummary == true) then empty
-      else ($l | del(.toolUseResult)
-            | (if (.message.content | type) == "array" then .message.content |= map(select(.type != "tool_result")) else . end)
-            | tojson | select(. as $t | any($fr[]; . as $x | $t | contains($x))) | "y")
+      else (if $l.type == "user" and $l.isCompactSummary != true then
+              ($l.message.content | if type == "array" then map(select(.type != "tool_result")) else . end)
+            elif $l.type == "attachment" and $l.attachment.type == "queued_command" then $l.attachment.prompt
+            else empty end)
+           | tojson | select(. as $t | any($fr[]; . as $x | $t | contains($x))) | "y"
       end' --args "$@" 2>/dev/null)" || out=y
   [ -n "$out" ]
 }

@@ -30,6 +30,11 @@
 {"name": "fetch, transcript unreadable", "mode": "no-transcript", "expect": "deny", "rule": "github", "tool": "Bash", "input": {"command": "git fetch origin"}}
 {"name": "commit, scheduled frame garbled", "mode": "sched-garbled", "expect": "deny", "rule": "scheduled-git", "tool": "Bash", "input": {"command": "git commit -m x"}}
 {"name": "commit, direct", "expect": "allow", "tool": "Bash", "input": {"command": "git commit -m x"}}
+{"name": "Kit Update fetch, frames only in attached files", "mode": "attached", "expect": "allow", "tool": "Bash", "input": {"command": "git fetch origin"}}
+{"name": "commit, frames only in attached files", "mode": "attached", "expect": "allow", "tool": "Bash", "input": {"command": "git commit -m x"}}
+{"name": "CONFIG.md edit, frames only in attached files", "mode": "attached", "expect": "allow", "tool": "Edit", "input": {"file_path": "@WORK@/CONFIG.md", "old_string": "a", "new_string": "b"}}
+{"name": "fetch, scheduled frame in a queued prompt", "mode": "queued-sched", "expect": "deny", "rule": "github", "tool": "Bash", "input": {"command": "git fetch origin"}}
+{"name": "github.sh comment, Slack frame in a queued prompt", "mode": "queued-slack", "expect": "deny", "rule": "channel-write", "tool": "Bash", "input": {"command": "bash \"$HOME/scripts/github.sh\" comment 13 /tmp/quality-inspector-c/comment.md"}}
 {"name": "git pull", "expect": "deny", "rule": "github", "tool": "Bash", "input": {"command": "cd /home/agent && git pull"}}
 {"name": "git push", "expect": "deny", "rule": "github", "tool": "Bash", "input": {"command": "git push -u origin fix/x"}}
 {"name": "git push, old-style run marker", "expect": "deny", "mode": "old-marker", "rule": "github", "tool": "Bash", "input": {"command": "git push -u origin fix/x"}}

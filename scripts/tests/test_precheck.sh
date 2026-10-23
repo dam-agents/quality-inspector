@@ -42,7 +42,7 @@ for bad in '{"mode":"slack","channel":"C0123ABCD","environment":{"busy":true},"q
 done
 printf '%s\n' '{"mode":"slack","channel":"C0123ABCD","environment":{"busy":false},"quota_left":1}' > "$SANDBOX/out"
 rm -f "$M"; o="$(HOME="$H" CLAUDE_CODE_SESSION_ID= bash "$H/scripts/precheck.sh" slack 42 2>/dev/null)"
-assert "slack 42 without a session id -> not marked" '.marked == null' "$o"
+assert "slack 42 without a session id -> not marked, says why" '.marked == null and (.error | test("no session id"))' "$o"
 [ ! -e "$M" ] || { echo "  slack 42 marked without a session"; FAILED=1; }
 o="$(HOME="$H" bash "$H/scripts/precheck.sh" slack '7;rm' 2>/dev/null)"
 assert "slack <not a number> -> an error, no marker" '.marked == null and (.error | test("not an issue number"))' "$o"

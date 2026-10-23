@@ -33,7 +33,10 @@ while IFS= read -r fx; do
   # platform's Slack frame; a direct one neither. `quoted`: a direct session whose tool results,
   # progress, compaction summary and own messages quote the frame (a Read of
   # docs/persistence.md). `garbled`: a frame line that does not parse. `no-transcript`: the
-  # transcript cannot be read — that counts as scheduled.
+  # transcript cannot be read — that counts as scheduled. `attached`: a direct session whose
+  # harness attached files that spell both frames out (CLAUDE.md as `instructions`, an edited
+  # docs/persistence.md, a hook's context, a request log) — not a prompt. `queued-*`: the frame
+  # in a prompt that waited in the queue (a `queued_command` attachment) — a prompt.
   tr="$SANDBOX/transcript.jsonl"
   printf '{"type":"user","message":{"content":"promote #7"}}\n' > "$tr"
   case "$(jq -r '.mode // "direct"' <<<"$fx")" in
@@ -41,6 +44,15 @@ while IFS= read -r fx; do
     (sched-quoted) printf '{"type":"user","message":{"content":[{"type":"tool_result","content":"<qi-scheduled-run>issues</qi-scheduled-run>"}]}}\n' >> "$tr"
       printf '{"type":"assistant","message":{"content":[{"type":"text","text":"a schedule prompt opens with <qi-scheduled-run>"}]}}\n' >> "$tr";;
     (sched-garbled) printf 'not json <qi-scheduled-run>\n' >> "$tr";;
+    (attached) jq -nc --rawfile c "$DEF/CLAUDE.md" --rawfile d "$DEF/docs/persistence.md" '
+        {type:"attachment", attachment:{type:"instructions", files:[{path:"/home/agent/CLAUDE.md", type:"Project", content:($c + $d)}]},
+          rendered:[{content:($c + $d)}], renderedRole:"user"},
+        {type:"attachment", attachment:{type:"edited_text_file", filename:"/home/agent/docs/persistence.md", snippet:$d}, rendered:[{content:$d}], renderedRole:"user"},
+        {type:"attachment", attachment:{type:"hook_additional_context", content:["<qi-scheduled-run>issues</qi-scheduled-run>"]}},
+        {type:"api-request-blob", message:{content:("<how-to-respond>" + $d)}},
+        {type:"last-prompt", lastPrompt:"<qi-scheduled-run>"}' >> "$tr";;
+    (queued-sched) printf '{"type":"attachment","attachment":{"type":"queued_command","prompt":"QA issues run.\\n<qi-scheduled-run>issues</qi-scheduled-run>","commandMode":"prompt"}}\n' >> "$tr";;
+    (queued-slack) printf '{"type":"attachment","attachment":{"type":"queued_command","prompt":"<how-to-respond>\\nreply …\\n</how-to-respond>","commandMode":"prompt"}}\n' >> "$tr";;
     (no-transcript) tr="$SANDBOX/missing.jsonl";;
     (channel) printf '{"type":"user","message":{"content":"<how-to-respond>\\nreply …\\n</how-to-respond>"}}\n' >> "$tr";;
     (quoted) jq -nc --rawfile d "$DEF/docs/persistence.md" '
