@@ -108,7 +108,7 @@ T
 mkdir -p "$W/inventory/c3"
 echo '{"routes":{"/":{"title":"Home","navigates":{"Projects":"/projects","Files":"/files","Recent":"/files"},"links":["All files → /files"],"viewport":[1000,500],"boxes":[["nav","Projects",0,0,100,20],["headings","Welcome home",200,100,300,40],["links","All files",400,300,100,20],
    ["tabs","Recent",600,0,100,20],["rows","Quarterly plan",0,400,500,50,"/projects"]]},
- "/projects":{"title":"Projects","buttons":["Rename"],"viewport":[1000,500],"boxes":[["buttons","Rename",100,50,200,25],["tabs","Recent",600,0,100,20],["buttons","toString",0,0,50,20],["links","Files",0,100,50,20,"/files"]]},"/files":{"title":"Files"}}}' > "$W/inventory/c3/inventory.json"
+ "/projects":{"title":"Projects","buttons":["Rename"],"viewport":[1000,500],"boxes":[["buttons","Rename",100,50,200,25],["tabs","Recent",600,0,100,20],["buttons","toString",0,0,50,20],["links","Files",0,100,50,20,"/files"],["tabs","Members",300,0,100,20],["headings","Members",0,200,100,20],["inputs","Members",0,250,100,20]],"navigates":{"Members":"/files"}},"/files":{"title":"Files"}}}' > "$W/inventory/c3/inventory.json"
 echo '[{"number":42,"title":"Rename <b>projects</b>","state":"closed","labels":[{"name":"area:projects"}]},{"number":57,"title":"Upload progress","state":"open","labels":[]},{"number":63,"title":"Bulk delete","state":"open","labels":[]},{"number":65,"title":"A labelled pull request","state":"open","labels":[],"pull_request":{"url":"x"}},{"number":67,"title":"Retest in progress","state":"open","labels":[{"name":"qa:retest"}]}]' > "$STUB_DIR/issues.json"
 # Overview → Activity: the lock (never its session), the rows on their way, the waiting issues, the schedules.
 mkdir -p "$W/env"; echo 'issues 2026-10-22T19:35:00Z SESSION-SECRET-ID' > "$W/env/LOCK"
@@ -172,9 +172,9 @@ assert "hotspots: a page-only control names its tests; a nav item stands for its
   and (.pages[] | select(.pattern == "/") | .hotspots[0:2] == [{"kind":"nav","name":"Projects","box":[0,0,0.1,0.04],"to":"/projects","items":["issue-42/AC-1","issue-42/EX-1"]},
     {"kind":"headings","name":"Welcome home","box":[0.2,0.2,0.3,0.08],"items":[]}])
   and (.pages[] | select(.pattern == "/") | .hotspots[2] | .kind == "links" and .name == "All files" and .to == "/files") and (.pages[] | select(.pattern == "/files") | .hotspots == [])' "$data"
-assert "hotspots: a tab walks where it led on its own page, a list row and a link where their link leads; nothing by an inherited name" '(.pages[] | select(.pattern == "/") | .hotspots[3:5] == [{"kind":"tabs","name":"Recent","box":[0.6,0,0.1,0.04],"to":"/files","items":["scenario-7/AC-1"]},
+assert "hotspots: a tab walks where it led on its own page, a list row and a link where their link leads; nothing by an inherited name, nor for a heading or a field of a clicked tab's name" '(.pages[] | select(.pattern == "/") | .hotspots[3:5] == [{"kind":"tabs","name":"Recent","box":[0.6,0,0.1,0.04],"to":"/files","items":["scenario-7/AC-1"]},
     {"kind":"rows","name":"Quarterly plan","box":[0,0.8,0.5,0.1],"to":"/projects","items":["issue-42/AC-1","issue-42/EX-1"]}])
-  and (.pages[] | select(.pattern == "/projects") | (.hotspots[1] | has("to") | not) and (.hotspots[2] | has("to") | not) and .hotspots[3].to == "/files")' "$data"
+  and (.pages[] | select(.pattern == "/projects") | (.hotspots[1] | has("to") | not) and (.hotspots[2] | has("to") | not) and .hotspots[3].to == "/files" and [.hotspots[4:7][] | .to] == ["/files",null,null])' "$data"
 assert "collections" '.collections == [{"name":"Upload","members":["#42","S-7 AC-1"]}]' "$data"
 assert "control center: the modules' state" '(.modules.modules | length) == 11 and (.modules.modules[] | select(.id == "ui-sweep") | .state == "disabled") and .interactive == false and (.modules | has("generated_utc") | not)' "$data"
 assert "design findings: register fields, a crop, nothing else" '(.design | length) == 2 and (.design[0] | .id == "D-1" and .saw == "Text of “Rename” button is clipped" and (.crop | test("^i[0-9]+$")) and (has("shot") | not) and (has("box") | not))

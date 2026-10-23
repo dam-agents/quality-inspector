@@ -45,6 +45,7 @@ const MAP_W = 720; // a page shot of the product map: wide enough to click a con
 const HISTORY_MAX = 30; // newest history entries per item: the page stays a few MB at a year of nights
 const RUNS_MAX = 400; // newest runs of the Runs view
 const HOTSPOTS_MAX = 120; // controls per page of the product map
+const CLICKED = new Set(['nav', 'tabs', 'buttons', 'links']); // box kinds a click of the UI map's crawl can be
 const DESIGN_CROPS_MAX = 80; // design findings' crops embedded, open and major first
 
 const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
@@ -339,9 +340,10 @@ if (newestMap) {
       const f = (n) => Math.round(n * 10000) / 10000;
       return (r.boxes ?? []).filter((b) => Array.isArray(b) && matchable(String(b[1]))).slice(0, HOTSPOTS_MAX).map(([kind, name, x, y, w, h, link]) => {
         const box = [f(x / vw), f(y / vh), f(w / vw), f(h / vh)];
-        // Where it leads: its link's page, else what clicking it on this page did; a navigation item
-        // or a link of a map without them by its name anywhere; a tab only on its own page.
-        const to = (typeof link === 'string' && link.startsWith('/') ? link : null) ?? navOf(r, name)
+        // Where it leads: its link's page, else what clicking it on this page did (only what the crawl
+        // clicks: a heading or a field of a tab's name leads nowhere); a navigation item or a link of a
+        // map without them by its name anywhere; a tab only on its own page.
+        const to = (typeof link === 'string' && link.startsWith('/') ? link : null) ?? (CLICKED.has(kind) ? navOf(r, name) : null)
           ?? (kind === 'nav' || kind === 'links' ? navTarget(name) : null);
         if (to) return { kind, name, box, to, items: reachOf.get(to) ?? [] };
         const re = controlRe(String(name), { quoted: true });
