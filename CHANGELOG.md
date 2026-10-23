@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.17.0 — 2026-10-23
+## 3.19.0 — 2026-10-23
 
 **Upgrade:**
 Nothing to run — scripts and docs are re-read per run. A report's publish now writes its share link
@@ -18,6 +18,23 @@ gets the file at its next revision. Offer, never enable: with **`report_visibili
 holding it opens — for the dashboard only, never in an issue comment or a Slack answer but a
 thread's under `slack_report_visibility: public`. Re-run `scripts/verify-onboarding.sh`: it now
 knows the key.
+
+## 3.18.0 — 2026-10-23
+
+**Upgrade:**
+Nothing — docs are re-read per run. A check is tested once: a scenario's criterion or an
+exploration that would repeat what a `regression`-tier test, the security run, a module that is on,
+or the profile's `## Tested elsewhere` list already checks is `testable: no — tested by <where>`
+(an exploration is not written), and the judge flags it. A test's own earlier version (its
+own id) never counts as elsewhere, for the judge's duplicate check too. An issue's ACs are exempt
+([docs/test-authoring.md](docs/test-authoring.md) → **Tested once**).
+
+## 3.17.0 — 2026-10-23
+
+**Upgrade:**
+Nothing — docs are re-read per run. From now on everything the agent writes is in English, its chat
+included; product copy and words as received stay as written. Files written earlier stay as they are
+([docs/acceptance-criteria.md](docs/acceptance-criteria.md) → Language).
 
 ## 3.16.0 — 2026-10-23
 

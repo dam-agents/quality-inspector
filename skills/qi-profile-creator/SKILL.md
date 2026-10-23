@@ -128,7 +128,10 @@ that remain.
   [profile-contract.md](../../docs/profile-contract.md) → `scenarios/`: a title, then
   `## AC-<k> — <name>` blocks with Given/When/Then in a user's words. Offer one golden-path
   scenario per main area from the brief; the team owns and extends them, and a PR that
-  changes how an area works updates its scenario. The nightly run adopts each one.
+  changes how an area works updates its scenario. The nightly run adopts each one. A
+  scenario asserts only what no other test checks; what the product's own suite already
+  keeps true goes in `SKILL.md`'s `## Tested elsewhere` list and is at most a Given
+  ([profile-contract.md](../../docs/profile-contract.md) → `scenarios/`).
 - **`sandbox`** — only when brief row 19 has a flow: the throwaway accounts the operator
   creates at onboarding, in the form of [profile-contract.md](../../docs/profile-contract.md)
   → `sandbox` and [references/discovery.md](references/discovery.md) → Sandbox accounts —
