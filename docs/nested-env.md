@@ -62,7 +62,8 @@ has less than `min_free_disk_gi` free. Before giving up on the entry:
 1. `bash "$HOME/scripts/env.sh" status`, then the diagnosis the profile's README names
    (read-only commands only).
 2. One repair attempt the evidence supports — usually `env.sh reset`, then `up` again,
-   for an install stuck half-way.
+   for an install stuck half-way or refused for disk space (on the `helm-k3s` engine a
+   reset also removes every image no container uses — the earlier builds').
 3. Still failing → abort the entry ([issue-qa.md](issue-qa.md) step 4) with the evidence
    in the log. A cause you reproduced goes to `work/LESSONS.md`; a profile defect is an
    issue on the profile's repository, never a local patch to the profile.

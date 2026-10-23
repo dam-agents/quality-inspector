@@ -15,6 +15,19 @@ to the page it led to where the current UI map recorded it. From the next regres
 map records where each link leads, the first row of a list per detail page, and every tab per page
 ([docs/change-awareness.md](docs/change-awareness.md)), so links, list rows and tabs walk too.
 
+## 3.10.1 — 2026-10-23
+
+**Upgrade:**
+Nothing to run — the policy hook and the engine are re-read per call. In a scheduled run or a
+channel turn the policy hook now also allows `modules.sh status|due|ran|focus-done|check|value|schedules` and a
+read-only command naming it with `2>&1`/`2>/dev/null` and pipes into `jq|head|tail|grep|egrep|fgrep|wc`,
+`$HOME/` written as such ([docs/modules.md](docs/modules.md) → Control). On the `helm-k3s`
+engine, `env.sh reset` now removes every image no container uses, and `up` does so while the
+k3s data volume has less than `engine_config.prune_below_gi` free (default 20 Gi). Where an
+install was refused for disk space: once, **"reset the environment"**
+([docs/on-demand.md](docs/on-demand.md)) — it holds the environment lock — frees the earlier
+builds' images.
+
 ## 3.10.0 — 2026-10-22
 
 **Upgrade:**

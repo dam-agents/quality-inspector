@@ -11,6 +11,10 @@ lowest best-effort I/O class), and so does everything they start — the product
 starves the agent's own runtime. `up` of the build already recorded in
 `$QI_ENV_DIR/STATE.json`, with the same rendered values, returns as soon as the UI answers
 (within 5 minutes — a restarted VM's cluster comes back from disk); anything else installs.
+`reset` uninstalls the release, deletes its volumes and removes every image no container
+uses, so it is also the repair for a full disk. **Limit:** the prune also removes an image only
+a short-lived pod uses (the local-path provisioner's helper, for one); the next such pod
+pulls it again, so its registry must be reachable unless k3s keeps it pinned.
 
 ## Configuration (`engine_config` in the profile's `profile.json`)
 
@@ -30,6 +34,7 @@ starves the agent's own runtime. `up` of the build already recorded in
 | `values` | the Helm values, as JSON, with placeholders |
 | `overlays` | `[{when: <config key>, values: {…}}]` — merged into `values` when that profile key is set; `when: "@model"` — while the agent lends its model; `when: "@sandbox:<id>"` — while every `E2E_SANDBOX_<ID>_*` line of `credentials.env` is filled |
 | `max_pages` | quay pages to read at most (default 30) |
+| `prune_below_gi` | after an `up`, the images no container uses (earlier builds') are removed while the k3s data volume has less free than this, in Gi (default 20); `reset` always removes them |
 
 `bin/versions --between <from> <to>` (bisection) reads the same tag listing — tags only —
 and returns the tags of the channel both builds match, in that channel's order.
