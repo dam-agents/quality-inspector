@@ -14,7 +14,8 @@
 #   PostToolUse         counts the call
 #   PostToolUseFailure  counts it, and logs tool_failed (warn) tool=<name>[ code=<exit>][ interrupt=1][ agent=<type>]
 #                       ms=<n> err=<excerpt> — a Bash exit 1 with no output (grep without a match, a
-#                       false test) is only counted
+#                       false test) and a Bash exit 3 ending "— run env.sh|suite.sh wait again" (a
+#                       wait poll while the run lasts) are only counted
 #   Stop, StopFailure   turn_end status=<ok|the API error> kind=<kind> secs=<n> tools=<n> failed=<n>
 #
 # The job of every line is the turn's: the mode in a scheduled turn's frame (`<qi-scheduled-run><mode>`,
@@ -93,6 +94,9 @@ case "$EVENT" in
     if [[ "$ERR" =~ ^Exit\ code\ ([0-9]+) ]]; then code="${BASH_REMATCH[1]}"; body="${ERR#Exit code $code}"; fi
     body="$(printf '%s' "$body" | tr -s '\r\n\t ' '    ' | sed -e 's/^ //' -e 's/ $//')"
     [ "$TOOL" = Bash ] && [ "$code" = 1 ] && [ -z "$body" ] && exit 0
+    # a `wait` poll's normal answer while its install or suite run lasts (env.sh, suite.sh)
+    [ "$TOOL" = Bash ] && [ "$code" = 3 ] && case "$body" in
+      (*"— run env.sh wait again"|*"— run suite.sh wait again") exit 0;; esac
     if [ -n "$body" ] && [ -s "$WORK/env/credentials.env" ]; then
       body="$(printf '%s' "$body" | node "$SCRIPT_DIR/lib/secrets.mjs" filter "$WORK/env/credentials.env" 2>/dev/null)" || body="(unmasked error withheld)"
     fi

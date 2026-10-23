@@ -58,6 +58,16 @@ assert "the unstopped turn ends interrupted (warn), the API error as its status 
   '.[0].level == "warn" and (.[0].msg | test("^status=interrupted kind=scheduled secs=[0-9]+ tools=1 failed=0$"))
    and .[1].level == "error" and (.[1].msg | test("^status=rate_limit kind=direct "))' "$e"
 
+# A wait poll while its install or suite run lasts (exit 3) only counts; another exit 3 is logged.
+hook UserPromptSubmit sess-w '{"prompt":"go"}'
+hook PostToolUseFailure sess-w '{"tool_name":"Bash","error":"Exit code 3\nenv: 0.2.21 still installing (since 2026-10-23T10:00:00Z) — run env.sh wait again"}'
+hook PostToolUseFailure sess-w '{"tool_name":"Bash","error":"Exit code 3\nsuite: issue-12 still runs (since 2026-10-23T10:00:00Z) — run suite.sh wait again"}'
+hook PostToolUseFailure sess-w '{"tool_name":"Bash","error":"Exit code 3\ngithub.sh: refused: not an issue of the target"}'
+hook Stop sess-w
+assert "wait polls are counted, not logged; another exit 3 is" \
+  '[.[] | select(.run == "sess-w")] | length == 1 and (.[0].msg | test("^tool=Bash code=3 ms=- err=github.sh: refused"))' "$(events tool_failed)"
+assert "the turn counts all three" '[.[] | select(.run == "sess-w")] | .[0].msg | test(" tools=3 failed=3$")' "$(events turn_end)"
+
 # Calls of a turn whose start it missed still count; bad input is silent and exits 0.
 hook PostToolUse sess-c '{"tool_name":"Read"}'
 hook Stop sess-c
