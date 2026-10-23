@@ -133,7 +133,8 @@ filesystems, writes outside `work/` (the agent proposes changes to itself as pat
 `work/patches/`), commits from a scheduled run or a Slack turn, and any GitHub write from a
 Slack turn except a Slack-ordered "test #N"'s comment and retest-label removal on that issue
 ([docs/black-box.md](docs/black-box.md) → Enforcement layers). The daily gate also stops every
-run while a hook or the deny list is gone.
+run while a hook or the deny list is gone. A trace hook logs every turn's start and end and every failed
+tool call to `work/logs/`, so the weekly audit sees crashed runs and repeating failures ([docs/logging.md](docs/logging.md) → Harness trace).
 
 ## What a report looks like
 

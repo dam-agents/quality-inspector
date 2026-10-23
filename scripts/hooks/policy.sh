@@ -86,9 +86,9 @@ TOOL="?"; SESSION=""
 
 deny() { # <rule> <where> <reason>
   printf 'policy: denied (%s): %s — docs/black-box.md → Enforcement layers\n' "$1" "$3" >&2
-  local at="${2%%[?#]*}"; at="${at//[[:space:]]/}"; at="${at:0:200}"
-  ( export LOG_RUN_ID="${LOG_RUN_ID:-$SESSION}"
-    . "$SCRIPT_DIR/log.sh" && logev warn policy_denied "tool=$TOOL rule=$1${at:+ at=$at}" ) >/dev/null 2>&1
+  local at="${2%%[?#]*}"; at="${at//[[:space:]]/}"
+  ( export LOG_RUN_ID="${LOG_RUN_ID:-$SESSION}"   # masked before the cut: a cut token escapes log.sh's patterns
+    . "$SCRIPT_DIR/log.sh" && at="$(_log_mask "$at")" && logev warn policy_denied "tool=$TOOL rule=$1${at:+ at=${at:0:200}}" ) >/dev/null 2>&1
   exit 2
 }
 
