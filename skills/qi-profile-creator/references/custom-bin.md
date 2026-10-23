@@ -9,6 +9,11 @@ parts and leave the product's part as `TODO(profile)`.
 
 - `#!/usr/bin/env bash`, `set -u`, `export LC_ALL=C`; `curl`, `jq` and the runtime you
   use listed in `requires.commands`.
+- A profile installed through the platform arrives as plain files, without exec bits: the
+  core starts each `bin/<cmd>` through the interpreter its `#!` line names (bash when it
+  has none). So every script has its `#!` line, an interpreter other than bash is in
+  `requires.commands`, and nothing in `bin/` is a symlink. Keep the exec bit in git anyway
+  (`chmod +x`) — it is what lets you run the script by hand.
 - Settings from `QI_PROFILE_CONFIG` (`jq -r '.<key> // empty'`), never from
   `work/CONFIG.md` directly. Product facts every instance shares stay in the script.
 - State in `$QI_ENV_DIR` only (mode 700): `credentials.env`, a `STATE.json` with the
@@ -17,7 +22,8 @@ parts and leave the product's part as `TODO(profile)`.
 - Scratch under `/tmp/quality-inspector-<purpose>`, removed before exit — the agent's
   runs must end with none left.
 - Diagnostics to stderr, one line, saying what failed and what the operator can do
-  ("pull failed — allow ghcr.io"). Never print a secret, not even in debug output.
+  ("pull failed — allow ghcr.io"). Never print a secret, not even in debug output —
+  `bin/sandbox` runs with the sandbox credentials in its environment.
 - Every command idempotent; a failed `up` safe to run again.
 
 ## `bin/versions` and `bin/build-time`
