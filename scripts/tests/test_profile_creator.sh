@@ -76,9 +76,16 @@ check "$P" | grep -q '^FAIL  interfaces.openapi' || { echo "  an openapi path ou
 
 # Egress entries as scripts/egress-rules.sh reads them: verdict, method *, pathPattern.
 P="$(helm_profile egress)"
-edit "$P" '.egress += [{"host":"github.com","method":"*","verdict":"allow","pathPattern":"/acme/tools/releases/*","why":"a tool"}]'
+edit "$P" '.egress += [{"host":"downloads.acme.example","method":"*","verdict":"allow","pathPattern":"/tools/releases/*","why":"a tool"}]'
 out="$(check "$P")"
 assert_eq "egress: method *, verdict and pathPattern pass" "" "$(grep '^FAIL  egress' <<<"$out")"
+grep -q '^PASS  egress lands: 3 by prompt, 0 by hand' <<<"$out" || { echo "  how the egress lands not reported"; FAILED=1; }
+# How each rule lands, by the core's egress-rules.sh: a GitHub host outside the sandbox
+# shapes is refused (a release download too), one the kit already allows is redundant.
+P="$(helm_profile egressgh)"
+edit "$P" '.egress += [{"host":"github.com","method":"GET","path":"/acme/tools/releases/download/*","why":"a tool"}]'
+check "$P" | grep -q '^FAIL  egress GET github.com /acme/tools/releases/download/\*: refused' \
+  || { echo "  a github.com release download in a profile must fail as refused"; FAILED=1; }
 P="$(helm_profile egressbad)"; edit "$P" '.egress += [{"host":"x.example","verdict":"maybe","pathPattern":"tools/*","why":"x"}]'
 out="$(check "$P")"
 grep -q "^FAIL  egress\[2\] (x.example): verdict 'maybe'" <<<"$out" || { echo "  an unknown egress verdict must fail"; FAILED=1; }
@@ -91,6 +98,10 @@ edit "$P" '.sandbox = {"accounts":[{"id":"github","what":"an organization","guid
   | .egress += [{"host":"api.github.com","method":"POST","path":"/repos/{profile.sb_repo}/issues","why":"the issue"}]'
 out="$(check "$P")"
 assert_eq "sandbox: no FAIL" "" "$(grep '^FAIL' <<<"$out")"
+grep -q '^WARN  egress POST api.github.com /repos/{profile.sb_repo}/issues: its profile key has no value' <<<"$out" \
+  || { echo "  an egress rule naming an unset key must warn, not fail"; FAILED=1; }
+check --set sb_repo=qi-sbx/sandbox "$P" | grep -q '^PASS  egress lands: 2 by prompt, 1 by hand' \
+  || { echo "  a sandbox repository rule lands by hand"; FAILED=1; }
 grep -q '^PASS  sandbox: 1 account(s) — github' <<<"$out" || { echo "  a sandbox must pass"; FAILED=1; }
 grep -q '^WARN  sandbox: no bin/sandbox' <<<"$out" || { echo "  a sandbox without bin/sandbox must warn"; FAILED=1; }
 P="$(helm_profile sandboxbad)"
@@ -247,8 +258,19 @@ P="$(own_profile badtime yesterday)"
 check --live "$P" | grep -q "^FAIL  live: bin/build-time 2.0.0-main.7 — 'yesterday' is not ISO-8601 UTC" \
   || { echo "  a non-ISO build time must fail"; FAILED=1; }
 
-P="$(own_profile noexec)"; chmod -x "$P/bin/build-time"
-check "$P" | grep -q '^FAIL  bin/build-time: not executable' || { echo "  a non-executable command must fail"; FAILED=1; }
+# A profile installed through the platform is plain files: no exec bit needed, its #! line
+# (else bash) starts it, as scripts/lib/profile.sh → profile_run does.
+P="$(own_profile noexec)"; chmod -x "$P/bin/"*
+out="$(check --live "$P")"; rc=$?
+assert_eq "own bin/ without its exec bit passes, --live too" 0 "$rc"
+grep -q '^PASS  live: candidate 2.0.0-main.7, baseline 1.9.0' <<<"$out" || { echo "  --live must start a plain-file bin/ through its #! line"; FAILED=1; }
+P="$(own_profile noshebang)"; printf 'echo 2026-10-01T10:00:00Z\n' > "$P/bin/build-time"
+out="$(check --live "$P")"
+grep -q '^WARN  bin/build-time: no #! line — it runs through bash' <<<"$out" || { echo "  a bin/ without #! must warn"; FAILED=1; }
+grep -q '^PASS  live: 2.0.0-main.7 published 2026-10-01T10:00:00Z' <<<"$out" || { echo "  a bin/ without #! runs through bash"; FAILED=1; }
+P="$(own_profile python)"; printf '#!/usr/bin/env python3\nprint("2026-10-01T10:00:00Z")\n' > "$P/bin/build-time"
+check "$P" | grep -q '^WARN  bin/build-time: runs through python3, which requires.commands does not list' \
+  || { echo "  an interpreter missing from requires.commands must warn"; FAILED=1; }
 
 ls -d "${TMPDIR:-/tmp}"/quality-inspector-check-* 2>/dev/null | grep -q . && { echo "  scratch directories left behind"; FAILED=1; }
 exit $FAILED

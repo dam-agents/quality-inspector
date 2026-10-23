@@ -12,7 +12,7 @@
 // --set       a non-default profile setting, as an instance would write it.
 // Prints PASS/WARN/FAIL lines; exit 0 = no FAIL, 1 = at least one, 2 = usage.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, delimiter, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,6 +58,12 @@ const obj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const str = (v) => typeof v === 'string' && v.trim().length > 0;
 const read = (f) => { try { return readFileSync(f, 'utf8'); } catch { return null; } };
 const isExec = (f) => { try { return (statSync(f).mode & 0o111) !== 0; } catch { return false; } };
+// How the core starts a profile's bin/<cmd> (scripts/lib/profile.sh → profile_run): itself
+// with its exec bit; without it — a profile installed through the platform is plain files —
+// through the interpreter its #! line names; bash when it has none (bash runs such a file
+// as a script even with its exec bit).
+const shebang = (f) => { const l = (read(f) ?? '').split('\n')[0].replace(/\r$/, ''); return l.startsWith('#!') ? l.slice(2).trim().split(/\s+/).filter(Boolean) : null; };
+const argvOf = (f) => { const sb = shebang(f); return sb === null ? ['bash', f] : isExec(f) ? [f] : [...sb, f]; };
 // The same node for every child (an older system node may come first on PATH).
 const PATH = `${dirname(process.execPath)}${delimiter}${process.env.PATH ?? ''}`;
 
@@ -66,6 +72,8 @@ if (!core) {
   const own = resolve(dirname(realpathSync(fileURLToPath(import.meta.url))), '../../..');
   if (existsSync(join(own, 'docs/profile-contract.md'))) core = own;
 }
+// Absolute: the engine's check and egress-rules.sh run with another working directory.
+if (core) core = resolve(core);
 if (core && !existsSync(join(core, 'docs/profile-contract.md'))) {
   fail(`--core ${core} is not the quality-inspector definition (no docs/profile-contract.md)`);
   core = '';
@@ -141,18 +149,30 @@ if (m) {
     if (!obj(m.engine_config)) fail('engine_config: missing or not an object (the engine reads its product from it)');
   } else if (m.engine_config !== undefined) warn('engine_config without engine — nothing reads it');
 
+  // A profile's own bin/<cmd>: its #! line decides how it starts (the exec bit is optional),
+  // and an interpreter other than bash must be on the VM (requires.commands).
+  const ownBin = (cmd) => {
+    const own = join(dir, 'bin', cmd);
+    const sb = shebang(own);
+    if (!sb) warn(`bin/${cmd}: no #! line — it runs through bash`);
+    else if (!sb.length) { fail(`bin/${cmd}: its #! line names no interpreter`); return false; }
+    const interp = sb ? basename(sb[0] === '/usr/bin/env' || basename(sb[0]) === 'env' ? sb.find((a, i) => i > 0 && !a.startsWith('-')) ?? '' : sb[0]) : 'bash';
+    if (!['bash', 'sh'].includes(interp)) {
+      const cmds = obj(m.requires) && Array.isArray(m.requires.commands) ? m.requires.commands : [];
+      if (!cmds.includes(interp)) warn(`bin/${cmd}: runs through ${interp}, which requires.commands does not list — the VM may lack it`);
+      pass(`bin/${cmd}: own, through ${interp}`);
+      return true;
+    }
+    const r = spawnSync('bash', ['-n', own], { encoding: 'utf8' });
+    if (r.error) warn(`bin/${cmd}: bash -n could not run — ${r.error.message}`);
+    else if (r.status === 0) pass(`bin/${cmd}: own, bash -n clean`);
+    else { fail(`bin/${cmd}: syntax error — ${(r.stderr || '').trim().split('\n')[0]}`); return false; }
+    return true;
+  };
   for (const cmd of ['env', 'versions', 'build-time']) {
     const own = join(dir, 'bin', cmd);
-    if (existsSync(own)) {
-      if (!isExec(own)) fail(`bin/${cmd}: not executable (chmod +x)`);
-      const first = (read(own) ?? '').split('\n')[0];
-      if (!first.startsWith('#!')) fail(`bin/${cmd}: no shebang line`);
-      else if (/\b(ba)?sh\b/.test(first)) {
-        const r = spawnSync('bash', ['-n', own], { encoding: 'utf8' });
-        if (r.error) warn(`bin/${cmd}: bash -n could not run — ${r.error.message}`);
-        else r.status === 0 ? pass(`bin/${cmd}: own, bash -n clean`) : fail(`bin/${cmd}: syntax error — ${(r.stderr || '').trim().split('\n')[0]}`);
-      } else pass(`bin/${cmd}: own`);
-    } else if (engineDir && isExec(join(engineDir, 'bin', cmd))) pass(`bin/${cmd}: from engine ${engine}`);
+    if (existsSync(own)) ownBin(cmd);
+    else if (engineDir && isExec(join(engineDir, 'bin', cmd))) pass(`bin/${cmd}: from engine ${engine}`);
     else if (engine !== undefined && !engineDir) warn(`bin/${cmd}: expected from engine '${engine}', not verified`);
     else fail(`bin/${cmd}: neither the profile nor an engine provides it`);
   }
@@ -223,7 +243,7 @@ if (m) {
       }
       const own = join(dir, 'bin', 'sandbox');
       if (!existsSync(own)) warn('sandbox: no bin/sandbox — nothing checks the accounts at onboarding');
-      else if (!isExec(own)) { fail('bin/sandbox: not executable (chmod +x)'); ok = false; }
+      else if (!ownBin('sandbox')) ok = false;
       if (ok) pass(`sandbox: ${acc.length} account(s) — ${acc.map((a) => a.id).join(', ')}`);
     }
   }
@@ -435,6 +455,38 @@ if (engineCheck && isExec(engineCheck)) {
   pass(`engine_config: ${m.engine} has no offline check`);
 }
 
+// ------------------------------------------- how the egress lands on the agent ----
+// The core's scripts/egress-rules.sh lists each rule the way onboarding hands it to the
+// operator (docs/black-box.md → Egress rules): prompt, by-hand, kit or refused.
+const egressRules = m && core && Array.isArray(m.egress) && m.egress.length ? join(core, 'scripts', 'egress-rules.sh') : '';
+if (egressRules && existsSync(egressRules)) {
+  const work = mkdtempSync(join(tmpdir(), 'quality-inspector-check-'));
+  try {
+    const conf = [`- profile: ${name}`, ...Object.entries(resolved).filter(([, v]) => v !== '').map(([k, v]) => `- profile.${k}: ${v}`)];
+    writeFileSync(join(work, 'CONFIG.md'), `${conf.join('\n')}\n`);
+    const r = spawnSync('bash', [egressRules, '--json'], {
+      cwd: work, env: { ...process.env, PATH, WORK_DIR: work, QI_PROFILE_DIR: dir, QI_TARGET_REPO: '' }, encoding: 'utf8', timeout: 60000,
+    });
+    let rows = null;
+    try { rows = r.status === 0 ? JSON.parse(r.stdout).rules.filter((x) => x.source === 'profile') : null; } catch { rows = null; }
+    if (!rows) warn(`egress: the core's egress-rules.sh did not classify it — ${(r.stderr || r.error?.message || 'no output').trim().split('\n').pop()}`);
+    else {
+      const n = { prompt: 0, 'by-hand': 0, kit: 0 };
+      for (const x of rows) {
+        const at = `${x.method} ${x.host} ${x.path}`;
+        if (x.how === 'refused') {
+          if (/\{profile\./.test(`${x.host}${x.path}`)) warn(`egress ${at}: its profile key has no value here — --set <key>=<value> to classify it`);
+          else fail(`egress ${at}: refused — ${x.why}`);
+        } else {
+          n[x.how] = (n[x.how] ?? 0) + 1;
+          if (x.how === 'kit') warn(`egress ${at}: the kit already allows it — drop it`);
+        }
+      }
+      pass(`egress lands: ${n.prompt} by prompt, ${n['by-hand']} by hand (no prompt appears; the operator adds each in the agent's network settings), ${n.kit} by the kit`);
+    }
+  } finally { rmSync(work, { recursive: true, force: true }); }
+}
+
 // ---------------------------------------------------------------------- live ----
 if (live && m) {
   const exe = (cmd) => {
@@ -445,7 +497,8 @@ if (live && m) {
   };
   const work = mkdtempSync(join(tmpdir(), 'quality-inspector-check-'));
   const run = (cmd, args, env = {}) => {
-    const r = spawnSync(exe(cmd), args, { cwd: work, env: { ...childEnv(work), ...env }, encoding: 'utf8', timeout: 120000 });
+    const [bin, ...pre] = argvOf(exe(cmd));
+    const r = spawnSync(bin, [...pre, ...args], { cwd: work, env: { ...childEnv(work), ...env }, encoding: 'utf8', timeout: 120000 });
     return { ok: r.status === 0, out: (r.stdout || '').trim(), err: (r.stderr || r.error?.message || '').trim().split('\n').pop() };
   };
   const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;

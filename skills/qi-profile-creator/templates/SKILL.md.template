@@ -22,7 +22,7 @@ The nested install is a fresh, <fill: single-user> instance at `<fill: app.url>`
 ## Test accounts
 
 - `owner` — <fill: its role and what it may do>.
-TODO(profile): one bullet per further role — `member`, `viewer`, `outsider` (E2E_USER_<ROLE>_*) — with what it may and may not do, or delete this line.
+TODO(profile): one bullet per further role — `member`, `viewer` (only a read-only user), `outsider` (E2E_USER_<ROLE>_*) — with what it may and may not do, or delete this line.
 
 ## What the nested install cannot do
 

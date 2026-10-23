@@ -37,14 +37,18 @@ Keep the template's order; drop a section that has nothing to say.
 - **Test accounts** — `owner` and each further role (`member`, `viewer`, `outsider`, the
   contract's names): what it may do and what it may not. Explorations and the security
   run judge access against these sentences. Never a username or password; tests read
-  them from the credentials.
+  them from the credentials. When older builds lack the further accounts, say from which
+  build they exist and that criteria needing them are `blocked` before it.
 - **What the nested install cannot do** — the section that decides verdicts. One bullet
   per limit: the limit, then the verdict in the core's words:
   - `testable: no — external dependency` for an outside service with no stand-in;
   - with sandbox accounts (`sandbox`), which flows they make testable, which `suite/`
     helper acts as the test person, how a result outside the product is observed (in the
     product's UI or through the helper — never by reading GitHub), and that without them
-    those criteria stay `testable: no — external dependency`;
+    those criteria stay `testable: no — external dependency`; also what a user would see
+    of the product's own rules there that shape how a test acts (it ignores its own app's
+    posts, drops a run of bot posts in one conversation) and the pattern the helpers
+    follow because of it (one thread per request);
   - another reason after `testable: no —` for another cause (`single user`);
   - `blocked`, naming the `profile.<key>`, when an optional setting provides the stand-in
     — an instance without it reports such criteria blocked, not failed;
