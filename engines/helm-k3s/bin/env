@@ -18,6 +18,7 @@ cfgv() { jq -r "$1 // empty" <<<"$CFG"; }
 CHART="$(cfgv .chart)"; RELEASE="$(cfgv .release)"; RELEASE="${RELEASE:-app}"
 NS="$(cfgv .namespace)"; NS="${NS:-default}"; APP_PORT="$(cfgv .app_port)"
 HELM_VERSION="$(cfgv .helm_version)"; HELM_VERSION="${HELM_VERSION:-v3.19.0}"
+PRUNE_BELOW_GI="$(cfgv .prune_below_gi)"; case "$PRUNE_BELOW_GI" in (''|*[!0-9]*) PRUNE_BELOW_GI=20;; esac
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 die() { echo "env: $*" >&2; exit 1; }
@@ -185,6 +186,21 @@ cmd_up() {
   ui_answers 60 || die "app not reachable at $(app_url) after 10 minutes"
   printf '{"build":"%s","values":"%s","installed_utc":"%s"}\n' "$tag" "$vhash" "$(now)" > "$ENVD/STATE.json"
   say "$RELEASE $tag is up at $(app_url)"
+  # Below prune_below_gi free, the earlier builds' images go; above it they stay, so a
+  # switch back (red-green, a bisection) pulls nothing.
+  local free; free="$(free_gi)"
+  [ -n "$free" ] && [ "$free" -lt "$PRUNE_BELOW_GI" ] && prune_images
+  return 0
+}
+
+# Images no container uses: every earlier build's after an `up`, this one's too after a
+# `reset`. containerd keeps them all otherwise, until the kubelet evicts pods for disk.
+prune_images() {
+  low k3s crictl rmi --prune >/dev/null 2>&1 && say "removed the images no container uses" \
+    || say "image prune failed — continuing"
+}
+free_gi() { # Gi free where k3s keeps its images; empty when unmeasurable
+  { df -Pk /var/lib/rancher 2>/dev/null || df -Pk / 2>/dev/null; } | awk 'NR==2 && $4 ~ /^[0-9]+$/ {print int($4/1048576)}'
 }
 
 cmd_reset() {
@@ -193,6 +209,7 @@ cmd_reset() {
   helm -n "$NS" uninstall "$RELEASE" --wait --timeout 10m >/dev/null 2>&1 || true
   kc -n "$NS" delete pvc --all --wait=true --timeout=300s >/dev/null 2>&1 || true
   rm -f "$ENVD/STATE.json"
+  prune_images
 }
 
 cmd_status() {
