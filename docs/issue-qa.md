@@ -93,7 +93,8 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
     runs: `env.sh wait <candidate>` / `suite.sh wait <label>` first); log `issue_done issue=<n> verdict=<v> minutes=<m> model_steps=<k>`,
     `m` and `k` the `elapsed_min` and `model_steps` of `suite.sh budget <claim time>`. Then the
     catalog ([catalog.md](catalog.md) → **Build and publish**) — on every path, an operator's or a
-    Slack "test #N" included, so Overview no longer shows the issue as working.
+    Slack "test #N" included, so Overview no longer shows the issue as working; a Slack "test #N"
+    sends its report reply after it ([slack.md](slack.md) → **Run the test**).
 
 A failure between steps 5 and 8 that is not an environment failure → finish with the
 evidence you have: the ACs you could not judge are `blocked` with the reason. Never

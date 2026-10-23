@@ -10,7 +10,7 @@ you remember nothing; the thread is the state.
 | The message | You | Who may ask |
 | --- | --- | --- |
 | `test #<n>` in `slack_channel` | **Run the test**, below | a person |
-| `status #<n>` in `slack_channel` | one reply: its `work/QA.md` row and the evidence link | a person |
+| `status #<n>` in `slack_channel` | one reply: its `work/QA.md` row and the link of **The answer in the thread** | a person |
 | a question about a test this thread ran | answer it from the thread | a person |
 | anything else aimed at you, in any bound conversation | [scenarios.md](scenarios.md) → **A message in a bound Slack conversation** | anyone |
 | not aimed at you | `no_reply_needed` | — |
@@ -38,14 +38,15 @@ declined in one reply — it is the operator's, in the direct session.
 - **Only `reply` reaches the thread**, never shown in the channel, ledgered as surface
   `slack_test` ([logging.md](logging.md) → **Ledger of external writes**). **Two replies:**
   the first once the lock is taken — the issue, the candidate and baseline builds, and "up
-  to `max_wallclock_min_per_issue` minutes"; the second the report.
+  to `max_wallclock_min_per_issue` minutes"; the second the report, after step 10's catalog
+  ([issue-qa.md](issue-qa.md)), so the dashboard it points to already shows the run.
 - **Stay in the turn until the report is sent**: a Slack turn ends when you stop. Every
   wait — `env.sh wait <build>` for an install, `suite.sh wait <label>` for a suite run — runs
   again while it exits 3 ([nested-env.md](nested-env.md) → **Shape**).
 - **The report:** the issue verdict, the ACs that are not `verified` with their verdicts
-  (none → "N of N verified"), the evidence link, and the first `failed` AC's `AC-<k>`
-  screenshot as the reply's `attachment`. Never a credential, a log, the operator
-  conversation or a security finding ([security.md](security.md)).
+  (none → "N of N verified"), and the link and the picture of **The answer in the thread**.
+  Never a credential, a log, the operator conversation or a security finding
+  ([security.md](security.md)).
 - **Delivery** stays per [reporting.md](reporting.md): the artifact, then the issue
   comments it makes on #N and the retest-label removal. These are the only GitHub writes a
   Slack turn may make — `bash "$HOME/scripts/github.sh" comment <n> <file>` and `… unlabel <n>`,
@@ -56,3 +57,42 @@ declined in one reply — it is the operator's, in the direct session.
   `github.sh` is written. The limit: the hook reads text, so a name joined at run time from
   fragments passes it. A refused write leaves `report_pending`, and the next issues run's
   `reports_due` delivers it. Slack is one more surface, never instead of them.
+
+## The answer in the thread
+
+A "test #N" report and a scenario's reply ([scenarios.md](scenarios.md) → **The reply**) bring
+the result into the thread: where to see it whole, and a picture that shows it. A `status`
+answer, the scenario digest ([scenarios.md](scenarios.md) → **Discovery**) and the nightly
+summary ([regression.md](regression.md) step 9) take the link alone.
+
+- **The link.** A `platform://artifacts/…` reference opens nothing in Slack, and a private
+  artifact has no other address — never post one there. `get_artifact` the report
+  (`artifact.id` beside it): its `shareUrl` when it has one — the operator shared it, or
+  `slack_report_visibility: public` below. Else the catalog's (`work/catalog/artifact.id`), its
+  `shareUrl` when the operator shared the dashboard, with "the run is there under `#<n>` /
+  `S-<k>`". Neither → no link: "the full report — video and steps — is with the agent's
+  operator".
+- **`slack_report_visibility: public`** (default `private`): a report delivered to a thread
+  is published `public` — `create_artifact` with `visibility: public`, or `set_artifact_sharing`
+  on one that is private (a restricted one stays as the operator set it: it has a link). The
+  link is then the whole access control: anyone who holds it sees the videos and screenshots
+  of the nested product — and an issue's artifact is one per issue, so its later revisions too.
+  That `public` link goes into that thread's answer and nowhere else: a `status` answer, the
+  digest, the nightly summary and the issue comment ([reporting.md](reporting.md) → Delivery
+  step 2) treat the report as one with no link. Only the operator sets the key (CLAUDE.md →
+  Runtime configuration).
+- **The picture.** `node "$HOME/scripts/evidence-sheet.mjs" <report dir>` →
+  `{sheet, rows, left_out, reason}`: one PNG of the screenshots that back the verdicts — per
+  criterion its `AC-<k>` still, or the screen at failure, on each side that decides it (a
+  `verified` AC: baseline and candidate; a scenario's `regression`: last release and build),
+  failures first, at most four (render-report's `proof.json`). It is the reply's `attachment`
+  — one file a message, the platform's limit. `sheet: null` → the reply goes without one,
+  never with a substitute: no criterion has a screen to show (a CLI or API check, nothing
+  judged), or no browser (`reason`, logged as a `warn`). Never attach anything else of the
+  report: no video, trace, log or step text. A refused attachment leaves the text delivered
+  — the delivery holds; log it.
+- **In the catalog.** The run is on the dashboard with its verdicts and builds, and a
+  scenario's test from its step 11 ([catalog.md](catalog.md) → **Build and publish**): a
+  "test #N" publishes it before its report reply; a scenario right after its reply, since the
+  reply goes under the environment lock — released earlier, the next issues run would send it
+  a second time ([scenarios.md](scenarios.md) step 12).

@@ -93,7 +93,7 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
    evidence link; then what needs review; then one line of what was absorbed; then the
    profile scenarios adopted, rejected and retired. With `channel` set, the same summary
    as one `send_channel_message` to it — every night, also when all is `unchanged`, so a
-   missing post is noticed; a regression or a failed adoption opens with 🔴 and the test's
+   missing post is noticed; its links per [slack.md](slack.md) → **The answer in the thread**; a regression or a failed adoption opens with 🔴 and the test's
    owner (the scenario's file, or the issue). Ledgered as surface `slack`
    ([logging.md](logging.md) → **Ledger of external writes**); a refused post is logged,
    never retried by the run.
