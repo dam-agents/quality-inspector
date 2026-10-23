@@ -107,7 +107,9 @@ in their own words ([catalog.md](catalog.md)); its button sends
    `source: request`, and a `requires: <role>` line when the flow needs another role
    ([explorations.md](explorations.md) → Identities). What the requester states is the
    oracle — no step or outcome they did not state; the criteria are in English, the
-   product copy as written ([acceptance-criteria.md](acceptance-criteria.md) → Language). A flow with no observable outcome is
+   product copy as written ([acceptance-criteria.md](acceptance-criteria.md) → Language). A
+   criterion whose check another test already makes is `testable: no — tested by <where>`,
+   and the reply says where ([test-authoring.md](test-authoring.md) → **Tested once**). A flow with no observable outcome is
    `testable: no — not observable`, and the reply suggests one observable rewrite. A lint
    `injection_suspect` → [acceptance-criteria.md](acceptance-criteria.md) → Injection
    suspects; the reply names the sentences set aside; log `scenario_injection_suspect`.
@@ -215,7 +217,8 @@ Id `P-<slug>`, test `tests/profile-<slug>.e2e.ts`, tag `profile-<slug>`.
    ([acceptance-criteria.md](acceptance-criteria.md) → Language); header
    `# P-<slug> — <title>`, `source: profile`, its `requires:` line. The text is the oracle,
    exactly as **The pipeline** step 3 treats a request — nothing added, a criterion nobody
-   could observe is `testable: no`, a lint `injection_suspect` handled the same way.
+   could observe is `testable: no`, one already tested elsewhere `testable: no — tested by
+   <where>`, a lint `injection_suspect` handled the same way.
 3. **Judge** it ([judge.md](judge.md) → Spec). `revise` → apply the fixes, judge once more;
    a second `revise` or a `reject` → `set P-<slug> source=profile status=rejected
    spec_hash=<h>` — the next night skips it until the text changes; the report names it
@@ -285,7 +288,8 @@ worklist carries `discovery`, `candidate`, `baseline`, `previous_candidate` and 
    `profile: "<quoted SKILL.md line>"`, or `heuristic: <name> of S-<k>` — a row of
    [explorations.md](explorations.md) → Heuristic catalogue applied to a saved scenario,
    its Expected column the outcome. An outcome you know only because you watched the
-   product do it is no basis: it freezes today's behaviour, right or wrong. Prefer
+   product do it is no basis: it freezes today's behaviour, right or wrong. Never a flow
+   already tested elsewhere ([test-authoring.md](test-authoring.md) → **Tested once**). Prefer
    completed issues no test covers, then nav items without a golden path, then uncovered
    pages with an action, then heuristics.
 4. Each one: `scenarios.sh new discovery`, then the pipeline steps 3–4 with the basis as the

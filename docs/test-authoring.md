@@ -83,6 +83,33 @@ and an `EX-<k>:` screenshot written by the rules above. Their blocks are hashed 
 (`check-asserts.sh --ex-hash`) and are not promoted state; a role session other than `owner`
 comes from the setup test too.
 
+## Tested once
+
+A check one test already makes is not made again by another. Before freezing a scenario's
+criteria or an issue's explorations, look where each check may already be made:
+
+- a `regression`-tier row of `work/SUITE.md` — a promoted issue test, a saved scenario, an
+  adopted profile scenario —, by the `## AC-<k> — <name>` lines of its criteria file. A row
+  of the same id as the test being frozen (`#<n>`, `S-<k>`, `P-<slug>`) never counts: it is
+  that test's own earlier version, not another test;
+- the security run's check catalogue ([security.md](security.md)), while `security_checks`
+  is not `disabled`, and the checks of a testing module that is switched on
+  ([modules.md](modules.md));
+- the `## Tested elsewhere` section of the profile's `SKILL.md`: the flows the product's own
+  test suite keeps true, in a user's words ([profile-contract.md](profile-contract.md) →
+  `SKILL.md`).
+
+What is tested there may be a test's **Given** — the state it starts from, reached as setup
+the way a user would — but it is not asserted again: no `criterion` block and no `AC-` or
+`EX-` screenshot for it. A criterion that would only repeat it is frozen `testable: no —
+tested by <where>` (`P-<slug> AC-<k>`, `#<n> AC-<k>`, `S-<k> AC-<k>`, a `SEC-` id, the
+module, or the quoted `SKILL.md` line), and the report and the reply name where. An
+exploration that would repeat it is not written and does not count toward its cap.
+
+**An issue's ACs are exempt.** The issue run tests every AC it froze, red-green, even one
+that another test also asserts: its verdict is about this issue's change. The rule binds
+scenarios — a request, a discovery proposal, a profile scenario — and explorations.
+
 ## Long waits
 
 A criterion that waits for time to pass — an agent falling asleep after being idle, a task

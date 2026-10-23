@@ -19,9 +19,12 @@ The pipeline, step 4), and does the evidence show what the verdict claims (step 
 
 ## Spec — is this a sound test?
 
-Inputs: `request.md`, the draft criteria, the profile's `SKILL.md`, and the titles of the
+Inputs: `request.md`, the draft criteria, the profile's `SKILL.md`, the titles of the
 existing criteria files (the first line of each `work/issues/*/criteria-*.md` and
-`work/scenarios/*/criteria-*.md`).
+`work/scenarios/*/criteria-*.md`), `work/SUITE.md` with the `## AC-<k>` lines of its
+`regression` rows' criteria files, `$HOME/docs/security.md` → Check catalogue, and the
+testing modules switched on. Every criteria file and row of the scenario's own id (`S-<k>`,
+`P-<slug>`) is left out: it is the scenario's own earlier version, not another test.
 
 Per AC:
 
@@ -36,6 +39,10 @@ Per AC:
 - **Testable here** — nothing the profile's `SKILL.md` says the nested product cannot do;
   otherwise it must already say `testable: no` with that reason.
 - **New** — no existing title states the same flow and outcome (else `duplicate_of`).
+- **Tested once** — the AC repeats no check made elsewhere
+  ([test-authoring.md](test-authoring.md) → **Tested once**); else the problem names where,
+  and the fix is `testable: no — tested by <where>`, or the AC's state moved into the next
+  AC's Given.
 
 ```json
 {"verdict": "accept", "duplicate_of": null, "reason": "one sentence",
