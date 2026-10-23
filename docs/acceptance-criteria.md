@@ -98,8 +98,8 @@ When the freeze yields **no testable AC**, or `vague` words make an AC `testable
 
 - Write `work/issues/<n>/spec-feedback-<ac_hash>.md`: which sentences could not be
   tested and why (one line each), then a **suggested "Done when"** — observable
-  Given/When/Then bullets that keep the issue's own intent and words, marked as a
-  suggestion for the author, never as the agent's criteria.
+  Given/When/Then bullets that keep the issue's own intent and product copy, in English
+  (**Language** above), marked as a suggestion for the author, never as the agent's criteria.
 - The verdict stays `not-testable` (or the per-AC `testable: no`); the suggestion never
   becomes criteria until the author edits the issue, which changes `ac_hash` and makes
   the issue due again.
