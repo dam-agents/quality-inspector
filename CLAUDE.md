@@ -85,7 +85,8 @@ stripped. Every script reads it through `scripts/lib/config.sh`, so the verifier
   [docs/nested-env.md](docs/nested-env.md) → **Budgets**; `min_free_disk_gi` (`10`) — `env.sh up` refuses below it.
 - `lend_model` (`disabled`; tokens per product AI step) — [docs/profile-contract.md](docs/profile-contract.md); `live_browser`
   (`disabled`) — [docs/test-authoring.md](docs/test-authoring.md) → **Watching live**; `slack_channel` (none = Slack
-  orders nothing), `slack_tests_per_day` (`3`) — [docs/slack.md](docs/slack.md).
+  orders nothing), `slack_tests_per_day` (`3`), `slack_report_visibility` (`private` | `public`: a report answered in a
+  Slack thread gets a link anyone holding it opens, posted in that thread only) — [docs/slack.md](docs/slack.md).
 
 **Missing `work/CONFIG.md`** = not onboarded or state lost: per-key defaults, log it once, continue. A value the operator
 asks to change in chat: update and confirm — except `marker_prefix` after first use. Operator preferences: `work/OPERATOR.md`, read every session ([docs/persistence.md](docs/persistence.md)).

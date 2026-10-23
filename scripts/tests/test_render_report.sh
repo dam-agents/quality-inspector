@@ -4,7 +4,9 @@
 # explorations render apart from the verdict, and a verdicts file without them renders as before;
 # noticed-in-passing items are listed outside the verdict; a baseline blocked reason and a
 # regression's build interval are shown; a scenario's evidence is found by its own tag and
-# carries the judge's reading, and a verified scenario is refused.
+# carries the judge's reading, and a verified scenario is refused; proof.json names the
+# screenshots behind each verdict on the sides that decide it, and evidence-sheet.mjs draws them
+# from the report's media/ alone, or says why there is no picture.
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 R="$SANDBOX/runs"
@@ -46,6 +48,24 @@ case "$h" in *'feature is absent there'*) ;; *) echo "  baseline blocked reason 
 assert "no exploration keys without explorations" 'has("explorations") | not' "$out"
 case "$h" in *'Beyond the criteria'*) echo "  explorations section rendered without explorations"; FAILED=1;; esac
 grep -q 'beyond the criteria' "$SANDBOX/out/comment.md" && { echo "  explorations comment line without explorations"; FAILED=1; }
+
+# proof.json: a verified AC shows baseline and candidate, a not-testable one nothing; it stays out of media/.
+pf="$(cat "$SANDBOX/out/proof.json")"
+assert "proof: the verified AC on both sides, from media/" '.mode == "issue" and .subject == "#42" and (.rows | length) == 1 and .rows[0].id == "AC-1"
+  and ([.rows[0].shots[].side] == ["baseline","candidate"]) and ([.rows[0].shots[].state] == ["failed","passed"])
+  and all(.rows[0].shots[]; (.src | startswith("media/")) and (.caption | startswith("AC-1:"))) and .left_out == 0' "$pf"
+assert "render-report counts the proof rows" '.proof == 1' "$out"
+
+# evidence-sheet.mjs: no proof.json is an error; no browser, no screen to show or a src outside
+# media/ is no picture, with the reason, and never a stale one.
+node "$SCRIPTS/evidence-sheet.mjs" "$SANDBOX/nothing" >/dev/null; assert_eq "evidence-sheet: no proof.json" 1 "$?"
+es="$(node "$SCRIPTS/evidence-sheet.mjs" "$SANDBOX/out")"
+assert "evidence-sheet: no playwright-core, no picture" '.sheet == null and .rows == 1 and (.reason | startswith("unavailable"))' "$es"
+cp -R "$SANDBOX/out" "$SANDBOX/out-es"; printf 'stale' > "$SANDBOX/out-es/evidence.png"
+jq '.rows[0].shots |= map(.src = "../../outside.png")' "$SANDBOX/out/proof.json" > "$SANDBOX/out-es/proof.json"
+es="$(node "$SCRIPTS/evidence-sheet.mjs" "$SANDBOX/out-es")"
+assert "evidence-sheet: a src outside media/ is never read" '.sheet == null and .rows == 0 and (.reason | startswith("no criterion"))' "$es"
+[ -f "$SANDBOX/out-es/evidence.png" ] && { echo "  a stale evidence.png survived"; FAILED=1; }
 
 # Explorations: their own run, tagged issue-<n>-ex + ex-<k>; candidate only, never in the verdict.
 d="$R/expl/artifacts/web/ex1/default/attempt-0"
@@ -102,6 +122,7 @@ h="$(cat "$SANDBOX/rout/index.html")"
 case "$h" in *'Signals no test covers'*'Error: &lt;img onerror=x&gt;'*'media/signal-1-settings.png'*'POST /api/keys/:id → 500'*'took 9000 ms'*) ;; *) echo "  signals list missing or unescaped"; FAILED=1;; esac
 case "$h" in *'<img onerror'*) echo "  signal text not escaped"; FAILED=1;; esac
 [ -f "$SANDBOX/rout/media/signal-1-settings.png" ] || { echo "  signal screenshot not copied"; FAILED=1; }
+[ -f "$SANDBOX/rout/proof.json" ] && { echo "  a regression run's report wrote proof.json"; FAILED=1; }
 
 # Regression mode: a confirmed regression's build interval and the interface diff.
 cat > "$SANDBOX/r2.json" <<'J'
@@ -129,6 +150,8 @@ h="$(cat "$SANDBOX/s-out/index.html")"
 case "$h" in *'S-7 — Export the usage table'*) ;; *) echo "  scenario title missing"; FAILED=1;; esac
 case "$h" in *'agrees (product-defect)'*) ;; *) echo "  judge reading missing"; FAILED=1;; esac
 grep -q '^• AC-1 csv downloads — regression$' "$SANDBOX/s-out/comment.md" || { echo "  scenario reply line missing"; FAILED=1; }
+assert "scenario proof: a regression shows the last release passing and the build failing" '.mode == "scenario" and .subject == "S-7"
+  and ([.rows[0].shots[] | [.side, .state, .build]] == [["baseline","passed","b1"],["candidate","failed","c1"]])' "$(cat "$SANDBOX/s-out/proof.json")"
 
 # A profile scenario: evidence by its profile-<slug> tag, the request shown verbatim from its
 # source-<spec_hash>.md; a request_file outside work/scenarios/ is never read.
@@ -142,6 +165,7 @@ cat > "$SANDBOX/p.json" <<'J'
 J
 out="$(QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/p.json" "$SANDBOX/p-out")"
 assert "profile scenario: evidence found by the profile tag" '.videos == 1' "$out"
+assert "profile scenario proof: a passed AC on the build only" '[.rows[0].shots[].side] == ["candidate"]' "$(cat "$SANDBOX/p-out/proof.json")"
 h="$(cat "$SANDBOX/p-out/index.html")"
 case "$h" in *'The request, verbatim'*'When the owner signs in &lt;b&gt;now&lt;/b&gt;'*) ;; *) echo "  verbatim request missing or unescaped"; FAILED=1;; esac
 echo secret > "$SANDBOX/outside.md"
