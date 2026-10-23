@@ -14,7 +14,7 @@ Nothing to run — scripts and docs are re-read per run. Every `suite.sh run <la
 a harness background task, followed by the new `suite.sh wait <label>` (exit 0 prints the
 summary, 3 = call again), like `env.sh up` / `wait` ([docs/nested-env.md](docs/nested-env.md) →
 Shape); both background tasks pass the tool a two-hour `timeout`, or a scheduled run stops
-them at 30 minutes. A test whose criterion waits minutes sets its own `timeout`
+them at 30 minutes. `env.sh unlock` now refuses while a background suite run still runs. A test whose criterion waits minutes sets its own `timeout`
 ([docs/test-authoring.md](docs/test-authoring.md) → Long waits). "test scenario <slug>" now
 resets the nested product before the candidate comes up ([docs/scenarios.md](docs/scenarios.md)
 → Profile scenarios → On demand).

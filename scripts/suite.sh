@@ -181,13 +181,14 @@ cmd_run() {
 ME="${CLAUDE_CODE_SESSION_ID:-}"
 now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 run_state() { printf '%s\n' "$SUITE/.e2e/state/$1"; }
+put_state() { printf '%s\n' "$2" > "$1.tmp" && mv -f "$1.tmp" "$1"; }  # never an empty file to read
 cmd_run_tracked() {
   local label="${1:?label}" st rc
   case "$label" in (*[!A-Za-z0-9._-]*) die "label must be [A-Za-z0-9._-]";; esac
   st="$(run_state "$label")"; mkdir -p "$(dirname "$st")"
-  printf 'running %s %s %s %s\n' "$label" "$(now)" "$$" "${ME:--}" > "$st"
+  put_state "$st" "running $label $(now) $$ ${ME:--}"
   ( cmd_run "$@" ); rc=$?
-  printf 'done %s %s %s %s\n' "$label" "$(now)" "$rc" "${ME:--}" > "$st"
+  put_state "$st" "done $label $(now) $rc ${ME:--}"
   return "$rc"
 }
 cmd_wait() { # <label> [<seconds>]

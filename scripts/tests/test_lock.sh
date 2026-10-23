@@ -83,6 +83,16 @@ kill "$bg" 2>/dev/null; wait "$bg" 2>/dev/null
 assert_eq "wait on a dead install" 1 "$(lk sess-a wait 1.0.0 1)"
 assert_eq "unlock once it is gone" 0 "$(lk sess-a unlock issues)"
 
+# unlock refuses while a background suite run still drives the product, and allows it once it died.
+mkdir -p "$WORK_DIR/suite/.e2e/state"
+sleep 30 & bg=$!
+echo "running issue-7-candidate $(iso_ago 1) $bg sess-a" > "$WORK_DIR/suite/.e2e/state/issue-7-candidate"
+lk sess-a lock issues >/dev/null
+assert_eq "unlock refused while a suite run runs" 1 "$(lk sess-a unlock issues)"
+grep -q 'suite.sh wait issue-7-candidate' "$SANDBOX/err" || { echo "  the refusal does not name the run"; FAILED=1; }
+kill "$bg" 2>/dev/null; wait "$bg" 2>/dev/null
+assert_eq "unlock once the suite run is gone" 0 "$(lk sess-a unlock issues)"
+
 # The pre-flight reads the same states.
 echo "issues $(iso_ago 5) sess-a" > "$L"
 out="$(STUB_RUNNING=sess-a bash "$SCRIPTS/preflight.sh" issues)"

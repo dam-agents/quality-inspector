@@ -57,7 +57,8 @@ both deterministically: minutes since the claim, and the `agent.act` / `agent.as
 steps of every suite run written since then, replays from the cache excluded — the only
 cost proxy a script can count (your own exploring turns are not in it, nor the product's
 own model calls under `lend_model: enabled`). When `exceeded`
-is non-empty: stop testing, judge what already ran, mark every remaining AC `blocked` with
+is non-empty: stop testing — stop a background `suite.sh run` that still runs (its harness
+task), since `env.sh unlock` refuses while one does —, judge what already ran, mark every remaining AC `blocked` with
 the note `budget exceeded`, log `issue_budget_exceeded` per budget
 ([logging.md](logging.md)), and finish from step 8 of [issue-qa.md](issue-qa.md) — the
 row ends `report_pending` or `reported`, never `in_progress`. `lock_ttl_min` stays above
