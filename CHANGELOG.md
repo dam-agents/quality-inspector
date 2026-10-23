@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.13.0 — 2026-10-23
+## 3.15.0 — 2026-10-23
 
 **Upgrade:**
 1. `bash "$HOME/scripts/hooks/install.sh"`, effective from the next session: it registers the trace
@@ -16,6 +16,19 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    `trace_hooks` warns.
 2. `bash "$HOME/scripts/verify-onboarding.sh"` and read its `trace_hook` line: a harness older than
    2.1.101 leaves failed tool calls untraced until the platform upgrades it — then repeat step 1.
+
+## 3.14.0 — 2026-10-23
+
+**Upgrade:**
+Nothing to run — scripts and docs are re-read per run. Every `suite.sh run <label>` now runs as
+a harness background task, followed by the new `suite.sh wait <label>` (exit 0 prints the
+summary, 3 = call again), like `env.sh up` / `wait` ([docs/nested-env.md](docs/nested-env.md) →
+Shape); both background tasks pass the tool a two-hour `timeout`, or a scheduled run stops
+them at 30 minutes. `env.sh unlock` now refuses while a background suite run still runs.
+A test whose criterion waits minutes sets its own `timeout`
+([docs/test-authoring.md](docs/test-authoring.md) → Long waits). "test scenario <slug>" now
+resets the nested product before the candidate comes up ([docs/scenarios.md](docs/scenarios.md)
+→ Profile scenarios → On demand).
 
 ## 3.13.0 — 2026-10-23
 

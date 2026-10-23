@@ -22,6 +22,16 @@ file is the why and the recovery path; how one product is installed is the profi
   never ends while an install runs. The engine runs the product below the agent's own CPU
   priority, and an `up` of the build that already answers with the same values returns at
   once — after a VM restart too ([engines/helm-k3s/README.md](../engines/helm-k3s/README.md)).
+- **Every `suite.sh run <label>` runs as a harness background task too** (its two-hour
+  `timeout` below), then
+  `suite.sh wait <label>` the same way: exit 0 prints the run's summary, 3 = still running,
+  1 = it failed (its output says why); the turn never ends while one runs. A test may wait
+  longer than one tool call ([test-authoring.md](test-authoring.md) → **Long waits**); every `suite.sh run …` in
+  these docs means this pair.
+- **Both background tasks pass the tool a `timeout` of 7200000 (two hours)**: in an
+  unattended run (a scheduled one) the harness stops a background task after 30 minutes
+  otherwise, and two hours is its maximum. A suite run that may take longer is split by
+  `--tag` into several runs.
 - **What a run leaves stays until the next reset**: a failed AC's data is there to look
   at ("show the environment") until a run resets for its baseline.
 - **Credentials are the profile's** — `env.sh init` makes it write
@@ -47,7 +57,8 @@ both deterministically: minutes since the claim, and the `agent.act` / `agent.as
 steps of every suite run written since then, replays from the cache excluded — the only
 cost proxy a script can count (your own exploring turns are not in it, nor the product's
 own model calls under `lend_model: enabled`). When `exceeded`
-is non-empty: stop testing, judge what already ran, mark every remaining AC `blocked` with
+is non-empty: stop testing — stop a background `suite.sh run` that still runs (its harness
+task), since `env.sh unlock` refuses while one does —, judge what already ran, mark every remaining AC `blocked` with
 the note `budget exceeded`, log `issue_budget_exceeded` per budget
 ([logging.md](logging.md)), and finish from step 8 of [issue-qa.md](issue-qa.md) — the
 row ends `report_pending` or `reported`, never `in_progress`. `lock_ttl_min` stays above

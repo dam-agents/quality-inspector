@@ -13,7 +13,15 @@
 #                                 A `failures` run attaches to live_browser when lib/config.sh
 #                                 → live_cdp allows it; a `full` (evidence) run never does.
 #                                 Extra args go to `e2e run`; a confirmation re-run adds
-#                                 `--repeat-each 3 --no-cache`, and by_test[].stability reads it
+#                                 `--repeat-each 3 --no-cache`, and by_test[].stability reads it.
+#                                 Always a harness background task with the tool's `timeout`
+#                                 at 7200000 (an unattended run stops one at 30 minutes
+#                                 otherwise), then `wait` — a test may wait longer than the
+#                                 tool's 10-minute foreground limit (its own timeout)
+#   suite.sh wait <label> [<seconds>]
+#                                 block until this session's background `run <label>` ends
+#                                 (default 540 s): exit 0 with its summary on stdout, 3 it
+#                                 still runs (call again), 1 it failed, died, or was never started
 #   suite.sh summary <label>      re-print the summary of an earlier run
 #   suite.sh roles                the e2e identities the profile provided, as a JSON array
 #                                 of role names (`["owner","member"]`) — names only, never a
@@ -168,6 +176,41 @@ cmd_run() {
   masked_summary "$SUITE/$out/report.json" "$label"
 }
 
+# run <label>, its result kept for `wait`: `running <label> <ISO> <pid> <session>`, then
+# `done <label> <ISO> <exit> <session>` — so a wait never reads an earlier run's result.
+ME="${CLAUDE_CODE_SESSION_ID:-}"
+now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+run_state() { printf '%s\n' "$SUITE/.e2e/state/$1"; }
+put_state() { printf '%s\n' "$2" > "$1.tmp" && mv -f "$1.tmp" "$1"; }  # never an empty file to read
+cmd_run_tracked() {
+  local label="${1:?label}" st rc
+  case "$label" in (*[!A-Za-z0-9._-]*) die "label must be [A-Za-z0-9._-]";; esac
+  st="$(run_state "$label")"; mkdir -p "$(dirname "$st")"
+  put_state "$st" "running $label $(now) $$ ${ME:--}"
+  ( cmd_run "$@" ); rc=$?
+  put_state "$st" "done $label $(now) $rc ${ME:--}"
+  return "$rc"
+}
+cmd_wait() { # <label> [<seconds>]
+  local want="${1:?label}" max="${2:-540}" end f st l ts x who
+  case "$max" in (''|*[!0-9]*) max=540;; esac
+  end=$(( $(date -u +%s) + max )); f="$(run_state "$want")"
+  while :; do
+    st=""; [ -f "$f" ] && read -r st l ts x who < "$f"
+    if [ -z "$st" ] || [ "$l" != "$want" ] || { [ -n "$ME" ] && [ "${who:--}" != "$ME" ]; }; then
+      echo "suite: this session started no run $want — suite.sh run $want as a background task first" >&2; return 1
+    fi
+    case "$st" in
+      (done) [ "$x" = 0 ] && { cmd_summary "$want"; return; }
+             echo "suite: the run $want failed (exit $x, $ts) — its background task's output says why" >&2; return 1;;
+      (running) kill -0 "$x" 2>/dev/null || { echo "suite: the run $want (started $ts) died without a result — a background task's time limit stops one so (docs/nested-env.md → Shape)" >&2; return 1; };;
+      (*) echo "suite: unreadable $f" >&2; return 1;;
+    esac
+    [ "$(date -u +%s)" -lt "$end" ] || { echo "suite: $want still runs (since $ts) — run suite.sh wait again" >&2; return 3; }
+    sleep 5
+  done
+}
+
 # A role is provided when credentials.env sets a non-empty E2E_USER_<ROLE>_USERNAME (lib/profile.sh).
 cmd_roles() {
   local f="$WORK/env/credentials.env"
@@ -202,9 +245,10 @@ cmd_budget() { # <claim-iso>
 
 case "${1:-}" in
   init)    cmd_init ;;
-  run)     shift; cmd_run "$@" ;;
+  run)     shift; cmd_run_tracked "$@" ;;
+  wait)    [ -n "${2:-}" ] || { echo "usage: $0 wait <label> [<seconds>]" >&2; exit 2; }; cmd_wait "$2" "${3:-}" ;;
   summary) cmd_summary "${2:-}" ;;
   roles)   cmd_roles ;;
   budget)  cmd_budget "${2:-}" ;;
-  *) echo "usage: $0 init | run <label> [--evidence full|failures] [--strict] [e2e run args…] | summary <label> | roles | budget <claim-iso>" >&2; exit 2 ;;
+  *) echo "usage: $0 init | run <label> [--evidence full|failures] [--strict] [e2e run args…] | wait <label> [<seconds>] | summary <label> | roles | budget <claim-iso>" >&2; exit 2 ;;
 esac
