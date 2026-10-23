@@ -52,7 +52,7 @@ lock_excl() { ( set -C; printf '%s\n' "$$" > "$1" ) 2>/dev/null; }
 
 # lock_mutex <file> [<tries>]: a short critical section around read-judge-write, a try every
 # 0.1 s (default 50), so two runs never both judge a lock free; the holder removes <file>. A
-# mutex older than a minute is a crash's leftover, a directory of a version before 3.10.1 too.
+# mutex older than a minute is a crash's leftover, a directory of a version before 3.10.2 too.
 lock_mutex() {
   local i
   for i in $(seq 1 "${2:-50}"); do

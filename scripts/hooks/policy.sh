@@ -57,7 +57,9 @@
 #                                          of `*` alone left out (mod_names) — unless
 #                                          it is one plain `[bash] "$HOME/scripts/modules.sh"
 #                                          status|due|ran|focus-done|check|value|schedules <args>` or one plain
-#                                          read-only command: the modules' settings, the focus queue and
+#                                          read-only command, either ending in `2>&1|2>/dev/null` and pipes
+#                                          into jq|head|tail|grep|egrep|fgrep|wc, `$HOME/` read as the home
+#                                          path (RE_MOD_TAIL): the modules' settings, the focus queue and
 #                                          dismissals are the operator's word (docs/modules.md → Control);
 #                                          the script refuses them outside the direct session itself, and
 #                                          the session variables it judges that by are never set by hand
@@ -319,7 +321,8 @@ check_simple() { # <one simple command>
 RE_CH_W='([^][:space:];&|<>(){}$`!\\"'"'"'*?]|"[^"$`\\]*"|'"'"'[^'"'"']*'"'"')+'
 RE_CH_RW='([^][:space:];&|<>(){}$`!\\"'"'"']|"[^"$`\\]*"|'"'"'[^'"'"']*'"'"')+'
 RE_GH_PLAIN='^[ 	]*(bash[ 	]+)?("?(\$HOME|\$\{HOME\}|/home/agent)/scripts/github\.sh"?|~/scripts/github\.sh)[ 	]+(whoami|check|list|issue|comments|comment|unlabel)(([ 	]+'"$RE_CH_W"')*)([ 	]+2>&1)?[ 	]*$'
-RE_RO_PLAIN='^[ 	]*(grep|egrep|fgrep|rg|cat|head|tail|wc|ls|git[ 	]+(log|grep|show|diff))([ 	]+'"$RE_CH_RW"')*[ 	]*$'
+RE_RO_CMD='^[ 	]*(grep|egrep|fgrep|rg|cat|head|tail|wc|ls|git[ 	]+(log|grep|show|diff))([ 	]+'"$RE_CH_RW"')*'
+RE_RO_PLAIN="$RE_RO_CMD"'[ 	]*$'
 RE_RO_RUNS='[ 	](--pre|--hostname|--op|--ou|-[^- 	][^ 	]*O|-O)'
 CHAN_WHY="a channel turn writes to GitHub only a Slack-ordered test's comment and retest label on its issue (docs/slack.md)"
 # The words bash reads literally from $1 (line continuations joined, $"…" as "…", quotes and
@@ -393,12 +396,24 @@ mod_names() { # <text> — 0 when it names modules.sh or a session variable dire
   NW_STAR_FREE=""
   return "$r"
 }
-RE_MOD_PLAIN='^[ 	]*(bash[ 	]+)?("?(\$HOME|\$\{HOME\}|/home/agent)/scripts/modules\.sh"?|~/scripts/modules\.sh|scripts/modules\.sh)[ 	]+(status|due|ran|focus-done|check|value|schedules)(([ 	]+'"$RE_CH_W"')*)([ 	]+2>&1)?[ 	]*$'
+# Its two shapes are wider than channel-write's: either may end in `2>&1` or
+# `2>/dev/null` and pipe into read-only filters (RE_MOD_TAIL: jq|head|tail|grep|egrep|fgrep|wc,
+# none of which writes a file or runs a program), and `$HOME/` or `${HOME}/` counts as the home
+# path written out (mod_home) — the one expansion allowed. Anything else stays refused.
+RE_MOD_TAIL='([ 	]+2>(&1|/dev/null))?([ 	]*\|[ 	]*(jq|head|tail|grep|egrep|fgrep|wc)([ 	]+'"$RE_CH_RW"')*)*[ 	]*$'
+RE_MOD_PLAIN='^[ 	]*(bash[ 	]+)?("?/home/agent/scripts/modules\.sh"?|~/scripts/modules\.sh|scripts/modules\.sh)[ 	]+(status|due|ran|focus-done|check|value|schedules)(([ 	]+'"$RE_CH_W"')*)'"$RE_MOD_TAIL"
+RE_MOD_RO="$RE_RO_CMD$RE_MOD_TAIL"
+mod_home() { # <command> → $X: every `${HOME}/` and `$HOME/` written as /home/agent/ — with
+  # nocasematch off, or `$home/` would count too
+  local b='${HOME}/' p='$HOME/' h=/home/agent/
+  X="${1//"$b"/$h}"; X="${X//"$p"/$h}"
+}
 check_module_cmd() { # <raw command> — it names modules.sh or a session variable (names_words)
-  local c="$1" ok=0
+  local c ok=0
   shopt -u nocasematch
+  mod_home "$1"; c="$X"
   if [[ "$c" =~ $RE_MOD_PLAIN ]]; then ok=1
-  elif [[ "$c" =~ $RE_RO_PLAIN ]] && ! [[ "${c//[\"\']/}" =~ $RE_RO_RUNS ]]; then ok=1
+  elif [[ "$c" =~ $RE_MOD_RO ]] && ! [[ "${c//[\"\']/}" =~ $RE_RO_RUNS ]]; then ok=1
   fi
   shopt -s nocasematch
   [ "$ok" = 1 ] || deny module-set "scripts/modules.sh" "the testing modules' settings, the focus queue and dismissals change only on the operator's word in the direct session (docs/modules.md)"

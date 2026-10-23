@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.10.1 — 2026-10-23
+## 3.10.2 — 2026-10-23
 
 **Upgrade:**
 Nothing to run — scripts are re-read per run. The short locks of `work/SCENARIOS.md` (and of new
@@ -15,6 +15,19 @@ scenario ids), of the environment lock (`work/env/LOCK.mutex`) and of the `work/
 files the shell creates exclusively, no longer directories: `mkdir` from uutils coreutils (Ubuntu
 25.10+) let two writers in at once, so a row or an id could be lost. A lock directory an older
 version left behind is taken over once it is older than a minute (the backup's: its 10 minutes).
+
+## 3.10.1 — 2026-10-23
+
+**Upgrade:**
+Nothing to run — the policy hook and the engine are re-read per call. In a scheduled run or a
+channel turn the policy hook now also allows `modules.sh status|due|ran|focus-done|check|value|schedules` and a
+read-only command naming it with `2>&1`/`2>/dev/null` and pipes into `jq|head|tail|grep|egrep|fgrep|wc`,
+`$HOME/` written as such ([docs/modules.md](docs/modules.md) → Control). On the `helm-k3s`
+engine, `env.sh reset` now removes every image no container uses, and `up` does so while the
+k3s data volume has less than `engine_config.prune_below_gi` free (default 20 Gi). Where an
+install was refused for disk space: once, **"reset the environment"**
+([docs/on-demand.md](docs/on-demand.md)) — it holds the environment lock — frees the earlier
+builds' images.
 
 ## 3.10.0 — 2026-10-22
 
