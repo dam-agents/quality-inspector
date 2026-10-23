@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # lock.sh — the environment lock, work/env/LOCK: one run at a time on the nested product
-# (docs/nested-env.md → Shape). Sourced by scripts/env.sh and scripts/preflight.sh.
+# (docs/nested-env.md → Shape). Sourced by scripts/env.sh and scripts/preflight.sh; its
+# short lock (lock_take, lock_mutex) also by scripts/scenarios.sh and scripts/work-backup.sh.
 #
 # One line: `<owner> <ISO since> [<session>]`, <session> being the holder's
 # CLAUDE_CODE_SESSION_ID. The platform runtime says whether that session still runs a
