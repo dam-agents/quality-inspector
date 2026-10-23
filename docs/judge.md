@@ -19,14 +19,18 @@ The pipeline, step 4), and does the evidence show what the verdict claims (step 
 
 ## Spec — is this a sound test?
 
-Inputs: `request.md`, the draft criteria, the profile's `SKILL.md`, and the titles of the
+Inputs: `request.md`, the draft criteria, the profile's `SKILL.md`, the titles of the
 existing criteria files (the first line of each `work/issues/*/criteria-*.md` and
-`work/scenarios/*/criteria-*.md`).
+`work/scenarios/*/criteria-*.md`), `work/SUITE.md` with the `## AC-<k>` lines of its
+`regression` rows' criteria files, `$HOME/docs/security.md` → Check catalogue, and the
+testing modules switched on. Every criteria file and row of the scenario's own id (`S-<k>`,
+`P-<slug>`) is left out: it is the scenario's own earlier version, not another test.
 
 Per AC:
 
 - **Faithful** — states what the request (or the proposal's basis) states: nothing added,
-  nothing dropped, the requester's names and words kept.
+  nothing dropped, the requester's names and product copy kept, the rest in English
+  ([acceptance-criteria.md](acceptance-criteria.md) → Language).
 - **Grounded** — the expected outcome follows from the request or the quoted basis, not
   from how the product behaves today; a `heuristic:` basis states its catalogue row's
   Expected, written either-or where the row leaves a choice open.
@@ -35,6 +39,10 @@ Per AC:
 - **Testable here** — nothing the profile's `SKILL.md` says the nested product cannot do;
   otherwise it must already say `testable: no` with that reason.
 - **New** — no existing title states the same flow and outcome (else `duplicate_of`).
+- **Tested once** — the AC repeats no check made elsewhere
+  ([test-authoring.md](test-authoring.md) → **Tested once**); else the problem names where,
+  and the fix is `testable: no — tested by <where>`, or the AC's state moved into the next
+  AC's Given.
 
 ```json
 {"verdict": "accept", "duplicate_of": null, "reason": "one sentence",

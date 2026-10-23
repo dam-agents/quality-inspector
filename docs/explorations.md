@@ -53,7 +53,8 @@ The only allowed sources; each EX names exactly one, by its name in the first co
 - **Selection:** per testable AC, derive candidates and keep them in the order
   `roles-isolation` → `persistence` → `negative-path` → the rest in table order, at most
   `max_explorations_per_ac`; at most 3 × the testable ACs per issue; a check two ACs
-  share is one EX. Number EX-1… in AC order.
+  share is one EX; a check already made elsewhere is no EX
+  ([test-authoring.md](test-authoring.md) → **Tested once**). Number EX-1… in AC order.
 
 ## Identities
 

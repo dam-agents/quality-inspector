@@ -33,7 +33,7 @@ test('#42 AC-1: a renamed project keeps its tasks', { session: 'owner', tags: ['
 ```
 
 - **Open each file with a doc comment** — `/** @qi-summary <one sentence: what the file proves,
-  in the issue's or request's words> @qi-area <the top-level navigation section it exercises> */`
+  in English ([acceptance-criteria.md](acceptance-criteria.md) → Language)> @qi-area <the top-level navigation section it exercises> */`
   — the test catalog's description ([catalog.md](catalog.md)). It is outside every AC block, so
   rewording it never drifts a promoted test.
 - **Right before each AC block, `app.screenshot('AC-<k>: <what the Then line looks at>')`.**
@@ -82,6 +82,33 @@ EX tagged `issue-<n>-ex`, `ex-<k>`, `from-ac-<j>`, with `// EX-<k> begin` / `end
 and an `EX-<k>:` screenshot written by the rules above. Their blocks are hashed apart
 (`check-asserts.sh --ex-hash`) and are not promoted state; a role session other than `owner`
 comes from the setup test too.
+
+## Tested once
+
+A check one test already makes is not made again by another. Before freezing a scenario's
+criteria or an issue's explorations, look where each check may already be made:
+
+- a `regression`-tier row of `work/SUITE.md` — a promoted issue test, a saved scenario, an
+  adopted profile scenario —, by the `## AC-<k> — <name>` lines of its criteria file. A row
+  of the same id as the test being frozen (`#<n>`, `S-<k>`, `P-<slug>`) never counts: it is
+  that test's own earlier version, not another test;
+- the security run's check catalogue ([security.md](security.md)), while `security_checks`
+  is not `disabled`, and the checks of a testing module that is switched on
+  ([modules.md](modules.md));
+- the `## Tested elsewhere` section of the profile's `SKILL.md`: the flows the product's own
+  test suite keeps true, in a user's words ([profile-contract.md](profile-contract.md) →
+  `SKILL.md`).
+
+What is tested there may be a test's **Given** — the state it starts from, reached as setup
+the way a user would — but it is not asserted again: no `criterion` block and no `AC-` or
+`EX-` screenshot for it. A criterion that would only repeat it is frozen `testable: no —
+tested by <where>` (`P-<slug> AC-<k>`, `#<n> AC-<k>`, `S-<k> AC-<k>`, a `SEC-` id, the
+module, or the quoted `SKILL.md` line), and the report and the reply name where. An
+exploration that would repeat it is not written and does not count toward its cap.
+
+**An issue's ACs are exempt.** The issue run tests every AC it froze, red-green, even one
+that another test also asserts: its verdict is about this issue's change. The rule binds
+scenarios — a request, a discovery proposal, a profile scenario — and explorations.
 
 ## Long waits
 
