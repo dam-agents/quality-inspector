@@ -83,7 +83,7 @@ e2e_version e2e_web_version e2e_model audit_report log_level media_retention_day
 explorations max_explorations_per_ac auto_promote security_checks security_failed_logins
 confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi
 scenario_discovery scenario_channel profile_scenarios regression_channel max_scenarios_per_run max_scenarios_per_day work_repo test_catalog
-lend_model live_browser slack_channel slack_tests_per_day slack_report_visibility github_login
+lend_model live_browser slack_channel slack_tests_per_day slack_report_visibility github_login found_label fix_label
 $(jq -r '[.global, (.modules[] | select(.kind == "modules" or .kind == "queue") | .settings)] | add | keys[]' "$SCRIPT_DIR/lib/modules.json" 2>/dev/null)"
 
 if [ "$STRUCTURE" = 1 ]; then

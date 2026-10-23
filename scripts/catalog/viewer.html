@@ -215,6 +215,27 @@ pre.diff{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--card);bord
 .dcard details summary{cursor:pointer;color:var(--link);font-size:12.5px}
 .ask textarea{width:100%;min-height:96px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit;resize:vertical}
 .ask{display:flex;flex-direction:column;gap:6px;margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+/* Help: a view's one-line purpose, an ⓘ with its explanation on hover, focus or tap, the guide. */
+.viewhelp{display:flex;gap:8px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--link);border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:13px}
+.viewhelp p{margin:0}.viewhelp .btn{margin-left:auto;flex:none;font-size:12px;padding:1px 8px}
+.tip{position:relative;display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--dim);color:var(--dim);font-size:10px;font-weight:700;font-style:normal;cursor:help;margin-left:4px;vertical-align:middle;background:none;padding:0;line-height:1;flex:none}
+.tip:hover::after,.tip:focus::after,.tip.open::after{content:attr(data-tip);position:absolute;left:50%;top:calc(100% + 6px);transform:translateX(-50%);z-index:40;width:max-content;max-width:min(300px,80vw);white-space:normal;text-align:left;font-weight:400;font-size:12.5px;line-height:1.4;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow);padding:6px 8px;text-transform:none;letter-spacing:0}
+.guide{margin-bottom:14px}.guide summary{cursor:pointer;font-weight:600}.guide dl{display:grid;grid-template-columns:minmax(0,160px) minmax(0,1fr);gap:6px 12px;font-size:13px;margin:10px 0 0}.guide dt{font-weight:600}.guide dd{margin:0;color:var(--dim)}
+@media (max-width:520px){.guide dl{grid-template-columns:minmax(0,1fr)}}
+/* Actions: what an operator can ask for — a title, a sentence of what happens, the command. */
+.actions{display:grid;gap:8px}
+.action{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--card);display:flex;flex-direction:column;gap:4px}
+.action b{font-size:13px}.action p{margin:0;color:var(--dim);font-size:12.5px}
+.action.hot{border-left:4px solid var(--bad)}
+.action .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.action input,.action select{padding:2px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg)}
+.found{display:inline-flex;gap:4px;align-items:center;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:0 8px;white-space:nowrap}
+.pick{width:16px;height:16px;cursor:pointer;accent-color:var(--link);vertical-align:middle;margin:0}
+.dcard.picked,.card.picked,tr.picked{outline:2px solid var(--link);outline-offset:-2px}
+#tray{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:18;width:min(980px,calc(100% - 24px));background:var(--bg);border:1px solid var(--link);border-radius:10px;box-shadow:var(--shadow);padding:10px 12px;display:flex;flex-direction:column;gap:6px;max-height:45vh;overflow:auto}
+#tray .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#tray .chip button{background:none;border:0;cursor:pointer;color:var(--dim);padding:0 0 0 2px}
+body.has-tray main{padding-bottom:220px}
 @media (max-width:520px){.set{grid-template-columns:minmax(0,1fr)}.set dd{margin-bottom:6px}}
 @media (max-width:1200px){.maplayout{grid-template-columns:200px minmax(0,1fr)}.maplayout .mapdetail{grid-column:1/-1}}
 @media (max-width:900px){.maplayout{grid-template-columns:minmax(0,1fr)}.pagelist{display:none}.pagepick{display:block}}
@@ -285,6 +306,36 @@ const VAL = {
   failed: ['Failed', 'bad'], regression: ['Regression', 'bad'],
   blocked: ['Blocked', 'muted'], environment: ['Environment failed — no results', 'muted'], superseded: ['Superseded by a change', 'muted'], 'not-testable': ['Not testable', 'muted'], drift: ['Drift — not run', 'muted'],
 };
+// What each result means, in plain words: the badge's tooltip and the legend.
+const VAL_HELP = {
+  verified: 'The test fails on the last release and passes on the new build. This shows that the change works.',
+  passed: 'The test passed. A scenario or a manual run does not compare the result with the last release.',
+  unchanged: 'The nightly test passed again.',
+  relearned: 'The UI changed. The test found the controls again and passed. The check did not change.',
+  'observed-ok': 'The exploration found no problem.',
+  healed: 'The UI changed and the check failed. The agent repaired the check. HEALS.md records the reason.',
+  'needs-review': 'The nightly test failed and the agent cannot find the cause. A person must examine it.',
+  flaky: 'The test passes and fails on the same build. Do not trust the result yet.',
+  inconclusive: 'The test passes on the new build and also on the last release. It does not show that the change has an effect.',
+  partial: 'Some criteria of the issue are verified. Other criteria are not verified.',
+  observation: 'An exploration found a possible problem. An exploration is a check outside the criteria of the issue. It does not change the verdict.',
+  failed: 'The check ran and the result was false. The product does not do what the criterion says. This is possibly a bug.',
+  regression: 'The test passed before and fails on the new build. This is possibly a bug.',
+  blocked: 'The test did not get to its check. Possible causes: a missing page or control, a timeout, a problem in the environment.',
+  environment: 'The product did not start for this run. The agent did not test.',
+  superseded: 'A newer issue changed this function intentionally. This test does not apply now.',
+  'not-testable': 'The agent cannot do this check from outside the product. The check needs the code or an internal state.',
+  drift: 'A person changed the checks of the test after its promotion. The test does not run at night until a person promotes it again.',
+  '': 'This test has no result yet.',
+};
+const TIER_HELP = {
+  regression: 'Promoted. The test runs each night on the newest build to find regressions.',
+  promotable: 'An issue run verified the test. You can promote it into the nightly run ("promote #N").',
+  exploratory: 'An issue run wrote the test and ran it one time. It does not run at night.',
+  quarantined: 'The test was flaky on two builds. It does not run at night until a person repairs it.',
+  retired: 'A completed issue replaced the test. The catalog keeps its history.',
+  untracked: 'The criterion has no test file, or SUITE.md does not list the test. Usually the criterion is not testable.',
+};
 const vLabel = (v) => (own(VAL, v) ? VAL[v][0] : v ? str(v) : 'No verdict yet');
 const vClass = (v) => (own(VAL, v) ? VAL[v][1] : 'none');
 const SEV = { bad: 0, warn: 1, muted: 2, ok: 3, none: 4 };
@@ -339,6 +390,7 @@ function derive() {
     if (img(it.still)) it.flags.push('has still');
     if (it.testable === false) it.flags.push('not testable');
     if (ATTN.has(it.latest) || it.drift) it.flags.push('needs attention');
+    if (foundOf(problemRef(it)).length) it.flags.push('issue created');
     if (!upto || it.history.length) items.push(it);
   }
   presentSet = new Set(items.map((i) => i.key));
@@ -367,7 +419,9 @@ const pagesData = arr(D.pages).filter((p) => p && p.pattern).map((p) => ({ ...p,
 const pageOf = (pat) => pagesData.find((p) => p.pattern === pat);
 
 // Runs: every night, issue run and scenario run — the way into each one's report.
-const RUNTYPE = { regression: 'Nightly regression', issue: 'Issue run', scenario: 'Scenario run' };
+const RUNTYPE = { regression: 'Nightly regression', issue: 'Issue run', scenario: 'Scenario run', rerun: 'Manual run' };
+const RUNTYPE_HELP = { regression: 'Each night, the promoted tests run on the newest build.', issue: 'The agent tests an issue that has the QA label. It freezes the criteria, writes the tests, and runs them on the new build and on the last release.',
+  scenario: 'The agent tests a scenario that a person requested (in Slack, in the chat or on this page) on the newest build.', rerun: 'You started this test. It shows the result only. It is not a verdict and it has no report.' };
 const runs = arr(D.runs).filter((r) => r && typeof r === 'object' && r.utc && own(RUNTYPE, r.type)).map((r) => ({
   ...r, type: str(r.type), ref: r.ref == null ? '' : str(r.ref), build: str(r.build), utc: str(r.utc), entries: arr(r.entries).filter((e) => e && e.key).map((e) => ({ key: str(e.key), value: str(e.value) })),
   issues: arr(r.issues).filter((x) => x && x.number != null), counts: r.counts && typeof r.counts === 'object' ? r.counts : null, signals: r.signals && typeof r.signals === 'object' ? r.signals : null,
@@ -405,6 +459,44 @@ const FACETS = [
   { id: 'state', label: 'Issue state', get: (i) => (i.origin.state ? [str(i.origin.state)] : []) },
 ];
 const FACET = Object.fromEntries(FACETS.map((f) => [f.id, f]));
+const FACET_HELP = {
+  tier: 'The status of the test: written by an issue run, promoted into the nightly run, quarantined or retired.',
+  verdict: 'The newest result of each test. Put the pointer on a badge to see its meaning.',
+  origin: 'The source of the test: a GitHub issue, or a scenario that a person requested.',
+  ref: 'The issue or the scenario of the test.',
+  kind: 'Criterion: an acceptance criterion of the issue. It is part of the verdict. Exploration: an additional check outside the criteria. It is not part of the verdict.',
+  flag: 'Special conditions: flaky, repaired after a UI change, changed after promotion, costly, has a screenshot, has an issue.',
+  collection: 'Your own groups of tests (work/CATALOG.md), for example "Upload".',
+  area: 'The area of the product that the test examines.',
+  page: 'The pages of the product that the test opens.',
+  run: 'The type of run that gave the newest result: issue run, nightly regression, scenario run or manual run.',
+  surface: 'How the test operates the product: through the UI, the CLI or the API.',
+  session: 'The role that the test uses to sign in (owner, member, viewer).',
+  label: 'The GitHub labels of the issue of the test.',
+  state: 'The status of the GitHub issue of the test: open or closed.',
+};
+// What each view is for: the line under the tabs and the tab's tooltip.
+const VIEW_HELP = {
+  overview: 'This view shows the status of testing: the current work, the tests that need attention, and the newest runs and results.',
+  modules: 'This view shows each type of testing with its switch, schedule and settings. When you change a setting, the page gives a command for the agent.',
+  findings: 'This view shows the problems that the testing modules found outside the issues: form validation, load (stress) and security counts. It also shows the tests that people requested. Select problems to report them in one issue.',
+  design: 'This view shows the layout, visual and accessibility defects that the UI sweep found. Each defect has a screenshot with a mark. You can put defects into categories, dismiss them, and report them in one issue.',
+  runs: 'This view shows all runs: nightly regressions, issue runs, scenario runs and manual runs. Each run has its result and its report (video, screenshots, steps).',
+  map: 'This view shows the pages of the product as screenshots. The color of a control shows the result of the tests that use it. Click a control to go to its page. You can request a test for a control that has no test.',
+  catalog: 'This view shows all tests, one row for each criterion or exploration. Use the filters on the left. Click a row to see its details, runs and actions. Select rows to report failures in one issue.',
+  gallery: 'This view shows the screenshot that each test makes before its check.',
+  coverage: 'This view shows the pages that the tests open. Green: a nightly test opens the page. Amber: only a test that ran one time opens it. Red: no test opens it.',
+  history: 'This view shows each test (row) on each build (column). The color shows the result. Use it to find when a test started to fail. Click a cell to open its run.',
+  lifecycle: 'This view shows how a test moves from an issue to the nightly run. It also shows the tests that you can promote.',
+};
+const QUICK_HELP = {
+  'Nightly regression': 'The tests that run each night.', 'Needs attention': 'Tests that failed, have a regression, are flaky, need review or changed after promotion. Start here.',
+  'Promotable queue': 'Verified tests that you can promote.', 'Flaky & healed': 'Unstable tests, and tests that the agent repaired after a UI change.',
+  'Costly (agent.assert)': 'Tests that use the model in each run. They cost tokens each night.', Explorations: 'Checks outside the criteria of the issues.', Scenarios: 'Tests of scenarios that people requested.',
+};
+// An ⓘ that explains its neighbour: on hover, keyboard focus or a tap.
+const tip = (text) => (text ? h('button', { class: 'tip', type: 'button', 'data-tip': text, 'aria-label': text, title: text,
+  onclick: (e) => { e.stopPropagation(); e.preventDefault(); e.currentTarget.classList.toggle('open'); } }, 'i') : null);
 
 // ------------------------------------------------------------------- state
 const VIEWS = [['overview', 'Overview'], ['modules', 'Modules'], ['findings', 'Findings'], ['design', 'Design'], ['runs', 'Runs'], ['map', 'Product map'], ['catalog', 'Catalog'], ['gallery', 'Gallery'], ['coverage', 'Coverage'], ['history', 'History'], ['lifecycle', 'Lifecycle']];
@@ -425,8 +517,19 @@ const COLS = {
   flaky: ['Flaky', (i) => (i.flaky.length || ''), (a, b) => a.flaky.length - b.flaky.length],
   pages: ['Pages', (i) => i.pages.join(', '), (a, b) => a.pages.length - b.pages.length, (i) => joinNodes(i.pages.map((x) => pageLink(x)))],
   report: ['Report', (i) => (i.evidence ? 'report' : ''), (a, b) => (a.evidence ? 0 : 1) - (b.evidence ? 0 : 1), (i) => reportBtn(i.evidence, () => openItem(i.key)) || ''],
+  found: ['Bug issue', (i) => foundOf(problemRef(i)).map((f) => `#${f.issue}`).join(' '), (a, b) => foundOf(problemRef(a)).length - foundOf(problemRef(b)).length, (i) => foundLinks(problemRef(i))],
 };
-const DEFAULT_COLS = ['ref', 'id', 'name', 'tier', 'verdict', 'area', 'last', 'report'];
+const COL_HELP = {
+  ref: 'The issue (#N) or the scenario (S-N) of the test. Click it to see all its criteria and runs.',
+  id: 'AC-N: an acceptance criterion of the issue. EX-N: an exploration outside the criteria.',
+  name: 'The check of the test, in the words of the frozen criterion.',
+  tier: 'The status of the test. Put the pointer on a tier to see its meaning.', verdict: 'The newest result. Put the pointer on a badge to see its meaning.',
+  area: 'The area of the product.', surface: 'UI, CLI or API.', session: 'The role that the test uses to sign in.', last: 'The date of the newest result.',
+  build: 'The build of the product for the newest result.', promoted: 'The date when the test started to run each night.', duration: 'The time of the newest run.',
+  heals: 'The number of times that the agent repaired the check after a UI change.', flaky: 'The number of times that the agent found the test flaky.', pages: 'The pages that the test opens.',
+  report: 'The report of the newest issue run or scenario run: video, screenshots, steps.', found: 'The GitHub issue for the failure of this test, if there is one.',
+};
+const DEFAULT_COLS = ['ref', 'id', 'name', 'tier', 'verdict', 'area', 'last', 'found', 'report'];
 const GROUPS = { none: 'No grouping', origin: 'Origin', tier: 'Tier', area: 'Area', page: 'Page', verdict: 'Latest verdict', collection: 'Collection', label: 'Issue label' };
 const QUICK = [
   ['Nightly regression', { tier: ['regression'] }], ['Needs attention', { flag: ['needs attention'] }], ['Promotable queue', { tier: ['promotable'] }],
@@ -434,7 +537,7 @@ const QUICK = [
 ];
 const S = { v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS.slice(), i: null, r: null, o: null, at: null, pg: null, hs: null, rt: 'all', rb: null, only: false, hall: false, hsort: 'recent', limit: 100, side: false };
 // The Design view's filters, in the address too, so "back" returns to them.
-const DS_DEFAULT = { st: 'open', sev: '', vp: '', ck: '', pg: '', q: '' };
+const DS_DEFAULT = { st: 'open', sev: '', vp: '', ck: '', pg: '', cat: '', q: '' };
 const DS = { ...DS_DEFAULT };
 
 const DEFAULTS = JSON.stringify({ v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS, i: null, r: null, o: null, at: null, pg: null, hs: null, rt: 'all', rb: null });
@@ -549,14 +652,17 @@ function sorted(list) {
 const toggleFacet = (k, v) => { const cur = S.f[k] || []; S.f[k] = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v]; S.limit = 100; };
 
 // ----------------------------------------------------------------- widgets
-const badge = (v) => h('span', { class: `badge ${vClass(v)}`, title: v || 'no verdict yet' }, vLabel(v));
-const tierB = (t) => h('span', { class: `tier ${t}` }, t);
+const badge = (v) => h('span', { class: `badge ${vClass(v)}`, title: `${vLabel(v)}: ${own(VAL_HELP, str(v)) ? VAL_HELP[str(v)] : str(v) || VAL_HELP['']}` }, vLabel(v));
+const tierB = (t) => h('span', { class: `tier ${t}`, title: own(TIER_HELP, t) ? `${t}: ${TIER_HELP[t]}` : null }, t);
 function stepText(t) {
   return str(t).split(/(\{[A-Za-z_]\w*\})/).map((p) => (/^\{[A-Za-z_]\w*\}$/.test(p) ? h('span', { class: 'token' }, p) : p));
 }
 // The commands the page may offer: the operator's words of docs/on-demand.md and docs/modules.md,
 // built from constants and ids only. Anything else is never shown, copied or sent.
-const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+|open the report [A-Za-z0-9_-]{1,64})$/;
+const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|run (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?|create issue for (?:#\d{1,7} (?:AC|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})(?:, (?:#\d{1,7} (?:AC|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})){0,19}(?: for the architect)?|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+(?: as (?:false-positive|wont-fix|duplicate|by-design))?|reopen D-\d+|categorize D-\d+ (?:[a-z0-9][a-z0-9-]{0,29}|-)|(?:add (?:#\d+|S-\d+)(?: AC-\d+)? to|remove (?:#\d+|S-\d+)(?: AC-\d+)? from) the collection [A-Za-z0-9][A-Za-z0-9 _.-]{0,39}|open the report [A-Za-z0-9_-]{1,64})$/;
+// A problem a found issue may be about (skills/create-issue): a criterion's or an exploration's failure,
+// a design finding, a validation case, a stress check.
+const PROB_RE = /^(?:#\d{1,7} (?:AC|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})$/;
 // On an interactive artifact beside the agent's chat the platform injects `platform.sendPrompt`:
 // a click sends the command as the operator's own chat message. It gives no answer back.
 const bridge = () => { try { return window.platform && typeof window.platform.sendPrompt === 'function' ? window.platform : null; } catch { return null; } };
@@ -566,11 +672,11 @@ const SCEN_RE = /^test this scenario: On the page \/[A-Za-z0-9_./:-]{0,120}(?:, 
 const allowed = (t) => CMD_RE.test(t) || SCEN_RE.test(t);
 function copyBox(text) {
   if (!allowed(text)) return null;
-  const box = h('span', { class: 'cmd' }, h('code', {}, text));
+  const box = h('span', { class: 'cmd' }, h('code', { title: 'The command for the chat of the agent. Nothing changes before the agent does it.' }, text));
   const b = h('button', { class: 'btn', type: 'button', onclick: async () => {
     try { await navigator.clipboard.writeText(text); b.textContent = 'Copied'; setTimeout(() => { b.textContent = 'Copy'; }, 1500); return; } catch { /* no clipboard */ }
     const inp = h('input', { readonly: true, value: text, 'aria-label': 'Command to copy' }); b.replaceWith(inp); inp.focus(); inp.select();
-  } }, 'Copy');
+  }, title: 'Copy the command. Then paste it into the chat of the agent.' }, 'Copy');
   box.append(b);
   if (bridge()) {
     const send = h('button', { class: 'btn primary', type: 'button', onclick: () => {
@@ -578,7 +684,7 @@ function copyBox(text) {
       send.disabled = true;
       Promise.resolve().then(() => p.sendPrompt(text)).then(() => { send.textContent = 'Sent — the answer is in the chat'; },
         () => { send.disabled = false; send.textContent = 'Not sent — copy it instead'; });
-    } }, 'Send to the agent');
+    }, title: 'Send this command to the chat of the agent as your message.' }, 'Send to the agent');
     box.append(send);
   }
   return box;
@@ -630,8 +736,8 @@ const artLink = (ref) => {
   if (/^https:\/\/\S+$/.test(str(ref))) return h('a', { href: str(ref), target: '_blank', rel: 'noopener noreferrer', title: REPORT_TIP }, 'open the report — video, screenshots, steps ↗');
   const c = reportCmd(ref);
   if (!c) return ref ? h('code', {}, str(ref)) : '–';
-  return h('div', {}, copyBox(c), h('div', { class: 'meta' }, bridge() ? 'The agent answers in the chat with the report; click it there to open it beside the chat.'
-    : 'A private report: paste this in the agent\'s chat and it answers with the report to open, or find it in the app\'s Artifacts.'));
+  return h('div', {}, copyBox(c), h('div', { class: 'meta' }, bridge() ? 'The agent sends the report in the chat. Click it there to open it next to the chat.'
+    : 'This report is private. Paste this command into the chat of the agent, and the agent sends the report. You can also find it in Artifacts in the app.'));
 };
 // In a table: one button — it sends the command where the page can, else opens the run with it.
 const artCell = (ref, open, text = 'Open the report') => {
@@ -657,6 +763,82 @@ const commands = (i) => {
   if (i.origin.kind !== 'scenario') out.push(`test ${r}`);
   return out;
 };
+// An action: what it is, what happens when the agent does it, and its command (copy or send).
+// Nothing changes before the agent does it; it may ask you first (a found issue's draft, a promotion).
+function action(title, help, cmd, hot) {
+  const box = copyBox(cmd);
+  return box ? h('div', { class: `action${hot ? ' hot' : ''}` }, h('b', {}, title), help ? h('p', {}, help) : null, h('div', { class: 'row' }, box)) : null;
+}
+
+// ------------------------------------------------------------- found issues
+// The GitHub issues opened for problems (work/FOUND.md), and the problems ticked for the next one.
+const FOUND = arr(D.found).filter((f) => f && PROB_RE.test(str(f.ref)) && Number.isInteger(f.issue) && /^https:\/\/\S+$/.test(str(f.url)));
+const LABELS = D.issue_labels && typeof D.issue_labels === 'object' ? D.issue_labels : {};
+const FIX_LABEL = /^[A-Za-z0-9][A-Za-z0-9:._/ -]{0,49}$/.test(str(LABELS.fix)) ? str(LABELS.fix) : null;
+const foundOf = (ref) => (ref ? FOUND.filter((f) => f.ref === ref) : []);
+const foundLinks = (ref) => { const l = foundOf(ref);
+  return l.length ? h('span', {}, joinNodes([...new Map(l.map((f) => [f.issue, f])).values()].map((f) => h('a', { class: 'found', href: f.url, target: '_blank', rel: 'noopener noreferrer',
+    title: `GitHub issue #${f.issue}, opened ${fmtDate(f.utc)} for ${f.ref}${f.labels.length ? ` · labels: ${f.labels.join(', ')}` : ''}` }, `issue #${f.issue} ↗`)), ' ')) : ''; };
+// The ref of a test's problem: `#42 AC-2`, `#42 EX-1`, `S-7 AC-1`, `P-sign-in AC-1` (a scenario's exploration has none).
+const problemRef = (i) => { const r = i.origin.kind === 'scenario' ? `${i.ref} ${str(i.id)}` : `#${num(i.ref)} ${str(i.id)}`; return PROB_RE.test(r) ? r : null; };
+const PICK_KEY = `qi-catalog:${str(D.target)}:picked`;
+const PICK_MAX = 20;
+let picked = [];
+if (storageOK) try { picked = arr(JSON.parse(localStorage.getItem(PICK_KEY) || '[]')).map(str).filter((r) => PROB_RE.test(r)).slice(0, 50); } catch { picked = []; }
+const savePicked = () => { try { localStorage.setItem(PICK_KEY, JSON.stringify(picked)); } catch { /* this browser only */ } };
+function togglePick(ref) { picked = picked.includes(ref) ? picked.filter((x) => x !== ref) : [...picked, ref]; savePicked(); render(); }
+const pickBox = (ref) => (ref ? h('input', { type: 'checkbox', class: 'pick', checked: picked.includes(ref) ? true : null, title: 'Select this problem to report it with other problems in one GitHub issue.',
+  'aria-label': `Select ${ref} for one issue with other problems`, onclick: (e) => e.stopPropagation(), onchange: () => togglePick(ref) }) : null);
+const pickRow = (ref) => (ref ? h('label', { class: 'meta', style: 'display:flex;gap:6px;align-items:center;cursor:pointer' }, pickBox(ref), 'Select this problem. You can then report all the selected problems in one issue.') : null);
+// Report one problem as a GitHub issue (the agent drafts it, shows it, opens it on your yes).
+function issueActions(ref, hot) {
+  if (!ref) return [];
+  const f = foundOf(ref); const cmd = `create issue for ${ref}`;
+  return [
+    f.length ? h('div', { class: 'action' }, h('b', {}, 'There is a GitHub issue for this problem'), h('p', {}, foundLinks(ref)), h('p', {}, 'If you request a new issue, the agent tells you about this issue first.')) : null,
+    action('Report it as a GitHub issue', `The agent writes the issue: the problem, the correct function (${/^(#|S-|P-)/.test(ref) ? 'the frozen criterion and a link to the original issue' : 'the rule of the check'}), the steps to reproduce it, and the evidence (screenshots, video, the marked crop). The agent shows you the draft in the chat. It creates the issue when you agree.`, cmd, hot && !f.length),
+    FIX_LABEL ? action('… and give it to the software architect', `This is the same issue with the label "${FIX_LABEL}". The software architect uses this label to find the issues that it must repair.`, `${cmd} for the architect`) : null,
+    pickRow(ref),
+  ];
+}
+function renderTray() {
+  const old = $('#tray'); if (old) old.remove();
+  document.body.classList.toggle('has-tray', picked.length > 0);
+  if (!picked.length) return;
+  const cmd = `create issue for ${picked.join(', ')}`;
+  const over = picked.length > PICK_MAX;
+  document.body.append(h('div', { id: 'tray', role: 'region', 'aria-label': 'Problems selected for one issue' },
+    h('div', { class: 'row' }, h('b', {}, `${picked.length} problem${picked.length === 1 ? '' : 's'} selected for one issue`),
+      tip('Select failed tests, design findings, validation findings or stress checks on this page. The agent writes one GitHub issue with one section for each problem: the problem, the correct function, the steps to reproduce it and the evidence. The agent creates the issue when you agree. This browser keeps your selection.'),
+      h('span', { style: 'flex:1' }), h('button', { class: 'btn', type: 'button', onclick: () => { picked = []; savePicked(); render(); } }, 'Remove all')),
+    h('div', { class: 'row' }, picked.map((r) => h('span', { class: 'chip' }, r, h('button', { type: 'button', title: `Remove ${r} from the selection`, 'aria-label': `Remove ${r}`, onclick: () => togglePick(r) }, '×')))),
+    over ? h('p', { class: 'badge bad' }, `One issue can have a maximum of ${PICK_MAX} problems. Remove ${picked.length - PICK_MAX}.`) : [
+      h('div', { class: 'row' }, h('span', { class: 'meta' }, 'Report them as one issue:'), copyBox(cmd)),
+      FIX_LABEL ? h('div', { class: 'row' }, h('span', { class: 'meta' }, `… and give it to the software architect (label "${FIX_LABEL}"):`), copyBox(`${cmd} for the architect`)) : null]));
+}
+// Manage a test: run it, retest its issue, promote or demote it, report it, put it in a collection.
+function itemActions(i) {
+  const out = [];
+  const r = i.origin.kind === 'scenario' ? i.ref : `#${num(i.ref)}`;
+  const bad = ATTN.has(i.latest) || ['blocked', 'observation'].includes(i.latest);
+  if (i.file) out.push(action('Run this test now', `This runs ${i.label} one time on the current build. The result shows in the history as "Manual run". It does not change a verdict or a tier, and it does not post anything.`, `run ${r} ${str(i.id)}`));
+  if (i.file) out.push(action(`Run all the tests of ${r}`, 'This does the same for all its criteria and explorations.', `run ${r}`));
+  if (i.kind === 'criterion' && i.origin.kind !== 'scenario') out.push(action('Test the full issue again', 'This is a full issue run. It tests each criterion on the new build and on the last release. It makes a new report with video and screenshots.', `test ${r}`));
+  if (i.kind === 'criterion' && ['promotable', 'exploratory', 'quarantined'].includes(i.tier)) out.push(action('Promote it into the nightly regression', 'After this, the test runs each night on the newest build. Before the agent does this, it shows you the test and its criteria.', `promote ${r}`));
+  if (i.kind === 'criterion' && i.tier === 'regression') out.push(action('Demote it', 'This removes the test from the nightly run. The catalog keeps the test and its history.', `demote ${r}`));
+  out.push(...issueActions(problemRef(i), bad));
+  const member = i.kind === 'criterion' ? `${r} ${str(i.id)}` : r;
+  const inp = h('input', { type: 'text', list: 'qi-colls', placeholder: 'collection name, for example Upload', 'aria-label': 'Collection name' });
+  const slot = h('div', { class: 'row' });
+  out.push(h('div', { class: 'action' }, h('b', {}, 'Put it in a collection'), h('p', {}, 'A collection is your own group of tests (work/CATALOG.md). You can filter and group the catalog by collection.'),
+    h('datalist', { id: 'qi-colls' }, collections.map((c) => h('option', { value: c.name }))),
+    h('div', { class: 'row' }, inp, h('button', { class: 'btn', type: 'button', onclick: () => {
+      slot.textContent = ''; const b = copyBox(`add ${member} to the collection ${inp.value.trim()}`);
+      if (b) slot.append(b); else { inp.setCustomValidity('Use only letters, digits, spaces and _ . - (maximum 40).'); inp.reportValidity(); }
+    } }, 'Add')), slot,
+    colls(i).map((c) => h('div', { class: 'row' }, h('span', { class: 'meta' }, `It is in "${c}". To remove it:`), copyBox(`remove ${member} from the collection ${c}`)))));
+  return out.filter(Boolean);
+}
 
 // ------------------------------------------------------------------ header
 function renderHeader() {
@@ -669,7 +851,7 @@ function renderHeader() {
   const bb = $('#h-back'); bb.textContent = '';
   bb.hidden = !trail.length;
   if (trail.length) bb.append(backBtn(), h('span', {}, `You are on ${where()}`));
-  for (const [k, label] of VIEWS) tabs.append(h('button', { role: 'tab', type: 'button', 'aria-selected': S.v === k ? 'true' : 'false', onclick: () => go({ v: k }) }, label));
+  for (const [k, label] of VIEWS) tabs.append(h('button', { role: 'tab', type: 'button', 'aria-selected': S.v === k ? 'true' : 'false', title: VIEW_HELP[k] || null, onclick: () => go({ v: k }) }, label));
   tabs.append(...[h('span', { class: 'sp' }),
     builds.length ? h('select', { 'aria-label': 'Show the state as of a build', onchange: (e) => go({ at: e.target.value || null }) },
       h('option', { value: '' }, 'As of: now'), builds.slice().reverse().map((b) => h('option', { value: b.id, selected: S.at === b.id ? true : null }, `As of ${fmtDate(b.utc)} · ${b.id}`))) : null,
@@ -681,16 +863,12 @@ function toggleLegend() {
   for (const [k, [label, c]] of Object.entries(VAL)) groups[c].push([k, label]);
   document.body.append(h('div', { id: 'legend', role: 'dialog', 'aria-label': 'Legend' },
     h('button', { class: 'btn close', type: 'button', onclick: toggleLegend }, 'Close'), h('b', {}, 'Verdicts'),
-    Object.entries(groups).map(([c, l]) => h('ul', {}, l.map(([k]) => h('li', {}, badge(k), ' ', h('span', { class: 'muted-t mono' }, k))))),
+    Object.entries(groups).map(([c, l]) => h('ul', {}, l.map(([k]) => h('li', {}, badge(k), ' ', h('span', { class: 'muted-t' }, own(VAL_HELP, k) ? VAL_HELP[k] : k))))),
     h('b', {}, 'Tiers'), h('ul', {},
-      h('li', {}, tierB('regression'), ' replayed every night against the newest build'),
-      h('li', {}, tierB('promotable'), ' verified, waiting for "promote all pending"'),
-      h('li', {}, tierB('exploratory'), ' written by an issue run, not replayed'),
-      h('li', {}, tierB('quarantined'), ' flaky on two builds, not replayed'),
-      h('li', {}, tierB('retired'), ' superseded by a completed issue'),
-      h('li', {}, tierB('untracked'), ' no test (not testable) or no suite row')),
-    h('p', { class: 'muted-t' }, bridge() ? 'A command button sends that command to the agent\'s chat as your message; nothing changes before the agent does it.'
-      : 'The page changes nothing itself. Copy a command into the agent\'s own chat; on an interactive page opened beside that chat, its button sends it.')));
+      TIERS.map((t) => h('li', {}, tierB(t), ' ', h('span', { class: 'muted-t' }, TIER_HELP[t])))),
+    h('b', {}, 'Runs'), h('ul', {}, Object.entries(RUNTYPE).map(([k, l]) => h('li', {}, h('b', {}, l), ' — ', h('span', { class: 'muted-t' }, RUNTYPE_HELP[k])))),
+    h('p', { class: 'muted-t' }, bridge() ? 'A command button sends its command to the chat of the agent as your message. Nothing changes before the agent does the action.'
+      : 'The page itself does not change anything. Copy a command into the chat of the agent. When an interactive page is open next to that chat, its button sends the command.')));
   renderHeader();
 }
 
@@ -776,7 +954,7 @@ function activityNow() {
   h('div', { class: 'now-body' }, h('div', { class: 'ringwrap' }, ring(frac, cls), h('div', { class: 'ringtxt' }, h('b', {}, m == null ? '–' : dur(m)), h('span', {}, `of ${budget} min`))),
     h('div', { style: 'min-width:0' }, h('p', { class: 'now-title' }, what.map((w) => h('div', {}, w))),
       h('p', { class: 'meta' }, since ? `Started ${fmtDate(since)} ${str(since).slice(11, 16)} UTC` : '', ' · ', `As of this page's build, ${rel(D.generated_utc)}.`),
-      frac >= 1 ? h('p', { class: 'meta', style: 'color:var(--bad)' }, 'Past its time budget: the agent stops it at its next milestone, or it stopped without a new page.') : null)));
+      frac >= 1 ? h('p', { class: 'meta', style: 'color:var(--bad)' }, 'This run used all its time. The agent stops it at its next milestone, or it stopped before the page was built again.') : null)));
   return card;
 }
 function activityQueue() {
@@ -794,21 +972,21 @@ function activityQueue() {
   ];
   const total = groups.reduce((n, g) => n + g[2].length, 0);
   const card = h('section', { class: 'panel' }, h('h2', {}, `Queue (${total})`));
-  const unknown = listed ? null : h('p', { class: 'meta', style: 'color:var(--warn)' }, 'Waiting issues unknown: the issue listing failed when this page was built.');
-  if (!total) { card.append(unknown || h('p', { class: 'muted-t' }, 'Nothing waits: every labelled issue has its verdict.')); return card; }
+  const unknown = listed ? null : h('p', { class: 'meta', style: 'color:var(--warn)' }, 'The waiting issues are not known. The list of issues failed when the agent built this page.');
+  if (!total) { card.append(unknown || h('p', { class: 'muted-t' }, 'No issue waits. Each issue with the label has its verdict.')); return card; }
   if (unknown) card.append(unknown);
   card.append(h('div', { class: 'qbar', role: 'img', 'aria-label': groups.map((g) => `${g[0]}: ${g[2].length}`).join(', ') },
     groups.filter((g) => g[2].length).map((g) => h('i', { class: g[1], style: `flex:${g[2].length}`, title: `${g[0]}: ${g[2].length}` }))));
   for (const [label, cls, list] of groups) if (list.length) card.append(...[h('h3', { class: 'qh' }, h('i', { class: `qdot ${cls}` }), `${label} (${list.length})`),
     h('ul', { class: 'att' }, list.slice(0, 6).map((x) => h('li', {}, x))), list.length > 6 ? h('p', { class: 'meta' }, `and ${list.length - 6} more`) : null].filter(Boolean));
-  card.append(h('p', { class: 'meta' }, 'The issues run takes them in order, one at a time.'));
+  card.append(h('p', { class: 'meta' }, 'The issues run tests them in this sequence, one at a time.'));
   return card;
 }
 function activitySchedule() {
   const sc = A.schedules && typeof A.schedules === 'object' ? A.schedules : null;
   const card = h('section', { class: 'panel' }, h('h2', {}, 'Schedule'));
   const list = sc ? arr(sc.list).filter((x) => x && x.name) : [];
-  if (!list.length) { card.append(h('p', { class: 'muted-t' }, 'The schedules appear after the agent next lists them (a module change, or the version check).')); return card; }
+  if (!list.length) { card.append(h('p', { class: 'muted-t' }, 'The schedules show here after the agent lists them again (after a module change or the version check).')); return card; }
   const key = (n) => str(n).replace(/^quality-inspector-/, '');
   const order = Object.keys(SCHED);
   // enabled: true, false, or null when the platform's listing did not say (shown as unknown).
@@ -866,10 +1044,35 @@ function activityBlock() {
   return h('div', { class: 'activity' }, activityNow(), activityQueue(), activitySchedule(), activityTimeline());
 }
 
+// The words of this page, once: what a test, a criterion, a tier, a verdict and an action are.
+const GUIDE_KEY = `qi-catalog:${str(D.target)}:guide`;
+function guide() {
+  let open = true; try { open = localStorage.getItem(GUIDE_KEY) !== 'closed'; } catch { /* default open */ }
+  const terms = [
+    ['Issue and criteria', 'The agent changes each GitHub issue that has the QA label into acceptance criteria (AC-1, AC-2: Given, When, Then). The agent freezes the criteria from the issue text before it tests.'],
+    ['Test', 'Each criterion has an automatic browser test. The test runs on the product in the machine of the agent. An exploration (EX-1) is an additional check outside the criteria. An exploration does not change the verdict.'],
+    ['Verdict', 'The result of a test. Verified: the test fails on the last release and passes on the new build. This shows that the change works. Failed or Regression: possibly a bug. Put the pointer on a badge to see its meaning. The Legend shows all results.'],
+    ['Tier', 'Exploratory: the test ran one time. Promotable: the test is verified. Regression: the test runs each night. Quarantined and retired tests do not run at night.'],
+    ['Run', 'An issue run tests one issue. The nightly regression runs the regression tier on the newest build. A manual run is a run that you start from the panel of a test.'],
+    ['Design findings', 'The UI sweep finds layout, visual and accessibility defects on each page. Put them into categories, dismiss the findings that are not defects, and report the other findings.'],
+    ['Actions', 'Each button gives a command for the agent, for example "run #42 AC-1" or "create issue for D-7". When this page is open next to the chat of the agent, the button sends the command. In other cases, copy the command into the chat. The page itself does not change anything.'],
+    ['Report a bug', 'Select failed tests and findings (☐). Then use "Report them as one issue" in the bar at the bottom. Or use "Report it as a GitHub issue" in the panel of a test. The agent writes the issue: the problem, the correct function, the steps and the screenshots. The agent shows you the issue and creates it when you agree.' + (FIX_LABEL ? ` The command with "for the architect" adds the label "${FIX_LABEL}". The software architect then repairs the problem.` : '')],
+  ];
+  return h('details', { class: 'panel guide', open: open ? true : null, ontoggle: (e) => { try { localStorage.setItem(GUIDE_KEY, e.currentTarget.open ? 'open' : 'closed'); } catch { /* ignore */ } } },
+    h('summary', {}, 'How this page works'), h('dl', {}, terms.map(([t, d]) => [h('dt', {}, t), h('dd', {}, d)])));
+}
+const KPI_HELP = {
+  'Regression tier': 'Tests that run each night on the newest build.', Promotable: 'Verified tests that you can promote into the nightly run.',
+  Exploratory: 'Tests that issue runs wrote and ran one time.', 'Retired · quarantined': 'Tests that do not run at night: a newer issue replaced them, or they are flaky.',
+  'Criteria · explorations': 'The acceptance criteria of the issues, and the additional checks outside the criteria.', 'Issues · scenarios': 'The sources of the tests.',
+  'Pages covered': 'The number of pages that a nightly test opens, of all the pages on the UI map.', 'Last night': 'The newest nightly regression. Click it to see its results.',
+  Flaky: 'Tests that pass and fail on the same build.', Drift: 'Tests with checks that a person changed after promotion. They do not run until a person promotes them again.',
+};
 function viewOverview() {
   const v = $('#view');
+  v.append(guide());
   const act = activityBlock(); if (act) v.append(act);
-  if (!items.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No tests in the catalog yet.'), h('p', {}, 'Tests appear here after the first issue run.'),
+  if (!items.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No tests in the catalog yet.'), h('p', {}, 'Tests show here after the first issue run.'),
     modList.length ? h('p', {}, h('button', { class: 'btn', type: 'button', onclick: () => go({ v: 'modules' }) }, 'Testing modules →')) : null)); return; }
   const t = (x) => items.filter((i) => i.tier === x).length;
   const origins = new Set(items.map((i) => `${i.origin.kind}:${i.ref}`));
@@ -883,7 +1086,7 @@ function viewOverview() {
       ['Issues · scenarios', `${[...origins].filter((o) => o.startsWith('issue')).length} · ${[...origins].filter((o) => o.startsWith('scenario')).length}`, null],
       ['Pages covered', pagesData.length ? `${cov} / ${pagesData.length}` : '–', null], ['Last night', lastTxt, last ? () => openRun(nightOf(str(last.build))) : null],
       ['Flaky', items.filter((i) => i.flags.includes('flaky')).length, { flag: ['flaky'] }], ['Drift', items.filter((i) => i.flags.includes('drift')).length, { flag: ['drift'] }]]
-      .map(([label, val, f]) => h(f ? 'button' : 'div', { class: 'kpi', type: f ? 'button' : null, style: f ? 'text-align:left;cursor:pointer' : null,
+      .map(([label, val, f]) => h(f ? 'button' : 'div', { class: 'kpi', type: f ? 'button' : null, style: f ? 'text-align:left;cursor:pointer' : null, title: KPI_HELP[label] || null,
         onclick: typeof f === 'function' ? f : f ? () => go({ v: 'catalog', f: JSON.parse(JSON.stringify(f)), q: '' }) : null }, h('b', {}, String(val)), h('span', {}, label)))));
   const att = items.filter((i) => i.flags.includes('needs attention')).sort((a, b) => SEV[a.cls] - SEV[b.cls] || str(b.verdict && b.verdict.utc).localeCompare(str(a.verdict && a.verdict.utc)));
   const labels = buildsAt.map((b) => fmtDate(b.utc) || b.id);
@@ -896,8 +1099,13 @@ function viewOverview() {
       h('button', { class: 'linkish', type: 'button', onclick: () => go({ v: 'modules' }) }, str(m.title) || str(m.id)),
       m.last_run && m.last_run.utc ? h('span', { class: 'meta' }, ` · ${rel(m.last_run.utc)}`) : null))),
       h('p', { class: 'meta' }, openD.length ? h('button', { class: 'linkish', type: 'button', onclick: () => go({ v: 'design' }) }, `${openD.length} open design finding(s), ${openD.filter((d) => d.severity === 'major').length} major →`) : 'No open design finding.')) : null,
-    h('section', { class: 'panel' }, h('h2', {}, `Needs attention (${att.length})`), att.length ? h('ul', { class: 'att' }, att.slice(0, 14).map((i) => h('li', {}, badge(i.latest || (i.flags.includes('drift') ? 'drift' : '')), ' ',
-      h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key) }, `${i.label} — ${str(i.name)}`), i.evidence ? [' ', reportBtn(i.evidence, () => openItem(i.key))] : null))) : h('p', { class: 'muted-t' }, 'Nothing needs attention.')),
+    h('section', { class: 'panel' }, h('h2', {}, `Needs attention (${att.length})`, tip('Tests that failed, have a regression, are flaky, need review or changed after promotion. The worst tests are first. Select tests to report them in one GitHub issue. Click a test to see its details and actions.')),
+      att.length ? h('ul', { class: 'att' }, att.slice(0, 14).map((i) => h('li', {}, pickBox(problemRef(i)), ' ', badge(i.latest || (i.flags.includes('drift') ? 'drift' : '')), ' ',
+      h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key) }, `${i.label} — ${str(i.name)}`), i.evidence ? [' ', reportBtn(i.evidence, () => openItem(i.key))] : null, ' ', foundLinks(problemRef(i))))) : h('p', { class: 'muted-t' }, 'Nothing needs attention.'),
+      att.length > 14 ? h('button', { class: 'linkish', type: 'button', onclick: () => go({ v: 'catalog', f: { flag: ['needs attention'] }, q: '' }) }, `All ${att.length} →`) : null),
+    FOUND.length ? h('section', { class: 'panel' }, h('h2', {}, `Bug issues from this page (${new Set(FOUND.map((f) => f.issue)).size})`, tip('The GitHub issues that the agent created for problems on this page (work/FOUND.md). One issue can have more than one problem.')),
+      h('ul', { class: 'att' }, [...new Map(FOUND.slice().reverse().map((f) => [f.issue, f])).values()].slice(0, 10).map((f) => h('li', {}, h('a', { class: 'found', href: f.url, target: '_blank', rel: 'noopener noreferrer' }, `issue #${f.issue} ↗`), ' ',
+        h('span', { class: 'meta' }, `${fmtDate(f.utc)} · ${FOUND.filter((x) => x.issue === f.issue).map((x) => x.ref).join(', ')}${f.labels.includes(FIX_LABEL) ? ' · for the architect' : ''}`))))) : null,
     h('section', { class: 'panel' }, h('h2', {}, 'Suite size over builds'), buildsAt.length ? lineChart([{ name: 'tests', color: 'var(--link)', values: all }, { name: 'regression tier', color: 'var(--ok)', values: reg }], labels) : h('p', { class: 'muted-t' }, 'No builds yet.')),
     h('section', { class: 'panel' }, h('h2', {}, 'Latest runs'), runsAt.length ? [h('ul', { class: 'att' }, runsAt.slice(0, 8).map((r) => h('li', {}, badge(r.verdict), ' ',
       h('button', { class: 'linkish', type: 'button', onclick: () => openRun(r) }, `${fmtDate(r.utc)} · ${runName(r)}`), r.report ? [' ', reportBtn(r.report, () => openRun(r))] : null))),
@@ -920,7 +1128,7 @@ function sidebar() {
     const many = vals.length > 10 && !S['all_' + f.id];
     const shown = many ? vals.slice(0, 10) : vals;
     const det = h('details', { open: sel.length || ['tier', 'verdict', 'flag', 'origin'].includes(f.id) ? true : null },
-      h('summary', {}, f.label, sel.length ? ` (${sel.length})` : ''),
+      h('summary', { title: FACET_HELP[f.id] || null }, f.label, sel.length ? ` (${sel.length})` : '', tip(FACET_HELP[f.id])),
       shown.map((v) => h('label', { class: counts.get(v) ? '' : 'zero' }, h('input', { type: 'checkbox', checked: sel.includes(v) ? true : null, onchange: () => { toggleFacet(f.id, v); writeHash(); render(); } }),
         h('span', {}, f.fmt ? f.fmt(v) : str(v)), h('span', { class: 'n' }, String(counts.get(v))))),
       many ? h('button', { class: 'linkish more', type: 'button', onclick: () => { S['all_' + f.id] = true; render(); } }, `Show all ${vals.length}`) : null);
@@ -943,19 +1151,19 @@ function toolbar(list, gallery) {
       !gallery && S.l === 'table' ? colsDet : null),
     h('div', { class: 'chips' }, QUICK.map(([label, f]) => {
       const on = JSON.stringify(Object.fromEntries(Object.entries(S.f).filter(([, x]) => x.length))) === JSON.stringify(f) && !S.q;
-      return h('button', { class: `chip${on ? ' on' : ''}`, type: 'button', 'aria-pressed': on ? 'true' : 'false', onclick: () => { S.f = on ? {} : JSON.parse(JSON.stringify(f)); S.q = ''; S.limit = 100; writeHash(); render(); } }, label);
+      return h('button', { class: `chip${on ? ' on' : ''}`, type: 'button', 'aria-pressed': on ? 'true' : 'false', title: QUICK_HELP[label] || null, onclick: () => { S.f = on ? {} : JSON.parse(JSON.stringify(f)); S.q = ''; S.limit = 100; writeHash(); render(); } }, label);
     }), active ? h('button', { class: 'chip', type: 'button', onclick: () => { S.f = {}; S.q = ''; writeHash(); render(); } }, '✕ Clear') : null,
     h('span', { class: 'count', 'aria-live': 'polite' }, `${list.length} of ${items.length} items`)));
 }
 function table(list) {
-  const head = h('tr', {}, storageOK ? h('th', { 'aria-label': 'Pinned' }, '') : null, S.cols.map((k) => {
+  const head = h('tr', {}, h('th', { title: 'Select failures to report together as one GitHub issue', 'aria-label': 'Select', style: 'cursor:default' }, '☐'), storageOK ? h('th', { 'aria-label': 'Pinned', title: 'Pin a test (this browser only)' }, '') : null, S.cols.map((k) => {
     const pos = S.sort.findIndex(([x]) => x === k);
-    return h('th', { scope: 'col', tabindex: 0, 'aria-sort': pos === 0 ? (S.sort[0][1] > 0 ? 'ascending' : 'descending') : null, title: 'Click to sort, shift-click to add a key',
+    return h('th', { scope: 'col', tabindex: 0, 'aria-sort': pos === 0 ? (S.sort[0][1] > 0 ? 'ascending' : 'descending') : null, title: `${COL_HELP[k] ? `${COL_HELP[k]} ` : ''}(click to sort, shift-click to add a sort key)`,
       onclick: (e) => sortBy(k, e.shiftKey), onkeydown: (e) => { if (e.key === 'Enter') sortBy(k, e.shiftKey); } },
     COLS[k][0], pos >= 0 ? h('span', { class: 'arr' }, ` ${S.sort[pos][1] > 0 ? '▲' : '▼'}${S.sort.length > 1 ? pos + 1 : ''}`) : '');
   }));
-  const body = h('tbody', {}, list.map((i) => h('tr', { tabindex: 0, onclick: rowClick(() => openItem(i.key)), onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(i.key); } },
-    storageOK ? h('td', {}, star(i)) : null,
+  const body = h('tbody', {}, list.map((i) => h('tr', { tabindex: 0, class: picked.includes(problemRef(i)) ? 'picked' : null, onclick: rowClick(() => openItem(i.key)), onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(i.key); } },
+    h('td', {}, pickBox(problemRef(i))), storageOK ? h('td', {}, star(i)) : null,
     S.cols.map((k) => h('td', { class: k === 'name' ? 'name' : ['last', 'promoted', 'build', 'duration', 'ref', 'id', 'report'].includes(k) ? 'nw' : null },
       k === 'name' ? [h('div', {}, str(i.name) || str(i.then)), i.kind === 'exploration' ? h('span', { class: 'meta' }, 'exploration') : null]
         : k === 'tier' ? tierB(i.tier) : k === 'verdict' ? badge(i.latest) : COLS[k][3] ? COLS[k][3](i) : COLS[k][1](i))))));
@@ -971,9 +1179,9 @@ function sortBy(k, add) {
 function cards(list, gallery) {
   return h('div', { class: gallery ? 'gal' : 'cards' }, list.map((i) => {
     const src = img(i.still);
-    return h('div', { class: 'card', role: 'button', tabindex: 0, onclick: rowClick(() => openItem(i.key)), onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(i.key); } },
+    return h('div', { class: `card${picked.includes(problemRef(i)) ? ' picked' : ''}`, role: 'button', tabindex: 0, onclick: rowClick(() => openItem(i.key)), onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(i.key); } },
       gallery ? (src ? h('img', { src, alt: `${i.label}: ${str(i.then)}`, loading: 'lazy' }) : h('div', { class: 'ph' }, 'no still yet')) : null,
-      h('div', { style: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' }, h('b', {}, refLink(i.ref), ` ${str(i.id)}`), tierB(i.tier), badge(i.latest), star(i), h('span', { style: 'flex:1' }), reportBtn(i.evidence, () => openItem(i.key))),
+      h('div', { style: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' }, pickBox(problemRef(i)), h('b', {}, refLink(i.ref), ` ${str(i.id)}`), tierB(i.tier), badge(i.latest), star(i), h('span', { style: 'flex:1' }), foundLinks(problemRef(i)), reportBtn(i.evidence, () => openItem(i.key))),
       h('div', {}, str(i.name)), i.then ? h('div', { class: 'then' }, `Then ${str(i.then)}`) : null,
       !gallery && src ? h('img', { src, alt: '', loading: 'lazy', style: 'max-height:120px;object-fit:cover;object-position:top' }) : null);
   }));
@@ -1008,7 +1216,7 @@ function viewList(gallery) {
 // ---------------------------------------------------------------- coverage
 function viewCoverage() {
   const v = $('#view');
-  if (!pagesData.length) { v.append(h('div', { class: 'empty' }, 'No UI map yet — the coverage appears after the first nightly regression run.')); return; }
+  if (!pagesData.length) { v.append(h('div', { class: 'empty' }, 'There is no UI map yet. The coverage shows here after the first nightly regression.')); return; }
   const groups = new Map(); for (const p of pagesData) { const k = str(p.nav) || '(other)'; (groups.get(k) || groups.set(k, []).get(k)).push(p); }
   const tot = { regression: 0, exploratory: 0, none: 0 }; for (const p of pagesData) tot[p.covered in tot ? p.covered : 'none']++;
   v.append(h('p', {}, h('b', {}, `${tot.regression} of ${pagesData.length}`), ' pages reached by a regression test · ', `${tot.exploratory} only by exploratory tests · ${tot.none} by none.`,
@@ -1165,7 +1373,8 @@ function itemDrawer(i) {
       h('button', { class: 'linkish', type: 'button', onclick: () => go({ v: 'map', pg: p.pattern, hs: k }) }, k == null ? `${str(p.title) || p.pattern} — the page` : `${str(p.title) || p.pattern} — ${KIND[p.hotspots[k].kind] || 'control'} "${p.hotspots[k].name}"`))))) : null,
     i.heals.length ? h('section', { class: 'sec' }, h('h3', {}, 'Repaired checks'), h('ul', {}, i.heals.map((x) => h('li', {}, `${fmtDate(x.utc)} on `, buildLink(x.build), ` — basis: ${str(x.basis)}`)))) : null,
     i.flaky.length ? h('section', { class: 'sec' }, h('h3', {}, 'Flaky confirmations'), h('ul', {}, i.flaky.map((x) => h('li', {}, `${fmtDate(x.utc)} on `, buildLink(x.build), ` — ${x.passes ?? '?'} of ${x.runs ?? '?'} runs passed`)))) : null,
-    commands(i).length ? h('section', { class: 'sec' }, h('h3', {}, 'Commands for the agent\'s direct session'), commands(i).map((c) => h('div', { style: 'margin:4px 0' }, copyBox(c)))) : null,
+    S.at ? null : h('section', { class: 'sec' }, h('h3', {}, 'What you can do', tip(bridge() ? 'Each button sends its command to the chat of the agent as your message. Nothing changes before the agent does the action.' : 'Copy a command into the chat of the agent. Or open this page next to the chat and click the button. Nothing changes before the agent does the action.')),
+      h('div', { class: 'actions' }, itemActions(i))),
     sib.length ? h('section', { class: 'sec' }, h('h3', {}, `Other criteria of ${i.ref}`), h('ul', { class: 'att' }, sib.map((x) => h('li', {}, badge(x.latest), ' ', h('button', { class: 'linkish', type: 'button', onclick: () => openItem(x.key) }, `${x.label} — ${str(x.name)}`))))) : null,
   ]);
 }
@@ -1201,8 +1410,11 @@ function originDrawer(ref) {
       h('button', { class: 'btn', type: 'button', onclick: () => go({ v: 'gallery', f: { ref: [ref] }, q: '' }) }, 'Its screenshots')),
     h('section', { class: 'sec' }, h('h3', {}, `Criteria and explorations (${its.length})`), its.length ? h('ul', { class: 'att' }, its.map((x) => itemRow(x, false))) : h('p', { class: 'muted-t' }, S.at ? 'None judged by then.' : 'None yet.')),
     h('section', { class: 'sec' }, h('h3', {}, `Runs (${rs.length})`), rs.length ? runTable(rs.map((r) => [r, null]), (r) => own2(r)) : h('p', { class: 'muted-t' }, 'Not run yet.'),
-      rs.some((r) => r.type === 'regression') ? h('p', { class: 'meta' }, 'A night is listed when one of these tests had a result other than unchanged.') : null),
-    crit && commands(crit).length ? h('section', { class: 'sec' }, h('h3', {}, 'Commands for the agent\'s direct session'), commands(crit).map((c) => h('div', { style: 'margin:4px 0' }, copyBox(c)))) : null,
+      rs.some((r) => r.type === 'regression') ? h('p', { class: 'meta' }, 'This list shows a night only when one of these tests had a result that was not unchanged.') : null),
+    crit && !S.at ? h('section', { class: 'sec' }, h('h3', {}, 'What you can do', tip('Each command goes to the chat of the agent. Nothing changes before the agent does the action.')), h('div', { class: 'actions' },
+      crit.file ? action(`Run all the tests of ${ref}`, 'This runs them one time on the current build. The results show in the history as "Manual run".', `run ${o.kind === 'scenario' ? ref : `#${num(ref)}`}`) : null,
+      commands(crit).map((c) => action(c.startsWith('test') ? 'Test the full issue again' : c.startsWith('promote') ? 'Promote its tests into the nightly regression' : 'Demote its tests',
+        c.startsWith('test') ? 'This is a full issue run. It tests each criterion on the new build and on the last release. It makes a new report.' : c.startsWith('promote') ? 'Before the agent does this, it shows you the tests and their criteria.' : 'This removes them from the nightly run.', c)))) : null,
   ]);
 }
 
@@ -1218,7 +1430,7 @@ function outcome(r) {
 const pickRt = (k) => { S.rt = k; S.limit = 100; writeHash(); render(); };
 function viewRuns() {
   const v = $('#view');
-  if (!runs.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No runs yet.'), h('p', {}, 'Issue runs, scenario runs and every nightly regression appear here, each with its report.'))); return; }
+  if (!runs.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No runs yet.'), h('p', {}, 'Issue runs, scenario runs and nightly regressions show here, each with its report.'))); return; }
   const inBuild = runs.filter((r) => !S.rb || r.build === S.rb);
   const list = inBuild.filter((r) => S.rt === 'all' || r.type === S.rt);
   if (S.rb) {
@@ -1230,7 +1442,7 @@ function viewRuns() {
   }
   v.append(h('div', { class: 'chips' }, [['all', 'All runs'], ...Object.entries(RUNTYPE)].map(([k, l]) => {
     const n = k === 'all' ? inBuild.length : inBuild.filter((r) => r.type === k).length;
-    return h('button', { class: `chip${S.rt === k ? ' on' : ''}`, type: 'button', 'aria-pressed': S.rt === k ? 'true' : 'false', onclick: () => pickRt(k) }, `${l} (${n})`);
+    return h('button', { class: `chip${S.rt === k ? ' on' : ''}`, type: 'button', 'aria-pressed': S.rt === k ? 'true' : 'false', title: RUNTYPE_HELP[k] || null, onclick: () => pickRt(k) }, `${l} (${n})`);
   })));
   const shown = list.slice(0, S.limit);
   v.append(h('div', { class: 'tablewrap' }, h('table', { class: 'list' },
@@ -1269,11 +1481,11 @@ function runDrawer(r) {
       h('button', { class: 'btn', type: 'button', onclick: () => go({ at: r.build, v: 'catalog' }) }, 'Catalog as of this build'),
       h('button', { class: 'btn', type: 'button', onclick: () => go({ at: r.build, v: 'map' }) }, 'Product map as of this build'),
       h('button', { class: 'btn', type: 'button', onclick: () => go({ v: 'runs', rb: r.build, rt: 'all' }) }, 'Every run on this build')) : null,
-    r.verdict === 'environment' ? h('p', { class: 'muted-t' }, 'The product did not come up on this build: nothing was replayed, and no test has a result from this night.') : null,
+    r.verdict === 'environment' ? h('p', { class: 'muted-t' }, 'The product did not start on this build. No test ran, and no test has a result from this night.') : null,
     h('section', { class: 'sec' }, h('h3', {}, night ? `Results that were not unchanged (${ents.length})` : `Verdicts (${ents.length})`),
       ents.length ? h('ul', { class: 'att' }, ents.map((e) => { const i = byKey.get(e.key); return h('li', {}, badge(e.value), ' ',
         i ? [h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key) }, `${i.label} — ${str(i.name)}`), night ? [' ', h('span', { class: 'meta' }, 'of '), refLink(i.ref)] : null] : h('code', {}, e.key)); })) : null,
-      night && r.verdict !== 'environment' ? h('p', { class: 'muted-t' }, 'Every other regression-tier test that night: unchanged (drifted ones are not run).') : null),
+      night && r.verdict !== 'environment' ? h('p', { class: 'muted-t' }, 'All other tests of the regression tier were unchanged that night. Tests with changed checks (drift) did not run.') : null),
     r.signals && Object.values(r.signals).some((n) => +n > 0) ? h('section', { class: 'sec' }, h('h3', {}, 'Signals no test covers'), h('ul', {}, Object.entries(r.signals).filter(([, n]) => +n > 0).map(([key, n]) => h('li', {}, `${key.replace(/_/g, ' ')}: ${+n}`)))) : null,
     r.issues.length ? h('section', { class: 'sec' }, h('h3', {}, `Completed issues in the window (${r.issues.length})`), h('ul', { class: 'att' }, r.issues.map((x) => h('li', {}, issueRef(+x.number), ' ', str(x.title),
       origins.has(`#${+x.number}`) && issueHref(+x.number) ? [' ', extIssue(+x.number)] : null)))) : null,
@@ -1305,7 +1517,7 @@ const walk = (to) => go({ pg: to, hs: null });
 const pickHs = (k) => { S.hs = k; writeHash(); render(); };
 function viewMap() {
   const v = $('#view');
-  if (!pagesData.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No UI map yet.'), h('p', {}, 'The product map appears after the first nightly regression run walks the product.'))); return; }
+  if (!pagesData.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No UI map yet.'), h('p', {}, 'The product map shows here after the first nightly regression examines the pages of the product.'))); return; }
   const p = pageOf(S.pg) || pageOf('/') || pagesData[0];
   const groups = new Map(); for (const x of pagesData) { const k = str(x.nav) || '(other)'; (groups.get(k) || groups.set(k, []).get(k)).push(x); }
   const tested = (x) => x.hotspots.filter((y) => hsItems(y).length).length;
@@ -1344,7 +1556,7 @@ function viewMap() {
       fromMap ? h('button', { class: 'btn', type: 'button', onclick: back }, `← ${fromMap}`) : null, h('h2', { style: 'font-size:16px;margin:0' }, str(p.title) || p.pattern), h('code', {}, p.pattern),
       h('span', { class: `badge ${{ regression: 'ok', exploratory: 'warn' }[p.covered] || 'bad'}` }, p.covered === 'regression' ? 'regression' : p.covered === 'exploratory' ? 'exploratory only' : 'not covered')),
     h('div', { class: 'legend-row' },
-      p.hotspots.length ? h('span', {}, `${named} of ${p.hotspots.length} controls named by a test`) : h('span', {}, 'This UI map has no control positions yet — they appear after the next nightly run.'),
+      p.hotspots.length ? h('span', {}, `${named} of ${p.hotspots.length} controls named by a test`) : h('span', {}, 'This UI map has no control positions yet. They show here after the next nightly run.'),
       h('span', {}, h('i', { class: 'sw bad' }), 'regression / failed'), h('span', {}, h('i', { class: 'sw warn' }), 'needs a look'), h('span', {}, h('i', { class: 'sw ok' }), 'passing'), h('span', {}, h('i', { class: 'sw' }), 'blocked / no verdict'),
       p.hotspots.length ? h('span', {}, h('i', { class: 'sw none' }), 'no test names it yet') : null,
       src && p.hotspots.length ? h('label', {}, h('input', { type: 'checkbox', checked: S.only ? true : null, onchange: () => { S.only = !S.only; render(); } }), ' only the controls a test names') : null));
@@ -1359,7 +1571,7 @@ function viewMap() {
       : [h('h3', {}, `Tests that reach this page (${pageItems.length})`), pageItems.length ? h('ul', { class: 'att' }, pageItems.map((x) => itemRow(x))) : h('p', { class: 'muted-t' }, 'No test reaches this page.'),
         design.some((d) => str(d.pattern) === p.pattern) ? h('p', {}, h('button', { class: 'linkish', type: 'button', onclick: () => go({ v: 'design', ds: { pg: p.pattern, st: '' } }) },
           `Design findings on this page (${design.filter((d) => str(d.pattern) === p.pattern && d.status === 'open').length} open) →`)) : null,
-        h('p', { class: 'meta' }, p.hotspots.length ? 'Click any outlined control on the screenshot: its tests, or ask for a test of it. A control that leads to another page (↗) — a navigation item, tab, link, or a list\'s first row — opens that page.' : '')]);
+        h('p', { class: 'meta' }, p.hotspots.length ? 'Click a control with an outline on the screenshot to see its tests, or to request a test for it. A control that goes to a different page (↗) opens that page: a navigation item, a tab, a link or the first row of a list.' : '')]);
   detail.append(askForm(p, x));
   v.append(h('div', { class: 'maplayout' }, list, h('div', { style: 'min-width:0' }, sel, head, stage), detail));
 }
@@ -1371,17 +1583,17 @@ function askForm(p, x) {
   const label = x ? `${(KIND[x.kind] || 'control').toLowerCase()} "${str(x.name).replace(/["\n\r]/g, '').slice(0, 80)}"` : null;
   const where = `On the page ${/^\/[A-Za-z0-9_./:-]{0,120}$/.test(p.pattern) ? p.pattern : '/'}${label ? `, the ${label}` : ''}`;
   const ta = h('textarea', { maxlength: 2000, 'aria-label': 'What to do and what should happen',
-    placeholder: 'What to do, step by step, and what should happen. E.g. "Rename a project to a 200-character name and save: the new name shows in the list, cut with an ellipsis."' });
+    placeholder: 'Write the steps and the result that you expect. For example: "Change the name of a project to a name of 200 characters and save it. The list shows the new name with an ellipsis."' });
   const msg = h('span', { class: 'meta' });
   const out = h('div', {}, asked.has(key) ? h('div', { class: 'pending', role: 'status' },
-    h('span', {}, bridge() ? 'Send it: the agent freezes your words into criteria, tests them on the newest build, and this page shows the result.'
-      : 'Copy it into the agent\'s chat; the result appears on this page after the run.'), copyBox(asked.get(key))) : null);
+    h('span', {}, bridge() ? 'Send it. The agent changes your words into frozen criteria and tests them on the newest build. This page then shows the result.'
+      : 'Copy it into the chat of the agent. The result shows on this page after the run.'), copyBox(asked.get(key))) : null);
   return h('div', { class: 'ask' }, h('b', {}, x ? 'Ask for a test of this control' : 'Ask for a test of this page'),
-    h('span', { class: 'meta' }, 'Only your words become the criteria: say what to do and what you expect to see.'), ta,
+    h('span', { class: 'meta' }, 'The agent makes the criteria only from your words. Write the steps and the result that you expect.'), ta,
     h('div', { class: 'cmd' }, h('button', { class: 'btn', type: 'button', onclick: () => {
       const words = ta.value.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, ' ').trim();
       const req = `test this scenario: ${where}: ${words}`;
-      if (words.length < 10 || !SCEN_RE.test(req)) { msg.textContent = 'Write at least a sentence: what to do and what should happen (up to 2000 characters).'; msg.className = 'badge warn'; return; }
+      if (words.length < 10 || !SCEN_RE.test(req)) { msg.textContent = 'Write a minimum of one sentence: the steps and the result that you expect (maximum 2000 characters).'; msg.className = 'badge warn'; return; }
       asked.set(key, req); render();
     } }, 'Prepare the request'), msg), out);
 }
@@ -1438,7 +1650,7 @@ function moduleCard(m) {
     focus = [h('datalist', { id: 'qi-areas' }, areas.map((a) => h('option', { value: a }))),
       h('div', { class: 'set' }, h('dt', {}, 'Area'), h('dd', {}, pick, h('button', { class: 'btn', type: 'button', onclick: () => {
         if (CMD_RE.test(`focus ${pick.value.trim()}`)) { want(id, `focus ${pick.value.trim()}`); return; }
-        pick.setCustomValidity('Letters, digits, spaces and _ . / - only, up to 40'); pick.reportValidity();
+        pick.setCustomValidity('Use only letters, digits, spaces and _ . / - (maximum 40).'); pick.reportValidity();
       } }, 'Queue'))),
       q.length ? h('ul', { class: 'att' }, q.slice(-8).reverse().map((f) => h('li', {}, h('span', { class: `badge ${f.status === 'queued' ? 'warn' : 'ok'}` }, str(f.status)), ` ${str(f.area)} · ${fmtDate(f.queued_utc)}${f.build ? ` · ${str(f.build)}` : ''}`))) : null];
   }
@@ -1449,14 +1661,14 @@ function moduleCard(m) {
       sc ? ` · schedule ${sc.enabled === true ? 'on' : sc.enabled === false ? 'off' : 'state unknown'}${sc.cron ? ` (${str(sc.cron)})` : ''}` : ''),
     settings.length ? h('dl', { class: 'set' }, settings.map(([k, spec]) => settingRow(id, k, spec))) : null,
     focus, actions.filter(Boolean).length ? h('div', { class: 'cmd' }, actions) : null,
-    pending.has(id) ? h('div', { class: 'pending', role: 'status' }, h('span', {}, 'Nothing has changed yet. The agent changes it on this command:'), copyBox(pending.get(id))) : null);
+    pending.has(id) ? h('div', { class: 'pending', role: 'status' }, h('span', {}, 'Nothing changed yet. The agent makes the change when it gets this command:'), copyBox(pending.get(id))) : null);
 }
 function viewModules() {
   const v = $('#view');
   if (!modList.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'The module state was not available when this page was built.'))); return; }
-  v.append(h('div', { class: 'note' }, bridge() ? 'A change below becomes a command; its "Send to the agent" button sends it to the agent\'s chat as your message.'
-    : D.interactive ? 'Open this page beside the agent\'s chat to send commands with a click; here, copy them into the chat.'
-      : 'A change below becomes a command to paste into the agent\'s chat; the agent applies it and refreshes this page.',
+  v.append(h('div', { class: 'note' }, bridge() ? 'A change below gives a command. Its "Send to the agent" button sends the command to the chat of the agent as your message.'
+    : D.interactive ? 'Open this page next to the chat of the agent to send commands with a click. Here, copy the commands into the chat.'
+      : 'A change below gives a command. Paste it into the chat of the agent. The agent makes the change and builds this page again.',
     MODS.schedules_as_of ? ` Schedule states as of ${fmtDate(MODS.schedules_as_of)}.` : ''));
   const groups = [['Testing modules', (m) => m.kind === 'modules' || m.kind === 'queue'], ['Scheduled runs', (m) => m.kind === 'schedule'], ['Issue runs', (m) => m.kind === 'core' || m.kind === 'config']];
   for (const [title, f] of groups) {
@@ -1466,13 +1678,19 @@ function viewModules() {
   const g = MODS.global && typeof MODS.global === 'object' ? Object.entries(MODS.global) : [];
   if (g.length) v.append(h('h2', { style: 'font-size:15px;margin:16px 0 8px' }, 'Every module'), h('div', { class: 'mods' }, h('section', { class: 'mod' },
     h('dl', { class: 'set' }, g.map(([k, spec]) => settingRow('global', k, spec))),
-    pending.has('global') ? h('div', { class: 'pending', role: 'status' }, h('span', {}, 'Nothing has changed yet. The agent changes it on this command:'), copyBox(pending.get('global'))) : null)));
+    pending.has('global') ? h('div', { class: 'pending', role: 'status' }, h('span', {}, 'Nothing changed yet. The agent makes the change when it gets this command:'), copyBox(pending.get('global'))) : null)));
 }
 
 // ---------------------------------------------------------------- findings
 const F = D.findings && typeof D.findings === 'object' ? D.findings : {};
 const SEVC = { critical: 'bad', high: 'bad', major: 'bad', medium: 'warn', minor: 'warn', low: 'muted', info: 'muted' };
-const sevB = (sv) => h('span', { class: `badge ${SEVC[str(sv)] || 'none'}` }, str(sv) || '–');
+const SEV_HELP = { critical: 'The product does not work for all users, or there is a serious security problem.', high: 'A serious problem for a user.', major: 'The problem stops or misleads a user, or the user loses data.',
+  medium: 'A real problem, but the user has a different way to do the task.', minor: 'It looks or operates incorrectly, but the user can do the task.', low: 'A small problem.', info: 'Information only.' };
+const sevB = (sv) => h('span', { class: `badge ${SEVC[str(sv)] || 'none'}`, title: SEV_HELP[str(sv)] || null }, str(sv) || '–');
+const VAL_KIND_HELP = { 'required-empty': 'A required field that is empty', 'wrong-type': 'A value of an incorrect type', 'num-below': 'A number less than the minimum', 'num-above': 'A number more than the maximum',
+  'pattern-miss': 'A value that does not agree with the pattern of the field', 'max-len+1': 'One character more than the maximum length', 'max-len': 'A text of the maximum length', whitespace: 'Only spaces', long: 'A very long text',
+  unicode: 'Letters with accents, and letters that are not Latin', rtl: 'Text from right to left', emoji: 'Emoji', html: 'Text that looks like HTML, for example <b>', 'duplicate-submit': 'The user submits the form two times quickly' };
+const VAL_RESULT_HELP = { finding: 'The form did not process the input correctly. This is possibly a bug.', flaky: 'It failed one time and passed on the second run.', blocked: 'The case did not get to its check: the page, the field or the button is missing.' };
 const design = arr(D.design).filter((d) => d && /^D-\d+$/.test(str(d.id)));
 function viewFindings() {
   const v = $('#view');
@@ -1495,23 +1713,24 @@ function viewFindings() {
   const tableOf = (cols, rows) => h('div', { class: 'tablewrap' }, h('table', { class: 'list' }, h('thead', {}, h('tr', {}, cols.map((c) => h('th', { style: 'cursor:default' }, c)))),
     h('tbody', {}, rows.map((r) => h('tr', { style: 'cursor:default' }, r.map((c) => h('td', {}, c)))))));
   const sec2 = (title, sub, body) => h('section', { class: 'panel', style: 'margin-top:14px' }, h('h2', {}, title), sub ? h('p', { class: 'meta' }, sub) : null, body);
-  v.append(sec2('Form validation', val ? ['Build ', buildLink(val.build), ` · run ${str(val.run)} · ${fmtDate(val.utc)} · ${arr(val.cases).length} cases`] : null,
-    !val ? h('p', { class: 'muted-t' }, 'The validation module has not run yet.') : vf.length ? tableOf(['Case', 'Page', 'Form · field', 'Input', 'Result', 'Severity', 'What broke'],
+  v.append(h('p', { class: 'meta' }, 'Select the problems (☐). Then report them in one GitHub issue from the bar at the bottom.'));
+  v.append(sec2('Form validation', val ? ['The agent puts empty, incorrect, too long and unusual input into each form. A finding is a form that does not refuse the input visibly, or that changes the input. Build ', buildLink(val.build), ` · run ${str(val.run)} · ${fmtDate(val.utc)} · ${arr(val.cases).length} cases`] : null,
+    !val ? h('p', { class: 'muted-t' }, 'The validation module has not run yet.') : vf.length ? tableOf(['☐', 'Case', 'Page', 'Form · field', 'Input', 'Result', 'Severity', 'What broke', 'Issue'],
       vf.sort((a, b) => (a.result === 'finding' ? 0 : 1) - (b.result === 'finding' ? 0 : 1) || (SEVC[a.severity] === 'bad' ? 0 : 1) - (SEVC[b.severity] === 'bad' ? 0 : 1))
-        .map((c) => [h('code', {}, str(c.id)), pageLink(str(c.page)), `${str(c.form)}${c.field ? ` · ${str(c.field)}` : ''}`, str(c.kind),
-          h('span', { class: `badge ${c.result === 'finding' ? 'bad' : c.result === 'flaky' ? 'warn' : 'muted'}` }, str(c.result)), c.severity ? sevB(c.severity) : '', str(c.message)])) : h('p', { class: 'muted-t' }, 'Every case passed.')));
-  v.append(sec2('Stress', st ? ['Build ', buildLink(st.build), ` · ${fmtDate(st.utc)}${st.config ? ` · ${str(st.config.concurrency)} workers × ${str(st.config.duration_s)} s` : ''}`] : null,
-    !st ? h('p', { class: 'muted-t' }, 'The stress module has not run yet.') : sf.length ? tableOf(['Check', 'Target', 'Status', 'Severity', 'Evidence'],
-      sf.map((c) => [h('code', {}, str(c.id)), h('code', {}, str(c.target)), h('span', { class: `badge ${c.status === 'fail' ? 'bad' : 'muted'}` }, str(c.status)), sevB(c.severity),
-        str(c.evidence || c.reason)])) : h('p', { class: 'muted-t' }, 'Every check passed.')));
+        .map((c) => [c.result === 'finding' ? pickBox(str(c.id)) : '', h('code', {}, str(c.id)), pageLink(str(c.page)), `${str(c.form)}${c.field ? ` · ${str(c.field)}` : ''}`, h('span', { title: VAL_KIND_HELP[str(c.kind)] || null }, str(c.kind)),
+          h('span', { class: `badge ${c.result === 'finding' ? 'bad' : c.result === 'flaky' ? 'warn' : 'muted'}`, title: VAL_RESULT_HELP[str(c.result)] || null }, str(c.result)), c.severity ? sevB(c.severity) : '', str(c.message), foundLinks(str(c.id))])) : h('p', { class: 'muted-t' }, 'Every case passed.')));
+  v.append(sec2('Stress', st ? ['Many users at the same time use the most important pages and endpoints. This finds errors and slow answers under load. Build ', buildLink(st.build), ` · ${fmtDate(st.utc)}${st.config ? ` · ${str(st.config.concurrency)} workers × ${str(st.config.duration_s)} s` : ''}`] : null,
+    !st ? h('p', { class: 'muted-t' }, 'The stress module has not run yet.') : sf.length ? tableOf(['☐', 'Check', 'Target', 'Status', 'Severity', 'Evidence', 'Issue'],
+      sf.map((c) => [c.status === 'fail' ? pickBox(str(c.id)) : '', h('code', {}, str(c.id)), h('code', {}, str(c.target)), h('span', { class: `badge ${c.status === 'fail' ? 'bad' : 'muted'}` }, str(c.status)), sevB(c.severity),
+        typeof c.evidence === 'object' && c.evidence ? JSON.stringify(c.evidence) : str(c.evidence || c.reason), foundLinks(str(c.id))])) : h('p', { class: 'muted-t' }, 'Every check passed.')));
   const rq = arr(F.requests).filter((x) => x && /^S-\d+$/.test(str(x.id)));
   const RQ = { queued: ['waiting for the environment', 'muted'], in_progress: ['being tested', 'warn'], report_pending: ['tested, report on its way', 'ok'], rejected: ['not testable as written', 'bad'] };
-  v.append(sec2('Requested tests', rq.length ? 'Scenarios asked for in Slack, in the chat or from this page, not yet reported. A finished one is under Runs.' : null,
-    !rq.length ? h('p', { class: 'muted-t' }, 'No request is waiting. Ask for one on the Product map.') : tableOf(['Scenario', 'From', 'State', 'Title', 'Updated'],
+  v.append(sec2('Requested tests', rq.length ? 'Scenarios that people requested in Slack, in the chat or on this page, and that have no report yet. Finished scenarios are in Runs.' : null,
+    !rq.length ? h('p', { class: 'muted-t' }, 'No request waits. You can request a test on the Product map.') : tableOf(['Scenario', 'From', 'State', 'Title', 'Updated'],
       rq.map((x) => [refLink(str(x.id)), str(x.source), h('span', { class: `badge ${(RQ[x.status] || ['', 'none'])[1]}` }, (RQ[x.status] || [str(x.status)])[0]),
         str(x.title) || h('span', { class: 'muted-t' }, 'criteria not frozen yet'), x.utc ? rel(x.utc) : '']))));
   const fo = arr(F.focus).filter((x) => x && typeof x === 'object');
-  v.append(sec2('Feature focus', fo.length ? `${fo.length} newest focus run(s)` : null, !fo.length ? h('p', { class: 'muted-t' }, 'No area has been tested in depth yet — queue one in Modules.')
+  v.append(sec2('Feature focus', fo.length ? `${fo.length} newest focus run(s)` : null, !fo.length ? h('p', { class: 'muted-t' }, 'The agent did not test an area in depth yet. You can add an area to the queue in Modules.')
     : fo.map((x) => h('div', { style: 'margin-top:8px' }, h('h3', {}, x.area && items.some((i) => str(i.area) === str(x.area)) ? facetLink('area', str(x.area)) : str(x.area) || str(x.run), x.build ? [' · ', buildLink(x.build)] : '', x.utc ? ` · ${fmtDate(x.utc)}` : ''),
       tableOf(['Check', 'Heuristic', 'Expected', 'Result', 'Severity'], arr(x.checks).map((c) => [h('code', {}, str(c.id)), str(c.heuristic), str(c.expected), badge(str(c.verdict)), c.severity ? sevB(c.severity) : '']))))));
   v.append(sec2('Security', sec ? ['Build ', buildLink(sec.candidate), ` · ${fmtDate(sec.utc)} — the findings stay in the private report`] : null,
@@ -1521,23 +1740,39 @@ function viewFindings() {
 
 // ------------------------------------------------------------------ design
 const dCheck = (d) => str(d.check).replace(/^review:.*/, 'review').replace(/^a11y:.*/, 'a11y');
+// What each check looks for (docs/ui-sweep.md), for the tooltips.
+const CHECK_HELP = {
+  'overflow-x': 'The page, or an element, is wider than the screen. The user must scroll horizontally.', offscreen: 'A control is partially or fully outside the screen.',
+  'broken-image': 'An image does not load.', 'placeholder-text': 'The page shows a raw placeholder: undefined, NaN, [object Object], {{…}} or a key that has no translation.',
+  'no-name': 'A button, link or field has no accessible name. A screen reader cannot read it.', 'clipped-text': 'The box of a text cuts the text, and there is no ellipsis.',
+  overlap: 'Two controls cover more than a quarter of each other.', contrast: 'The contrast of a text is less than WCAG AA.', 'tap-target': 'A control is smaller than 24 px on a phone.',
+  'layout-shift': 'The layout moves while the page loads (CLS more than 0.1).', 'console-error': 'The page writes an error to the browser console.', 'failed-request': 'The server sends an error (400 or more) for a request of the page.',
+  a11y: 'An axe-core accessibility rule (WCAG 2 A/AA) fails.', review: 'The model found a problem in the screenshot: alignment, spacing, typography, layout, cut text or legibility.',
+};
+const checkHelp = (c) => CHECK_HELP[str(c)] || CHECK_HELP[str(c).replace(/^review:.*/, 'review').replace(/^a11y:.*/, 'a11y')] || null;
+const DSTATUS_HELP = { open: 'The newest sweep of its page found it, and you did not dismiss it.', resolved: 'A newer build was swept, and the check does not find it now.', dismissed: 'You said that it is not a defect. It stays dismissed until you reopen it.' };
+const DISMISS = [['false-positive', 'Not a defect: the check is incorrect here'], ['wont-fix', 'A defect, but the team will not repair it'], ['duplicate', 'The same as a different finding'], ['by-design', 'The team designed it like this']];
 function designMarkdown(list) {
   return list.map((d) => `- **${str(d.id)}** (${str(d.severity)}${d.suspect ? ', suspect' : ''}) \`${str(d.pattern)}\`${d.viewport && d.viewport !== '-' ? ` @ ${str(d.viewport)}` : ''} — ${str(d.saw)}`
     + ` _(${str(d.check)}; since ${str(d.first_seen)}${d.status !== 'open' ? `; ${str(d.status)}` : ''})_`).join('\n');
 }
 function viewDesign() {
   const v = $('#view');
-  if (!design.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No design findings yet.'), h('p', {}, 'Switch the UI sweep on in Modules; tests\' "noticed in passing" items appear here too.'))); return; }
+  if (!design.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No design findings yet.'), h('p', {}, 'Switch on the UI sweep in Modules. Problems that tests find by chance ("noticed in passing") also show here.'))); return; }
   const uniq = (f) => [...new Set(design.map(f).filter(Boolean))].sort();
   const pass = (d) => (!DS.st || d.status === DS.st) && (!DS.sev || d.severity === DS.sev) && (!DS.vp || str(d.viewport) === DS.vp) && (!DS.ck || dCheck(d) === DS.ck)
-    && (!DS.pg || str(d.pattern) === DS.pg) && (!DS.q || [d.id, d.saw, d.target, d.pattern, d.check].map(str).join(' ').toLowerCase().includes(DS.q.toLowerCase()));
+    && (!DS.pg || str(d.pattern) === DS.pg) && (!DS.cat || (DS.cat === '(none)' ? !d.category : str(d.category) === DS.cat))
+    && (!DS.q || [d.id, d.saw, d.target, d.pattern, d.check, d.category].map(str).join(' ').toLowerCase().includes(DS.q.toLowerCase()));
+  const cats = uniq((d) => str(d.category));
   const list = design.filter(pass).sort((a, b) => (a.severity === 'major' ? 0 : 1) - (b.severity === 'major' ? 0 : 1) || str(a.pattern).localeCompare(str(b.pattern)) || num(a.id) - num(b.id));
   const newest = str(F.design_build); // the newest sweep's build: ids need not sort in build order
   const open = design.filter((d) => d.status === 'open');
   v.append(h('div', { class: 'grid-kpi' }, [['Open', open.length], ['Open · major', open.filter((d) => d.severity === 'major').length],
-    ['New in the newest build', open.filter((d) => str(d.first_seen) === newest).length], ['Suspect (model unsure)', open.filter((d) => d.suspect).length],
-    ['Resolved', design.filter((d) => d.status === 'resolved').length], ['Dismissed', design.filter((d) => d.status === 'dismissed').length]]
-    .map(([l, n]) => h('div', { class: 'kpi' }, h('b', {}, String(n)), h('span', {}, l)))));
+    ['New in the newest build', open.filter((d) => str(d.first_seen) === newest).length], ['Suspect (the model is not sure)', open.filter((d) => d.suspect).length],
+    ['Resolved', design.filter((d) => d.status === 'resolved').length], ['Dismissed', design.filter((d) => d.status === 'dismissed').length],
+    ['Uncategorized (open)', open.filter((d) => !d.category).length], ['Reported as an issue', design.filter((d) => foundOf(str(d.id)).length).length]]
+    .map(([l, n]) => h('div', { class: 'kpi', title: { Open: DSTATUS_HELP.open, Resolved: DSTATUS_HELP.resolved, Dismissed: DSTATUS_HELP.dismissed, 'Suspect (the model is not sure)': 'The model that examined the screenshot was less than 60 % sure. Examine the finding before you do an action.',
+      'Uncategorized (open)': 'Open findings that have no category.', 'Reported as an issue': 'Findings that have a GitHub issue.' }[l] || null }, h('b', {}, String(n)), h('span', {}, l)))));
   const sel = (label, key, opts, fmt) => h('select', { 'aria-label': label, onchange: (e) => { DS[key] = e.target.value; writeHash(); render(); } },
     h('option', { value: '' }, `${label}: all`), opts.map((o) => h('option', { value: o, selected: DS[key] === o ? true : null }, fmt ? fmt(o) : o)));
   const copyMd = h('button', { class: 'btn', type: 'button', onclick: async () => {
@@ -1547,22 +1782,44 @@ function viewDesign() {
   } }, 'Copy as Markdown');
   const q = h('input', { type: 'search', placeholder: 'Search findings', value: DS.q, 'aria-label': 'Search findings', oninput: debounce((e) => { DS.q = e.target.value; writeHash(); render(true); }, 200) });
   v.append(h('div', { class: 'toolbar', style: 'margin-top:14px' }, q, sel('Status', 'st', ['open', 'resolved', 'dismissed']), sel('Severity', 'sev', ['major', 'minor']),
-    sel('Screen', 'vp', uniq((d) => str(d.viewport))), sel('Check', 'ck', uniq(dCheck)), sel('Page', 'pg', uniq((d) => str(d.pattern))),
-    h('span', { class: 'count' }, `${list.length} of ${design.length}`), copyMd));
+    sel('Screen', 'vp', uniq((d) => str(d.viewport))), sel('Check', 'ck', uniq(dCheck)), sel('Page', 'pg', uniq((d) => str(d.pattern))), sel('Category', 'cat', [...cats, '(none)']),
+    h('span', { class: 'count' }, `${list.length} of ${design.length}`), copyMd,
+    list.some((d) => d.status === 'open') ? h('button', { class: 'btn', type: 'button', title: 'Select all the open findings in this list to report them in one GitHub issue (maximum 20).',
+      onclick: () => { for (const d of list.filter((x) => x.status === 'open')) if (!picked.includes(str(d.id)) && picked.length < PICK_MAX) picked.push(str(d.id)); savePicked(); render(); } }, 'Select all open findings') : null));
+  v.append(h('p', { class: 'meta' }, 'Severity: ', h('b', {}, 'major'), ' means that the problem stops or misleads a user (a broken layout, a control that the user cannot reach, a missing name). ', h('b', {}, 'minor'), ' means that it looks incorrect but it works. Open "Manage" on a card to set a category, dismiss the finding or report it.'));
   if (!list.length) { v.append(h('p', { class: 'empty' }, 'No finding matches.')); return; }
+  const known = [...new Set(design.map((d) => str(d.category)).filter(Boolean))].sort();
+  v.append(h('datalist', { id: 'qi-dcats' }, known.map((c) => h('option', { value: c }))));
   v.append(h('div', { class: 'gal' }, list.slice(0, S.limit).map((d) => {
-    const src = img(d.crop);
-    return h('article', { class: 'dcard', 'aria-label': str(d.id) },
-      src ? h('img', { src, alt: `${str(d.id)}: ${str(d.saw)}`, loading: 'lazy' }) : h('div', { class: 'ph' }, 'no screenshot'),
-      h('div', { style: 'display:flex;flex-wrap:wrap;gap:4px;align-items:center' }, h('b', {}, str(d.id)), sevB(d.severity),
-        h('span', { class: `badge ${d.status === 'open' ? 'warn' : d.status === 'resolved' ? 'ok' : 'muted'}` }, str(d.status)), d.suspect ? h('span', { class: 'badge muted', title: 'The model was unsure — check before acting' }, 'suspect') : null),
+    const src = img(d.crop); const id = str(d.id);
+    const catIn = h('input', { type: 'text', list: 'qi-dcats', placeholder: 'for example layout, a11y, branding', value: str(d.category), 'aria-label': `Category of ${id}` });
+    const catSlot = h('div', { class: 'row' });
+    const why = h('select', { 'aria-label': `Why ${id} is not a defect` }, DISMISS.map(([k, l]) => h('option', { value: k }, l)));
+    const whySlot = h('div', { class: 'row' });
+    return h('article', { class: `dcard${picked.includes(id) ? ' picked' : ''}`, 'aria-label': id },
+      src ? h('img', { src, alt: `${id}: ${str(d.saw)}`, loading: 'lazy' }) : h('div', { class: 'ph' }, 'no screenshot'),
+      h('div', { style: 'display:flex;flex-wrap:wrap;gap:4px;align-items:center' }, pickBox(id), h('b', {}, id), sevB(d.severity),
+        h('span', { class: `badge ${d.status === 'open' ? 'warn' : d.status === 'resolved' ? 'ok' : 'muted'}`, title: DSTATUS_HELP[d.status] || null }, str(d.status)),
+        d.dismiss_reason ? h('span', { class: 'badge muted', title: 'Why it was dismissed' }, (DISMISS.find(([k]) => k === d.dismiss_reason) || [str(d.dismiss_reason)])[0]) : null,
+        d.category ? h('button', { class: 'chip', type: 'button', title: 'Show only this category', onclick: () => { DS.cat = str(d.category); writeHash(); render(); } }, str(d.category)) : null,
+        d.suspect ? h('span', { class: 'badge muted', title: 'The model was not sure. Examine the finding before you do an action.' }, 'suspect') : null, foundLinks(id)),
       h('div', { class: 'saw' }, str(d.saw)),
-      h('div', { class: 'meta' }, pageLink(str(d.pattern)), d.viewport && d.viewport !== '-' ? ` @ ${str(d.viewport)}` : '', ` · ${str(d.check)}`),
+      h('div', { class: 'meta' }, pageLink(str(d.pattern)), d.viewport && d.viewport !== '-' ? ` @ ${str(d.viewport)}` : '', ` · ${str(d.check)}`, tip(checkHelp(d.check))),
       h('details', {}, h('summary', {}, 'Details'), h('dl', { class: 'dl' },
         h('dt', {}, 'Element'), h('dd', {}, str(d.target) || '–'), h('dt', {}, 'Source'), h('dd', {}, { sweep: 'UI sweep check', review: 'model review of the screenshot', noticed: 'noticed while testing' }[d.source] || str(d.source)),
         h('dt', {}, 'First seen'), h('dd', {}, d.first_seen ? buildLink(d.first_seen) : '–'), h('dt', {}, 'Last seen'), h('dd', {}, d.last_seen ? buildLink(d.last_seen) : '–'),
-        d.resolved_build ? [h('dt', {}, 'Resolved in'), h('dd', {}, buildLink(d.resolved_build))] : null),
-        d.status === 'open' ? h('div', {}, h('span', { class: 'meta' }, 'Not a defect? '), copyBox(`dismiss ${str(d.id)}`)) : null));
+        d.resolved_build ? [h('dt', {}, 'Resolved in'), h('dd', {}, buildLink(d.resolved_build))] : null)),
+      S.at ? null : h('details', {}, h('summary', {}, 'Manage: category, dismiss, report'), h('div', { class: 'actions', style: 'margin-top:6px' },
+        h('div', { class: 'action' }, h('b', {}, 'Category'), h('p', {}, 'A category is your own group for the design team. Use lower-case words with -. You can filter by category above.'),
+          h('div', { class: 'row' }, catIn, h('button', { class: 'btn', type: 'button', onclick: () => {
+            catSlot.textContent = ''; const c = catIn.value.trim().toLowerCase().replace(/\s+/g, '-') || '-'; const b = copyBox(`categorize ${id} ${c}`);
+            if (b) catSlot.append(b); else { catIn.setCustomValidity('Use only lower-case letters, digits and - (maximum 30).'); catIn.reportValidity(); }
+          } }, d.category ? 'Change' : 'Set'), d.category ? h('button', { class: 'btn', type: 'button', onclick: () => { catSlot.textContent = ''; catSlot.append(copyBox(`categorize ${id} -`)); } }, 'Clear') : null), catSlot),
+        d.status === 'dismissed'
+          ? action('Reopen it', 'This cancels the dismissal. The next sweep then sets the status again.', `reopen ${id}`)
+          : h('div', { class: 'action' }, h('b', {}, 'Dismiss it: not a defect'), h('p', {}, 'It goes out of the open list. It stays dismissed on all builds until you reopen it.'),
+            h('div', { class: 'row' }, why, h('button', { class: 'btn', type: 'button', onclick: () => { whySlot.textContent = ''; whySlot.append(copyBox(`dismiss ${id} as ${why.value}`)); } }, 'Dismiss')), whySlot),
+        d.status !== 'dismissed' ? issueActions(id, d.severity === 'major' && d.status === 'open') : null)));
   })));
   if (list.length > S.limit) v.append(h('div', { class: 'more-row' }, h('button', { class: 'btn', type: 'button', onclick: () => { S.limit += 100; render(); } }, `Show more (${list.length - S.limit})`)));
 }
@@ -1579,9 +1836,17 @@ function render(keepSearchFocus) {
       nightOf(S.at) ? h('button', { class: 'btn', type: 'button', onclick: () => openRun(nightOf(S.at)) }, 'That night') : null,
       h('button', { class: 'btn', type: 'button', onclick: () => go({ at: null }) }, 'Back to now')));
   }
+  if (VIEW_HELP[S.v] && !hiddenHelp.has(S.v)) v.append(h('div', { class: 'viewhelp', role: 'note' }, h('p', {}, VIEW_HELP[S.v]),
+    h('button', { class: 'btn', type: 'button', title: 'Hide this line in this view. Only this browser keeps this setting.', onclick: () => { hiddenHelp.add(S.v); saveHidden(); render(); } }, 'Hide')));
   ({ overview: viewOverview, modules: viewModules, findings: viewFindings, design: viewDesign, runs: viewRuns, map: viewMap, catalog: () => viewList(false), gallery: () => viewList(true), coverage: viewCoverage, history: viewHistory, lifecycle: viewLifecycle }[S.v] || viewOverview)();
   if (pos != null) { const q = $('input[type=search]'); if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch { /* ignore */ } } }
+  renderTray();
 }
+// The views' help lines a viewer hid (this browser only); the guide's open state likewise.
+const HELP_KEY = `qi-catalog:${str(D.target)}:help-hidden`;
+let hiddenHelp = new Set();
+if (storageOK) try { hiddenHelp = new Set(arr(JSON.parse(localStorage.getItem(HELP_KEY) || '[]')).map(str)); } catch { hiddenHelp = new Set(); }
+function saveHidden() { try { localStorage.setItem(HELP_KEY, JSON.stringify([...hiddenHelp])); } catch { /* ignore */ } }
 // The steps kept with a history entry: a reload or a "forward" finds its own way back.
 const trailOf = (st) => arr(st && st.qi).filter((x) => x && typeof x.h === 'string' && typeof x.label === 'string').slice(-100);
 readHash();

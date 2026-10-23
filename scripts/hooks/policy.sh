@@ -41,7 +41,8 @@
 #                                          (docs/self-modification.md §8)
 #   run-mode         Write Edit …          work/env/RUN_MODE (only `precheck.sh slack <n>` writes it)
 #   scheduled-def    Write Edit … (sched.) work/CONFIG.md, work/OPERATOR.md (the operator's standing preferences),
-#                                          work/FOCUS.md, work/design/DISMISSED.md (docs/modules.md)
+#                                          work/FOCUS.md, work/design/DISMISSED.md, work/design/CATEGORIES.md
+#                                          (docs/modules.md), work/FOUND.md (skills/create-issue)
 #   scheduled-git    Bash (scheduled)      git commit
 #   policy-tamper    Bash (scheduled)      any command naming RUN_MODE (the Slack marker), scripts/hooks/ or .claude/settings
 #   channel-write    Bash (channel turn)   a command naming github.sh, comment or unlabel in any spelling
@@ -64,6 +65,10 @@
 #                                          dismissals are the operator's word (docs/modules.md → Control);
 #                                          the script refuses them outside the direct session itself, and
 #                                          the session variables it judges that by are never set by hand
+#   issue-create     Bash (scheduled)      a command whose text, its quotes, escapes and $'…' read as bash reads
+#                                          them (issue_names), holds create-issue: opening an issue
+#                                          (scripts/github.sh create-issue) is the operator's word in the direct
+#                                          session (skills/create-issue); github.sh refuses it there itself
 #   backup-override  Bash                  a command naming QI_WORK_BACKUP_ (the offline tests' remote and clone
 #                                          overrides): the backup's destination is work_repo alone
 #   backup-direct    Bash (scheduled)      scripts/work-backup.sh — there the Stop hook alone backs up
@@ -387,6 +392,15 @@ mod_names() { # <text> — 0 when it names modules.sh or a session variable dire
   NW_STAR_FREE=""
   return "$r"
 }
+# issue-create — the text `create-issue` once bash's quoting is gone: each $'…' span decoded,
+# quotes, backslashes and line continuations dropped (create-"issue", cr\eate-issue). A glob or a
+# name joined at run time is out of reach of text; github.sh then refuses outside the direct session.
+issue_names() { # <text>
+  local bsnl=$'\\\n'
+  ansi_c_decoded "$1"; X="${X//"$bsnl"/}"; X="${X//[\"\'\\]/}"
+  case "$X" in (*create-issue*) return 0;; esac
+  return 1
+}
 # Its two shapes are wider than channel-write's: either may end in `2>&1` or
 # `2>/dev/null` and pipe into read-only filters (RE_MOD_TAIL: jq|head|tail|grep|egrep|fgrep|wc,
 # none of which writes a file or runs a program), and `$HOME/` or `${HOME}/` counts as the home
@@ -451,6 +465,8 @@ check_bash() {
   case "$CMD" in (*QI_TARGET_REPO*) deny github "QI_TARGET_REPO" "the target comes from work/CONFIG.md alone";; esac
   chan_names "$CMD" && channel_turn && check_channel_writes "$CMD"
   mod_names "$CMD" && scheduled && check_module_cmd "$CMD"
+  issue_names "$CMD" && scheduled \
+    && deny issue-create "scripts/github.sh" "a new issue is opened only on the operator's word in the direct session (skills/create-issue)"
   case "$CMD" in (*'<<'*) strip_heredocs "$CMD"; CMD="$X";; esac
   while IFS= read -r seg; do check_simple "$seg"; done <<<"$(printf '%s\n' "$CMD" | tr ';&|()' '\n\n\n\n\n')"
   case "$CMD" in (*node_modules/*)
@@ -473,8 +489,8 @@ check_write() {
     && deny channel-write "$p" "a channel turn writes no file that names github.sh (docs/slack.md)"
   [ "$p" = "$WORK/env/RUN_MODE" ] && deny run-mode "$p" "only precheck.sh slack <n> writes the Slack marker"
   if under "$p" "$WORK"; then
-    case "$p" in ("$WORK/CONFIG.md"|"$WORK/OPERATOR.md"|"$WORK/FOCUS.md"|"$WORK/design/DISMISSED.md")
-      scheduled && deny scheduled-def "$p" "a scheduled run or a channel turn never changes the configuration, the operator's preferences, the focus queue or the dismissed findings";; esac
+    case "$p" in ("$WORK/CONFIG.md"|"$WORK/OPERATOR.md"|"$WORK/FOCUS.md"|"$WORK/design/DISMISSED.md"|"$WORK/design/CATEGORIES.md"|"$WORK/FOUND.md")
+      scheduled && deny scheduled-def "$p" "a scheduled run or a channel turn never changes the configuration, the operator's preferences, the focus queue, the design findings' triage or the found issues";; esac
     return 0
   fi
   in_tmp_qi "$p" && return 0

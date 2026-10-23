@@ -236,6 +236,10 @@ file → keep its values, show them once, and ask only for the keys it lacks. As
 4. **`spec_feedback`** — ask, default `disabled`: when an issue has nothing testable, the
    agent comments a suggested observable "Done when" on it (public, as the connection's
    account).
+   **`fix_label`** — optional: the label a software architect agent picks up to fix an issue.
+   With it, the dashboard's "Report it as a GitHub issue" also offers "… and hand it to the
+   software architect" ([skills/create-issue](skills/create-issue/SKILL.md)); without it, none.
+   A found issue always gets `found_label` (default `qa:found`).
 5. **`slack_channel`** — optional, off unless the operator says yes: `describe_channel` for
    `slack`; when it lists a chat, offer test requests there ([docs/slack.md](docs/slack.md))
    and record its id. Not connected → skip; a channel can be bound later. Say that an answer

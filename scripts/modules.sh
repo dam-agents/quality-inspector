@@ -17,8 +17,12 @@
 #                                          value outside its type, every write when one is bad
 #   modules.sh focus <area>                queue an area for the next modules run
 #   modules.sh focus-done <area> <build>   mark the queued area done (exit 2 when none is queued)
-#   modules.sh dismiss D-<k>               the operator's "not a defect": a row in
-#                                          work/design/DISMISSED.md (docs/ui-sweep.md)
+#   modules.sh dismiss D-<k> [<reason>]    the operator's "not a defect": a row in
+#                                          work/design/DISMISSED.md (docs/ui-sweep.md); <reason> one of
+#                                          false-positive|wont-fix|duplicate|by-design
+#   modules.sh reopen D-<k>                take it off DISMISSED.md: the sweeps decide again
+#   modules.sh categorize D-<k> <category> the operator's own category of a finding (a slug, `-` clears
+#                                          it): a row in work/design/CATEGORIES.md
 #   modules.sh value <key>                 a registry key's effective value: the CONFIG.md bullet
 #                                          when it fits its type, else the default — what a script
 #                                          that runs a module reads
@@ -31,7 +35,7 @@
 #                                          work/schedules.json, with the time it was taken
 #
 # The registry (lib/modules.json) is the closed set: a key it does not name, or a value
-# outside its type, is never written. `set`, `focus` and `dismiss` are the operator's word: they run in
+# outside its type, is never written. `set`, `focus`, `dismiss`, `reopen` and `categorize` are the operator's word: they run in
 # the direct session only (lib/config.sh → direct_session) — never in a scheduled run, a
 # Slack turn or a dashboard viewer's turn. Exit 2 = refused input, 1 = failed write.
 
@@ -203,18 +207,50 @@ spec_of() { reg_spec "$1"; }
 
 cmd_value() { reg "${1:-}" || die 2 "modules.sh: '${1:-}' is not a registry key"; }
 
+finding_id() { [[ "${1:-}" =~ ^D-[0-9]{1,6}$ ]] || die 2 "modules.sh: '${1:-}' is not a design finding id (D-<k>)"; }
+# without_rows <file> <id>: the file without the data rows whose first cell is <id>.
+without_rows() {
+  local tmp="$1.tmp.$$"
+  awk -F'|' -v id="$2" 'NR <= 2 { print; next } { x=$2; gsub(/^[ \t]+|[ \t]+$/,"",x) } x != id { print }' "$1" > "$tmp" && mv "$tmp" "$1"
+}
 cmd_dismiss() {
-  local id="${1:-}" f="$WORK/design/DISMISSED.md"
+  local id="${1:-}" why="${2:--}" f="$WORK/design/DISMISSED.md"
   operator_only dismiss
-  [[ "$id" =~ ^D-[0-9]{1,6}$ ]] || die 2 "modules.sh: '$id' is not a design finding id (D-<k>)"
+  finding_id "$id"
+  [[ "$why" =~ ^($DISMISS_REASONS|-)$ ]] || die 2 "modules.sh: '$why' is not a reason (${DISMISS_REASONS//|/, })"
   mkdir -p "$WORK/design" || die 1 "modules.sh: cannot create work/design"
-  [ -f "$f" ] || printf '%s\n| --- | --- |\n' "$DISMISSED_HEADER" > "$f" || die 1 "modules.sh: cannot write $f"
+  [ -f "$f" ] || printf '%s\n| --- | --- | --- |\n' "$DISMISSED_HEADER" > "$f" || die 1 "modules.sh: cannot write $f"
   if table_rows "$f" | while IFS= read -r r; do [ "$(cell "$r" 1)" = "$id" ] && exit 3; done; [ $? = 3 ]; then
     jq -nc --arg id "$id" '{id:$id, dismissed:false, reason:"already dismissed"}'; return
   fi
-  printf '| %s | %s |\n' "$id" "$NOW_ISO" >> "$f" || die 1 "modules.sh: cannot write $f"
-  logev info module_set "module=ui-sweep key=dismiss old=- new=$id"
-  jq -nc --arg id "$id" '{id:$id, dismissed:true}'
+  printf '| %s | %s | %s |\n' "$id" "$NOW_ISO" "$why" >> "$f" || die 1 "modules.sh: cannot write $f"
+  logev info module_set "module=ui-sweep key=dismiss old=- new=$id:$why"
+  jq -nc --arg id "$id" --arg w "$why" '{id:$id, dismissed:true, why:(if $w == "-" then null else $w end)}'
+}
+cmd_reopen() {
+  local id="${1:-}" f="$WORK/design/DISMISSED.md"
+  operator_only reopen
+  finding_id "$id"
+  if ! { [ -f "$f" ] && table_rows "$f" | while IFS= read -r r; do [ "$(cell "$r" 1)" = "$id" ] && exit 3; done; [ $? = 3 ]; }; then
+    jq -nc --arg id "$id" '{id:$id, reopened:false, reason:"not dismissed"}'; return
+  fi
+  without_rows "$f" "$id" || die 1 "modules.sh: cannot write $f"
+  logev info module_set "module=ui-sweep key=dismiss old=$id new=-"
+  jq -nc --arg id "$id" '{id:$id, reopened:true}'
+}
+CATEGORY_RE='^[a-z0-9][a-z0-9-]{0,29}$'
+cmd_categorize() {
+  local id="${1:-}" cat="${2:-}" f="$WORK/design/CATEGORIES.md" old=""
+  operator_only categorize
+  finding_id "$id"
+  [ "$cat" = - ] || [[ "$cat" =~ $CATEGORY_RE ]] || die 2 "modules.sh: '$cat' is not a category (lower-case letters, digits and -, up to 30; - clears it)"
+  mkdir -p "$WORK/design" || die 1 "modules.sh: cannot create work/design"
+  [ -f "$f" ] || printf '%s\n| --- | --- | --- |\n' "$CATEGORIES_HEADER" > "$f" || die 1 "modules.sh: cannot write $f"
+  old="$(table_rows "$f" | while IFS= read -r r; do [ "$(cell "$r" 1)" = "$id" ] && cell "$r" 2; done | tail -1)"
+  without_rows "$f" "$id" || die 1 "modules.sh: cannot write $f"
+  [ "$cat" = - ] || printf '| %s | %s | %s |\n' "$id" "$cat" "$NOW_ISO" >> "$f" || die 1 "modules.sh: cannot write $f"
+  logev info module_set "module=ui-sweep key=category old=${old:--} new=$id:$cat"
+  jq -nc --arg id "$id" --arg o "$old" --arg c "$cat" '{id:$id, old:(if $o == "" then null else $o end), category:(if $c == "-" then null else $c end)}'
 }
 
 cmd_check() {
@@ -252,6 +288,8 @@ case "${1:-}" in
   check) cmd_check ;;
   value) shift; cmd_value "$@" ;;
   dismiss) shift; cmd_dismiss "$@" ;;
+  reopen) shift; cmd_reopen "$@" ;;
+  categorize) shift; cmd_categorize "$@" ;;
   schedules) shift; cmd_schedules "$@" ;;
-  *) die 2 "usage: modules.sh status | due [<candidate>] | set <id|global> <key>=<value>… | focus <area> | focus-done <area> <build> | dismiss D-<k> | value <key> | ran <id> <candidate> [k=v…] | check | schedules <file|->" ;;
+  *) die 2 "usage: modules.sh status | due [<candidate>] | set <id|global> <key>=<value>… | focus <area> | focus-done <area> <build> | dismiss D-<k> [<reason>] | reopen D-<k> | categorize D-<k> <category|-> | value <key> | ran <id> <candidate> [k=v…] | check | schedules <file|->" ;;
 esac

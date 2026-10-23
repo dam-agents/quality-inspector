@@ -28,16 +28,18 @@ Only the operator, in the direct session, changes a module (CLAUDE.md → trust 
 | `module <id> on` / `off` (a schedule kind) | the platform's schedule tools: enable or disable its schedule; then `modules.sh schedules` with the new `list_schedules` answer |
 | `module <id> run now` | a `modules` kind: the modules run below for that module only, ignoring "already ran". A schedule kind: `regression` — "run the regression now", `security` — "run the security checks", `discovery` — "propose scenarios" ([on-demand.md](on-demand.md)); `benchmark` — [benchmark.md](benchmark.md) → the run; `audit` — [audit.md](audit.md), now |
 | `focus <area>` | `modules.sh focus <area>` — the next modules run takes it |
-| `dismiss D-<k>` | `modules.sh dismiss D-<k>` — a row in `work/design/DISMISSED.md` ([ui-sweep.md](ui-sweep.md)) |
+| `dismiss D-<k>` / `dismiss D-<k> as <reason>` | `modules.sh dismiss D-<k> [<reason>]` — a row in `work/design/DISMISSED.md`; `<reason>` one of `false-positive`, `wont-fix`, `duplicate`, `by-design` ([ui-sweep.md](ui-sweep.md) → **Triage**) |
+| `reopen D-<k>` | `modules.sh reopen D-<k>` — its row off `DISMISSED.md`; the next merge decides open or resolved |
+| `categorize D-<k> <category>` | `modules.sh categorize D-<k> <category>` — a row in `work/design/CATEGORIES.md` (lower-case letters, digits, `-`, up to 30; `-` clears it) |
 
-`modules.sh set`, `focus` and `dismiss` write only registry keys with valid values, an area name
-or a finding id, and refuse to run outside the direct session (`lib/config.sh` →
+`modules.sh set`, `focus`, `dismiss`, `reopen` and `categorize` write only registry keys with valid values, an area name,
+a finding id with a reason or a category, and refuse to run outside the direct session (`lib/config.sh` →
 `direct_session`). The policy hook is the second layer: in a scheduled or channel turn it
 allows `modules.sh` only as one plain `status|due|ran|focus-done|check|value|schedules` call
 or one plain read-only command (`grep`, `cat`, …), either optionally ending in `2>&1` or
 `2>/dev/null` and piped into `jq`, `head`, `tail`, `grep`, `egrep`, `fgrep` or `wc`; anything else naming it
 (`;`, `&&`, `$(…)`, a redirection to a file, another pipe) is refused. It refuses a command naming the session variables `direct_session` reads, and refuses edits of
-`work/CONFIG.md`, `work/FOCUS.md` and `work/design/DISMISSED.md` (`module-set`, `scheduled-def`).
+`work/CONFIG.md`, `work/FOCUS.md`, `work/design/DISMISSED.md` and `work/design/CATEGORIES.md` (`module-set`, `scheduled-def`).
 **Limit:** a schedule is switched through the platform's tools, which the policy hook does not
 see — only this rule keeps it the operator's. The hook reads a `$'…'` span as bash decodes it,
 and does not count a glob of `*` alone (`*`, `*.sh`), so ordinary scheduled commands pass. Such
@@ -79,8 +81,9 @@ candidate), `focus[]`, `inventory` (the candidate's UI map or `null`), `max_wall
 7. The catalog ([catalog.md](catalog.md) → **Build and publish**), after the unlock: the
    dashboard is the report of this run.
 
-Findings of a module never change an issue verdict, never become a comment, an issue or a
-label, and are never `verified`. Security findings keep their own private report
+Findings of a module never change an issue verdict, never become a comment or a label, never an
+issue on their own — only the operator's "create issue for …" opens one
+([skills/create-issue](../skills/create-issue/SKILL.md)) — and are never `verified`. Security findings keep their own private report
 ([security.md](security.md)).
 
 ## Feature focus

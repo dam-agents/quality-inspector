@@ -6,6 +6,10 @@
 [ "${STUB_GH_FAIL:-0}" = 1 ] && { echo "stub: failure" >&2; exit 1; }
 args="$*"
 printf '%s\n' "$args" >> "$STUB_DIR/gh.calls" 2>/dev/null
+# A new issue (github.sh create-issue): number 101, the labels it was sent — what its --jq prints.
+case "$args" in (*"-X POST repos/"*"/issues -f title="*)
+  l="$(for a in "$@"; do case "$a" in ('labels[]='*) printf '%s\n' "${a#labels[]=}";; esac; done | jq -R . | jq -sc .)"
+  jq -nc --argjson l "$l" '{number: 101, url: "https://github.com/acme/widgets/issues/101", labels: $l}'; exit 0 ;; esac
 for a in "$@"; do
   case "$a" in (*/issues/*) n="${a##*/issues/}"; case "$n" in (''|*[!0-9]*) ;; (*)
     [ -f "$STUB_DIR/issue-$n.json" ] && { cat "$STUB_DIR/issue-$n.json"; exit 0; }

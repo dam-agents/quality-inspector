@@ -31,6 +31,37 @@ grep -qF -- "-X POST repos/acme/widgets/issues/7/comments -F body=@$SANDBOX/c.md
 grep -qF -- "-X DELETE repos/acme/widgets/issues/7/labels/qa%3Aretest" "$STUB_DIR/gh.calls" \
   || { echo "  assertion failed: only the retest label, URL-encoded"; FAILED=1; }
 
+# create-issue: the operator's alone, a draft under work/found/ with its marker, once per problem.
+export CLAUDE_CONFIG_DIR="$SANDBOX/claude" CLAUDE_CODE_SESSION_ID=s1
+mkdir -p "$CLAUDE_CONFIG_DIR/projects/p"; TR="$CLAUDE_CONFIG_DIR/projects/p/s1.jsonl"
+printf '{"type":"user","message":{"content":"create issue for #7 AC-1, D-3"}}\n' > "$TR"
+F="$WORK_DIR/found/two"; mkdir -p "$F"
+echo '{"refs":["#7 AC-1","D-3"],"build":"c1","labels":["qa:found"]}' > "$F/draft.json"
+echo 'Rename loses sessions; the header overflows' > "$F/title.txt"
+printf '<!-- quality-inspector-found refs="#7 AC-1; D-3" build=c1 -->\n## What is wrong\nEvidence: EVIDENCE_LINK\n' > "$F/body.md"
+bash "$G" create-issue "$F" >/dev/null 2>&1; assert_eq "EVIDENCE_LINK left in the body is refused" 3 "$?"
+sed -i.bak 's|EVIDENCE_LINK|https://example.test/e|' "$F/body.md" && rm -f "$F/body.md.bak"
+mkdir -p "$SANDBOX/elsewhere"; cp "$F"/* "$SANDBOX/elsewhere/"
+bash "$G" create-issue "$SANDBOX/elsewhere" >/dev/null 2>&1; assert_eq "a draft outside work/found is refused" 3 "$?"
+cp "$TR" "$TR.direct"
+printf '{"type":"user","message":{"content":"QA issues run.\\n<qi-scheduled-run>issues</qi-scheduled-run>\\n{}"}}\n' >> "$TR"
+bash "$G" create-issue "$F" >/dev/null 2>&1; assert_eq "a scheduled run cannot open an issue" 3 "$?"
+cp "$TR.direct" "$TR"
+bash "$G" create-issue "$F" --fix >/dev/null 2>&1; assert_eq "--fix needs fix_label" 3 "$?"
+: > "$STUB_DIR/gh.calls"
+out="$(bash "$G" create-issue "$F")"
+assert "one issue for both problems" '.number == 101 and .refs == ["#7 AC-1","D-3"] and .labels == ["qa:found"]' "$out"
+assert_eq "a FOUND.md row per problem" "2" "$(grep -c '| #101 |' "$WORK_DIR/FOUND.md")"
+grep -qF -- "-X POST repos/acme/widgets/issues -f title=Rename loses sessions; the header overflows -F body=@" "$STUB_DIR/gh.calls" \
+  || { echo "  assertion failed: the issue goes to the target, title and body as given"; FAILED=1; }
+bash "$G" create-issue "$F" >/dev/null 2>&1; assert_eq "a problem with an issue is refused" 3 "$?"
+printf -- '- fix_label: architect:fix\n' >> "$WORK_DIR/CONFIG.md"
+assert "--again --fix: another, for the architect" '.labels == ["qa:found","architect:fix"]' "$(bash "$G" create-issue "$F" --again --fix)"
+sed -i.bak 's|refs="#7 AC-1; D-3"|refs="#7 AC-1"|' "$F/body.md" && rm -f "$F/body.md.bak"
+bash "$G" create-issue "$F" --again >/dev/null 2>&1; assert_eq "a marker that does not name every problem is refused" 3 "$?"
+echo '{"refs":["#7 AC-1; rm"],"build":"c1"}' > "$F/draft.json"
+bash "$G" create-issue "$F" --again >/dev/null 2>&1; assert_eq "a malformed ref is refused" 3 "$?"
+
 # Every request names the target's issues, or the identity.
 grep -vE '(^| )repos/acme/widgets/issues([/?]| |$)|^api user|user --jq' "$STUB_DIR/gh.calls" \
   && { echo "  assertion failed: a request outside the target's issues"; FAILED=1; }

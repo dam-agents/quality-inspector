@@ -17,12 +17,14 @@ The operator may share the page beyond themselves, so it carries only what conce
   per build (issue runs, nights, scenarios; the newest 30 — a night that does not name a
   regression-tier item is `unchanged`, or `drift` while its file is drifted), heals (date,
   build, basis), flaky confirmations, durations, the AC still and the evidence artifact's
-  reference.
+  reference, and the GitHub issue opened for its problem (work/FOUND.md: number, address,
+  labels, date — one issue may stand for several problems).
 - **Around them:** the newest UI map's pages with their coverage and shot, the operator's
   collections, and **every run** (the newest 400): each night of `work/REGRESSION.log` — its
   counts, the criteria that were not `unchanged`, the change context's issues (number, title), UI
   diff text and signal counts — or its environment failure; each issue and scenario run with its
-  verdicts; each with its build and report reference (a link when `artifact.id` holds one; else
+  verdicts; each run by hand (`work/reruns/`, [on-demand.md](on-demand.md) → "run #N") with its raw
+  results; each with its build and report reference (a link when `artifact.id` holds one; else
   "Open the report" — the command `open the report <id>`, since a private artifact has no
   address a page can link to).
 - **Product map:** per page of the newest map, every named control the map saw on screen (its
@@ -40,7 +42,7 @@ The operator may share the page beyond themselves, so it carries only what conce
   row's last update; never the request's words.
 - **Control center:** every module's state, settings, schedule and last run (`modules.sh
   status`), the focus queue and the areas; the design findings register with each finding's crop
-  ([ui-sweep.md](ui-sweep.md)); the newest validation results and stress checks; of the newest
+  ([ui-sweep.md](ui-sweep.md)) with the operator's category and dismissal reason; the newest validation results and stress checks; of the newest
   security run only its counts by severity and its report's reference.
 - **Never:** a scenario's request text, requester or thread; a verdict's notes or a triage
   explanation; `work/LESSONS.md`; the operator conversation; a security finding or anything else
@@ -65,6 +67,13 @@ The operator may share the page beyond themselves, so it carries only what conce
 
   A member is `#N`, `#N AC-k`, `S-k` or `S-k AC-j`; an unknown one is kept and matches nothing.
 - **Pins:** each viewer's own, kept in their browser.
+
+**Explained on the page**, in ASD-STE100 ([reporting.md](reporting.md) → **Artifact text is ASD-STE100**). Each view opens with one line of what it is for (hideable, per
+browser); Overview has a "How this page works" guide of the page's words (criterion,
+exploration, verdict, tier, run, design finding, action, reporting a bug); every verdict badge,
+tier, severity, design check, validation input, run type, column, filter, quick filter and
+figure carries its meaning as a tooltip, and an ⓘ beside a heading explains it on hover, focus
+or tap; the Legend lists every verdict, tier and run type with its meaning.
 
 Views: Overview, Modules (each module's switches and settings), Findings (validation, stress,
 security counts, edge-case observations), Design (the design findings: crops, filters, "copy as
@@ -91,8 +100,20 @@ and breadcrumbs up to its origin; Close returns to the place under it. **As of a
 build** shows every view with the verdicts as they stood when that build last ran (files, tiers
 and steps stay today's); older catalogs are the artifact's earlier revisions. An action appears
 as a command for the direct session (`promote #42`, `module stress set stress_checks=weekly`) —
-only one of the closed set of [on-demand.md](on-demand.md) (`open the report <id>` included) and [modules.md](modules.md) →
-**Control**, built from constants and ids, never from page data. It can be copied; on an
+only one of the closed set of [on-demand.md](on-demand.md) (`open the report <id>` included), [modules.md](modules.md) →
+**Control** and [skills/create-issue](../skills/create-issue/SKILL.md), built from constants, ids and a
+name or category the person types (checked against its pattern), never from other page data.
+
+**Managing from the page.** A test's panel has "What you can do": run it now (`run #42 AC-1`, or
+every test of its issue), retest the whole issue (`test #42`), promote or demote it, put it in or
+take it out of a collection, and report it as a GitHub issue (`create issue for #42 AC-1`, plus
+`… for the architect` when `fix_label` is set). A design finding's card has "Manage":
+categorize it, dismiss it with a reason or reopen it, report it. **Several problems as one
+issue:** every failed test (catalog table and cards, Needs attention), design finding,
+validation finding and failed stress check has a ☐; the ticked ones gather in a bar at the bottom
+of every view with one command, `create issue for <ref>, <ref>…` (at most 20), and its
+architect variant. The selection is the viewer's own, kept in their browser. A problem an issue
+was opened for shows that issue's link everywhere it appears, and the flag "issue created". It can be copied; on an
 interactive page opened beside the agent's chat its button sends it as the operator's message.
 The one exception is **Ask for a test** on the Product map: a scenario request built from the
 page's pattern, the control's kind and name, and the person's own words, in the one shape of

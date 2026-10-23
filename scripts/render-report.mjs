@@ -154,10 +154,10 @@ const VERDICT = {
 const SEVERITY = { info: 'muted', minor: 'warn', major: 'bad' };
 const sevBadge = (x) => (x ? `<span class="badge ${SEVERITY[x] ?? 'muted'}">${esc(x)}</span>` : '');
 const BLOCKED = {
-  absent: 'Baseline stopped before the check because the feature is absent there — counts as the red of red-green.',
-  environment: 'Baseline stopped before the check for an environment reason — not a red; the criterion stays inconclusive.',
-  model: 'Baseline stopped before the check because an agent step failed — not a red; the criterion stays inconclusive.',
-  setup: 'Baseline stopped before the check in the test setup — not a red; the criterion stays inconclusive.',
+  absent: 'On the baseline, the test stopped before the check because the function is not there. This is the red of red-green.',
+  environment: 'On the baseline, the test stopped before the check because of a problem in the environment. This is not a red. The criterion stays inconclusive.',
+  model: 'On the baseline, the test stopped before the check because an agent step failed. This is not a red. The criterion stays inconclusive.',
+  setup: 'On the baseline, the test stopped before the check in the test setup. This is not a red. The criterion stays inconclusive.',
 };
 const badge = (x) => { const [t, c] = VERDICT[x] ?? [x, 'muted']; return `<span class="badge ${c}">${esc(t)}</span>`; };
 const stateBadge = (s) => {
@@ -250,7 +250,7 @@ const noticedShot = (p) => {
 const noticedHtml = !noticed.length ? '' : `
 <section id="noticed">
 <h2>Noticed in passing</h2>
-<p class="dim"><b>Not tested, not part of the verdict.</b> What the agent saw outside the criteria while testing them — worth a look, nothing more.</p>
+<p class="dim"><b>Not tested, not part of the verdict.</b> The agent saw these problems outside the criteria during the test. Examine them if you want. They do not change the verdict.</p>
 <ul class="signals">${noticed.map((x) => `<li><code>${esc(x.where)}</code> — ${esc(x.saw)}${noticedShot(x.shot)}</li>`).join('')}</ul>
 </section>`;
 
@@ -288,7 +288,7 @@ const acHtml = acs.map((ac) => `
   ${ac.explanation ? `<p><b>Why:</b> ${esc(ac.explanation)}${ac.because_issue ? ` — see #${esc(ac.because_issue)}` : ''}</p>` : ''}
   ${ac.heal ? `<p class="dim">Check repaired: <code>${esc(ac.heal.from)}</code> → <code>${esc(ac.heal.to)}</code></p>` : ''}
   ${ac.judge ? `<p class="dim"><b>Judge:</b> ${ac.judge.agree ? 'agrees' : 'disagrees'}${ac.judge.call && ac.judge.call !== '-' ? ` (${esc(ac.judge.call)})` : ''} — ${esc(ac.judge.reason)}</p>` : ''}
-  ${ac.baseline_blocked_reason ? `<p class="dim">${BLOCKED[ac.baseline_blocked_reason] ?? `Baseline stopped before the check (${esc(ac.baseline_blocked_reason)}).`}</p>` : ''}
+  ${ac.baseline_blocked_reason ? `<p class="dim">${BLOCKED[ac.baseline_blocked_reason] ?? `On the baseline, the test stopped before the check (${esc(ac.baseline_blocked_reason)}).`}</p>` : ''}
   ${ac.regressed_between ? `<p><b>Regressed between</b> <code>${esc(ac.regressed_between.from)}</code> (passes) and <code>${esc(ac.regressed_between.to)}</code> (fails)${ac.regressed_between.builds_between == null ? '' : ac.regressed_between.builds_between ? ` · ${esc(ac.regressed_between.builds_between)} untested builds in between` : ' · adjacent builds'}</p>` : ''}
   ${ac.testable === false ? '' : `<div class="sides">${sideHtml(`${regression ? 'Build' : 'Candidate'} ${v.candidate ?? ''}`, ac.cand)}${regression
     ? (ac.before ? `<section class="side"><h4>Previous build ${esc(ctx?.previous ?? '')}</h4><figure><a href="${esc(ac.before)}" target="_blank"><img src="${esc(ac.before)}" alt="previous build"></a><figcaption>the same page on the previous build</figcaption></figure></section>` : '')
@@ -307,16 +307,16 @@ ${CSS}
 </style></head><body><main>
 ${regression ? `<div class="hero"><h1>Regression run — ${esc(v.candidate)}</h1>${badge(v.verdict)}</div>
 <p class="meta">previous build <code>${esc(ctx?.previous ?? '–')}</code> · ${esc(v.generated_utc ?? '')}</p>
-<p class="dim">Every promoted criterion was replayed on the new build. A UI that moved or was renamed is absorbed (steps re-learned) or repaired (check updated); only a criterion that no longer holds and that no completed issue explains is a <b>regression</b>.</p>
+<p class="dim">Each promoted criterion ran again on the new build. When a part of the UI moved or got a new name, the test found the controls again (relearned) or the agent repaired the check (healed). A <b>regression</b> is a criterion that is not true now and that no completed issue explains.</p>
 <table><thead><tr><th>AC</th><th>Criterion</th><th>Result</th><th>Triage</th></tr></thead><tbody>${summaryRows}</tbody></table>${contextHtml}`
 : scenario ? `<div class="hero"><h1>${esc(v.scenario)} — ${esc(v.title)}</h1>${badge(v.verdict)}</div>
 <p class="meta">build <code>${esc(v.candidate ?? '–')}</code> · last release <code>${esc(v.baseline ?? '–')}</code> · scenario <code>spec=${esc(v.spec_hash)}</code> (source: ${esc(v.source ?? 'request')}) · ${esc(v.generated_utc ?? '')}</p>
-<p class="dim">Each step of the scenario was tested on the build. A failure that held on a re-run was also run on the last release: failing only on the build is a <b>regression</b>, failing on both is <b>failed</b>. An independent judge read the evidence of every criterion. Watch the videos and screenshots to check the result yourself.</p>
+<p class="dim">The agent tested each step of the scenario on the build. When a failure occurred again on a second run, the agent also ran the test on the last release. A failure only on the build is a <b>regression</b>. A failure on both is <b>failed</b>. An independent judge examined the evidence of each criterion. You can examine the videos and screenshots to check the result.</p>
 <table><thead><tr><th>AC</th><th>Criterion</th><th>Build</th><th>Last release</th><th>Verdict</th></tr></thead><tbody>${summaryRows}</tbody></table>
-${(() => { const t = requestText(); return t == null ? '' : `<details class="request" open><summary><b>The request, verbatim</b> — the words the criteria below were frozen from</summary><pre>${esc(t)}</pre></details>`; })()}`
+${(() => { const t = requestText(); return t == null ? '' : `<details class="request" open><summary><b>The request, verbatim</b> — the agent froze the criteria below from these words</summary><pre>${esc(t)}</pre></details>`; })()}`
 : `<div class="hero"><h1>#${esc(v.issue)} — ${esc(v.title)}</h1>${badge(v.verdict)}</div>
 <p class="meta">candidate <code>${esc(v.candidate ?? '–')}</code> · baseline <code>${esc(v.baseline ?? '–')}</code> · criteria <code>ac=${esc(v.ac_hash)}</code> (source: ${esc(v.criteria_source ?? 'done-when')}) · ${esc(coverage)} · ${esc(v.generated_utc ?? '')}</p>
-<p class="dim">Each criterion was tested on the candidate build and on the baseline release. <b>Verified</b> means it fails on the baseline and passes on the candidate. Watch the videos and screenshots to check the result yourself.</p>
+<p class="dim">The agent tested each criterion on the candidate build and on the baseline release. <b>Verified</b> means that the test fails on the baseline and passes on the candidate. You can examine the videos and screenshots to check the result.</p>
 <table><thead><tr><th>AC</th><th>Criterion</th><th>Candidate</th><th>Baseline</th><th>Verdict</th></tr></thead><tbody>${summaryRows}</tbody></table>`}
 ${acHtml}
 ${exHtml}
@@ -396,7 +396,7 @@ ${CSS}
 </style></head><body><main>
 <div class="hero"><h1>Security checks — ${esc(v.candidate)}</h1></div>
 <p class="meta">${ORDER.map((s) => `${esc(s)} <b>${esc(counts[s] ?? 0)}</b>`).join(' · ')} · skipped <b>${esc(counts.skipped ?? findings.filter((f) => f.status === 'skipped').length)}</b> · ${esc(v.generated_utc ?? '')}</p>
-<p class="dim">Black-box checks of the nested product against the frozen catalogue (docs/security.md). Private: never forward this page to a public place.</p>
+<p class="dim">Black-box checks of the nested product, from the frozen catalogue (docs/security.md). This page is private. Do not send it to a public place.</p>
 <table><thead><tr><th>Severity</th><th>Check</th><th>Target</th><th>Status</th><th>Explanation</th></tr></thead><tbody>${findings.map(row).join('')}</tbody></table>
 ${findings.filter((f) => f.status === 'fail').map(detail).join('')}
 ${(v.notes ?? []).length ? `<h3>Notes</h3><ul>${v.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
