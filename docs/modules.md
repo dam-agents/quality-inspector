@@ -35,7 +35,7 @@ or a finding id, and refuse to run outside the direct session (`lib/config.sh` �
 `direct_session`). The policy hook is the second layer: in a scheduled or channel turn it
 allows `modules.sh` only as one plain `status|due|ran|focus-done|check|value|schedules` call
 or one plain read-only command (`grep`, `cat`, …), either optionally ending in `2>&1` or
-`2>/dev/null` and piped into `jq`, `head`, `tail`, `grep` or `wc`; anything else naming it
+`2>/dev/null` and piped into `jq`, `head`, `tail`, `grep`, `egrep`, `fgrep` or `wc`; anything else naming it
 (`;`, `&&`, `$(…)`, a redirection to a file, another pipe) is refused. It refuses a command naming the session variables `direct_session` reads, and refuses edits of
 `work/CONFIG.md`, `work/FOCUS.md` and `work/design/DISMISSED.md` (`module-set`, `scheduled-def`).
 **Limit:** a schedule is switched through the platform's tools, which the policy hook does not

@@ -204,6 +204,8 @@
 {"name": "module status with stderr to a file, scheduled", "expect": "deny", "mode": "scheduled", "rule": "module-set", "tool": "Bash", "input": {"command": "bash \"$HOME/scripts/modules.sh\" status 2>/tmp/quality-inspector-m.err"}}
 {"name": "modules.sh read through a writing filter, scheduled", "expect": "deny", "mode": "scheduled", "rule": "module-set", "tool": "Bash", "input": {"command": "cat \"$HOME/scripts/modules.sh\" | sort -o /tmp/quality-inspector-m"}}
 {"name": "modules.sh under a variable that is not HOME, scheduled", "expect": "deny", "mode": "scheduled", "rule": "module-set", "tool": "Bash", "input": {"command": "grep x \"$HOMEX/scripts/modules.sh\""}}
+{"name": "modules.sh under a lowercase $home, scheduled", "expect": "deny", "mode": "scheduled", "rule": "module-set", "tool": "Bash", "input": {"command": "cat \"$home/scripts/modules.sh\""}}
+{"name": "modules.sh run under a mixed-case ${Home}, scheduled", "expect": "deny", "mode": "scheduled", "rule": "module-set", "tool": "Bash", "input": {"command": "bash \"${Home}/scripts/modules.sh\" status"}}
 {"name": "dismissed findings edit, scheduled", "expect": "deny", "mode": "scheduled", "rule": "scheduled-def", "tool": "Write", "input": {"file_path": "@WORK@/design/DISMISSED.md", "content": "| D-1 | x |"}}
 {"name": "dismissed findings edit, direct", "expect": "allow", "tool": "Write", "input": {"file_path": "@WORK@/design/DISMISSED.md", "content": "| D-1 | x |"}}
 {"name": "an ANSI-C tab in a loop, scheduled", "expect": "allow", "mode": "scheduled", "tool": "Bash", "input": {"command": "jq -r '.a' work/x.json | while IFS=$'\\t' read -r a b; do echo \"$a\"; done"}}

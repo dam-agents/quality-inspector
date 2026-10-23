@@ -403,14 +403,15 @@ mod_names() { # <text> — 0 when it names modules.sh or a session variable dire
 RE_MOD_TAIL='([ 	]+2>(&1|/dev/null))?([ 	]*\|[ 	]*(jq|head|tail|grep|egrep|fgrep|wc)([ 	]+'"$RE_CH_RW"')*)*[ 	]*$'
 RE_MOD_PLAIN='^[ 	]*(bash[ 	]+)?("?/home/agent/scripts/modules\.sh"?|~/scripts/modules\.sh|scripts/modules\.sh)[ 	]+(status|due|ran|focus-done|check|value|schedules)(([ 	]+'"$RE_CH_W"')*)'"$RE_MOD_TAIL"
 RE_MOD_RO="$RE_RO_CMD$RE_MOD_TAIL"
-mod_home() { # <command> → $X: every `${HOME}/` and `$HOME/` written as /home/agent/
+mod_home() { # <command> → $X: every `${HOME}/` and `$HOME/` written as /home/agent/ — with
+  # nocasematch off, or `$home/` would count too
   local b='${HOME}/' p='$HOME/' h=/home/agent/
   X="${1//"$b"/$h}"; X="${X//"$p"/$h}"
 }
 check_module_cmd() { # <raw command> — it names modules.sh or a session variable (names_words)
   local c ok=0
-  mod_home "$1"; c="$X"
   shopt -u nocasematch
+  mod_home "$1"; c="$X"
   if [[ "$c" =~ $RE_MOD_PLAIN ]]; then ok=1
   elif [[ "$c" =~ $RE_MOD_RO ]] && ! [[ "${c//[\"\']/}" =~ $RE_RO_RUNS ]]; then ok=1
   fi

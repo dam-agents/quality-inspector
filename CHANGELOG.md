@@ -12,7 +12,7 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 **Upgrade:**
 Nothing to run — the policy hook and the engine are re-read per call. In a scheduled run or a
 channel turn the policy hook now also allows `modules.sh status|due|ran|focus-done|check|value|schedules` and a
-read-only command naming it with `2>&1`/`2>/dev/null` and pipes into `jq|head|tail|grep|wc`,
+read-only command naming it with `2>&1`/`2>/dev/null` and pipes into `jq|head|tail|grep|egrep|fgrep|wc`,
 `$HOME/` written as such ([docs/modules.md](docs/modules.md) → Control). On the `helm-k3s`
 engine, `env.sh reset` now removes every image no container uses, and `up` does so while the
 k3s data volume has less than `engine_config.prune_below_gi` free (default 20 Gi): where an
