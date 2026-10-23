@@ -250,7 +250,8 @@ scenario starts on a fresh platform, as the nightly one does ([regression.md](re
 step 2) —, then the candidate up as
 **The pipeline** steps 5–6, then **Adopt** steps 1–4 (an unchanged text reuses its frozen
 criteria and test: steps 1 and 4's run only), the verdicts and report as **The pipeline**
-steps 9–10 and 12 — the reply in the requester's turn, or the chat UI.
+steps 9–10 and 12 — the reply in the requester's turn, or the chat UI. The lock it releases
+is its own: `env.sh unlock P-<slug>` where step 12 says `S-<k>`, and on every abort.
 It writes no `P-<slug>` row: no status write of pipeline steps 5 and 12, none of Adopt step 3 (a
 rejection goes in the reply only). A row it wrote would read as adopted, and the nightly
 run would then never register the test. It never registers or retires anything either:
