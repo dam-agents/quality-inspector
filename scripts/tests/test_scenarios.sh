@@ -102,8 +102,15 @@ bash "$S" set S-20 verdict=verified >/dev/null 2>&1; assert_eq "a scenario is ne
 bash "$S" set S-20 'thread=C1|x' >/dev/null 2>&1; assert_eq "a '|' in a value is refused" 2 "$?"
 bash "$S" set S-20 colour=red >/dev/null 2>&1; assert_eq "an unknown column is refused" 2 "$?"
 bash "$S" set S-20 verdict=passed status=reported >/dev/null
-for k in 21 22 23 24 25 26 27 28; do bash "$S" set "S-$k" source=discovery status=proposed >/dev/null & done; wait
-assert_eq "concurrent writers lose no row" 9 "$(table_rows "$WORK_DIR/SCENARIOS.md" | grep -c '^| S-')"
+for k in 21 22 23 24 25 26 27 28; do
+  { bash "$S" set "S-$k" source=discovery status=proposed >/dev/null 2>"$SANDBOX/w$k.err"; echo "$? $(date -u +%T)" > "$SANDBOX/w$k.rc"; } &
+done; wait
+n="$(table_rows "$WORK_DIR/SCENARIOS.md" | grep -c '^| S-')"
+assert_eq "concurrent writers lose no row" 9 "$n"
+if [ "$n" != 9 ]; then
+  for k in 21 22 23 24 25 26 27 28; do echo "    S-$k rc=$(cat "$SANDBOX/w$k.rc" 2>/dev/null || echo none) $(head -c 300 "$SANDBOX/w$k.err" 2>/dev/null)"; done
+  sed 's/^/    | /' "$WORK_DIR/SCENARIOS.md"; ls -la "$WORK_DIR" "$WORK_DIR/scenarios" | sed 's/^/    /'
+fi
 assert_eq "one row per id" "| S-20 | slack | U0123ABCD | C0123ABCD/1.2 | abc | c1 | passed | reported |" "$(row S-20 | sed 's/ [0-9T:Z-]* |$//')"
 [ ! -d "$WORK_DIR/scenarios/.lock" ] || { echo "  the row lock was left behind"; FAILED=1; }
 bash "$S" set P-sign-in source=profile status=retired >/dev/null
