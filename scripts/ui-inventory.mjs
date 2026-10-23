@@ -12,8 +12,9 @@
 //
 // Signs in with E2E_USER_OWNER_USERNAME / _PASSWORD (work/env/credentials.env), then only
 // navigates: it follows same-origin links and clicks navigation items (each name once) and
-// tabs (each name once per page). It never clicks anything else, types, or submits. Signals are only listened to
-// while a page is visited; --timing-samples > 1 reloads the page for more timing samples.
+// tabs (each name once per page). It never clicks anything else, types, or submits. Signals
+// are only listened to while a page is visited; --timing-samples > 1 reloads the page for
+// more timing samples.
 // Every same-origin API request the signed-in pages make is recorded once per method and
 // path shape (`api_requests`) — method and path only, never headers or bodies — for the
 // security run's replay (docs/security.md). Each page's forms (`forms`: name, submit button,
@@ -109,7 +110,8 @@ async function signIn() {
   return 'signed-in';
 }
 
-// Everything the user can see and act on, outside repeated data rows (lists, tables).
+// Everything the user can see and act on, outside repeated data rows (lists, tables) — but for
+// their links in `boxes`, of which the crawl keeps one per page they lead to.
 const extract = () => {
   const vis = (e) => e.checkVisibility?.({ visibilityProperty: true, opacityProperty: true }) ?? !!e.offsetParent;
   const clean = (s) => (s ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
