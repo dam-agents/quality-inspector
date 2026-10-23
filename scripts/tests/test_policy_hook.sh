@@ -82,6 +82,12 @@ done < "$TESTS_DIR/policy-fixtures.jsonl"
 ev="$(cat "$WORK_DIR"/logs/events-*.jsonl 2>/dev/null | jq -sc '[.[] | select(.event == "policy_denied")]')"
 assert "every denial is logged" 'length > 20 and all(.msg | test("^tool=[A-Za-z]+ rule=[a-z-]+( at=[^ ]+)?$"))' "$ev"
 assert "no query string reaches the log" 'all(.msg | test("[?]") | not)' "$ev"
+# A token that the 200-character cut of at= would split is masked before the cut.
+url="https://github.com/$(printf 'a%.0s' $(seq 179))/ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+jq -nc --arg u "$url" '{tool_name:"WebFetch", session_id:"s-cut", tool_input:{url:$u, prompt:"x"}}' | "$HOOK" 2>/dev/null
+assert_eq "the long GitHub URL is denied" 2 "$?"
+ev="$(cat "$WORK_DIR"/logs/events-*.jsonl | jq -sc '[.[] | select(.event == "policy_denied" and .run == "s-cut")]')"
+assert "a token at the cut is masked, never cut" 'length == 1 and (.[0].msg | test("ghp_") | not) and (.[0].msg | test(" at=github.com/a+/gh[*]_MASK"))' "$ev"
 printf 'not json' | "$HOOK" 2>/dev/null; assert_eq "unparsable input fails closed" 2 "$?"
 
 # install.sh: merge keeps other keys, is idempotent, and its check sees a removal.

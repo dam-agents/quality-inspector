@@ -7,7 +7,7 @@
 # stdout would join the prompt) and always exits 0. The harness runs it, so a model that forgets
 # to log, or a turn that dies mid-pipeline, still leaves its trace. No line holds a prompt, a
 # command or a tool's input: a prompt is its size and a 12-hex sha256, a failure its tool, exit
-# code and a short excerpt of the error, masked (lib/secrets.mjs, then log.sh).
+# code and a short excerpt of the error, masked in full (lib/secrets.mjs, log.sh) and then cut.
 #
 #   UserPromptSubmit    turn_start kind=<scheduled|channel|direct> bytes=<n> sha=<hex12>
 #                       — first a turn_end status=interrupted for a turn of this session that never stopped
@@ -96,6 +96,8 @@ case "$EVENT" in
     if [ -n "$body" ] && [ -s "$WORK/env/credentials.env" ]; then
       body="$(printf '%s' "$body" | node "$SCRIPT_DIR/lib/secrets.mjs" filter "$WORK/env/credentials.env" 2>/dev/null)" || body="(unmasked error withheld)"
     fi
+    # token shapes too, before the cut: a cut token is shorter than log.sh's patterns
+    body="$( . "$SCRIPT_DIR/log.sh" >/dev/null 2>&1 && _log_mask "$body")" || body="(unmasked error withheld)"
     read -r _ job _ < "$STATE" 2>/dev/null
     ev "${job:-session}" warn tool_failed \
       "tool=${TOOL:-?}${code:+ code=$code}$([ "$INTERRUPT" = true ] && echo ' interrupt=1')${AGENT:+ agent=${AGENT//[^A-Za-z0-9_.:-]/}} ms=${MS:--} err=${body:0:$EXCERPT}"

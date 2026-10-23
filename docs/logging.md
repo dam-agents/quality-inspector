@@ -71,8 +71,8 @@ Retention: 14 days, swept by the audit pre-flight.
 `turn_start`, `turn_end` and `tool_failed` lines above with the session id as `run` and the
 turn's job (the mode in a scheduled run's frame, `channel`, else `session`), so a turn
 that dies mid-pipeline or a failure you never logged still leaves a line. A prompt is only its
-size and hash; a failure's error is cut to 160 characters, credential values and token shapes
-masked; a Bash exit 1 with no output (`grep` without a match) is counted, not logged. A turn
+size and hash; a failure's error has its credential values and token shapes masked, then is
+cut to 160 characters; a Bash exit 1 with no output (`grep` without a match) is counted, not logged. A turn
 that never reached Stop is closed `interrupted` by the session's next prompt. Its state is
 `work/env/turns/<session>`. `PostToolUseFailure` and `StopFailure` need Claude Code 2.1.101
 or newer, so `scripts/hooks/install.sh` registers them only there. The audit reads the lines

@@ -33,6 +33,12 @@ assert "a failure logs once, with tool, code, agent and duration — the benign 
   'length == 1 and .[0].level == "warn" and (.[0].msg | test("^tool=Bash code=22 agent=general-purpose ms=812 err=curl: \\(22\\) 401"))' "$f"
 assert "the error's credential value and token are masked" \
   '(.[0].msg | test("hunter2|ghp_[a-z]") | not)' "$f"
+# A token that the 160-character cut would split is masked first, never cut.
+pad="$(printf 'x%.0s' $(seq 140))"
+hook PostToolUseFailure sess-cut "$(jq -nc --arg e "Exit code 22
+$pad ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" '{tool_name:"Bash", error:$e}')"
+assert "a token at the excerpt's cut is masked, never cut" \
+  '[.[] | select(.run == "sess-cut")] | length == 1 and (.[0].msg | test("ghp_") | not) and (.[0].msg | test("err=x{140} gh[*]_MASK"))' "$(events tool_failed)"
 e="$(events turn_end)"
 assert "the turn ends with its counts" '.[0].msg | test("^status=ok kind=channel secs=[0-9]+ tools=3 failed=2$")' "$e"
 assert "no line holds the prompt" '[.[] | .msg | test("login of alice")] | any | not' "$(jq -sc . "$LOG")"
