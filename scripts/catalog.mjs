@@ -18,7 +18,7 @@
 // work/catalog/thumbs/ (rendered by the suite's own playwright-core; none without it).
 // `runs` lists every night, issue run and scenario run with its build, verdicts and report
 // reference — the page is the way into all of them; `pages[].hotspots` are the controls of the
-// newest UI map with the items that name them (the product map). `modules`, `design` and
+// newest UI map with the items that name them, or reach the page the control leads to (the product map). `modules`, `design` and
 // `findings` make it the control center (docs/modules.md): the modules' state, the design
 // findings with their crops, the newest validation and stress results — of the security run its
 // counts and report reference only.
@@ -323,11 +323,12 @@ if (newestMap) {
     for (const [pat, r] of Object.entries(inv?.routes ?? {})) for (const b of r?.boxes ?? []) {
       const k = String(b[1]).toLowerCase(); onPages.set(k, (onPages.get(k) ?? new Set()).add(pat));
     }
-    // A navigation item stands for the page it leads to: the items that reach that page.
+    // A control that leads to another page stands for that page: the items that reach it.
     const routes = Object.entries(inv?.routes ?? {});
     const routeOf = (path) => path && routes.map(([pat]) => pat)
       .find((pat) => new RegExp(`^${pat.split('/').map((x) => (x === ':id' ? '[^/]+' : esc(x))).join('/')}/?$`).test(path));
-    const navTarget = (name) => routes.map(([, r]) => r?.navigates?.[name]).find(Boolean)
+    const navOf = (r, name) => (r?.navigates && Object.hasOwn(r.navigates, name) && typeof r.navigates[name] === 'string' ? r.navigates[name] : null);
+    const navTarget = (name) => routes.map(([, r]) => navOf(r, name)).find(Boolean)
       ?? routeOf(routes.flatMap(([, r]) => r?.links ?? []).map((l) => String(l).split(' → ')).find(([n]) => n === name)?.[1]);
     const reach = (files) => items.filter((i) => i.file && files.some((f) => f === i.file || f.endsWith(`/${i.file}`))).map((i) => i.key);
     const reachOf = new Map((cov.pages ?? []).map((p) => [p.pattern, reach((p.tests ?? []).map((x) => x.test))]));
@@ -336,9 +337,12 @@ if (newestMap) {
       if (!(vw > 0 && vh > 0)) return [];
       const opens = pageRe(pat);
       const f = (n) => Math.round(n * 10000) / 10000;
-      return (r.boxes ?? []).filter((b) => Array.isArray(b) && matchable(String(b[1]))).slice(0, HOTSPOTS_MAX).map(([kind, name, x, y, w, h]) => {
+      return (r.boxes ?? []).filter((b) => Array.isArray(b) && matchable(String(b[1]))).slice(0, HOTSPOTS_MAX).map(([kind, name, x, y, w, h, link]) => {
         const box = [f(x / vw), f(y / vh), f(w / vw), f(h / vh)];
-        const to = kind === 'nav' || kind === 'links' ? navTarget(name) : null;
+        // Where it leads: its link's page, else what clicking it on this page did; a navigation item
+        // or a link of a map without them by its name anywhere; a tab only on its own page.
+        const to = (typeof link === 'string' && link.startsWith('/') ? link : null) ?? navOf(r, name)
+          ?? (kind === 'nav' || kind === 'links' ? navTarget(name) : null);
         if (to) return { kind, name, box, to, items: reachOf.get(to) ?? [] };
         const re = controlRe(String(name), { quoted: true });
         const only = onPages.get(String(name).toLowerCase())?.size === 1;

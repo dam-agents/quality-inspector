@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // ui-inventory.mjs — a read-only map of the nested product's UI for one build: every
 // reachable page pattern with its headings, navigation, buttons, tabs, form fields and
-// links, where each sits in the screenshot (`boxes`, for the catalog's product map), plus an
+// links, where each sits in the screenshot and the page a link or a navigation item leads to
+// (`boxes`, `navigates`, for the catalog's product map; a list stands there by its first row), plus an
 // accessibility snapshot and a screenshot, and the page's signals: console
 // errors, failed same-origin requests and load timing. Two maps diff into what was added,
 // removed, renamed or moved, and which signals are new (ui-diff.mjs). Rationale:
@@ -10,8 +11,8 @@
 //   node ui-inventory.mjs <out-dir> [--base <app url>] [--max-pages 60] [--depth 3] [--timing-samples 1]
 //
 // Signs in with E2E_USER_OWNER_USERNAME / _PASSWORD (work/env/credentials.env), then only
-// navigates: it follows same-origin links and clicks navigation items and tabs (each name
-// once). It never clicks anything else, types, or submits. Signals are only listened to
+// navigates: it follows same-origin links and clicks navigation items (each name once) and
+// tabs (each name once per page). It never clicks anything else, types, or submits. Signals are only listened to
 // while a page is visited; --timing-samples > 1 reloads the page for more timing samples.
 // Every same-origin API request the signed-in pages make is recorded once per method and
 // path shape (`api_requests`) — method and path only, never headers or bodies — for the
@@ -122,22 +123,26 @@ const extract = () => {
   const uniq = (a) => [...new Set(a)];
   // Where each named control sits in the screenshot (the viewport), for the catalog's product
   // map: [kind, name, x, y, w, h] in CSS pixels, clipped to the viewport; off-screen ones left out.
+  // A link carries its href as a 7th element, which the crawl turns into the page it leads to.
   const W = innerWidth, H = innerHeight;
   const boxes = [];
   const box = (k, sel, f = name, data = true) => {
     for (const e of document.querySelectorAll(sel)) {
-      if (boxes.length >= 200 || !vis(e) || (data && inData(e))) continue;
+      if (boxes.length >= 200 || !vis(e) || (data === true && inData(e)) || (data === 'only' && !inData(e))) continue;
       const n = f(e); const r = e.getBoundingClientRect();
       const x = Math.max(0, r.left), y = Math.max(0, r.top), x2 = Math.min(W, r.right), y2 = Math.min(H, r.bottom);
-      if (n && x2 - x >= 4 && y2 - y >= 4) boxes.push([k, n, Math.round(x), Math.round(y), Math.round(x2 - x), Math.round(y2 - y)]);
+      if (n && x2 - x >= 4 && y2 - y >= 4) boxes.push([k, n, Math.round(x), Math.round(y), Math.round(x2 - x), Math.round(y2 - y), ...(typeof e.href === 'string' && e.href ? [e.href] : [])]);
     }
   };
-  box('nav', 'nav a,[role=navigation] a,aside a', name, false);
+  box('nav', 'nav a,[role=navigation] a,aside a,nav button,[role=navigation] button', name, false);
   box('headings', 'h1,h2,h3,[role=heading]');
   box('tabs', '[role=tab]');
   box('buttons', 'button,[role=button],input[type=submit]');
   box('inputs', 'input:not([type=hidden]):not([type=submit]),textarea,select,[role=combobox],[role=switch],[role=checkbox]', label);
   box('links', 'a[href]:not(nav a):not([role=navigation] a):not(aside a)');
+  // Repeated data stays out but for its links: the crawl keeps the first per page it leads to,
+  // so one row or card of a list stands for the list and walks to its detail page.
+  box('rows', 'a[href]:not(nav a):not([role=navigation] a):not(aside a)', name, 'only');
   return {
     title: document.title,
     viewport: [W, H],
@@ -195,7 +200,22 @@ const extractForms = () => {
   return out;
 };
 
-// Navigation items and tabs: clicked once per distinct name, from the page they appear on.
+// A box's href becomes the page pattern it leads to (dropped when it leaves the app or stays on
+// this page); of the rows, the first per page they lead to stays, at most ROWS a page.
+const ROWS = 10;
+const leads = (boxes, here) => {
+  const rows = new Set();
+  return boxes.flatMap(([k, n, x, y, w, h, href]) => {
+    let to = null;
+    try { const u = new URL(href); if (u.origin === base.origin && !SKIP.test(u.pathname)) to = pattern(u); } catch { /* no link */ }
+    if (to === here) to = null;
+    if (k === 'rows') { if (!to || rows.has(to) || rows.size >= ROWS) return []; rows.add(to); }
+    return [to ? [k, n, x, y, w, h, to] : [k, n, x, y, w, h]];
+  });
+};
+
+// Navigation items and tabs: clicked once per distinct name, from the page they appear on — a
+// tab once per page, since another page's tab of that name leads elsewhere.
 const NAV = 'nav button,[role=navigation] button,nav [role=link],[role=navigation] [role=link],[role=tab],[role=menuitem]';
 const clicked = new Set();
 // An item that opens a new window leaves the app (external docs): close it, keep crawling.
@@ -203,10 +223,11 @@ context.on('page', (p) => { if (p !== page) p.close().catch(() => {}); });
 async function discover(url) {
   const found = [];
   const names = await page.locator(NAV).evaluateAll((els) => els.filter((e) => e.checkVisibility?.() ?? !!e.offsetParent)
-    .map((e) => (e.getAttribute('aria-label') || e.innerText || '').replace(/\s+/g, ' ').trim()).filter(Boolean));
-  for (const n of [...new Set(names)]) {
-    if (clicked.has(n) || DANGER.test(n) || /expand|collapse|toggle|menu/i.test(n)) continue;
-    clicked.add(n);
+    .map((e) => [(e.getAttribute('aria-label') || e.innerText || '').replace(/\s+/g, ' ').trim(), e.getAttribute('role') === 'tab']).filter(([n]) => n));
+  for (const [n, tab] of new Map(names)) {
+    const key = tab ? `${pattern(url)} ${n}` : n;
+    if (clicked.has(key) || DANGER.test(n) || /expand|collapse|toggle|menu/i.test(n)) continue;
+    clicked.add(key);
     try {
       // A fresh load per click: a dialog or drawer an earlier item opened must not cover this one.
       await page.goto(url.href, { waitUntil: 'domcontentloaded' }); await settle();
@@ -255,6 +276,7 @@ while (queue.length && Object.keys(routes).length < maxPages) {
     try { await page.reload({ waitUntil: 'load', timeout: 30000 }); await settle(); times.push(await timing()); } catch { break; }
   }
   const { hrefs, ...rest } = data;
+  rest.boxes = leads(rest.boxes, pat);
   const med = (k) => median(times.map((t) => t[k]));
   routes[pat] = { example: url.pathname, landed: landed.pathname === url.pathname ? undefined : landed.pathname, ...rest, shot: `shots/${s}.png`, aria: `aria/${s}.yml`,
     console_errors: [...sig.errors].sort(), failed_requests: [...sig.requests].sort().map((x) => JSON.parse(x)),
@@ -263,7 +285,9 @@ while (queue.length && Object.keys(routes).length < maxPages) {
   sig = null;
   if (depth >= maxDepth) continue;
   for (const [u, via] of await discover(url)) {
-    if (!seen.has(pattern(u))) { queue.push([u, depth + 1]); routes[pat].navigates ??= {}; routes[pat].navigates[via] = pattern(u); }
+    const to = pattern(u);
+    if (to !== pat) { routes[pat].navigates ??= {}; routes[pat].navigates[via] = to; }
+    if (!seen.has(to)) queue.push([u, depth + 1]);
   }
   for (const h of hrefs) {
     let u; try { u = new URL(h); } catch { continue; }
