@@ -51,7 +51,7 @@ run type (`issues`, `regression`, `security`, `modules`, `scenario`, `discovery`
 | `suite_run` / `suite_failed` | `scripts/suite.sh` | `<label> exit=<rc>` / free text |
 | `onboarding_verify` | `scripts/verify-onboarding.sh` | free text |
 | `policy_denied` (warn) | `scripts/hooks/policy.sh` | `tool=<name> rule=<id>[ at=<host/path or file>]` — never a command or query string |
-| `turn_start` / `turn_end` | `scripts/hooks/trace.sh` (**Harness trace** below) | `kind=<scheduled\|channel\|direct>[ schedule=<id>] bytes=<n> sha=<hex12>` / `status=<ok\|interrupted\|<API error>> kind=<k> secs=<n> tools=<n> failed=<n>` — `interrupted` is `warn`, an API error `error` |
+| `turn_start` / `turn_end` | `scripts/hooks/trace.sh` (**Harness trace** below) | `kind=<scheduled\|channel\|direct> bytes=<n> sha=<hex12>` / `status=<ok\|interrupted\|<API error>> kind=<k> secs=<n> tools=<n> failed=<n>` — `interrupted` is `warn`, an API error `error` |
 | `tool_failed` (warn) | `scripts/hooks/trace.sh` | `tool=<name>[ code=<exit>][ interrupt=1][ agent=<type>] ms=<n> err=<excerpt>` |
 | `work_backup` | `scripts/work-backup.sh` (job `backup` from the Stop hook) | free text; `error` = a refused or failed persist, foreign commits, a failed restore ([persistence.md](persistence.md) → **Backup & restore**) |
 
@@ -69,7 +69,7 @@ Retention: 14 days, swept by the audit pre-flight.
 
 `scripts/hooks/trace.sh`, a Claude Code hook the harness runs (not you), writes the
 `turn_start`, `turn_end` and `tool_failed` lines above with the session id as `run` and the
-turn's job (`preflight.sh <mode>` of a scheduled task, `channel`, else `session`), so a turn
+turn's job (the mode in a scheduled run's frame, `channel`, else `session`), so a turn
 that dies mid-pipeline or a failure you never logged still leaves a line. A prompt is only its
 size and hash; a failure's error is cut to 160 characters, credential values and token shapes
 masked; a Bash exit 1 with no output (`grep` without a match) is counted, not logged. A turn

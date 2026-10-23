@@ -9,7 +9,7 @@
 # command or a tool's input: a prompt is its size and a 12-hex sha256, a failure its tool, exit
 # code and a short excerpt of the error, masked (lib/secrets.mjs, then log.sh).
 #
-#   UserPromptSubmit    turn_start kind=<scheduled|channel|direct>[ schedule=<id>] bytes=<n> sha=<hex12>
+#   UserPromptSubmit    turn_start kind=<scheduled|channel|direct> bytes=<n> sha=<hex12>
 #                       — first a turn_end status=interrupted for a turn of this session that never stopped
 #   PostToolUse         counts the call
 #   PostToolUseFailure  counts it, and logs tool_failed (warn) tool=<name>[ code=<exit>][ interrupt=1][ agent=<type>]
@@ -17,8 +17,8 @@
 #                       false test) is only counted
 #   Stop, StopFailure   turn_end status=<ok|the API error> kind=<kind> secs=<n> tools=<n> failed=<n>
 #
-# The job of every line is the turn's: the schedule's mode for a scheduled turn (`preflight.sh
-# <mode>` in its prompt), `channel`, else `session`. A turn's state is work/env/turns/<session>
+# The job of every line is the turn's: the mode in a scheduled turn's frame (`<qi-scheduled-run><mode>`,
+# lib/channel.sh), `channel`, else `session`. A turn's state is work/env/turns/<session>
 # (pod-local, never backed up): the line `<start epoch|-> <job> <kind>`, then one byte per tool
 # call — `.` done, `x` failed.
 
@@ -46,7 +46,6 @@ export LOG_RUN_ID="$SESSION"
 ev() { # <job> <level> <event> <msg>
   ( export LOG_JOB="$1"; . "$SCRIPT_DIR/log.sh" && logev "$2" "$3" "$4" ) >/dev/null 2>&1
 }
-iso2epoch() { date -u -d "$1" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
 sha12() { { sha256sum 2>/dev/null || shasum -a 256 2>/dev/null; } | cut -c1-12; }
 
 end_turn() { # <status> — the state file's turn_end, then the file goes
@@ -76,22 +75,16 @@ case "$EVENT" in
     fi
     PROMPT="$(printf '%s' "$IN" | jq -j '.prompt // "" | tostring' 2>/dev/null)"
     . "$SCRIPT_DIR/lib/channel.sh" 2>/dev/null
-    kind=direct job=session sched=""
-    case "$PROMPT" in
+    kind=direct job=session
+    case "$PROMPT" in   # the platform's channel frames first: anyone in a channel can type the other
       (*'<how-to-respond>'*) kind=channel job=channel;;
       (*"${ARTIFACT_VIEWER_FRAME:-<no viewer frame>}"*) kind=channel job=channel;;
-      (*)
-        # a schedule's task names `preflight.sh <mode>`, and its Precheck wrote
-        # `scheduled <ISO> <schedule id>` right before the turn
-        read -r rk riso rid _ < "$WORK/env/RUN_MODE" 2>/dev/null
-        if [[ "$PROMPT" =~ preflight\.sh\"?\ +([a-z]+) ]] && [ "${rk:-}" = scheduled ] \
-           && [ $(( $(date -u +%s) - $(iso2epoch "${riso:-x}") )) -lt 900 ]; then
-          kind=scheduled job="${BASH_REMATCH[1]}" sched="${rid:--}"
-        fi;;
+      (*"${SCHEDULED_FRAME:-<no scheduled frame>}"*)
+        kind=scheduled job=scheduled
+        re="$SCHEDULED_FRAME([a-z_]+)<"; [[ "$PROMPT" =~ $re ]] && job="${BASH_REMATCH[1]}";;
     esac
     mkdir -p "$TURNS" 2>/dev/null && printf '%s %s %s\n' "$(date -u +%s)" "$job" "$kind" > "$STATE"
-    ev "$job" info turn_start \
-      "kind=$kind${sched:+ schedule=${sched//[!A-Za-z0-9_.-]/}} bytes=${#PROMPT} sha=$(printf '%s' "$PROMPT" | sha12)"
+    ev "$job" info turn_start "kind=$kind bytes=${#PROMPT} sha=$(printf '%s' "$PROMPT" | sha12)"
     ;;
   (PostToolUse) count . ;;
   (PostToolUseFailure)

@@ -38,16 +38,15 @@ assert "the turn ends with its counts" '.[0].msg | test("^status=ok kind=channel
 assert "no line holds the prompt" '[.[] | .msg | test("login of alice")] | any | not' "$(jq -sc . "$LOG")"
 [ -e "$WORK_DIR/env/turns/sess-a" ] && { echo "  assertion failed: the turn's state outlived its end"; FAILED=1; }
 
-# A scheduled turn takes its job from the task's `preflight.sh <mode>` and the Precheck's marker;
+# A scheduled turn takes its job from the Precheck's frame in its prompt;
 # a prompt that follows a turn that never stopped closes it as interrupted; an API error ends one.
-printf 'scheduled %s sched-42\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$WORK_DIR/env/RUN_MODE"
-hook UserPromptSubmit sess-b '{"prompt":"QA issues run. Run `bash \"$HOME/scripts/preflight.sh\" issues` first"}'
+hook UserPromptSubmit sess-b '{"prompt":"QA issues run. Run the pre-flight first.\n<qi-scheduled-run>issues</qi-scheduled-run>\n{\"mode\":\"issues\"}"}'
 hook PostToolUse sess-b '{"tool_name":"Bash"}'
 hook UserPromptSubmit sess-b '{"prompt":"go on"}'
 hook StopFailure sess-b '{"error":"rate_limit"}'
 s="$(events turn_start | jq -c '[.[] | select(.run == "sess-b")]')"
-assert "a scheduled turn names its job and schedule; a later prompt in it is direct" \
-  '.[0].job == "issues" and (.[0].msg | test("^kind=scheduled schedule=sched-42 ")) and .[1].job == "session" and (.[1].msg | test("^kind=direct "))' "$s"
+assert "a scheduled turn names its job; a later prompt in it is direct" \
+  '.[0].job == "issues" and (.[0].msg | test("^kind=scheduled bytes=")) and .[1].job == "session" and (.[1].msg | test("^kind=direct "))' "$s"
 e="$(events turn_end | jq -c '[.[] | select(.run == "sess-b")]')"
 assert "the unstopped turn ends interrupted (warn), the API error as its status (error)" \
   '.[0].level == "warn" and (.[0].msg | test("^status=interrupted kind=scheduled secs=[0-9]+ tools=1 failed=0$"))
@@ -98,14 +97,14 @@ assert "the week's turns in stats" '.stats.turns_7d | .turns == 1 and .by_kind.d
 old="$(iso_ago 300)"
 ev() { jq -nc --arg ts "$old" --arg r "$1" --arg j "$2" --arg l "$3" --arg e "$4" --arg m "$5" \
   '{ts:$ts, run:$r, job:$j, level:$l, event:$e, msg:$m}' >> "$LOG"; }
-ev crashed-run-1 issues info turn_start "kind=scheduled schedule=s1 bytes=10 sha=abcdefabcdef"
+ev crashed-run-1 issues info turn_start "kind=scheduled bytes=10 sha=abcdefabcdef"
 ev crashed-run-1 issues info issue_start "issue=12 kind=first"
 ev crashed-run-1 issues info issue_milestone "issue=12 step=freeze"
-ev done-run-2 issues info turn_start "kind=scheduled schedule=s1 bytes=10 sha=abcdefabcdef"
+ev done-run-2 issues info turn_start "kind=scheduled bytes=10 sha=abcdefabcdef"
 ev done-run-2 issues info issue_start "issue=13 kind=first"
 ev done-run-2 issues info issue_done "issue=13 verdict=verified minutes=20 model_steps=80"
 ev done-run-2 issues info turn_end "status=ok kind=scheduled secs=1200 tools=90 failed=0"
-ev api-run-3 regression info turn_start "kind=scheduled schedule=s2 bytes=10 sha=abcdefabcdef"
+ev api-run-3 regression info turn_start "kind=scheduled bytes=10 sha=abcdefabcdef"
 ev api-run-3 regression error turn_end "status=rate_limit kind=scheduled secs=60 tools=4 failed=0"
 for i in 1 2 3 4 5; do ev loop-run-4 session warn tool_failed "tool=Bash code=2 ms=1$i err=env.sh: build 0.2.$i not found"; done
 audit="$(bash "$SCRIPTS/preflight.sh" audit 2>/dev/null)"
