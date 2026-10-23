@@ -147,6 +147,23 @@ grep -q 'already up' "$SANDBOX/uperr" || { echo "  fast path not taken: $(cat "$
 assert_eq "other values: installs again" 1 "$(up '{"img":"y","mock":""}')"
 [ -f "$E/STATE.json" ] && { echo "  the old build stayed recorded through a failed upgrade"; FAILED=1; }
 
+# Images no container uses: removed by every reset, and after an up only below prune_below_gi free.
+G="$SANDBOX/okbin"; mkdir -p "$G"; cp "$U/curl" "$G/curl"
+printf '#!/usr/bin/env bash\necho "$*" >> "%s/k3s-ok.log"\n' "$SANDBOX" > "$G/k3s"
+printf '#!/usr/bin/env bash\n[ "$1" = version ] && echo "v3.19.0+gstub"\n[ "$1" = pull ] && while [ $# -gt 0 ]; do [ "$1" = --untardir ] && mkdir -p "$2/chart"; shift; done\nexit 0\n' > "$G/helm"
+chmod +x "$G"/*
+okup() { rm -f "$SANDBOX/k3s-ok.log" "$SANDBOX/envg/STATE.json"
+  PATH="$G:$PATH" HOME="$SANDBOX/home" QI_ENV_DIR="$SANDBOX/envg" QI_PROFILE_CONFIG='{"img":"x","mock":""}' \
+    QI_ENGINE_CONFIG="$(cfg oci | jq -c --argjson p "$1" '.prune_below_gi = $p')" bash "$ENG/bin/env" up 1.0.0 >/dev/null 2>&1; echo $?; }
+assert_eq "an up with the stubbed cluster succeeds" 0 "$(okup 1000000)"
+grep -qx "crictl rmi --prune" "$SANDBOX/k3s-ok.log" || { echo "  up below prune_below_gi free: unused images must be removed"; FAILED=1; }
+assert_eq "an up with room to spare succeeds" 0 "$(okup 0)"
+grep -q "crictl" "$SANDBOX/k3s-ok.log" && { echo "  up above prune_below_gi free: images must stay"; FAILED=1; }
+rm -f "$SANDBOX/k3s-ok.log"
+PATH="$G:$PATH" HOME="$SANDBOX/home" QI_ENV_DIR="$SANDBOX/envg" QI_PROFILE_CONFIG='{"img":"x","mock":""}' QI_ENGINE_CONFIG="$(cfg oci)" \
+  bash "$ENG/bin/env" reset >/dev/null 2>"$SANDBOX/reseterr"
+grep -qx "crictl rmi --prune" "$SANDBOX/k3s-ok.log" || { echo "  reset: unused images must be removed: $(cat "$SANDBOX/reseterr")"; FAILED=1; }
+
 # bin/check: offline validation of engine_config (README → Check).
 mkdir -p "$SANDBOX/pd" && echo '{"app":{"url":"http://localhost:8080"}}' > "$SANDBOX/pd/profile.json"
 PCFG='{"img":"x","mock":""}'

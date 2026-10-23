@@ -33,8 +33,10 @@ Only the operator, in the direct session, changes a module (CLAUDE.md → trust 
 `modules.sh set`, `focus` and `dismiss` write only registry keys with valid values, an area name
 or a finding id, and refuse to run outside the direct session (`lib/config.sh` →
 `direct_session`). The policy hook is the second layer: in a scheduled or channel turn it
-allows `modules.sh` only as one plain `status|due|ran|focus-done|check|value|schedules` call,
-refuses a command naming the session variables `direct_session` reads, and refuses edits of
+allows `modules.sh` only as one plain `status|due|ran|focus-done|check|value|schedules` call
+or one plain read-only command (`grep`, `cat`, …), either optionally ending in `2>&1` or
+`2>/dev/null` and piped into `jq`, `head`, `tail`, `grep` or `wc`; anything else naming it
+(`;`, `&&`, `$(…)`, a redirection to a file, another pipe) is refused. It refuses a command naming the session variables `direct_session` reads, and refuses edits of
 `work/CONFIG.md`, `work/FOCUS.md` and `work/design/DISMISSED.md` (`module-set`, `scheduled-def`).
 **Limit:** a schedule is switched through the platform's tools, which the policy hook does not
 see — only this rule keeps it the operator's. The hook reads a `$'…'` span as bash decodes it,
@@ -93,7 +95,9 @@ map. For each queued area, on the candidate:
    [explorations.md](explorations.md) (`FX-<k>` for `EX-<k>`, "from page" for "from AC"),
    derived from those pages' headings, controls and fields.
 3. `tests/focus-<area-slug>.e2e.ts` (tags `focus-<area-slug>`, `fx-<k>`), authored and
-   judged as explorations are; run `--strict --evidence failures`.
+   judged as explorations are; run it with `bash "$HOME/scripts/suite.sh" run focus-<area-slug>-<candidate>
+   --strict --evidence failures --tag focus-<area-slug>` — `--strict` and `--evidence` are
+   `suite.sh run`'s own options, which `e2e run` does not know.
 4. `ui-sweep.mjs` and `validation-plan.mjs` with the inventory cut to those pages, all
    viewports — their findings go to their usual places.
 5. `work/focus/<area-slug>-<candidate>/results.json`: `{area, build, generated_utc, checks: [...]}`,
