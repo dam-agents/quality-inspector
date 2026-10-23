@@ -43,7 +43,7 @@ export const textHash = (t) => createHash('sha256').update(t.replace(/\s+/g, ' '
 const ADDRESS = String.raw`\b(?:qa|test|testing)[ -]?(?:agent|bot|assistant|tester)\s*[:,]`;
 const LEAD = String.raw`(?:then|next|now|first|finally|lastly|afterwards?|also|just|simply),? `;
 const verb = (id, phrase, tracker) => ({ id, re: new RegExp(
-  String.raw`(?:^(?:${LEAD}){0,2}|\b(?:kindly|please) )${phrase}|^(?=.*${ADDRESS}).*\b${phrase}|\b${tracker}`, 'i') });
+  String.raw`(?:^(?:${LEAD}){0,2}|\b(?:kindly |please ))${phrase}|^(?=.*${ADDRESS}).*\b${phrase}|\b${tracker}`, 'i') });
 export const INJECTION = [
   { id: 'ignore', re: /\bignore (?:the|all|any|previous|prior|above|your)\b/i },
   { id: 'agent-role', re: /\bas (?:the|an?) (?:qa|test|testing|ai)[ -]?(?:agent|bot|assistant|model)\b/i },
@@ -57,7 +57,7 @@ export const INJECTION = [
   verb('fetch', 'fetch ', String.raw`fetch this (?:url|link|page|file)\b`),
   verb('open-link', String.raw`open (?:this|the|a) (?:pr|pull request|link|url)\b`, String.raw`open this (?:pr|pull request|link|url)\b`),
   verb('mark-passed', String.raw`(?:mark|report)\b.{0,60}?\b(?:as )?(?:passed|verified)\b`,
-    String.raw`(?:mark|report)\b.{0,60}?\b(?:acs?|criteri(?:on|a)|everything|this issue)\b.{0,60}?\b(?:passed|verified)\b`),
+    String.raw`(?:mark|report)\b.{0,60}?\b(?:acs?|criteri(?:on|a)|everything|(?:this|the) issue)\b.{0,60}?\b(?:passed|verified)\b`),
 ];
 const sentences = (t) => t.replace(/<!--|-->/g, '\n').split(/\n|(?<=[.!?])\s+/)
   .map((x) => x.replace(/^[ \t]*(?:[-*+]|[0-9]+[.)]|>)[ \t]+/, '').trim()).filter(Boolean);
