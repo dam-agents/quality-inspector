@@ -52,8 +52,9 @@ Paths below are relative to this skill's directory. Everything you write is in
 - **Fewest operator steps, least privilege.** Every `ask` key, every `by-hand` egress row
   and every step of a sandbox guide is a manual onboarding step someone can get wrong.
   Default what can be defaulted (a pinned stand-in image beats an asked one), keep each
-  egress rule to the method and path the flow needs, and never solve a product's need by
-  widening a platform-wide preset or the core's kit.
+  egress rule to the method and path the flow needs, and never solve one product's need by
+  widening a platform-wide preset or the core's kit — only a generic need of many products
+  (a cluster prerequisite) may join the kit, as a separate change to the core.
 
 ## Workflow
 

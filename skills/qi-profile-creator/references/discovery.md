@@ -151,7 +151,7 @@ whether the flow should be testable end to end; if so, per service (the core's
   with its own method. Copy those rows from there; anything else there is `refused`, a
   GitHub App's `/app/…` and `/installation/…` endpoints included — prefer a fine-grained
   token scoped to the sandbox repository (`GET /user` the kit already allows). Every GitHub
-  row lands by hand; the hosts a third-party page loads its scripts and styles from (the
+  row the kit does not already allow lands by hand; the hosts a third-party page loads its scripts and styles from (the
   sign-in pages' `github.githubassets.com`, `GET /assets/*`) land by prompt.
 - **A GitHub sign-in** — a sandbox user of its own (login, password and a TOTP secret as
   credentials; no passkey, no e-mail device check), and an OAuth App registered in the
@@ -192,7 +192,10 @@ Every host the install and the build listing contact, with `method` (`GET` unles
 needed), a `path` where the host is shared, and a `why`. Registries hand blobs to other
 hosts — quay.io → `*.quay.io`; Docker Hub → `registry-1.docker.io`, `auth.docker.io`,
 `production.cloudflare.docker.com`; a mirror that serves layers from its own host
-(`mirror.gcr.io` for Docker Hub images) needs one rule. The helm-k3s engine also needs
+(`mirror.gcr.io` for Docker Hub images) needs one rule. ghcr.io hands its blobs to
+`pkg-containers.githubusercontent.com`, a GitHub host a profile cannot name: publish the
+QA builds to another registry or a mirror, or propose that host for the core's kit (a
+separate change there). The helm-k3s engine also needs
 `get.helm.sh`. A page a browser renders in a sandbox flow loads assets from further hosts.
 
 - **How each lands.** The checker classifies every rule through the core's

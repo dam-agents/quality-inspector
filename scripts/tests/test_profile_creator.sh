@@ -102,6 +102,9 @@ grep -q '^WARN  egress POST api.github.com /repos/{profile.sb_repo}/issues: its 
   || { echo "  an egress rule naming an unset key must warn, not fail"; FAILED=1; }
 check --set sb_repo=qi-sbx/sandbox "$P" | grep -q '^PASS  egress lands: 2 by prompt, 1 by hand' \
   || { echo "  a sandbox repository rule lands by hand"; FAILED=1; }
+edit "$P" '.egress += [{"host":"api.github.com","method":"GET","path":"/repos/{profile.sb_repo}/issues","why":"read the issue"}]'
+check --set sb_repo=qi-sbx/sandbox "$P" | grep -q '^WARN  egress GET api.github.com /repos/qi-sbx/sandbox/issues: the kit already allows it' \
+  || { echo "  a rule the kit already allows must warn"; FAILED=1; }
 check --set sb_repo=qi-sbx/sand_box "$P" | grep -q '^FAIL  egress POST api.github.com /repos/{profile.sb_repo}/issues: refused' \
   || { echo "  a set value that is not a plain name must fail as refused"; FAILED=1; }
 grep -q '^PASS  sandbox: 1 account(s) — github' <<<"$out" || { echo "  a sandbox must pass"; FAILED=1; }
