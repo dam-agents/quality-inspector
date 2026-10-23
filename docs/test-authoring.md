@@ -89,8 +89,8 @@ A criterion that waits for time to pass — an agent falling asleep after being 
 scheduled minutes ahead — gives its own test the time: `test(title, { session, tags, timeout:
 <ms> }, …)`, the wait its words name plus their "within" margin plus five minutes for the
 steps. The config's `timeout` (five minutes) stays for every other test, and the file's
-timeouts together stay under `max_wallclock_min_per_issue` ([nested-env.md](nested-env.md) →
-**Budgets**). Wait on a locator (`expect(…).toBeVisible({ timeout })`) or a profile helper's
+timeouts together stay under two hours, the background task's limit ([nested-env.md](nested-env.md)
+→ **Shape**), and under `max_wallclock_min_per_issue` (→ **Budgets**). Wait on a locator (`expect(…).toBeVisible({ timeout })`) or a profile helper's
 own polling, never a long `agent.waitFor`, which judges the screen once per interval — a
 model call each. While a criterion says nobody uses the product, the test only waits: no
 `agent.act`, no page the profile's `SKILL.md` says would count as use.

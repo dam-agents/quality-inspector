@@ -14,8 +14,10 @@
 #                                 → live_cdp allows it; a `full` (evidence) run never does.
 #                                 Extra args go to `e2e run`; a confirmation re-run adds
 #                                 `--repeat-each 3 --no-cache`, and by_test[].stability reads it.
-#                                 Always a harness background task, then `wait` — a test may
-#                                 wait longer than the tool's 10-minute limit (its own timeout)
+#                                 Always a harness background task with the tool's `timeout`
+#                                 at 7200000 (an unattended run stops one at 30 minutes
+#                                 otherwise), then `wait` — a test may wait longer than the
+#                                 tool's 10-minute foreground limit (its own timeout)
 #   suite.sh wait <label> [<seconds>]
 #                                 block until this session's background `run <label>` ends
 #                                 (default 540 s): exit 0 with its summary on stdout, 3 it
@@ -200,7 +202,7 @@ cmd_wait() { # <label> [<seconds>]
     case "$st" in
       (done) [ "$x" = 0 ] && { cmd_summary "$want"; return; }
              echo "suite: the run $want failed (exit $x, $ts) — its background task's output says why" >&2; return 1;;
-      (running) kill -0 "$x" 2>/dev/null || { echo "suite: the run $want (started $ts) died without a result" >&2; return 1; };;
+      (running) kill -0 "$x" 2>/dev/null || { echo "suite: the run $want (started $ts) died without a result — a background task's time limit stops one so (docs/nested-env.md → Shape)" >&2; return 1; };;
       (*) echo "suite: unreadable $f" >&2; return 1;;
     esac
     [ "$(date -u +%s)" -lt "$end" ] || { echo "suite: $want still runs (since $ts) — run suite.sh wait again" >&2; return 3; }

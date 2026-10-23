@@ -13,7 +13,8 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 Nothing to run — scripts and docs are re-read per run. Every `suite.sh run <label>` now runs as
 a harness background task, followed by the new `suite.sh wait <label>` (exit 0 prints the
 summary, 3 = call again), like `env.sh up` / `wait` ([docs/nested-env.md](docs/nested-env.md) →
-Shape). A test whose criterion waits minutes sets its own `timeout`
+Shape); both background tasks pass the tool a two-hour `timeout`, or a scheduled run stops
+them at 30 minutes. A test whose criterion waits minutes sets its own `timeout`
 ([docs/test-authoring.md](docs/test-authoring.md) → Long waits). "test scenario <slug>" now
 resets the nested product before the candidate comes up ([docs/scenarios.md](docs/scenarios.md)
 → Profile scenarios → On demand).
