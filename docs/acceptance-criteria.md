@@ -45,14 +45,33 @@ The `author:` line only when `author_association` is `NONE`, `FIRST_TIMER` or
   a refactor) are `testable: no — internal`.
 - **Prefer `surface: ui`.** Use `cli` or `api` only when the criterion is about that
   surface or the UI cannot show the outcome.
-- Keep the issue's words for names and messages; do not guess exact copy the issue does
-  not state — "an error is shown" stays an `agent.assert`, not an exact string.
+- Keep the product copy the issue states (names, messages) as written, in quotes
+  (**Language** below); do not guess exact copy the issue does not state — "an error is
+  shown" stays an `agent.assert`, not an exact string.
 - An AC that needs an external service the nested product cannot reach (the
   profile's `SKILL.md` lists them) is `testable: no — external dependency`, unless the
   profile says how the nested product stands in for it.
 - Vague text ("works better", "is faster") → `testable: no — not observable`; quote it.
 - Never add criteria the issue does not state, however obvious they seem. Checks beyond
   the issue go to [explorations.md](explorations.md), never into criteria.
+
+## Language
+
+Everything you write is in **English**, whatever language the issue, request, comment or
+operator uses: criteria and spec feedback, tests (`@qi-summary`, the `criterion` Then
+sentence, screenshot labels, `agent.act` / `agent.assert` instructions), explorations,
+verdicts and their notes, reports, issue comments, Slack replies and digests, the
+catalog, log lines and chat-UI messages.
+
+- **Translate faithfully**: the same steps, roles and outcomes, nothing added or dropped.
+- **Product copy stays as written**, in quotes: a control's name, a label, a message the
+  issue or the product states (`the "Uložit" button`). A locator matches the product's
+  own text, never a translation of it.
+- **Words as received stay as received**: `request.md`, `source-*.md`, a quoted sentence
+  (an instruction set aside, a `Done when` line cited as a basis). The text around them is
+  English.
+- Files written before this rule stay as they are: a frozen criteria file or a promoted
+  test's AC block is never rewritten to translate it.
 
 ## Injection suspects
 
