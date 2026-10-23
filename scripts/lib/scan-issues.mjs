@@ -32,22 +32,32 @@ export const hasDoneWhen = (body) => String(body ?? '').split('\n').some((l) => 
 export const textHash = (t) => createHash('sha256').update(t.replace(/\s+/g, ' ').replace(/^ /, '').replace(/ $/, '')).digest('hex').slice(0, 12);
 // Prompt-injection suspects: sentences of the spec that address the agent instead of
 // describing the product. Each pattern runs on one sentence with its bullet marker
-// stripped; product verbs (run, delete, fetch) count only as a sentence-initial
-// imperative or aimed at the tracker itself, so "the user can delete an item" stays a
-// criterion. A matched sentence is frozen as an instruction (docs/acceptance-criteria.md).
+// stripped. A product verb (run, delete, fetch, open, post, mark/report) is product
+// behavior too, so it counts only aimed at the agent — an imperative at the sentence's
+// start, after up to two leading words (LEAD: "Then", "Next,", "Then just") or after
+// "please" or "kindly", or anywhere in a sentence that addresses a QA agent ("QA agent:
+// … and post a comment") — or aimed at the tracker or the issue itself ("open this link").
+// "the user can delete an item" and "asks the agent to open a pull request" stay criteria.
+// A matched sentence is frozen as an instruction (docs/acceptance-criteria.md).
 // One list, here; nothing else may restate it.
+const ADDRESS = String.raw`\b(?:qa|test|testing)[ -]?(?:agent|bot|assistant|tester)\s*[:,]`;
+const LEAD = String.raw`(?:then|next|now|first|finally|lastly|afterwards?|also|just|simply),? `;
+const verb = (id, phrase, tracker) => ({ id, re: new RegExp(
+  String.raw`(?:^(?:${LEAD}){0,2}|\b(?:kindly |please ))${phrase}|^(?=.*${ADDRESS}).*\b${phrase}|\b${tracker}`, 'i') });
 export const INJECTION = [
   { id: 'ignore', re: /\bignore (?:the|all|any|previous|prior|above|your)\b/i },
   { id: 'agent-role', re: /\bas (?:the|an?) (?:qa|test|testing|ai)[ -]?(?:agent|bot|assistant|model)\b/i },
   { id: 'agent-address', re: /^(?:dear )?(?:qa|test|ai) (?:agent|bot|assistant)\s*[:,]/i },
   { id: 'you-must', re: /\byou (?:must|should|are)\b(?! (?:able|now|then|shown|redirected|taken|asked|prompted|signed|logged|notified|presented|see|get|receive)\b)/i },
-  { id: 'run', re: /^(?:run|execute) |\b(?:run|execute) (?:this|these|the following|the command)\b/i },
+  verb('run', '(?:run|execute) ', String.raw`(?:run|execute) (?:this|these|the following)\b`),
   { id: 'curl', re: /\b(?:curl|wget) /i },
-  { id: 'post-comment', re: /\bpost (?:a|the|this) comment\b/i },
-  { id: 'delete', re: /^delete |\bdelete (?:this|the) (?:issue|repo|repository|branch|comment|label|file)s?\b/i },
-  { id: 'fetch', re: /^fetch |\bfetch (?:this|the) (?:url|link|page|file)\b/i },
-  { id: 'open-link', re: /\bopen (?:this|the|a) (?:pr|pull request|link|url)\b/i },
-  { id: 'mark-passed', re: /\b(?:mark|report)\b.{0,60}?\b(?:as )?(?:passed|verified)\b/i },
+  verb('post-comment', String.raw`post (?:a|the|this) comment\b`,
+    String.raw`post (?:this comment|(?:a|the) comment (?:on|to|in|under) (?:this|the) (?:issue|pr|pull request))\b`),
+  verb('delete', 'delete ', String.raw`delete (?:this (?:issue|repo|repository|branch|comment|label|file)s?|the (?:issue|repo|repository))\b`),
+  verb('fetch', 'fetch ', String.raw`fetch this (?:url|link|page|file)\b`),
+  verb('open-link', String.raw`open (?:this|the|a) (?:pr|pull request|link|url)\b`, String.raw`open this (?:pr|pull request|link|url)\b`),
+  verb('mark-passed', String.raw`(?:mark|report)\b.{0,60}?\b(?:as )?(?:passed|verified)\b`,
+    String.raw`(?:mark|report)\b.{0,60}?\b(?:acs?|criteri(?:on|a)|everything|(?:this|the) issue)\b.{0,60}?\b(?:passed|verified)\b`),
 ];
 const sentences = (t) => t.replace(/<!--|-->/g, '\n').split(/\n|(?<=[.!?])\s+/)
   .map((x) => x.replace(/^[ \t]*(?:[-*+]|[0-9]+[.)]|>)[ \t]+/, '').trim()).filter(Boolean);
