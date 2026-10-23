@@ -26,7 +26,8 @@ existing criteria files (the first line of each `work/issues/*/criteria-*.md` an
 Per AC:
 
 - **Faithful** — states what the request (or the proposal's basis) states: nothing added,
-  nothing dropped, the requester's names and words kept.
+  nothing dropped, the requester's names and product copy kept, the rest in English
+  ([acceptance-criteria.md](acceptance-criteria.md) → Language).
 - **Grounded** — the expected outcome follows from the request or the quoted basis, not
   from how the product behaves today; a `heuristic:` basis states its catalogue row's
   Expected, written either-or where the row leaves a choice open.
