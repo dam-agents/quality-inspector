@@ -98,12 +98,13 @@ cmd_set() {
   until mkdir "$lk" 2>/dev/null; do
     tries=$((tries + 1))
     if [ "$tries" -ge 50 ]; then
-      [ -n "$(find "$lk" -maxdepth 0 -mmin +1 2>/dev/null)" ] && { rmdir "$lk" 2>/dev/null; tries=0; continue; }
+      [ -n "$(find "$lk" -maxdepth 0 -mmin +1 2>/dev/null)" ] && { [ -n "${QI_SCEN_TRACE:-}" ] && echo "$(date +%s.%N) $$ $id STALE-BREAK $(stat -c %Y "$lk" 2>/dev/null)" >> "$QI_SCEN_TRACE"; rmdir "$lk" 2>/dev/null; tries=0; continue; }
       echo "scenarios: work/SCENARIOS.md stays locked ($lk)" >&2; exit 1
     fi
     sleep 0.2
   done
-  ROW_LOCK="$lk"; trap 'rmdir "$ROW_LOCK" 2>/dev/null' EXIT
+  ROW_LOCK="$lk"; trap 'rmdir "$ROW_LOCK" 2>/dev/null; [ -n "${QI_SCEN_TRACE:-}" ] && echo "$(date +%s.%N) $$ $BASHPID release" >> "$QI_SCEN_TRACE"' EXIT
+  [ -n "${QI_SCEN_TRACE:-}" ] && echo "$(date +%s.%N) $$ $id acquire tries=$tries" >> "$QI_SCEN_TRACE"
   [ -f "$f" ] || printf '# Scenarios — one row per scenario (docs/scenarios.md → State)\n\n%s\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n' "$SCENARIOS_HEADER" > "$f"
   old="$(table_rows "$f" | awk -F'|' -v id="$id" '{x=$2; gsub(/[ \t]/,"",x)} x==id {print; exit}')"
   if [ -z "$old" ] && { [ -z "$c_source" ] || [ -z "$c_status" ]; }; then
@@ -128,6 +129,7 @@ cmd_set() {
         print L[i]
         if (i == last && !done) { print row; done = 1 } } }' "$f" > "$tmp" && mv -f "$tmp" "$f" \
     || { rm -f "$tmp"; echo "scenarios: cannot rewrite work/SCENARIOS.md" >&2; exit 1; }
+  [ -n "${QI_SCEN_TRACE:-}" ] && echo "$(date +%s.%N) $$ $id wrote rows=$(grep -c '^| S-' "$f")" >> "$QI_SCEN_TRACE"
   # A claim takes the environment: what max_scenarios_per_day counts (scripts/lib/state.sh).
   # A bare `set S-<k>` only refreshes updated_utc and claims nothing.
   if [ "$want" = in_progress ]; then
