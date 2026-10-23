@@ -4,7 +4,8 @@
 # The agent calls it; the pre-flight never does. docs/nested-env.md.
 #
 #   env.sh lock <owner> | unlock <owner>     one run at a time (exit 1 when a live holder has it;
-#                                            lib/lock.sh); unlock refuses while an `up` still runs
+#                                            lib/lock.sh); unlock refuses while an `up` or a
+#                                            background `suite.sh run` still runs
 #   env.sh init | up <build> | reset | status | down    → the profile
 #                                            (`up` first checks min_free_disk_gi and keeps its
 #                                            result in work/env/UP for `wait`)
@@ -62,12 +63,18 @@ cmd_lock() {
   printf '%s %s %s\n' "$owner" "$(now)" "$ME" > "$ENVD/LOCK.tmp" && mv -f "$ENVD/LOCK.tmp" "$ENVD/LOCK"
 }
 up_running() { local st b ts x _; [ -f "$UPF" ] && read -r st b ts x _ < "$UPF" && [ "$st" = running ] && kill -0 "$x" 2>/dev/null; }
+# A background `suite.sh run` (its state line in work/suite/.e2e/state/) still drives the product.
+suite_running() { local f st l ts x _
+  for f in "$WORK"/suite/.e2e/state/*; do
+    [ -f "$f" ] && read -r st l ts x _ < "$f" && [ "$st" = running ] && kill -0 "$x" 2>/dev/null && { echo "$l"; return 0; }
+  done; return 1; }
 cmd_unlock() {
   local owner="${1:?owner}" held ts sess
   [ -f "$ENVD/LOCK" ] || return 0
   read -r held ts sess _ < "$ENVD/LOCK"
   lock_mine "$held" "${sess:--}" "$owner" || return 0
   up_running && { echo "env: an install still runs — env.sh wait until it ends, then unlock" >&2; exit 1; }
+  local run; run="$(suite_running)" && { echo "env: the suite run $run still runs — suite.sh wait $run until it ends, or stop its background task, then unlock" >&2; exit 1; }
   rm -f "$ENVD/LOCK"
   return 0
 }

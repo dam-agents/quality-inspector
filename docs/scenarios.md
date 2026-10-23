@@ -245,7 +245,9 @@ is the product team's to update in the scenario's file — report it `regression
 explanation naming `scenarios/<slug>.md`. Heals stay as triage allows (locators only).
 
 **On demand** — "test scenario <slug>" in the direct session or a bound Slack conversation:
-`scenarios.sh admit` (Slack only), `env.sh lock P-<slug>`, the candidate up as
+`scenarios.sh admit` (Slack only), `env.sh lock P-<slug>`, `env.sh reset` — a profile
+scenario starts on a fresh platform, as the nightly one does ([regression.md](regression.md)
+step 2) —, then the candidate up as
 **The pipeline** steps 5–6, then **Adopt** steps 1–4 (an unchanged text reuses its frozen
 criteria and test: steps 1 and 4's run only), the verdicts and report as **The pipeline**
 steps 9–10 and 12 — the reply in the requester's turn, or the chat UI.

@@ -83,6 +83,18 @@ and an `EX-<k>:` screenshot written by the rules above. Their blocks are hashed 
 (`check-asserts.sh --ex-hash`) and are not promoted state; a role session other than `owner`
 comes from the setup test too.
 
+## Long waits
+
+A criterion that waits for time to pass — an agent falling asleep after being idle, a task
+scheduled minutes ahead — gives its own test the time: `test(title, { session, tags, timeout:
+<ms> }, …)`, the wait its words name plus their "within" margin plus five minutes for the
+steps. The config's `timeout` (five minutes) stays for every other test, and the file's
+timeouts together stay under two hours, the background task's limit ([nested-env.md](nested-env.md)
+→ **Shape**), and under `max_wallclock_min_per_issue` (→ **Budgets**). Wait on a locator (`expect(…).toBeVisible({ timeout })`) or a profile helper's
+own polling, never a long `agent.waitFor`, which judges the screen once per interval — a
+model call each. While a criterion says nobody uses the product, the test only waits: no
+`agent.act`, no page the profile's `SKILL.md` says would count as use.
+
 ## Finding the steps
 
 Explore the running candidate with `npx e2e mcp` (registered for this harness at
