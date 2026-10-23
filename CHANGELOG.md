@@ -7,13 +7,26 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.11.0 — 2026-10-23
+## 3.12.0 — 2026-10-23
 
 **Upgrade:**
 Nothing to run. On the dashboard's next build, a tab or a navigation button walks the Product map
 to the page it led to where the current UI map recorded it. From the next regression run on, the UI
 map records where each link leads, the first row of a list per detail page, and every tab per page
 ([docs/change-awareness.md](docs/change-awareness.md)), so links, list rows and tabs walk too.
+
+## 3.11.1 — 2026-10-23
+
+**Upgrade:**
+Nothing to run — scripts are re-read per run. The short locks (`work/scenarios/.lock`,
+`work/env/LOCK.mutex`, the `work/` backup's lock) are now files, not directories; a lock directory
+an older version left behind is removed on its own once it is past its age limit.
+
+## 3.11.0 — 2026-10-23
+
+**Upgrade:**
+Nothing to run — only the `qi-profile-creator` skill changed, which a product team runs on its
+own profile and an instance never does.
 
 ## 3.10.1 — 2026-10-23
 

@@ -3,8 +3,8 @@
 # calls; its writes are a scenario's empty directory, its work/SCENARIOS.md row and event lines.
 #
 #   scenarios.sh new <slack|operator|discovery|dashboard>  reserve the next id: creates
-#                                                 work/scenarios/S-<k>/ atomically (two turns
-#                                                 at once never share an id), logs
+#                                                 work/scenarios/S-<k>/ under the row lock (two
+#                                                 turns at once never share an id), logs
 #                                                 `scenario_new`, prints S-<k>
 #   scenarios.sh adopt <slug>                     the profile's scenarios/<slug>.md as P-<slug>:
 #                                                 creates work/scenarios/P-<slug>/, copies the
@@ -48,16 +48,22 @@ iso2epoch() { date -d "$1" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ'
 cmd_new() {
   case "${1:-}" in (slack|operator|discovery|dashboard) ;; (*) echo "usage: $0 new <slack|operator|discovery|dashboard>" >&2; exit 2;; esac
   mkdir -p "$WORK/scenarios" || exit 1
-  local k n
+  local k
+  row_lock
   k="$(ls -1 "$WORK/scenarios" 2>/dev/null | sed -n 's/^S-\([0-9][0-9]*\)$/\1/p' | sort -n | tail -1)"
   k=$(( ${k:-0} + 1 ))
-  for n in $(seq "$k" $((k + 49))); do
-    if mkdir "$WORK/scenarios/S-$n" 2>/dev/null; then
-      logev info scenario_new "id=S-$n source=$1"
-      echo "S-$n"; return 0
-    fi
-  done
-  echo "scenarios: no free id after S-$k" >&2; exit 1
+  mkdir "$WORK/scenarios/S-$k" || exit 1
+  logev info scenario_new "id=S-$k source=$1"
+  echo "S-$k"
+}
+
+# row_lock: one writer of work/scenarios/ and work/SCENARIOS.md at a time (lib/lock.sh
+# lock_mutex, up to 10 s; a lock older than a minute belongs to a writer that died), held
+# until the script exits.
+row_lock() {
+  local lk="$WORK/scenarios/.lock"
+  lock_mutex "$lk" 100 || { echo "scenarios: work/SCENARIOS.md stays locked ($lk)" >&2; exit 1; }
+  ROW_LOCK="$lk"; trap 'rm -f "$ROW_LOCK" 2>/dev/null' EXIT
 }
 
 # Columns of a row, in SCENARIOS_HEADER order, and the values each one takes.
@@ -74,7 +80,7 @@ valid_id() {
 }
 
 cmd_set() {
-  local id="${1:-}" kv k v f="$WORK/SCENARIOS.md" lk="$WORK/scenarios/.lock" tries=0 tmp old row now ttl
+  local id="${1:-}" kv k v f="$WORK/SCENARIOS.md" tmp old row now ttl
   local c_source="" c_requester="" c_thread="" c_hash="" c_build="" c_verdict="" c_status=""
   valid_id "$id" || { echo "usage: $0 set <S-<k>|P-<slug>> [<column>=<value>…]" >&2; exit 2; }
   shift
@@ -94,16 +100,7 @@ cmd_set() {
     esac
   done
   mkdir -p "$WORK/scenarios" || exit 1
-  # mkdir is atomic; a lock older than a minute belongs to a writer that died.
-  until mkdir "$lk" 2>/dev/null; do
-    tries=$((tries + 1))
-    if [ "$tries" -ge 50 ]; then
-      [ -n "$(find "$lk" -maxdepth 0 -mmin +1 2>/dev/null)" ] && { rmdir "$lk" 2>/dev/null; tries=0; continue; }
-      echo "scenarios: work/SCENARIOS.md stays locked ($lk)" >&2; exit 1
-    fi
-    sleep 0.2
-  done
-  ROW_LOCK="$lk"; trap 'rmdir "$ROW_LOCK" 2>/dev/null' EXIT
+  row_lock
   [ -f "$f" ] || printf '# Scenarios — one row per scenario (docs/scenarios.md → State)\n\n%s\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n' "$SCENARIOS_HEADER" > "$f"
   old="$(table_rows "$f" | awk -F'|' -v id="$id" '{x=$2; gsub(/[ \t]/,"",x)} x==id {print; exit}')"
   if [ -z "$old" ] && { [ -z "$c_source" ] || [ -z "$c_status" ]; }; then

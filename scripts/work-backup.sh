@@ -29,6 +29,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOG_JOB="${LOG_JOB:-session}"
 if ! . "$SCRIPT_DIR/log.sh" 2>/dev/null; then logev() { :; }; fi
 . "$SCRIPT_DIR/lib/config.sh" || { echo "work-backup: cannot source lib/config.sh" >&2; exit 1; }
+. "$SCRIPT_DIR/lib/lock.sh" || { echo "work-backup: cannot source lib/lock.sh" >&2; exit 1; }
 
 LOCAL="${QI_WORK_BACKUP_LOCAL:-/dev/shm/qi-work-backup}"   # tmpfs: the pod's only non-NFS disk
 LOCK="$LOCAL.lock"; AGAIN="$LOCAL.again"; STAMP="$LOCAL.stamp"; VERIFIED="$LOCAL.verified"
@@ -135,11 +136,11 @@ scan_secrets() {
 HELD=0
 acquire_lock() {
   mkdir -p "$(dirname "$LOCK")" 2>/dev/null
-  if mkdir "$LOCK" 2>/dev/null; then HELD=1; return 0; fi
+  if lock_take "$LOCK"; then HELD=1; return 0; fi
   if [ -n "$(find "$LOCK" -maxdepth 0 -mmin "+$LOCK_TTL_MIN" 2>/dev/null)" ]; then
     local dead="$LOCK.stale.$$"
     if mv "$LOCK" "$dead" 2>/dev/null; then
-      rm -rf "$dead"; mkdir "$LOCK" 2>/dev/null && { HELD=1; logev warn work_backup "stale persist lock taken over"; return 0; }
+      rm -rf "$dead"; lock_take "$LOCK" && { HELD=1; logev warn work_backup "stale persist lock taken over"; return 0; }
     fi
   fi
   return 1
