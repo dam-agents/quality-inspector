@@ -1297,6 +1297,8 @@ function itemRow(i, full = true) {
 }
 // A walk through the map is a step like any other: "back" returns to the page before.
 const walk = (to) => go({ pg: to, hs: null });
+// Picking a control refines the page, like a filter: it replaces the current step, never adds one.
+const pickHs = (k) => { S.hs = k; writeHash(); render(); };
 function viewMap() {
   const v = $('#view');
   if (!pagesData.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No UI map yet.'), h('p', {}, 'The product map appears after the first nightly regression run walks the product.'))); return; }
@@ -1327,7 +1329,7 @@ function viewMap() {
     stage.append(h('button', { class: `hs ${st}${to ? ' go' : ''}${S.hs === k ? ' sel' : ''}`, type: 'button', style: `left:${bx}%;top:${by}%;width:${bw}%;height:${bh}%`,
       title: to ? `${what} — opens ${to} on the map (${tests})` : `${what} — ${tests}`,
       'aria-label': to ? `${what}: open ${to}` : `${what}: ${its.length} test(s)`, 'aria-pressed': to ? null : S.hs === k ? 'true' : 'false',
-      onclick: () => (to ? walk(to) : go({ hs: S.hs === k ? null : k })) },
+      onclick: () => (to ? walk(to) : pickHs(S.hs === k ? null : k)) },
     src ? null : h('span', {}, to ? `${x.name} ↗` : x.name)));
   }
   const pageItems = p.items.filter(present).map((k) => byKey.get(k)).sort((a, b) => SEV[a.cls] - SEV[b.cls]);
@@ -1349,7 +1351,7 @@ function viewMap() {
     x ? [h('div', { class: 'meta' }, KIND[x.kind] || 'Control'), h('h3', {}, `"${x.name}"`),
       x.to ? h('p', { class: 'meta' }, `Leads to ${x.to}: the tests that reach that page.`, pageOf(x.to) ? [' ', h('button', { class: 'linkish', type: 'button', onclick: () => walk(x.to) }, 'Open it on the map →')] : null) : null,
       its.length ? h('ul', { class: 'att' }, its.map((x) => itemRow(x))) : h('p', { class: 'muted-t' }, x.to ? 'No test reaches that page.' : 'No test names this control.'),
-      h('button', { class: 'linkish', type: 'button', onclick: () => go({ hs: null }) }, '← the whole page')]
+      h('button', { class: 'linkish', type: 'button', onclick: () => pickHs(null) }, '← the whole page')]
       : [h('h3', {}, `Tests that reach this page (${pageItems.length})`), pageItems.length ? h('ul', { class: 'att' }, pageItems.map((x) => itemRow(x))) : h('p', { class: 'muted-t' }, 'No test reaches this page.'),
         design.some((d) => str(d.pattern) === p.pattern) ? h('p', {}, h('button', { class: 'linkish', type: 'button', onclick: () => go({ v: 'design', ds: { pg: p.pattern, st: '' } }) },
           `Design findings on this page (${design.filter((d) => str(d.pattern) === p.pattern && d.status === 'open').length} open) →`)) : null,

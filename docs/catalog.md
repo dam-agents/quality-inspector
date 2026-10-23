@@ -83,8 +83,8 @@ design finding's page to the map, and from a map page to its design findings. Ev
 artifact with the video, the screenshots and the steps — is reachable wherever its run or its
 origin appears: the catalog's Report column, cards, Overview, the map's test lists, the runs in an
 item's and an origin's panel, the Runs view and the run panel. Every move to another place (a view,
-a panel, a map page, a build, "as of") is a history step: the browser's back and forward walk them,
-and the page's own **← Back** (under the title and in every panel) returns to the place before,
+a panel, a map page, a build, "as of") is a history step the browser's back and forward walk; a filter, a sort,
+a search or a picked control of the map refines the place instead. The page's own **← Back** (under the title and in every panel) returns to the place before,
 named — in memory where the frame may not touch the browser history. A panel has previous and
 next (the item in the list it was opened from, the run before or after, the neighbouring origin)
 and breadcrumbs up to its origin; Close returns to the place under it. **As of a
