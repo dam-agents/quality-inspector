@@ -239,9 +239,10 @@ file → keep its values, show them once, and ask only for the keys it lacks. As
 5. **`slack_channel`** — optional, off unless the operator says yes: `describe_channel` for
    `slack`; when it lists a chat, offer test requests there ([docs/slack.md](docs/slack.md))
    and record its id. Not connected → skip; a channel can be bound later. Say that an answer
-   in Slack carries a picture of the evidence, and a link only where one opens for its readers
-   ([docs/slack.md](docs/slack.md) → **The answer in the thread**); `slack_report_visibility:
-   public` makes such reports open to anyone with the link — only on the operator's word.
+   in Slack carries a picture of the evidence, and a link only where one opens for its readers —
+   the dashboard's, once the operator shares it ([docs/slack.md](docs/slack.md) → **The answer in
+   the thread**); `slack_report_visibility: public` makes such reports open to anyone with the
+   link, posted in their thread only — only on the operator's word.
 6. **The profile's keys** — every `config` entry of its `profile.json`, written as
    `- profile.<key>: <value>`: ask those marked `"ask": true` (its `about` text is the
    question), default the rest. Tick item 6.

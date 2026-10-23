@@ -59,11 +59,10 @@ declined in one reply — it is the operator's, in the direct session.
 
 ## The answer in the thread
 
-Every Slack answer that carries a verdict — a "test #N" report, a scenario's reply
-([scenarios.md](scenarios.md) → **The reply**), a `status` answer — brings the result into the
-thread: where to see it whole, and a picture that shows it. A post with a verdict outside a
-thread — the scenario digest ([scenarios.md](scenarios.md) → **Discovery**), the nightly summary
-([regression.md](regression.md) step 9) — takes the link alone.
+A "test #N" report and a scenario's reply ([scenarios.md](scenarios.md) → **The reply**) bring
+the result into the thread: where to see it whole, and a picture that shows it. A `status`
+answer, the scenario digest ([scenarios.md](scenarios.md) → **Discovery**) and the nightly
+summary ([regression.md](regression.md) step 9) take the link alone.
 
 - **The link.** A `platform://artifacts/…` reference opens nothing in Slack, and a private
   artifact has no other address — never post one there. `get_artifact` the report
@@ -77,8 +76,10 @@ thread — the scenario digest ([scenarios.md](scenarios.md) → **Discovery**),
   on one that is private (a restricted one stays as the operator set it: it has a link). The
   link is then the whole access control: anyone who holds it sees the videos and screenshots
   of the nested product — and an issue's artifact is one per issue, so its later revisions too.
-  The link goes to that thread only. Only the operator sets the key (CLAUDE.md → Runtime
-  configuration).
+  That `public` link goes into that thread's answer and nowhere else: a `status` answer, the
+  digest, the nightly summary and the issue comment ([reporting.md](reporting.md) → Delivery
+  step 2) treat the report as one with no link. Only the operator sets the key (CLAUDE.md →
+  Runtime configuration).
 - **The picture.** `node "$HOME/scripts/evidence-sheet.mjs" <report dir>` →
   `{sheet, rows, left_out, reason}`: one PNG of the screenshots that back the verdicts — per
   criterion its `AC-<k>` still, or the screen at failure, on each side that decides it (a

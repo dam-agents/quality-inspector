@@ -112,8 +112,10 @@ re-run. Never retry within the same run.
      `<!-- <marker_prefix> issue=<n> ac=<ac_hash> build=<candidate> -->`. Found → do not
      post; record as delivered. A failed listing is "could not look" → do not post, log,
      leave `report_pending`.
-   - Post `comment.md` with `github.sh comment <n> <file>` (with `EVIDENCE_LINK` replaced by the artifact's share link, or by
-     "evidence kept by the agent" when artifacts are disabled) with that marker and one
+   - Post `comment.md` with `github.sh comment <n> <file>` (with `EVIDENCE_LINK` replaced by the artifact's share link —
+     never a `public` one while `slack_report_visibility: public`, which may have opened it for a
+     Slack thread ([slack.md](slack.md) → **The answer in the thread**) — or, with none, by
+     "evidence kept by the agent") with that marker and one
      machine copy next to it:
      `<!-- <marker_prefix>-data {"issue":42,"ac":"…","build":"…","verdicts":{"AC-1":"verified"}} -->`.
    - When the worklist entry had `retest_label_present`, remove that label after a
