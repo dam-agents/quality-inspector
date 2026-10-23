@@ -46,8 +46,10 @@ library for evidence, the skill catalog for profiles, sub-agents for independent
   and a one-off deep test of a chosen area (docs/modules.md).
 - **Weekly audit** (off by default) — health, the black-box boundary probes, assertion
   drift, cache efficiency, and the week's speed and cost per issue (docs/audit.md).
-- **From Slack** (off by default) — a person in the bound channel asks "test #N" and gets
-  the report in the thread; one test at a time, `slack_tests_per_day` a day (docs/slack.md).
+- **From Slack** (off by default) — a person in the bound channel asks "test #N" or for a
+  scenario and gets the verdict in the thread, with one picture of the screenshots behind it
+  and a link to the report or the dashboard where one opens; the run shows on the dashboard.
+  One test at a time, `slack_tests_per_day` a day (docs/slack.md).
   In the direct session the operator can watch exploration live in the Browser Panel
   (`live_browser`), and the nested product can call the agent's own model by placeholder
   instead of a mock (`lend_model`).
@@ -201,6 +203,7 @@ configuration.
 | `ui_sweep`, `validation_checks`, `stress_checks` and their tunables, `focus_max_checks`, `modules_max_wallclock_min` | offered, default `disabled` | The testing modules of the nightly modules run; registry `scripts/lib/modules.json` ([docs/modules.md](docs/modules.md)). |
 | `dashboard_interactive` | offered, default `disabled` | The dashboard's buttons send their command to the agent's chat (needs the platform's Interactive artifacts). |
 | `slack_channel`, `slack_tests_per_day` | asked (optional), default `3` | Slack test requests ([docs/slack.md](docs/slack.md)). |
+| `slack_report_visibility` | default `private` | `public`: a report answered in a Slack thread gets a link anyone holding it opens, posted in that thread only ([docs/slack.md](docs/slack.md) → The answer in the thread). |
 | `lend_model`, `live_browser` | offered, default `disabled` | The product calls the agent's model by placeholder; exploration in the browser the operator watches. |
 
 ## Runtime requirements

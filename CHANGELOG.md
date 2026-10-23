@@ -17,6 +17,20 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 2. `bash "$HOME/scripts/verify-onboarding.sh"` and read its `trace_hook` line: a harness older than
    2.1.101 leaves failed tool calls untraced until the platform upgrades it — then repeat step 1.
 
+## 3.13.0 — 2026-10-23
+
+**Upgrade:**
+Nothing to run — scripts and docs are re-read per run. An answer in a Slack thread (a "test #N"
+report, a scenario's reply) now carries one picture of the screenshots behind its verdicts
+(`scripts/evidence-sheet.mjs`, from the report's new `proof.json`). It, a status answer, the
+scenario digest and the nightly summary post a link only where one opens in Slack — the
+report's or the dashboard's share link (once the operator shares the dashboard), never a
+`platform://` reference. A Slack "test #N" report reply now goes after the catalog is published,
+so the run is already there ([docs/slack.md](docs/slack.md) → **The answer in the thread**).
+Offer, never enable: with **`slack_report_visibility: public`** (default `private`) a report answered in a thread is
+published as a public link anyone holding it opens, posted in that thread only — never in a
+status answer or an issue comment. `kit.yaml`'s Slack note changed wording only.
+
 ## 3.12.1 — 2026-10-23
 
 **Upgrade:**
