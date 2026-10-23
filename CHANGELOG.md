@@ -14,9 +14,9 @@ Nothing to run — scripts and docs are re-read per run. An answer in a Slack th
 report, a scenario's reply, a status) now carries one picture of the screenshots behind its
 verdicts (`scripts/evidence-sheet.mjs`, from the report's new `proof.json`) and a link only
 where one opens in Slack — the report's or the dashboard's share link, never a `platform://`
-reference, also in the scenario digest and the nightly summary — and goes after the catalog is
-published, so the run is already there ([docs/slack.md](docs/slack.md) → **The answer in the
-thread**). Offer, never enable: with
+reference, also in the scenario digest and the nightly summary. A Slack "test #N" report reply
+now goes after the catalog is published, so the run is already there ([docs/slack.md](docs/slack.md)
+→ **The answer in the thread**). Offer, never enable: with
 **`slack_report_visibility: public`** (default `private`) a report answered in a thread is
 published as a public link anyone holding it opens. `kit.yaml`'s Slack note changed wording only.
 

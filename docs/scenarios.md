@@ -145,12 +145,12 @@ in their own words ([catalog.md](catalog.md)); its button sends
     `S-<k>` in the `issue` column; only **Saving** moves it on.
 12. **Deliver.** The artifact as [reporting.md](reporting.md) → Delivery step 1 (with a
     `thread`, its visibility per [slack.md](slack.md) → **The answer in the thread**), then
-    `report_pending`; log `scenario_done id=S-<k> verdict=<v>`; `env.sh unlock S-<k>`; the
-    catalog ([catalog.md](catalog.md) → **Build and publish**) — before the reply, so the run
-    is on the dashboard when the requester looks; then **The reply**, then `reported` as the
-    next write; every send is ledgered. Source `dashboard`: no reply here or at any other step
-    (**A request from the dashboard**) — `reported` right after `report_pending`, then the
-    unlock and the catalog.
+    `report_pending`, then **The reply**, then `reported` as the next write; every send is
+    ledgered. Log `scenario_done id=S-<k> verdict=<v>`. `env.sh unlock S-<k>` only now: while
+    the row is `report_pending` the lock keeps the next issues run's `report` entry (**Waiting
+    scenarios**) from sending the reply a second time. Then the catalog ([catalog.md](catalog.md)
+    → **Build and publish**). Source `dashboard`: no reply here or at any other step (**A
+    request from the dashboard**).
 
 **Budgets** hold per scenario as per issue: `suite.sh budget <claim time>` at every step
 from 6 on ([nested-env.md](nested-env.md) → **Budgets**); exceeded → the remaining ACs

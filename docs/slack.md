@@ -89,7 +89,8 @@ thread — the scenario digest ([scenarios.md](scenarios.md) → **Discovery**),
   judged), or no browser (`reason`, logged as a `warn`). Never attach anything else of the
   report: no video, trace, log or step text. A refused attachment leaves the text delivered
   — the delivery holds; log it.
-- **In the catalog.** The run is on the dashboard before the answer goes
-  ([catalog.md](catalog.md) → **Build and publish**) — a scenario's test, registered at its
-  step 11, and every run with its verdicts and builds; a scenario request still reads "awaiting
-  delivery" there until the next publish.
+- **In the catalog.** The run is on the dashboard with its verdicts and builds, and a
+  scenario's test from its step 11 ([catalog.md](catalog.md) → **Build and publish**): a
+  "test #N" publishes it before its report reply; a scenario right after its reply, since the
+  reply goes under the environment lock — released earlier, the next issues run would send it
+  a second time ([scenarios.md](scenarios.md) step 12).
