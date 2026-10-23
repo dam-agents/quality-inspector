@@ -622,8 +622,8 @@ function pageLink(path, text) {
 const facetLink = (k, v, text) => (v ? h('button', { class: 'lnk', type: 'button', title: `Every test with ${FACET[k].label.toLowerCase()} ${v}`, onclick: () => go({ v: 'catalog', f: { [k]: [str(v)] }, q: '' }) }, text ?? str(v)) : '–');
 const joinNodes = (list, sep = ', ') => list.flatMap((x, k) => (k ? [sep, x] : [x]));
 const cells = (hist, n = 12) => h('span', { class: 'cells', 'aria-hidden': true }, hist.slice(-n).map((e) => h('i', { class: vClass(e.value), title: `${fmtDate(e.utc)} ${str(e.build)}: ${vLabel(e.value)}` })));
-// A report is a private artifact: the page cannot link to it (the app has no address for one), so
-// the agent opens it — "open the report <id>" answers with the platform's chip beside the chat.
+// A report with a share link (artifact.url) opens in one click. A private one has no address the page
+// can link to, so the agent opens it — "open the report <id>" answers with the platform's chip beside the chat.
 const reportCmd = (ref) => { const m = /^platform:\/\/artifacts\/([A-Za-z0-9_-]{1,64})$/.exec(str(ref)); return m ? `open the report ${m[1]}` : null; };
 const REPORT_TIP = 'The report: the video, the screenshots and the steps of every criterion';
 const artLink = (ref) => {
