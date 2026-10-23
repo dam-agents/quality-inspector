@@ -40,7 +40,8 @@ declined in one reply — it is the operator's, in the direct session.
   the first once the lock is taken — the issue, the candidate and baseline builds, and "up
   to `max_wallclock_min_per_issue` minutes"; the second the report.
 - **Stay in the turn until the report is sent**: a Slack turn ends when you stop. Every
-  wait for an install is `env.sh wait <build>` again while it exits 3 ([issue-qa.md](issue-qa.md)).
+  wait — `env.sh wait <build>` for an install, `suite.sh wait <label>` for a suite run — runs
+  again while it exits 3 ([nested-env.md](nested-env.md) → **Shape**).
 - **The report:** the issue verdict, the ACs that are not `verified` with their verdicts
   (none → "N of N verified"), the evidence link, and the first `failed` AC's `AC-<k>`
   screenshot as the reply's `attachment`. Never a credential, a log, the operator

@@ -25,8 +25,8 @@ file is the why and the recovery path; how one product is installed is the profi
 - **Every `suite.sh run <label>` runs as a harness background task too** (its two-hour
   `timeout` below), then
   `suite.sh wait <label>` the same way: exit 0 prints the run's summary, 3 = still running,
-  1 = it failed (its output says why). A test may wait longer than one tool call
-  ([test-authoring.md](test-authoring.md) → **Long waits**); every `suite.sh run …` in
+  1 = it failed (its output says why); the turn never ends while one runs. A test may wait
+  longer than one tool call ([test-authoring.md](test-authoring.md) → **Long waits**); every `suite.sh run …` in
   these docs means this pair.
 - **Both background tasks pass the tool a `timeout` of 7200000 (two hours)**: in an
   unattended run (a scheduled one) the harness stops a background task after 30 minutes

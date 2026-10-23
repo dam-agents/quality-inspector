@@ -89,8 +89,8 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    Tiers); `auto_promote: verified` writes a qualifying file as `regression` instead. A
    retest of a promoted file never demotes it and never rewrites its hash. Name every
    `promotable` (or auto-promoted) file in the run's chat summary.
-10. **Release.** `env.sh unlock issues` (it refuses while the background install runs:
-    `env.sh wait <candidate>` first); log `issue_done issue=<n> verdict=<v> minutes=<m> model_steps=<k>`,
+10. **Release.** `env.sh unlock issues` (it refuses while a background install or suite run
+    runs: `env.sh wait <candidate>` / `suite.sh wait <label>` first); log `issue_done issue=<n> verdict=<v> minutes=<m> model_steps=<k>`,
     `m` and `k` the `elapsed_min` and `model_steps` of `suite.sh budget <claim time>`. Then the
     catalog ([catalog.md](catalog.md) → **Build and publish**) — on every path, an operator's or a
     Slack "test #N" included, so Overview no longer shows the issue as working.
