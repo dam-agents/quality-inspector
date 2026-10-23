@@ -60,29 +60,27 @@ agent_login() {
 cfg_table() { sed -n "/^## $1\$/,/^## /p" "$CONFIG" 2>/dev/null \
               | grep '^|' | tail -n +3; }
 
-# direct_session: 0 when this shell runs in the operator's direct session — no run marker
-# younger than lock_ttl_min (a scheduled turn), not a channel turn (lib/channel.sh: Slack, or a
-# viewer of the shared dashboard), and this session's transcript found. Fails closed; the
-# reason is in $WHY_NOT_DIRECT. The scripts' own half of docs/persistence.md → Scheduled or
-# direct session (the policy hook is the other).
+# direct_session: 0 when this shell runs in the operator's direct session — its transcript
+# found, and neither a scheduled run nor a channel turn by it (lib/channel.sh: the Precheck's
+# frame; Slack, or a viewer of the shared dashboard). Fails closed; the reason is in
+# $WHY_NOT_DIRECT. The scripts' own half of docs/persistence.md → Scheduled or direct session
+# (the policy hook is the other).
 WHY_NOT_DIRECT=""
 direct_session() {
-  local ttl m t
-  ttl="$(cfg lock_ttl_min)"; case "$ttl" in (''|*[!0-9]*) ttl=180;; esac
-  m="${WORK_DIR:-${HOME:-/home/agent}/work}/env/RUN_MODE"
-  [ -f "$m" ] && [ -n "$(find "$m" -mmin -"$ttl" 2>/dev/null)" ] && { WHY_NOT_DIRECT="a scheduled turn"; return 1; }
+  local t
   . "${BASH_SOURCE[0]%/*}/channel.sh" 2>/dev/null || { WHY_NOT_DIRECT="lib/channel.sh is missing"; return 1; }
   t="$(session_transcript)" || { WHY_NOT_DIRECT="this session's transcript is not found, so it cannot be shown direct"; return 1; }
+  transcript_is_scheduled "$t" && { WHY_NOT_DIRECT="a scheduled run"; return 1; }
   transcript_is_channel "$t" && { WHY_NOT_DIRECT="a channel turn"; return 1; }
   return 0
 }
 
 # live_cdp: the live_browser CDP endpoint when a run may attach to it — set, on this VM, in a
 # direct session, and answering. Prints it, or nothing (docs/test-authoring.md → Watching
-# live). Not direct = a run marker younger than lock_ttl_min (a scheduled turn), or a channel
-# turn (lib/channel.sh), or a session whose transcript cannot be found: all run headless.
+# live). Not direct = a scheduled run or a channel turn (lib/channel.sh), or a session whose
+# transcript cannot be found: all run headless.
 live_cdp() {
-  local u ttl m t; u="$(cfg live_browser)"
+  local u; u="$(cfg live_browser)"
   case "$u" in (''|disabled) return 1;; (http://127.0.0.1:*|http://localhost:*) ;;
     (*) echo "live_browser '$u' is not a CDP endpoint on this VM — running headless" >&2; return 1;; esac
   direct_session || { echo "live_browser: $WHY_NOT_DIRECT — running headless" >&2; return 1; }

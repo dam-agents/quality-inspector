@@ -11,10 +11,11 @@
 #
 # The agent reaches GitHub only through scripts/github.sh, which requests the target's issues
 # endpoints alone; the kit's egress allows nothing else there (docs/black-box.md → GitHub).
-# "scheduled" = a fresh work/env/RUN_MODE, or a channel turn — a session whose
-# transcript holds the platform's Slack frame `<how-to-respond>`, or its frame of a shared
-# dashboard viewer's button, in a prompt, not in a tool's output (lib/channel.sh;
-# docs/persistence.md → Scheduled or direct session). Every
+# "scheduled" = a session whose transcript holds, in a prompt and not in a tool's output, the
+# Precheck's frame `<qi-scheduled-run>` (a scheduled run) or a channel frame — the platform's
+# Slack frame `<how-to-respond>`, or its frame of a shared dashboard viewer's button (a
+# channel turn) — or whose transcript cannot be read (lib/channel.sh; docs/persistence.md →
+# Scheduled or direct session). No clock decides it. Every
 # rule id below has a deny fixture in scripts/tests/policy-fixtures.jsonl; the validator
 # fails without one.
 #
@@ -38,18 +39,18 @@
 #   write-outside    Write Edit MultiEdit NotebookEdit  a path outside work/ and /tmp/quality-inspector-* —
 #                                          the live definition included: a change to it is a patch
 #                                          (docs/self-modification.md §8)
-#   run-mode         Write Edit …          work/env/RUN_MODE (only the Precheck writes it)
+#   run-mode         Write Edit …          work/env/RUN_MODE (only `precheck.sh slack <n>` writes it)
 #   scheduled-def    Write Edit … (sched.) work/CONFIG.md, work/OPERATOR.md (the operator's standing preferences),
 #                                          work/FOCUS.md, work/design/DISMISSED.md (docs/modules.md)
 #   scheduled-git    Bash (scheduled)      git commit
-#   policy-tamper    Bash (scheduled)      any command naming RUN_MODE, scripts/hooks/ or .claude/settings
+#   policy-tamper    Bash (scheduled)      any command naming RUN_MODE (the Slack marker), scripts/hooks/ or .claude/settings
 #   channel-write    Bash (channel turn)   a command naming github.sh, comment or unlabel in any spelling
 #                                          bash reads literally (quotes, escapes, $"…", globs, braces,
 #                                          heredoc bodies) — unless it is one plain `github.sh <sub> <args>`
 #                                          (`comment|unlabel`: the delivery of a Slack-ordered "test #N",
-#                                          docs/slack.md: <n> written out, while RUN_MODE is a fresh
+#                                          docs/slack.md: <n> written out, while RUN_MODE is
 #                                          `slack <ISO> - <n> <session>` (precheck.sh slack <n>; <session>
-#                                          this one, or -) and the work/QA.md row of <n> is report_pending)
+#                                          this one) and the work/QA.md row of <n> is report_pending)
 #                                          or one plain read-only grep|rg|cat|head|tail|wc|ls|git log…
 #                    Write Edit … (channel turn)  content naming github.sh
 #   module-set       Bash (scheduled)      a command naming modules.sh, CLAUDE_CODE_SESSION_ID or CLAUDE_CONFIG_DIR
@@ -125,7 +126,6 @@ load_profile() { # lazily: only a rule that needs the profile's boundary reads i
   P_PKGS="$(printf '%s\n' "$out" | sed -n 's|^p ||p')"
 }
 
-iso2epoch() { date -u -d "$1" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
 CHAN=""
 channel_turn() { # lib/channel.sh → transcript_is_channel, once per call
   [ -n "$CHAN" ] && { [ "$CHAN" = 1 ]; return; }
@@ -134,32 +134,23 @@ channel_turn() { # lib/channel.sh → transcript_is_channel, once per call
   [ "$CHAN" = 1 ]
 }
 # slack_test_issue <n>: the issue a Slack-ordered "test #N" delivers to — RUN_MODE is
-# `slack <ISO> <schedule> <n> <session>` written within lock_ttl_min, its session this one
-# (or - when the shell had none), and work/QA.md's row of <n> is report_pending.
+# `slack <ISO> <schedule> <n> <session>`, its session this one, and work/QA.md's row of <n>
+# is report_pending.
 slack_test_issue() {
-  local f="$WORK/env/RUN_MODE" kind="" iso="" sid="" num="" sess="" ttl
+  local f="$WORK/env/RUN_MODE" kind="" iso="" sid="" num="" sess=""
   read -r kind iso sid num sess _ < "$f" 2>/dev/null
   [ "$kind" = slack ] && [ -n "$num" ] && [ "$num" = "$1" ] || return 1
-  case "$sess" in (''|-) ;; (*) [ "$sess" = "$SESSION" ] || return 1;; esac
-  ttl="$(cfg lock_ttl_min)"; case "$ttl" in (''|*[!0-9]*) ttl=180;; esac
-  [ $(( $(date -u +%s) - $(iso2epoch "${iso:-x}") )) -lt $(( ttl * 60 )) ] || return 1
+  [ -n "$SESSION" ] && [ "$sess" = "$SESSION" ] || return 1
   awk -F'|' -v n="$1" '{i=$2; s=$7; gsub(/[ \t]/, "", i); gsub(/[ \t]/, "", s)} i == n && s == "report_pending" {f=1} END {exit !f}' \
     "$WORK/QA.md" 2>/dev/null
 }
 SCHED=""
-scheduled() { # a RUN_MODE written (content time) or touched (mtime) within lock_ttl_min, or a
-  # channel turn (above)
+scheduled() { # a scheduled run (lib/channel.sh → transcript_is_scheduled), a channel turn
+  # (above), or a session whose transcript cannot be read — that fails closed
   [ -n "$SCHED" ] && { [ "$SCHED" = 1 ]; return; }
-  SCHED=0
-  local f="$WORK/env/RUN_MODE" ttl now t1 t2 kind iso
-  channel_turn && { SCHED=1; return 0; }
-  [ -e "$f" ] || return 1
-  ttl="$(cfg lock_ttl_min)"; case "$ttl" in (''|*[!0-9]*) ttl=180;; esac
-  now="$(date -u +%s)"
-  read -r kind iso _ < "$f" 2>/dev/null; t1="$(iso2epoch "${iso:-x}")"
-  t2="$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null || echo 0)"
-  [ "$t2" -gt "$t1" ] 2>/dev/null && t1="$t2"
-  [ $(( now - t1 )) -lt $(( ttl * 60 )) ] && SCHED=1
+  SCHED=1
+  [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ] && [ -r "$TRANSCRIPT" ] \
+    && ! transcript_is_scheduled "$TRANSCRIPT" && ! channel_turn && SCHED=0
   [ "$SCHED" = 1 ]
 }
 
@@ -454,7 +445,7 @@ strip_heredocs() {
 check_bash() {
   local seg e
   case "$CMD" in (*RUN_MODE*|*scripts/hooks/*|*.claude/settings*)
-    scheduled && deny policy-tamper "" "a scheduled run never touches the policy or its run marker";; esac
+    scheduled && deny policy-tamper "" "a scheduled run or a channel turn never touches the policy or the Slack marker";; esac
   case "$CMD" in (*QI_WORK_BACKUP_*) deny backup-override "" "the backup's destination comes from work_repo alone";; esac
   case "$CMD" in (*work-backup.sh*) scheduled && deny backup-direct "" "a scheduled run or a channel turn never backs up by hand — the Stop hook does";; esac
   case "$CMD" in (*QI_TARGET_REPO*) deny github "QI_TARGET_REPO" "the target comes from work/CONFIG.md alone";; esac
@@ -480,7 +471,7 @@ check_write() {
   norm "$FPATH"; local p="$N"
   [ -n "$CONTENT" ] && chan_names "$CONTENT" github && channel_turn \
     && deny channel-write "$p" "a channel turn writes no file that names github.sh (docs/slack.md)"
-  [ "$p" = "$WORK/env/RUN_MODE" ] && deny run-mode "$p" "only the schedule's Precheck writes the run marker"
+  [ "$p" = "$WORK/env/RUN_MODE" ] && deny run-mode "$p" "only precheck.sh slack <n> writes the Slack marker"
   if under "$p" "$WORK"; then
     case "$p" in ("$WORK/CONFIG.md"|"$WORK/OPERATOR.md"|"$WORK/FOCUS.md"|"$WORK/design/DISMISSED.md")
       scheduled && deny scheduled-def "$p" "a scheduled run or a channel turn never changes the configuration, the operator's preferences, the focus queue or the dismissed findings";; esac

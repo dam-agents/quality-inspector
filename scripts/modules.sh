@@ -32,7 +32,7 @@
 #
 # The registry (lib/modules.json) is the closed set: a key it does not name, or a value
 # outside its type, is never written. `set`, `focus` and `dismiss` are the operator's word: they run in
-# the direct session only (lib/config.sh → direct_session) — never in a scheduled turn, a
+# the direct session only (lib/config.sh → direct_session) — never in a scheduled run, a
 # Slack turn or a dashboard viewer's turn. Exit 2 = refused input, 1 = failed write.
 
 set -u
