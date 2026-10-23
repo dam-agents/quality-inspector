@@ -49,7 +49,7 @@ cmd_lock() {
   local owner="${1:?owner}" state held ts sess
   mkdir -p "$ENVD"
   lock_mutex "$ENVD/LOCK.mutex" || { echo "env: another run is taking the lock right now" >&2; exit 1; }
-  trap 'rmdir "$ENVD/LOCK.mutex" 2>/dev/null' EXIT
+  trap 'rm -f "$ENVD/LOCK.mutex"' EXIT
   [ -f "$ENVD/LOCK" ] && read -r held ts sess _ < "$ENVD/LOCK"
   if [ -n "${held:-}" ] && ! lock_mine "$held" "${sess:--}" "$owner"; then
     read -r state held ts sess <<<"$(lock_state "$ENVD/LOCK" "$LOCK_TTL_MIN")"

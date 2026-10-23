@@ -105,7 +105,22 @@ bash "$S" set S-20 verdict=passed status=reported >/dev/null
 for k in 21 22 23 24 25 26 27 28; do bash "$S" set "S-$k" source=discovery status=proposed >/dev/null & done; wait
 assert_eq "concurrent writers lose no row" 9 "$(table_rows "$WORK_DIR/SCENARIOS.md" | grep -c '^| S-')"
 assert_eq "one row per id" "| S-20 | slack | U0123ABCD | C0123ABCD/1.2 | abc | c1 | passed | reported |" "$(row S-20 | sed 's/ [0-9T:Z-]* |$//')"
-[ ! -d "$WORK_DIR/scenarios/.lock" ] || { echo "  the row lock was left behind"; FAILED=1; }
+[ ! -e "$WORK_DIR/scenarios/.lock" ] || { echo "  the row lock was left behind"; FAILED=1; }
+# The lock never rests on mkdir: uutils' mkdir (Ubuntu 25.10+) counts a directory another caller
+# made in between as its own. This mkdir always does; the rows and the ids still never collide.
+R="$SANDBOX/racy"; mkdir -p "$R/bin" "$R/work/logs"
+printf '#!/usr/bin/env bash\nfor a in "$@"; do :; done\n[ -d "$a" ] && exit 0\nexec %s "$@"\n' "$(command -v mkdir)" > "$R/bin/mkdir"
+chmod +x "$R/bin/mkdir"
+racy() { WORK_DIR="$R/work" PATH="$R/bin:$PATH" bash "$S" "$@"; }
+for k in 21 22 23 24 25 26 27 28; do racy set "S-$k" source=discovery status=proposed >/dev/null & done; wait
+assert_eq "racy mkdir: concurrent writers lose no row" 8 "$(table_rows "$R/work/SCENARIOS.md" | grep -c '^| S-')"
+ids="$(for k in 1 2 3 4 5 6; do racy new discovery & done; wait)"
+assert_eq "racy mkdir: concurrent ids are distinct" 6 "$(printf '%s\n' "$ids" | grep '^S-' | sort -u | wc -l | tr -d ' ')"
+# A lock directory of an older version, left by a crash, is taken over after a minute.
+rm -f "$R/work/scenarios/.lock"; mkdir "$R/work/scenarios/.lock"; touch -t 202001010000 "$R/work/scenarios/.lock"
+racy set S-29 source=discovery status=proposed >/dev/null
+assert_eq "a stale lock directory is taken over" 9 "$(table_rows "$R/work/SCENARIOS.md" | grep -c '^| S-')"
+[ ! -e "$R/work/scenarios/.lock" ] || { echo "  the taken-over lock was left behind"; FAILED=1; }
 bash "$S" set P-sign-in source=profile status=retired >/dev/null
 bash "$SCRIPTS/scenarios.sh" set S-11 source=dashboard status=queued requester=- thread=- spec_hash=d11 >/dev/null
 v="$(HOME="$SANDBOX" bash "$SCRIPTS/verify-onboarding.sh" 2>/dev/null | grep ' scenarios_rows ')"

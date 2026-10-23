@@ -7,6 +7,15 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.10.1 — 2026-10-23
+
+**Upgrade:**
+Nothing to run — scripts are re-read per run. The short locks of `work/SCENARIOS.md` (and of new
+scenario ids), of the environment lock (`work/env/LOCK.mutex`) and of the `work/` backup are now
+files the shell creates exclusively, no longer directories: `mkdir` from uutils coreutils (Ubuntu
+25.10+) let two writers in at once, so a row or an id could be lost. A lock directory an older
+version left behind is taken over once it is older than a minute (the backup's: its 10 minutes).
+
 ## 3.10.0 — 2026-10-22
 
 **Upgrade:**

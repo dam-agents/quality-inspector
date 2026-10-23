@@ -44,13 +44,20 @@ lock_state() {
   [ "$age" -lt "$2" ] && echo "held $held ${ts:--} ${sess:--}" || echo "stale $held ${ts:--} ${sess:--}"
 }
 
-# lock_mutex <dir>: a short critical section around read-judge-write — mkdir is atomic, so
-# two runs never both judge a lock free. A mutex older than a minute is a crash's leftover.
+# lock_excl <file>: create <file> holding this shell's pid, or fail at once when it exists. The
+# shell's noclobber opens it with O_EXCL, so two callers never both take it. Never a mkdir:
+# uutils' mkdir (Ubuntu 25.10+) checks, then creates, and counts a directory another caller
+# made in between as its own — both callers win.
+lock_excl() { ( set -C; printf '%s\n' "$$" > "$1" ) 2>/dev/null; }
+
+# lock_mutex <file> [<tries>]: a short critical section around read-judge-write, a try every
+# 0.1 s (default 50), so two runs never both judge a lock free; the holder removes <file>. A
+# mutex older than a minute is a crash's leftover, a directory of a version before 3.10.1 too.
 lock_mutex() {
   local i
-  for i in $(seq 1 50); do
-    mkdir "$1" 2>/dev/null && return 0
-    [ -n "$(find "$1" -maxdepth 0 -mmin +1 2>/dev/null)" ] && rmdir "$1" 2>/dev/null
+  for i in $(seq 1 "${2:-50}"); do
+    lock_excl "$1" && return 0
+    [ -n "$(find "$1" -maxdepth 0 -mmin +1 2>/dev/null)" ] && rm -rf "$1"
     sleep 0.1
   done
   return 1

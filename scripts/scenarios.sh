@@ -45,9 +45,18 @@ export LOG_JOB="${LOG_JOB:-scenario}"
 
 iso2epoch() { date -d "$1" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
 
+# The one lock of work/SCENARIOS.md and of the ids (lib/lock.sh → lock_mutex), held until exit:
+# Slack turns and runs write at once.
+row_lock() {
+  local lk="$WORK/scenarios/.lock"
+  mkdir -p "$WORK/scenarios" || exit 1
+  lock_mutex "$lk" 100 || { echo "scenarios: work/SCENARIOS.md stays locked ($lk)" >&2; exit 1; }
+  ROW_LOCK="$lk"; trap 'rm -f "$ROW_LOCK"' EXIT
+}
+
 cmd_new() {
   case "${1:-}" in (slack|operator|discovery|dashboard) ;; (*) echo "usage: $0 new <slack|operator|discovery|dashboard>" >&2; exit 2;; esac
-  mkdir -p "$WORK/scenarios" || exit 1
+  row_lock
   local k n
   k="$(ls -1 "$WORK/scenarios" 2>/dev/null | sed -n 's/^S-\([0-9][0-9]*\)$/\1/p' | sort -n | tail -1)"
   k=$(( ${k:-0} + 1 ))
@@ -74,7 +83,7 @@ valid_id() {
 }
 
 cmd_set() {
-  local id="${1:-}" kv k v f="$WORK/SCENARIOS.md" lk="$WORK/scenarios/.lock" tries=0 tmp old row now ttl
+  local id="${1:-}" kv k v f="$WORK/SCENARIOS.md" tmp old row now ttl
   local c_source="" c_requester="" c_thread="" c_hash="" c_build="" c_verdict="" c_status=""
   valid_id "$id" || { echo "usage: $0 set <S-<k>|P-<slug>> [<column>=<value>…]" >&2; exit 2; }
   shift
@@ -93,17 +102,7 @@ cmd_set() {
       (*) echo "scenarios: unknown column '$k'" >&2; exit 2 ;;
     esac
   done
-  mkdir -p "$WORK/scenarios" || exit 1
-  # mkdir is atomic; a lock older than a minute belongs to a writer that died.
-  until mkdir "$lk" 2>/dev/null; do
-    tries=$((tries + 1))
-    if [ "$tries" -ge 50 ]; then
-      [ -n "$(find "$lk" -maxdepth 0 -mmin +1 2>/dev/null)" ] && { rmdir "$lk" 2>/dev/null; tries=0; continue; }
-      echo "scenarios: work/SCENARIOS.md stays locked ($lk)" >&2; exit 1
-    fi
-    sleep 0.2
-  done
-  ROW_LOCK="$lk"; trap 'rmdir "$ROW_LOCK" 2>/dev/null' EXIT
+  row_lock
   [ -f "$f" ] || printf '# Scenarios — one row per scenario (docs/scenarios.md → State)\n\n%s\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n' "$SCENARIOS_HEADER" > "$f"
   old="$(table_rows "$f" | awk -F'|' -v id="$id" '{x=$2; gsub(/[ \t]/,"",x)} x==id {print; exit}')"
   if [ -z "$old" ] && { [ -z "$c_source" ] || [ -z "$c_status" ]; }; then

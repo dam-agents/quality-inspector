@@ -103,14 +103,14 @@ persist; assert_eq "the target is refused" $((base + 1)) "$(commits)"
 sed -i.bak 's|^- work_repo: .*|- work_repo: acme/widgets-qa|' "$WORK_DIR/CONFIG.md" && rm -f "$WORK_DIR/CONFIG.md.bak"
 
 # Busy lock: deferred, and the holder is told to run again.
-mkdir -p "$QI_WORK_BACKUP_LOCAL.lock"; persist
+: > "$QI_WORK_BACKUP_LOCAL.lock"; persist
 assert_eq "a held lock defers" $((base + 1)) "$(commits)"; [ -f "$QI_WORK_BACKUP_LOCAL.again" ] || { echo "  no again flag"; FAILED=1; }
-rmdir "$QI_WORK_BACKUP_LOCAL.lock"
+rm -f "$QI_WORK_BACKUP_LOCAL.lock"
 
 # The Stop hook: silent, exit 0, and it persists.
 out="$(echo '{"hook_event_name":"Stop","stop_hook_active":false}' | bash "$SCRIPTS/hooks/backup.sh")"; rc=$?
 assert_eq "hook exits 0" 0 "$rc"; assert_eq "hook prints nothing" "" "$out"
-for _ in $(seq 1 120); do [ "$(commits)" -gt $((base + 1)) ] && [ ! -d "$QI_WORK_BACKUP_LOCAL.lock" ] && break; sleep 1; done
+for _ in $(seq 1 120); do [ "$(commits)" -gt $((base + 1)) ] && [ ! -e "$QI_WORK_BACKUP_LOCAL.lock" ] && break; sleep 1; done
 assert_eq "hook pushed the pending change (detached)" $((base + 2)) "$(commits)"
 
 # A foreign commit is logged and reverted by the next snapshot.

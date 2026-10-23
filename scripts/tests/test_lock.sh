@@ -49,7 +49,7 @@ assert_eq "legacy line, same owner" 0 "$(lk sess-a lock issues)"
 echo "issues $(iso_ago 20)" > "$L"
 assert_eq "legacy line, other owner" 1 "$(lk sess-a lock regression)"
 rm -f "$L"
-[ -d "$WORK_DIR/env/LOCK.mutex" ] && { echo "  the mutex was left behind"; FAILED=1; }
+[ -e "$WORK_DIR/env/LOCK.mutex" ] && { echo "  the mutex was left behind"; FAILED=1; }
 
 # up keeps its result for wait; unlock refuses while an install still runs.
 assert_eq "up through the profile" 0 "$(lk sess-a up 1.0.0)"
