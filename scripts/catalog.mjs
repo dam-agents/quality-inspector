@@ -143,8 +143,16 @@ const stillRuns = new Map(); // item key -> [{label, utc}] candidate runs, newes
 const evidence = new Map(); // origin key -> artifact reference
 const titles = new Map(); // origin key -> title from a verdicts file
 const runs = []; // every run: nights, issue runs, scenario runs (the Runs view)
-// artifact.id holds the platform's reference; a link when it is one.
-const artRef = (dir) => { const a = read(join(dir, 'artifact.id'))?.trim(); return a ? (/^https:\/\/\S+$/.test(a) ? a : `platform://artifacts/${a}`) : null; };
+// artifact.id holds the platform's reference; a link when it is one. artifact.url, beside it, the
+// report's share link (docs/reporting.md → Delivery step 1) — a link the page opens in one click.
+// The security report never links: its findings stay out of the page (docs/catalog.md → Never).
+const HTTPS = /^https:\/\/\S+$/;
+const artRef = (dir, { link = true } = {}) => {
+  const u = link ? read(join(dir, 'artifact.url'))?.trim() : null;
+  if (u && HTTPS.test(u)) return u;
+  const a = read(join(dir, 'artifact.id'))?.trim();
+  return a ? (HTTPS.test(a) ? a : `platform://artifacts/${a}`) : null;
+};
 
 const WORST = ['regression', 'failed', 'needs-review', 'flaky', 'inconclusive', 'partial', 'blocked', 'not-testable', 'passed', 'verified'];
 const rank = (v) => (WORST.includes(v) ? WORST.indexOf(v) : WORST.length);
@@ -438,7 +446,7 @@ const findings = {
       result: c.result, severity: c.severity ?? null, message: c.message ?? null })) } : null,
   stress: stress ? { build: stress.build ?? null, utc: stress.generated_utc ?? null, config: stress.config ?? null, counts: stress.counts ?? null,
     checks: (stress.checks ?? []).map((c) => ({ id: c.id, target: c.target, status: c.status, severity: c.severity, evidence: c.evidence ?? null, reason: c.reason ?? null })) } : null,
-  security: sec ? { candidate: sec.candidate ?? null, utc: sec.generated_utc ?? null, counts: sec.counts ?? null, report: artRef(dirname(secFile)) } : null,
+  security: sec ? { candidate: sec.candidate ?? null, utc: sec.generated_utc ?? null, counts: sec.counts ?? null, report: artRef(dirname(secFile), { link: false }) } : null,
 };
 // What the agent does now, what waits, and when it runs (Overview → Activity): the lock's holder
 // and since (never its session), the rows in progress or awaiting delivery, the labelled open

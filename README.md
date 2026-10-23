@@ -206,6 +206,7 @@ configuration.
 | `ui_sweep`, `validation_checks`, `stress_checks` and their tunables, `focus_max_checks`, `modules_max_wallclock_min` | offered, default `disabled` | The testing modules of the nightly modules run; registry `scripts/lib/modules.json` ([docs/modules.md](docs/modules.md)). |
 | `dashboard_interactive` | offered, default `disabled` | The dashboard's buttons send their command to the agent's chat (needs the platform's Interactive artifacts). |
 | `slack_channel`, `slack_tests_per_day` | asked (optional), default `3` | Slack test requests ([docs/slack.md](docs/slack.md)). |
+| `report_visibility` | default `private` | `public`: every report but the security run's gets a link anyone holding it opens, and the dashboard opens it in one click ([docs/reporting.md](docs/reporting.md) → Delivery). |
 | `slack_report_visibility` | default `private` | `public`: a report answered in a Slack thread gets a link anyone holding it opens, posted in that thread only ([docs/slack.md](docs/slack.md) → The answer in the thread). |
 | `lend_model`, `live_browser` | offered, default `disabled` | The product calls the agent's model by placeholder; exploration in the browser the operator watches. |
 

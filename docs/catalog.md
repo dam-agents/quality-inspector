@@ -24,9 +24,12 @@ The operator may share the page beyond themselves, so it carries only what conce
   counts, the criteria that were not `unchanged`, the change context's issues (number, title), UI
   diff text and signal counts — or its environment failure; each issue and scenario run with its
   verdicts; each run by hand (`work/reruns/`, [on-demand.md](on-demand.md) → "run #N") with its raw
-  results; each with its build and report reference (a link when `artifact.id` holds one; else
-  "Open the report" — the command `open the report <id>`, since a private artifact has no
-  address a page can link to).
+  results; each with its build and report reference (a link when the report has one —
+  `artifact.url`, its share link, e.g. under `report_visibility: public`
+  ([reporting.md](reporting.md) → Delivery step 1), or an `https://` `artifact.id` — opened in one
+  click; else "Open the report" — the command `open the report <id>`, since a private artifact
+  has no address a page can link to). The security run's report never links. Whoever sees the
+  page can pass a public link on: the link is that report's whole access control.
 - **Product map:** per page of the newest map, every named control the map saw on screen (its
   `boxes`, [change-awareness.md](change-awareness.md) → The three sources) with the items that
   name it in a quoted string — on that page only, or in a test that opens the page; a control

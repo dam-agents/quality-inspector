@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.19.0 — 2026-10-23
+## 3.20.0 — 2026-10-23
 
 **Upgrade:**
 1. **Operator-only — the egress.** The kit now allows `POST` on `api.github.com`
@@ -24,6 +24,18 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    write report notes and found issues so from now on; the next catalog build ships the rewritten page.
 4. Nothing else — `work/design/DISMISSED.md` keeps its two columns until the next dismissal adds the
    reason column's rows; the next catalog build ships the new page.
+
+## 3.19.0 — 2026-10-23
+
+**Upgrade:**
+Nothing to run — scripts and docs are re-read per run. A report's publish now writes its share link
+to `artifact.url` beside `artifact.id` ([docs/reporting.md](docs/reporting.md) → Delivery step 1), and
+the catalog links it, so the dashboard opens that report in one click; a report published before
+gets the file at its next revision. Offer, never enable: with **`report_visibility: public`**
+(default `private`) every report but the security run's is published as a public link anyone
+holding it opens — for the dashboard only, never in an issue comment or a Slack answer but a
+thread's under `slack_report_visibility: public`. Re-run `scripts/verify-onboarding.sh`: it now
+knows the key.
 
 ## 3.18.0 — 2026-10-23
 
