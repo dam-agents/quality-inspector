@@ -276,6 +276,7 @@ mode_regression() {
 count_lines() { local n; n="$(grep -c -- "$1" "$2" 2>/dev/null)"; echo "${n:-0}"; }
 CHECKS='[]'
 POLICY_DENIED_WARN=3   # weekly policy_denied events above this are a warn
+TOOL_LOOP_WARN=5       # one session's failures of one tool with one error at or above this are a loop
 check() { CHECKS="$(printf '%s' "$CHECKS" | jq -c --arg id "$1" --arg s "$2" --arg d "$3" '. + [{id:$id, status:$s, detail:$d}]')"; }
 
 # 0 = the request succeeded (reachable), 1 = refused/failed, 2 = held (timed out).
@@ -457,6 +458,66 @@ mode_audit() {
         else check policy_denied ok "$n refusals this week (${denied#* })"; fi;;
   esac
 
+  # harness trace (docs/logging.md → Harness trace): the trace hook registered, turns that never
+  # ended, work left mid-pipeline in its session, and failed tool calls by tool and by loop. A
+  # turn or an item younger than lock_ttl_min may still run, and this session is running.
+  local th trace turns7=null
+  th="$(bash "$SCRIPT_DIR/hooks/install.sh" --check-trace 2>&1)" && check trace_hooks ok "$th" || check trace_hooks warn "$th"
+  trace="$(cat "$WORK"/logs/events-*.jsonl 2>/dev/null | jq -sc --arg since "$week_ago" \
+      --arg open "$(epoch2iso $((NOW_EPOCH - LOCK_TTL_MIN * 60)))" --arg self "${CLAUDE_CODE_SESSION_ID:-}" \
+      --argjson loop "$TOOL_LOOP_WARN" '
+    def kv($k): (capture("(^| )" + $k + "=(?<v>[^ ]+)") | .v) // null;
+    def med: sort | if length == 0 then null else .[(length - 1) / 2 | floor] end;
+    [.[] | select((.ts | type) == "string" and .ts >= $since and (.msg | type) == "string")] as $w
+    | [$w | group_by(.run)[] | select(.[0].run != $self)
+       | (map(select(.level == "error" or .event == "issue_abort" or .event == "scenario_abort")) | length == 0) as $silent
+       | . as $r
+       | { run: .[0].run, silent: $silent,
+           unended: (([.[] | select(.event == "turn_start") | .ts] | max) as $s
+                    | ([.[] | select(.event == "turn_end") | .ts] | max) as $e
+                    | if $s != null and $s < $open and ($e == null or $e < $s)
+                      then {job: ([.[] | select(.event == "turn_start")] | last | .job), ts: $s} else null end),
+           open: ([ .[] | select((.event == "issue_start" or .event == "scenario_run") and .ts < $open)
+                   | (if .event == "issue_start" then "#" + (.msg | kv("issue") // "?") else (.msg | kv("id") // "S-?") end) as $item
+                   | select([$r[] | select(.event == "issue_done" or .event == "issue_abort" or .event == "scenario_done" or .event == "scenario_abort")
+                             | if (.event | startswith("issue")) then "#" + (.msg | kv("issue") // "") else (.msg | kv("id") // "") end]
+                            | index($item) | not)
+                   | $item ] | unique),
+           loops: ([ .[] | select(.event == "tool_failed")
+                    | {tool: (.msg | kv("tool") // "?"),
+                       sig: (.msg | (capture("err=(?<e>.*)$").e // "") | gsub("[0-9]+"; "N") | .[0:80])} ]
+                  | group_by([.tool, .sig]) | map(select(length >= $loop) | {tool: .[0].tool, sig: .[0].sig, n: length})) } ] as $runs
+    | [$w[] | select(.event == "turn_end")] as $ends
+    | [$w[] | select(.event == "tool_failed") | .msg | kv("tool") // "?"] as $tf
+    | { unended: [$runs[] | select(.unended) | {run, silent} + .unended],
+        open: [$runs[] | select(.open | length > 0) | {run, silent, items: .open}],
+        loops: [$runs[] | .run as $id | .loops[] | . + {run: $id}],
+        api_errors: [$ends[] | .msg | kv("status") | select(. != null and . != "ok" and . != "interrupted")],
+        failed_by_tool: ($tf | group_by(.) | map({key: .[0], value: length}) | from_entries),
+        turns_7d: {turns: ([$w[] | select(.event == "turn_start")] | length),
+                   by_kind: ([$w[] | select(.event == "turn_start") | .msg | kv("kind") // "?"] | group_by(.) | map({key: .[0], value: length}) | from_entries),
+                   secs_p50: ([$ends[] | .msg | kv("secs") | select(. != null and test("^[0-9]+$")) | tonumber] | med),
+                   tool_calls: ([$ends[] | .msg | kv("tools") | select(. != null) | tonumber] | add // 0),
+                   tool_failures: ($tf | length)} }' 2>/dev/null)"
+  if ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$trace"; then
+    check unfinished_runs warn "not measured"; check tool_failures warn "not measured"
+  else
+    turns7="$(jq -c .turns_7d <<<"$trace")"
+    local fin; fin="$(jq -r '
+      def who: .run[0:8] + (if .silent then " (silent: no error logged)" else "" end);
+      [ (if (.unended | length) > 0 then "\(.unended | length) turn(s) never ended: " + (.unended | map("\(.job) \(who) at \(.ts)") | join(", ")) else empty end),
+        (if (.open | length) > 0 then "work left mid-pipeline: " + (.open | map("\(.items | join(",")) in \(who)") | join(", ")) else empty end),
+        (if (.api_errors | length) > 0 then "\(.api_errors | length) turn(s) stopped on an API error (" + (.api_errors | group_by(.) | map("\(.[0])×\(length)") | join(", ")) + ")" else empty end)
+      ] | join("; ")' <<<"$trace")"
+    [ -z "$fin" ] && check unfinished_runs ok "every turn of the week ended, no work left mid-pipeline" || check unfinished_runs warn "$fin"
+    local tfd; tfd="$(jq -r '"\(.turns_7d.tool_failures) failed tool calls in \(.turns_7d.turns) turns"
+      + (if (.failed_by_tool | length) > 0 then " (" + (.failed_by_tool | to_entries | map("\(.key)×\(.value)") | join(", ")) + ")" else "" end)' <<<"$trace")"
+    if jq -e '.loops | length > 0' >/dev/null <<<"$trace"; then
+      check tool_failures warn "$tfd — loops: $(jq -r '.loops | map("\(.tool)×\(.n) in \(.run[0:8]): \(.sig)") | join("; ")' <<<"$trace")"
+    else check tool_failures ok "$tfd"; fi
+  fi
+  find "$WORK/env/turns" -type f -mtime +14 -delete 2>/dev/null || true
+
   # criteria_injection: the week's frozen criteria quoting links, code or hidden comments, and
   # the issues and scenarios the agent logged as injection suspects (docs/acceptance-criteria.md);
   # a scenario's words come from anyone in a bound Slack conversation (docs/scenarios.md).
@@ -513,9 +574,9 @@ mode_audit() {
   stats="$(jq -nc --argjson v "$stats" --arg runs "$(count_lines '' "$WORK/ISSUES.log")" \
     --arg reg "$(count_lines 'ran candidate=' "$WORK/REGRESSION.log")" \
     --arg heals "$(count_lines '^| 20' "$WORK/HEALS.md")" --argjson sw "$sigweeks" \
-    --argjson cov "$cov" --argjson sc "$sstats" --argjson cost "$cost" \
+    --argjson cov "$cov" --argjson sc "$sstats" --argjson cost "$cost" --argjson turns "${turns7:-null}" \
     '{verdicts_7d:$v, scenarios_7d:$sc, issues_preflights_total:($runs|tonumber), regression_runs_total:($reg|tonumber), heals_total:($heals|tonumber),
-      signals_by_week:$sw, coverage:$cov, cost_7d:$cost}')"
+      signals_by_week:$sw, coverage:$cov, cost_7d:$cost, turns_7d:$turns}')"
 
   runlog AUDIT_PREFLIGHT "checks=$(printf '%s' "$CHECKS" | jq length)"
   jq -nc --argjson c "$CHECKS" --argjson f "$failures" --argjson s "$stats" --argjson logs "$(logs_json)" \

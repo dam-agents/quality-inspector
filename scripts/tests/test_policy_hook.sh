@@ -73,7 +73,7 @@ echo '{"model":"x","permissions":{"deny":["Bash(rm -rf /:*)"]},"hooks":{"Stop":[
 bash "$SCRIPTS/hooks/install.sh" >/dev/null && bash "$SCRIPTS/hooks/install.sh" >/dev/null
 s="$(cat "$QI_CLAUDE_SETTINGS")"
 assert "other keys kept" '.model == "x" and .hooks.Stop[0].hooks[0].command == "true" and (.permissions.deny | index("Bash(rm -rf /:*)")) == 0' "$s"
-assert "registered once" '(.hooks.PreToolUse | length) == 1 and (.hooks.Stop | length) == 2 and (.permissions.deny | length) == (.permissions.deny | unique | length)' "$s"
+assert "registered once" '(.hooks.PreToolUse | length) == 1 and (.hooks.Stop | length) == 3 and (.permissions.deny | length) == (.permissions.deny | unique | length)' "$s"
 assert "backup hook on Stop, no matcher" '.hooks.Stop[1] | (has("matcher") | not) and .hooks[0].command == "\"$HOME\"/scripts/hooks/backup.sh"' "$s"
 bash "$SCRIPTS/hooks/install.sh" --check >/dev/null; assert_eq "check passes after install" 0 "$?"
 audit="$(bash "$SCRIPTS/preflight.sh" audit 2>/dev/null)"

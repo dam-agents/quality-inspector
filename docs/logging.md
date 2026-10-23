@@ -22,7 +22,7 @@ that prefix for a run that did not finish.
 
 Written through `scripts/log.sh` (`logev <level> <event> <msg>`), one JSON line
 `{ts, run, job, level, event, msg}`, secrets masked before writing. Set `LOG_JOB` to the
-run type (`issues`, `regression`, `security`, `modules`, `scenario`, `discovery`, `audit`, `slack_test`, `session`).
+run type (`issues`, `regression`, `security`, `modules`, `scenario`, `discovery`, `audit`, `slack_test`, `channel`, `session`).
 
 | Event | Writer | `msg` grammar (parsed) |
 | --- | --- | --- |
@@ -51,6 +51,8 @@ run type (`issues`, `regression`, `security`, `modules`, `scenario`, `discovery`
 | `suite_run` / `suite_failed` | `scripts/suite.sh` | `<label> exit=<rc>` / free text |
 | `onboarding_verify` | `scripts/verify-onboarding.sh` | free text |
 | `policy_denied` (warn) | `scripts/hooks/policy.sh` | `tool=<name> rule=<id>[ at=<host/path or file>]` — never a command or query string |
+| `turn_start` / `turn_end` | `scripts/hooks/trace.sh` (**Harness trace** below) | `kind=<scheduled\|channel\|direct>[ schedule=<id>] bytes=<n> sha=<hex12>` / `status=<ok\|interrupted\|<API error>> kind=<k> secs=<n> tools=<n> failed=<n>` — `interrupted` is `warn`, an API error `error` |
+| `tool_failed` (warn) | `scripts/hooks/trace.sh` | `tool=<name>[ code=<exit>][ interrupt=1][ agent=<type>] ms=<n> err=<excerpt>` |
 | `work_backup` | `scripts/work-backup.sh` (job `backup` from the Stop hook) | free text; `error` = a refused or failed persist, foreign commits, a failed restore ([persistence.md](persistence.md) → **Backup & restore**) |
 
 The issue events are what the pre-flight's row liveness reads when the environment lock
@@ -62,6 +64,19 @@ by hand with `jq -cn`.
 
 Errors are grouped by the audit into `failures[]` signatures (digits normalized).
 Retention: 14 days, swept by the audit pre-flight.
+
+## Harness trace
+
+`scripts/hooks/trace.sh`, a Claude Code hook the harness runs (not you), writes the
+`turn_start`, `turn_end` and `tool_failed` lines above with the session id as `run` and the
+turn's job (`preflight.sh <mode>` of a scheduled task, `channel`, else `session`), so a turn
+that dies mid-pipeline or a failure you never logged still leaves a line. A prompt is only its
+size and hash; a failure's error is cut to 160 characters, credential values and token shapes
+masked; a Bash exit 1 with no output (`grep` without a match) is counted, not logged. A turn
+that never reached Stop is closed `interrupted` by the session's next prompt. Its state is
+`work/env/turns/<session>`. `PostToolUseFailure` and `StopFailure` need Claude Code 2.1.101
+or newer, so `scripts/hooks/install.sh` registers them only there. The audit reads the lines
+as `trace_hooks`, `unfinished_runs`, `tool_failures` and `stats.turns_7d` ([audit.md](audit.md)).
 
 ## Ledger of external writes
 

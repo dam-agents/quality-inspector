@@ -27,8 +27,8 @@ enabled (ONBOARDING Step 4). The nested product is always rebuildable through th
 `scripts/work-backup.sh` backs `work/` up to `work_repo` — a **private** repository the
 connection can push to, never the target or a fork of it — and restores it on a fresh volume.
 
-- **When.** The Stop hook (`scripts/hooks/backup.sh`, registered by `scripts/hooks/install.sh`)
-  starts `work-backup.sh persist`, fully detached, after every turn of the main agent —
+- **When.** The Stop hook (`scripts/hooks/backup.sh`, registered by `scripts/hooks/install.sh`;
+  also on `StopFailure` where the harness has it) starts `work-backup.sh persist`, fully detached, after every turn of the main agent —
   scheduled, channel or direct. No turn waits for it, no instruction can skip or redirect it.
   In a scheduled run or a channel turn the agent never runs the script itself (policy rule
   `backup-direct`); in the direct session "back up now" runs `persist`.

@@ -18,7 +18,13 @@ when `audit_report: disabled` (still append the log line).
    week's criteria files of issues and scenarios holding URLs, code fences or HTML comments;
    the week's `issue_injection_suspect` and `scenario_injection_suspect` events) — a `warn`
    lists the issues and `S-<k>`: sample one and check its instruction sentences are
-   `testable: no`. `failures[]` groups the week's error events; `stats` counts verdicts,
+   `testable: no`. From the harness trace ([logging.md](logging.md) → **Harness trace**):
+   `trace_hooks` (registered for every event the harness has), `unfinished_runs` (turns that
+   never ended, issues and scenarios left mid-pipeline in their session — `silent` when that
+   session logged no error — and API-error stops) and `tool_failures` (by tool; a `warn` names
+   a loop: one session's same failure five times or more) — treat each `warn` like a
+   `failures[]` signature in step 2; `stats.turns_7d` counts the week's turns.
+   `failures[]` groups the week's error events; `stats` counts verdicts,
    `stats.coverage` the pages, and `stats.cost_7d` the week's speed and cost: finished
    issues with their median and total minutes and model steps, installs with their median
    seconds ([logging.md](logging.md)) — name the median issue in the report.
