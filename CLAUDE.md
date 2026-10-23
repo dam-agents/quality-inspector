@@ -61,7 +61,7 @@ stripped. Every script reads it through `scripts/lib/config.sh`, so the verifier
   `profile.<key>` — its own keys, defaults in its `profile.json`; an unknown one fails verification.
 - `target_repo` — `[<host>/]<owner>/<repo>` whose issues are tested; required, no default (missing → every mode fails).
   `QI_TARGET_REPO` wins. `github_login` — the agent's own login when the token cannot tell (a GitHub App: `<slug>[bot]`).
-- `marker_prefix` (`quality-inspector`) — **immutable once a comment exists** (it would orphan past verdicts). `issue_comments` opt-in (`disabled`), `artifact_reports` (`enabled`), `test_catalog` (`enabled`; [docs/catalog.md](docs/catalog.md)).
+- `marker_prefix` (`quality-inspector`) — **immutable once a comment exists** (it would orphan past verdicts). `issue_comments` opt-in (`disabled`), `artifact_reports` (`enabled`), `report_visibility` (`private` | `public`: a link anyone holding it opens, for the dashboard; [docs/reporting.md](docs/reporting.md) → Delivery), `test_catalog` (`enabled`; [docs/catalog.md](docs/catalog.md)).
 - `qa_label` (`qa:ready`), `retest_label` (`qa:retest`) — the gates; `candidate_channel`, `baseline_channel`
   — passed to the profile (empty = its defaults); `baseline_channel: none` turns red-green off.
 - `include_comments`, `spec_feedback` — `enabled` | `disabled` (both default): comments

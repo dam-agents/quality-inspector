@@ -54,6 +54,7 @@ cat > "$W/issues/42/verdicts-abc-c1.json" <<'J'
  "notes":["NOTE-SECRET in the notes"]}
 J
 echo abc123 > "$W/issues/42/artifact.id"
+echo 'http://share.example/a/plain' > "$W/issues/42/artifact.url" # not https: the reference stays
 cat > "$W/regression/c2/verdicts.json" <<'J'
 {"mode":"regression","candidate":"c2","acs":[{"issue":42,"id":"AC-1","verdict":"healed","explanation":"EXPLAIN-SECRET the tab moved"}],
  "context":{"previous":"c1","issues":[{"number":40,"title":"Projects get tabs"}],"ui_diff":"- renamed tab \"Tasks\" → \"To-dos\" on /projects","signals":{"console_errors_new":["E1"],"slow_tests":[]}}}
@@ -63,6 +64,9 @@ echo 'REQUEST-SECRET please test the upload, my boss asked' > "$W/scenarios/S-7/
 echo '{"scenario":"S-7","candidate":"c1","generated_utc":"2026-10-04T10:00:00Z","acs":[{"id":"AC-1","verdict":"passed"}],"notes":["NOTE-SECRET"]}' > "$W/scenarios/S-7/verdicts-s1-c1.json"
 echo 'https://claude.ai/artifact/s7' > "$W/scenarios/S-7/artifact.id"
 echo '{"candidate":"c1","counts":{"critical":0,"high":2,"medium":1},"findings":[{"id":"SEC-SECRET","explanation":"SEC-SECRET recipe"}]}' > "$W/security/c1/verdicts.json"
+# A report's share link (docs/reporting.md → Delivery step 1): the night's links; the security run's never.
+echo night2 > "$W/regression/c2/artifact.id"; echo 'https://share.example/a/Night2Slug' > "$W/regression/c2/artifact.url"
+echo sec1 > "$W/security/c1/artifact.id"; echo 'https://share.example/a/SecSlug' > "$W/security/c1/artifact.url"
 # The control center's sources: design findings with a crop, validation results, stress results.
 mkdir -p "$W/design/crops" "$W/validation/c3" "$W/stress/c3" "$W/focus/upload-c3"
 echo '{"area":"Upload","build":"c3","checks":[{"id":"FX-1","heuristic":"negative-path","expected":"refused visibly","verdict":"observation","severity":"minor","note":"FOCUS-NOTE-SECRET"}]}' > "$W/focus/upload-c3/results.json"
@@ -172,7 +176,7 @@ assert "nights and builds" '(.nights | length) == 2 and .nights[0].counts.healed
 assert "runs: newest first; nights, an environment failure, issue and scenario runs" '[.runs[] | .type + ":" + (.ref // "-") + ":" + .build + ":" + .verdict]
   == ["regression:-:c3:unchanged","regression:-:c2:healed","regression:-:c2:environment","scenario:S-7:c1:passed","issue:#42:c1:partial"]' "$data"
 assert "a night: its entries, change context and signal counts, its report" '.runs[1] | .entries == [{"key":"issue-42/AC-1","value":"healed"}] and .previous == "c1"
-  and .issues == [{"number":40,"title":"Projects get tabs"}] and (.ui_diff | test("To-dos")) and .signals == {"console_errors_new":1,"slow_tests":0} and .report == null and .counts.healed == 1' "$data"
+  and .issues == [{"number":40,"title":"Projects get tabs"}] and (.ui_diff | test("To-dos")) and .signals == {"console_errors_new":1,"slow_tests":0} and .report == "https://share.example/a/Night2Slug" and .counts.healed == 1' "$data"
 assert "an issue run: its verdicts and report; a scenario run: its link" '(.runs[4] | .entries == [{"key":"issue-42/AC-1","value":"verified"},{"key":"issue-42/AC-2","value":"not-testable"},{"key":"issue-42/EX-1","value":"observation"}]
   and .report == "platform://artifacts/abc123" and .baseline == "b1") and .runs[3].report == "https://claude.ai/artifact/s7"
   and (.items[] | select(.key == "scenario-7/AC-1") | .evidence) == "https://claude.ai/artifact/s7"' "$data"
@@ -189,7 +193,7 @@ assert "control center: the modules' state" '(.modules.modules | length) == 11 a
 assert "design findings: register fields, a crop, nothing else" '(.design | length) == 2 and (.design[0] | .id == "D-1" and .saw == "Text of “Rename” button is clipped" and (.crop | test("^i[0-9]+$")) and (has("shot") | not) and (has("box") | not))
   and .design[1].status == "dismissed" and .design[1].crop == null' "$data"
 assert "findings: validation and stress as they are, security only counted" '.findings.validation.cases[0].message == "[value-intact] changed" and .findings.stress.checks[0].id == "STRESS-API-2"
-  and .findings.security == {"candidate":"c1","utc":null,"counts":{"critical":0,"high":2,"medium":1},"report":null}' "$data"
+  and .findings.security == {"candidate":"c1","utc":null,"counts":{"critical":0,"high":2,"medium":1},"report":"platform://artifacts/sec1"}' "$data"
 assert "requests on their way: id, source, state — never the requester or thread" '.findings.requests == [{"id":"S-9","source":"dashboard","status":"queued","build":null,"verdict":null,"utc":"2026-10-22T08:00:00Z","title":null},
   {"id":"S-10","source":"slack","status":"rejected","build":null,"verdict":null,"utc":"2026-10-21T08:00:00Z","title":null}]' "$data"
 assert "a focus run, its checks without their notes" '.findings.focus == [{"run":"upload-c3","area":"Upload","build":"c3","utc":null,"checks":[{"id":"FX-1","heuristic":"negative-path","given":null,"when":null,"expected":"refused visibly","verdict":"observation","severity":"minor"}]}]' "$data"

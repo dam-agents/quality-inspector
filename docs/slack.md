@@ -80,7 +80,9 @@ summary ([regression.md](regression.md) step 9) take the link alone.
   That `public` link goes into that thread's answer and nowhere else: a `status` answer, the
   digest, the nightly summary and the issue comment ([reporting.md](reporting.md) → Delivery
   step 2) treat the report as one with no link. Only the operator sets the key (CLAUDE.md →
-  Runtime configuration).
+  Runtime configuration). A report `public` while `report_visibility: public` (it may have
+  been opened for the dashboard, [reporting.md](reporting.md) → Delivery step 1) counts as one
+  with no link here too, but in a thread's answer under `slack_report_visibility: public`.
 - **The picture.** `node "$HOME/scripts/evidence-sheet.mjs" <report dir>` →
   `{sheet, rows, left_out, reason}`: one PNG of the screenshots that back the verdicts — per
   criterion its `AC-<k>` still, or the screen at failure, on each side that decides it (a

@@ -268,7 +268,9 @@ file → keep its values, show them once, and ask only for the keys it lacks. As
    testable (tokens per product AI step), and `live_browser` when `/etc/AGENTS.md` names the
    shared browser's CDP endpoint. Offer the testing modules ([docs/modules.md](docs/modules.md)), all off
    by default, and `dashboard_interactive: enabled` when the operator has Interactive artifacts on
-   in the platform (the dashboard's buttons then send commands to this chat).
+   in the platform (the dashboard's buttons then send commands to this chat). Name, never
+   enable on your own, `report_visibility: public`: the dashboard then opens a report in one
+   click, but anyone holding its link sees the videos and screenshots — only on the operator's word.
 
 Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s keys):
 
@@ -319,6 +321,7 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - slack_channel:
 - slack_tests_per_day: 3
 - slack_report_visibility: private
+- report_visibility: private
 - ui_sweep: disabled
 - ui_sweep_viewports: 1440x900,768x1024,390x844
 - ui_sweep_review_pages: 10
