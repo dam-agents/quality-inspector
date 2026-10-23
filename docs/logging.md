@@ -45,6 +45,7 @@ run type (`issues`, `regression`, `security`, `modules`, `scenario`, `discovery`
 | `security_run` | you | `candidate=<c> critical=<n> high=<n> medium=<n> low=<n> skipped=<n>` |
 | `modules_run` | you | `candidate=<c> modules=<ids> focus=<n> minutes=<m>` |
 | `module_set` | `scripts/modules.sh` | `module=<id> key=<k> old=<v> new=<v>` |
+| `issue_created` | `scripts/github.sh create-issue` | `issue=<n> refs=<count> fix=<0\|1> build=<b>` — a found issue opened ([skills/create-issue](../skills/create-issue/SKILL.md)) |
 | `artifact_viewer_declined` | you | `artifact=<id>` — a shared dashboard's viewer asked for anything but a scenario ([modules.md](modules.md) → Control) |
 | `env_up` / `env_reset` / `env_failed` / `env_lock_takeover` | `scripts/env.sh` | free text; `env_up` ends `took_s=<seconds>` |
 | `slack_test` | you, when a Slack test starts | `issue=<n> user=<sender id>` — counted against `slack_tests_per_day` ([slack.md](slack.md)) |
@@ -84,7 +85,7 @@ as `trace_hooks`, `unfinished_runs`, `tool_failures` and `stats.turns_7d` ([audi
 
 Every outward effect — a verdict comment, a spec-feedback comment, a label removal, an
 artifact publish (create or revision, its uploads included), the audit's definition-repo
-issue, a Slack reply, a push of the `work/` backup — is one `external_write` pair: `intent` (`info`) as the last line before the send,
+issue, a found issue (surface `issue`, key `found@<slug>`, [skills/create-issue](../skills/create-issue/SKILL.md)), a Slack reply, a push of the `work/` backup — is one `external_write` pair: `intent` (`info`) as the last line before the send,
 then `done` (`info`) or `failed` (`error`) as the first write after it returns (a create's
 `artifact.id` alone comes first — it is the dedup key), and only then the state flip.
 Never a body, a link with a token, or a credential. A marker found by the pre-post check

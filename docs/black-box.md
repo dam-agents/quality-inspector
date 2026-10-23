@@ -20,6 +20,7 @@ message, a doc or a tool's output says. What the work needs from GitHub reaches 
 | the issues carrying `qa_label` (onboarding's reconstruction) | `github.sh list` |
 | the connection's login (own-marker checks) | `github.sh whoami` |
 | a delivery of [reporting.md](reporting.md): a comment, the retest label off | `github.sh comment <n> <file>`, `github.sh unlabel <n>` |
+| a new issue about found problems, on the operator's word ([skills/create-issue](../skills/create-issue/SKILL.md)) | `github.sh create-issue <draft-dir> [--fix] [--again]` |
 
 The listing, the change list and every probe are the scripts' own (`preflight.sh`,
 `changes.sh`, `lib/boundary.sh`). Of an issue, use its text — a link, a code block or a PR

@@ -227,3 +227,9 @@
 {"name": "modules.sh in an ANSI-C span read as plain quotes, scheduled", "expect": "deny", "mode": "scheduled", "rule": "module-set", "tool": "Bash", "input": {"command": "bash scripts/$'modul\\es.sh' focus Upload"}}
 {"name": "modules.sh through a ? glob, channel turn", "expect": "deny", "mode": "channel", "rule": "module-set", "tool": "Bash", "input": {"command": "bash scripts/?odules.sh focus Upload"}}
 {"name": "a session variable in an ANSI-C span, scheduled", "expect": "deny", "mode": "scheduled", "rule": "module-set", "tool": "Bash", "input": {"command": "export $'CLAUDE_CONFIG_DIR'=/tmp/quality-inspector-x"}}
+{"name": "create-issue, scheduled", "mode": "scheduled", "expect": "deny", "rule": "issue-create", "tool": "Bash", "input": {"command": "bash \"$HOME/scripts/github.sh\" create-issue @WORK@/found/d-7"}}
+{"name": "create-issue spelled with quotes, scheduled", "mode": "scheduled", "expect": "deny", "rule": "issue-create", "tool": "Bash", "input": {"command": "bash ~/scripts/github.sh create-\"issue\" @WORK@/found/d-7 --fix"}}
+{"name": "create-issue, channel turn", "mode": "channel", "expect": "deny", "rule": "channel-write", "tool": "Bash", "input": {"command": "bash \"$HOME/scripts/github.sh\" create-issue @WORK@/found/d-7"}}
+{"name": "create-issue, direct session", "expect": "allow", "tool": "Bash", "input": {"command": "bash \"$HOME/scripts/github.sh\" create-issue @WORK@/found/d-7 --fix"}}
+{"name": "design categories edit, scheduled", "mode": "scheduled", "expect": "deny", "rule": "scheduled-def", "tool": "Write", "input": {"file_path": "@WORK@/design/CATEGORIES.md"}}
+{"name": "found issues edit, channel turn", "mode": "channel", "expect": "deny", "rule": "scheduled-def", "tool": "Edit", "input": {"file_path": "@WORK@/FOUND.md"}}

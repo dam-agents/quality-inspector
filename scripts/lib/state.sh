@@ -17,7 +17,10 @@ SCEN_STATUSES='proposed|queued|in_progress|report_pending|reported|rejected|reti
 SCEN_VERDICTS='passed|failed|regression|needs-review|blocked|flaky|not-testable|-'
 CATALOG_HEADER='| collection | members |'   # work/CATALOG.md, the operator's collections (docs/catalog.md)
 FOCUS_HEADER='| area | queued_utc | status | build |'   # work/FOCUS.md, written by scripts/modules.sh (docs/modules.md)
-DISMISSED_HEADER='| id | dismissed_utc |'   # work/design/DISMISSED.md, written by scripts/modules.sh dismiss (docs/ui-sweep.md)
+DISMISSED_HEADER='| id | dismissed_utc | reason |'   # work/design/DISMISSED.md, written by scripts/modules.sh dismiss (docs/ui-sweep.md); a two-column file of an earlier version reads the same
+DISMISS_REASONS='false-positive|wont-fix|duplicate|by-design'   # its reason column; `-` = none given
+CATEGORIES_HEADER='| id | category | updated_utc |'   # work/design/CATEGORIES.md, written by scripts/modules.sh categorize (docs/ui-sweep.md)
+FOUND_HEADER='| ref | issue | url | build | labels | created_utc |'   # work/FOUND.md, written by scripts/github.sh create-issue (skills/create-issue)
 
 # Data rows of a markdown table file (everything after the header + separator).
 table_rows() { grep '^|' "$1" 2>/dev/null | tail -n +3; }

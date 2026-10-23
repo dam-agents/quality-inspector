@@ -7,6 +7,24 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.20.0 — 2026-10-23
+
+**Upgrade:**
+1. **Operator-only — the egress.** The kit now allows `POST` on `api.github.com`
+   `/repos/*/*/issues` — opening an issue, only through `scripts/github.sh create-issue` on the
+   operator's word — with the two denies beside it (`/repos/*/*/*/issues`, `/repos/*_2F*/issues`)
+   ([docs/black-box.md](docs/black-box.md) → Egress rules). A kit never updates an existing agent's
+   rules: recreate the agent from the kit, or give the operator what
+   `bash "$HOME/scripts/egress-rules.sh" --kit` lists for these three rules (host, method, path) to add
+   by hand. Until then "create issue for …" fails at the gateway; nothing else changes.
+2. Optional config keys: `found_label` (default `qa:found`) and `fix_label` (no default — the label
+   the software architect picks up). Ask the operator for `fix_label`; without it the dashboard
+   offers no "for the architect".
+3. Artifact text is now ASD-STE100 ([docs/reporting.md](docs/reporting.md) → **Artifact text is ASD-STE100**):
+   write report notes and found issues so from now on; the next catalog build ships the rewritten page.
+4. Nothing else — `work/design/DISMISSED.md` keeps its two columns until the next dismissal adds the
+   reason column's rows; the next catalog build ships the new page.
+
 ## 3.19.0 — 2026-10-23
 
 **Upgrade:**

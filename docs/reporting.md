@@ -63,6 +63,14 @@ which the renderer shows verbatim above the criteria ([scenarios.md](scenarios.m
 `acs` or `verdict` ([explorations.md](explorations.md) → **Reporting**, **Noticed in passing**). Never: credentials,
 internal state, the operator conversation.
 
+**Artifact text is ASD-STE100** (Simplified Technical English). Every sentence a reader sees in an
+artifact — a report, the dashboard, an evidence page, a found issue's body — and every text you
+write for one (a verdict's `note`, `notes`, an edit of a found issue): one statement or instruction
+per sentence, at most 20 words for an instruction and 25 for a description, active voice, simple
+tenses, one word for one meaning from the common technical words (`examine`, not "look into";
+`repair`, not "fix up"), no idioms, phrasal verbs or `-ing` nouns. Identifiers, commands, quoted
+product text and the frozen criteria stay verbatim.
+
 ## The report — `work/issues/<n>/report-<ac_hash>-<candidate>/`
 
 `node "$HOME/scripts/render-report.mjs" <verdicts.json> <dir>` writes:
