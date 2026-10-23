@@ -39,11 +39,11 @@
 #   write-outside    Write Edit MultiEdit NotebookEdit  a path outside work/ and /tmp/quality-inspector-* —
 #                                          the live definition included: a change to it is a patch
 #                                          (docs/self-modification.md §8)
-#   run-mode         Write Edit …          work/env/RUN_MODE (only the Precheck writes it)
+#   run-mode         Write Edit …          work/env/RUN_MODE (only `precheck.sh slack <n>` writes it)
 #   scheduled-def    Write Edit … (sched.) work/CONFIG.md, work/OPERATOR.md (the operator's standing preferences),
 #                                          work/FOCUS.md, work/design/DISMISSED.md (docs/modules.md)
 #   scheduled-git    Bash (scheduled)      git commit
-#   policy-tamper    Bash (scheduled)      any command naming RUN_MODE, scripts/hooks/ or .claude/settings
+#   policy-tamper    Bash (scheduled)      any command naming RUN_MODE (the Slack marker), scripts/hooks/ or .claude/settings
 #   channel-write    Bash (channel turn)   a command naming github.sh, comment or unlabel in any spelling
 #                                          bash reads literally (quotes, escapes, $"…", globs, braces,
 #                                          heredoc bodies) — unless it is one plain `github.sh <sub> <args>`
@@ -430,7 +430,7 @@ strip_heredocs() {
 check_bash() {
   local seg e
   case "$CMD" in (*RUN_MODE*|*scripts/hooks/*|*.claude/settings*)
-    scheduled && deny policy-tamper "" "a scheduled run never touches the policy or its run marker";; esac
+    scheduled && deny policy-tamper "" "a scheduled run or a channel turn never touches the policy or the Slack marker";; esac
   case "$CMD" in (*QI_WORK_BACKUP_*) deny backup-override "" "the backup's destination comes from work_repo alone";; esac
   case "$CMD" in (*work-backup.sh*) scheduled && deny backup-direct "" "a scheduled run or a channel turn never backs up by hand — the Stop hook does";; esac
   case "$CMD" in (*QI_TARGET_REPO*) deny github "QI_TARGET_REPO" "the target comes from work/CONFIG.md alone";; esac
@@ -456,7 +456,7 @@ check_write() {
   norm "$FPATH"; local p="$N"
   [ -n "$CONTENT" ] && chan_names "$CONTENT" github && channel_turn \
     && deny channel-write "$p" "a channel turn writes no file that names github.sh (docs/slack.md)"
-  [ "$p" = "$WORK/env/RUN_MODE" ] && deny run-mode "$p" "only the schedule's Precheck writes the run marker"
+  [ "$p" = "$WORK/env/RUN_MODE" ] && deny run-mode "$p" "only precheck.sh slack <n> writes the Slack marker"
   if under "$p" "$WORK"; then
     case "$p" in ("$WORK/CONFIG.md"|"$WORK/OPERATOR.md"|"$WORK/FOCUS.md"|"$WORK/design/DISMISSED.md")
       scheduled && deny scheduled-def "$p" "a scheduled run or a channel turn never changes the configuration, the operator's preferences, the focus queue or the dismissed findings";; esac
