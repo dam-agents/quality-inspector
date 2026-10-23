@@ -23,7 +23,7 @@ const NAME = /^[a-z0-9_]+$/;
 const K8S = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 const KNOWN = ['chart', 'registry_api', 'release', 'namespace', 'app_port', 'traefik_port', 'apply_chart_crds',
   'channels', 'default_candidate', 'default_baseline', 'helm_version', 'credentials', 'prerequisites', 'values',
-  'overlays', 'max_pages'];
+  'overlays', 'max_pages', 'prune_below_gi'];
 
 const json = (s, what) => { try { return JSON.parse(s || '{}'); } catch { fail(`${what} is not JSON`); return null; } };
 const raw = json(process.env.QI_ENGINE_CONFIG, 'QI_ENGINE_CONFIG');
@@ -94,6 +94,9 @@ if (process.env.QI_PROFILE_DIR && Number.isInteger(port)) {
 }
 if (cfg.helm_version !== undefined && !/^v\d+\.\d+\.\d+$/.test(String(cfg.helm_version))) {
   fail(`helm_version '${cfg.helm_version}' is not v<major>.<minor>.<patch>`);
+}
+if (cfg.prune_below_gi !== undefined && !(Number.isInteger(cfg.prune_below_gi) && cfg.prune_below_gi >= 0)) {
+  fail(`prune_below_gi '${cfg.prune_below_gi}' is not a whole number of Gi (0 or more)`);
 }
 
 // Channels and their defaults.

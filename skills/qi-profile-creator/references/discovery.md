@@ -19,19 +19,19 @@ confirmed before writing files.
 | 4 | Build channels: names, tag pattern, ordering, which is the default candidate and baseline | `channels`, the defaults, README → Channels |
 | 5 | Prerequisites a fresh cluster or host needs (CRDs, operators, a database, ingress) | `prerequisites`, or `bin/env up` |
 | 6 | How a fresh install gets a signed-in-able **owner** account without a person | values with `{{user:owner.…}}`, or `bin/env up` |
-| 7 | Further accounts, by the contract's role names: `member`, `viewer`, `outsider` (The owner account, below) | more `credentials.users` / `E2E_USER_<ROLE>_*` |
+| 7 | Further accounts, by the contract's role names: `member`, `viewer` (only a truly read-only user), `outsider` (The owner account, below); whether the product must change to create them | more `credentials.users` / `E2E_USER_<ROLE>_*` |
 | 8 | First-run screens (terms, a setup wizard, a tour) and how to skip them | values, or a `SKILL.md` note |
 | 9 | Where product data lives — what `reset` must wipe | the engine (release + PVCs), or `bin/env reset` |
-| 10 | Every outside service the product calls, and whether a stand-in exists | `SKILL.md` → cannot do; an optional `config` key |
+| 10 | Every outside service the product calls, and whether a stand-in exists (a model provider: a mock, or the agent's lent model) | `SKILL.md` → cannot do; a `config` key with a working default |
 | 11 | Every host `up` and `versions` download from | `egress` |
 | 12 | Extra surfaces that would expose the implementation; the product's npm scopes or package names | `boundary`, `boundary.packages` |
 | 13 | Root, commands, memory a fresh install with two builds' images needs | `requires` |
 | 14 | Settings an operator may change, and which have no safe default | `config` (`ask`) |
 | 15 | Main UI areas and the terms users see | `SKILL.md` |
 | 16 | A published CLI or API (the command, the path of its OpenAPI JSON), its npm package, and how a user gets a token for it | `interfaces`, `boundary.packages`, `SKILL.md` → CLI and API |
-| 17 | The main object a user creates, with a name and a description (a project, a document), and where in the UI; the namespace its pods run in when no engine names one | `security.entity`, `security.namespace`, `canary.thing` (`canary.field` when the text shows in another field, `canary.none` when there is no such object) |
+| 17 | The main object a user creates, with a name and a description (a project, a document), and where in the UI; the namespace its pods run in when no engine names one | `security.entity`, `security.namespace`, `canary.thing` — one a user creates in one step, with nothing set up first (`canary.field` when the text shows in another field, `canary.none` when there is no such object) |
 | 18 | API calls the security run cannot make through the UI: create that object, mint and use an API key | `suite/lib/security-api.ts` (its exports: the core's `docs/security.md`) |
-| 19 | Main flows that leave the product (it answers in Slack, files a GitHub issue) and the throwaway accounts that would make them testable: what the product's connection asks for, the hosts, methods and paths, what the test person does there | `sandbox`, `sandbox/<name>.md`, `bin/sandbox`, `suite/` helpers, `ask` config keys, `egress` (Sandbox accounts, below) |
+| 19 | Main flows that leave the product (it answers in Slack, files a GitHub issue) and the throwaway accounts that would make them testable: what the product's connection asks for, the hosts, methods and paths, what the test person does there, how the product treats posts from apps and bots | `sandbox`, `sandbox/<name>.md`, `bin/sandbox`, `suite/` helpers, `ask` config keys, `egress` (Sandbox accounts, below) |
 
 ## Where to look
 
@@ -91,6 +91,18 @@ of the contract (`docs/profile-contract.md` → The bin/ contract: `member`, `vi
 is one more user with the same mechanism. Without them, `SKILL.md` says ACs about other
 users are `testable: no — single user`.
 
+- **`viewer` only for a read-only user.** The security run replays every write as
+  `viewer` and reports each success as a finding. A product without a read-only user gets
+  no `viewer`; an account that fits no contract role keeps a name of its own
+  (`E2E_USER_<NAME>_*`), and `SKILL.md` says what it may do.
+- **The mechanism may need a product change** — the install creates one user, not a list.
+  That change lands in the product first (a list value beside the single one, empty by
+  default, so other installs do not change), and builds before it have only the owner:
+  `SKILL.md` says criteria that need another account are `blocked` on such a build, the
+  baseline included until a release carries it.
+- Each account's unique fields (an e-mail derived from the name) must not collide with
+  the owner's or each other's — an identity provider refuses the whole import otherwise.
+
 ## Outside services
 
 The nested product reaches only the hosts in its `egress` list, and those exist to
@@ -101,6 +113,15 @@ storage) — then it is a `config` key or a literal in the install, and `SKILL.m
 a user observes it — or `SKILL.md` makes the ACs that need it `testable: no — external
 dependency`.
 
+- **Default the stand-in, don't ask for it.** A stand-in the main flows need (a mock model
+  for a product whose agents otherwise never answer) is on by default with a working
+  value; an empty, asked default leaves most criteria `blocked` until someone answers. An
+  image without release tags is pinned to a digest or a source revision, and the README
+  says how to move the pin when the product needs a newer one.
+- **A model provider** can also be the agent's own connection, lent per instance
+  (`lend_model`, `docs/profile-contract.md` → The bin/ contract: `QI_MODEL_*`); the mock
+  stays the default, and `SKILL.md` says which criteria only a lent model makes testable.
+
 ## Sandbox accounts
 
 Some outside services are the point of a main flow — an agent that answers in Slack, files
@@ -109,9 +130,12 @@ whether the flow should be testable end to end; if so, per service (the core's
 `docs/profile-contract.md` → `sandbox`):
 
 - **What the product's connection asks for** — read its configuration reference: a GitHub
-  App or a token, a Slack bot token and Socket Mode or a webhook. A webhook into the nested
-  product cannot work (it is on `localhost`), so a service it needs inbound is testable only
-  through an outbound mode (Socket Mode, polling); otherwise it stays `testable: no`.
+  App, a token or an OAuth sign-in, a Slack bot token and Socket Mode or a webhook. A
+  webhook into the nested product cannot work (it is on `localhost`), so a service it needs
+  inbound is testable only through an outbound mode (Socket Mode, polling); otherwise it
+  stays `testable: no`. Prefer the connection a user really makes when the flow under test
+  is that connection (a "Connect with GitHub" sign-in); a token the install imports is
+  enough when the flow only uses it.
 - **The guide** — `sandbox/<name>.md`, the operator's steps in order: create the
   organization or workspace (never the product's own, never a company one), the narrowest
   app or token, where each value is shown, which line of `credentials.env` it fills. A
@@ -121,35 +145,82 @@ whether the flow should be testable end to end; if so, per service (the core's
   a key file as one base64 line named `…_B64`. Names that are no secret (an organization
   and repository) are `ask` config keys, so the egress can name them as `{profile.<key>}`.
 - **Egress** — each request the product and the test person make, by method and path. On a
-  GitHub host only `/repos/{profile.<key>}/<rest>` passes — the core refuses anything else
-  there, a GitHub App's `/app/…` endpoints included; prefer a fine-grained token scoped to the
-  sandbox repository (`GET /user` the kit already allows).
+  GitHub host only the core's closed set passes (its `docs/black-box.md` → Sandbox
+  accounts): a sandbox repository's API paths `/repos/{profile.<key>}/<rest>`, git's four
+  smart-HTTP requests to it, and the OAuth sign-in's exact requests on the web host, each
+  with its own method. Copy those rows from there; anything else there is `refused`, a
+  GitHub App's `/app/…` and `/installation/…` endpoints included — prefer a fine-grained
+  token scoped to the sandbox repository (`GET /user` the kit already allows). Every GitHub
+  row the kit does not already allow lands by hand; the hosts a third-party page loads its scripts and styles from (the
+  sign-in pages' `github.githubassets.com`, `GET /assets/*`) land by prompt.
+- **A GitHub sign-in** — a sandbox user of its own (login, password and a TOTP secret as
+  credentials; no passkey, no e-mail device check), and an OAuth App registered in the
+  sandbox organization, its callback on the nested product's `localhost` URL. The product
+  gets the App's client through the install (an overlay value), so a test never types a
+  sandbox value. A `suite/` helper drives the pages and computes the TOTP code (RFC 6238 —
+  check it against the RFC's test vectors).
+- **Chat services** — the test person posts through an app or user of its own, never the
+  product's: the product ignores its own app's messages, so nothing would answer. Find out
+  how the product treats posts from apps and bots — loop guards that drop a run of bot
+  posts in one conversation, rate limits — and shape the helpers around it (one thread per
+  request; replies read without the test person's own posts).
 - **Install-time values** — a service the product configures per install (a Slack app's
   tokens in its Helm values) takes them in the engine's values as
   `{{sandbox:<id>.<NAME>}}`, inside an overlay `when: "@sandbox:<id>"`, so an instance
-  without the account installs as before (helm-k3s README → Placeholders).
-- **`bin/sandbox check`** — one request per account: who the token is, that the channel or
-  repository exists and is no fork; `ok`/`FAIL` lines, never a value.
+  without the account installs as before (helm-k3s README → Placeholders). The overlay is
+  on only while every credential of the account is filled.
+- **The nested product's own way out** — it reaches the sandbox through the VM's gateway,
+  which may terminate TLS: the product trusts the gateway's CA (`{{gateway_ca}}`), and a
+  product with an egress policy of its own names the gateway's address (`{{gateway_ip}}`)
+  — helm-k3s README → Placeholders.
+- **`bin/sandbox check`** — one request per credential: who the token is, that the channel
+  or repository exists and is no fork, that a client is valid (an OAuth code exchange with
+  a made-up code answers `bad_verification_code` only for a valid client); `ok`/`FAIL`
+  lines, never a value.
 - **The test person** — helpers in `suite/` (`personSays`, `repliesTo`): the only way a test
   writes to or reads from the service. A result the agent leaves on GitHub is checked
-  through what the product shows, never by reading GitHub.
+  through what the product shows, never by reading GitHub. Labels and button names on a
+  third-party page are assumptions until a live run: a helper waits for each with a
+  timeout that names what it missed, so a changed page fails visibly. A test removes its
+  leftovers only after its last criterion passes, so the helpers also remove older runs'
+  leftovers by their `unique()` id (the core's `docs/test-authoring.md` → Clean up only
+  after a pass).
 
 ## Egress
 
 Every host the install and the build listing contact, with `method` (`GET` unless more is
-needed), a `path` where the host is shared (e.g. `github.com` release downloads), and a
-`why`. Registries hand blobs to other hosts — quay.io → `*.quay.io`; ghcr.io →
-`pkg-containers.githubusercontent.com`; Docker Hub → `registry-1.docker.io`,
-`auth.docker.io`, `production.cloudflare.docker.com`; GitHub release downloads →
-`objects.githubusercontent.com`, `release-assets.githubusercontent.com`. The helm-k3s
-engine also needs `get.helm.sh`. `scripts/egress-rules.sh` lists these entries for the operator (the core's
-`docs/black-box.md` → Egress rules): a host no kit rule covers lands through its approval
-prompt, one under a kit deny (any `github.com` path) only by hand — keep those few. GitHub
-is deny-by-default for every repository there, so an install that downloads from the
-target repository's own releases cannot work — such builds must come from a registry; a
-third-party release download needs an entry with its exact path. The kit already opens
-cert-manager's `cert-manager.yaml` and Gateway API's `standard-install.yaml` release files,
-and the `trusted` preset the hosts GitHub redirects downloads to — leave those out.
+needed), a `path` where the host is shared, and a `why`. Registries hand blobs to other
+hosts — quay.io → `*.quay.io`; Docker Hub → `registry-1.docker.io`, `auth.docker.io`,
+`production.cloudflare.docker.com`; a mirror that serves layers from its own host
+(`mirror.gcr.io` for Docker Hub images) needs one rule. ghcr.io hands its blobs to
+`pkg-containers.githubusercontent.com`, a GitHub host a profile cannot name: publish the
+QA builds to another registry or a mirror, or propose that host for the core's kit (a
+separate change there). The helm-k3s engine also needs
+`get.helm.sh`. A page a browser renders in a sandbox flow loads assets from further hosts.
+
+- **How each lands.** The checker classifies every rule through the core's
+  `scripts/egress-rules.sh` (Phase 4); the full table, as the operator will get it:
+
+  ```bash
+  w="$(mktemp -d)"; printf -- '- profile.<key>: <sample value>\n' > "$w/CONFIG.md"
+  WORK_DIR="$w" QI_PROFILE_DIR="$PWD/<profile-dir>" bash "$QI_CORE/scripts/egress-rules.sh"; rm -rf "$w"
+  ```
+
+  A host no kit rule covers lands through its approval prompt. A request under a kit deny
+  is refused at once and no prompt ever appears — also where a kit allow covers it but a
+  longer kit deny beside it wins — so the operator adds it by hand; keep those few.
+- **No GitHub downloads.** On `github.com`, `*.github.com` and `*.githubusercontent.com` a
+  profile rule outside the sandbox shapes is `refused`, a third-party release download
+  included. Take such a file from a registry or a mirror; a generic cluster prerequisite
+  many products need may join the core's kit instead (a separate change there — the kit
+  already opens cert-manager's `cert-manager.yaml` and Gateway API's
+  `standard-install.yaml`). Builds never come from the target repository's releases.
+- **Host-wide where the gateway must not look inside.** A rule with a path or a method
+  makes the VM's gateway terminate the TLS to read the request. A long-lived websocket (a
+  chat service's socket mode) or a client that does not trust the gateway's CA breaks then:
+  give such a host `"method": "*"` and no path, and say so in its `why`.
+- **Least privilege.** A host the nested product needs is the profile's, never a platform
+  preset's or the kit's, however harmless it looks.
 
 ## Boundary
 

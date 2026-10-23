@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.10.1 — 2026-10-23
+## 3.11.1 — 2026-10-23
 
 **Upgrade:**
 Nothing to run — scripts are re-read per run. A scheduled run is now known by the
@@ -16,6 +16,25 @@ Nothing to run — scripts are re-read per run. A scheduled run is now known by 
 included) is no longer refused `git fetch origin`, commits or `work/CONFIG.md` edits. A
 `scheduled …` line left in `work/env/RUN_MODE` means nothing now. A Slack-ordered "test #N" is
 marked only when the shell knows its session id, and its marker no longer expires.
+
+## 3.11.0 — 2026-10-23
+
+**Upgrade:**
+Nothing to run — only the `qi-profile-creator` skill changed, which a product team runs on its
+own profile and an instance never does.
+
+## 3.10.1 — 2026-10-23
+
+**Upgrade:**
+Nothing to run — the policy hook and the engine are re-read per call. In a scheduled run or a
+channel turn the policy hook now also allows `modules.sh status|due|ran|focus-done|check|value|schedules` and a
+read-only command naming it with `2>&1`/`2>/dev/null` and pipes into `jq|head|tail|grep|egrep|fgrep|wc`,
+`$HOME/` written as such ([docs/modules.md](docs/modules.md) → Control). On the `helm-k3s`
+engine, `env.sh reset` now removes every image no container uses, and `up` does so while the
+k3s data volume has less than `engine_config.prune_below_gi` free (default 20 Gi). Where an
+install was refused for disk space: once, **"reset the environment"**
+([docs/on-demand.md](docs/on-demand.md)) — it holds the environment lock — frees the earlier
+builds' images.
 
 ## 3.10.0 — 2026-10-22
 

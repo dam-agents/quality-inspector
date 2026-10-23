@@ -49,6 +49,12 @@ Paths below are relative to this skill's directory. Everything you write is in
 - **Confirm, don't guess.** Tag patterns, the sign-in bootstrap and the nested limits
   decide verdicts. Confirm each with the person or an observation (a registry listing, a
   trial install) and mark what stays unconfirmed in the brief.
+- **Fewest operator steps, least privilege.** Every `ask` key, every `by-hand` egress row
+  and every step of a sandbox guide is a manual onboarding step someone can get wrong.
+  Default what can be defaulted (a pinned stand-in image beats an asked one), keep each
+  egress rule to the method and path the flow needs, and never solve one product's need by
+  widening a platform-wide preset or the core's kit — only a generic need of many products
+  (a cluster prerequisite) may join the kit, as a separate change to the core.
 
 ## Workflow
 
@@ -73,6 +79,8 @@ Phases in order. Write no profile files before the person approves the Phase 1 b
    where it stands, and change only what was asked. Keep `config` key names stable: an
    instance's `work/CONFIG.md` holds `profile.<key>` bullets, and a renamed key is unknown
    there — when a rename is unavoidable, the profile README says what instances change.
+   The same holds for a credential added to a sandbox account: its overlay stays off on an
+   instance until the operator fills the new line, so the README says that too.
 
 ### Phase 1 — Discovery and the brief (approval gate)
 
@@ -106,7 +114,7 @@ that remain.
 | `templates/profile.helm-k3s.json.template` or `templates/profile.custom.json.template` | `profile.json` | Fields: the contract; `engine_config`: the engine's README. |
 | `templates/SKILL.md.template` | `SKILL.md` | [references/tester-knowledge.md](references/tester-knowledge.md). |
 | `templates/README.md.template` | `README.md` | Delivery, channels, config, egress, diagnosis, keep-in-step rule. |
-| `templates/bin/env.template`, `versions.template`, `build-time.template` | `bin/env`, `bin/versions`, `bin/build-time` | Own scripts only; `chmod +x`. |
+| `templates/bin/env.template`, `versions.template`, `build-time.template` | `bin/env`, `bin/versions`, `bin/build-time` | Own scripts only; a `#!` line ([references/custom-bin.md](references/custom-bin.md) → Conventions). |
 
 - **`config` keys** are what an operator may need to change per instance: a chart or
   image repository, a prerequisite's version, an optional stand-in. Each gets a string
@@ -129,6 +137,13 @@ that remain.
   person's helpers in `suite/`, and the README's Sandbox accounts section.
 - **Channels** are named in the README (operators choose them), build names in
   `SKILL.md` (testers read them in reports).
+- **What the profile needs from elsewhere.** A change the product must make first (a chart
+  value for more test accounts, an OAuth client default) lands there before the profile
+  uses it; until it is released the baseline build lacks it, so `SKILL.md` says which
+  criteria are `blocked` on builds before it. A feature of the core the profile relies on
+  (a placeholder, a sandbox shape) sets the minimum quality-inspector version in the
+  README, and a placeholder new to the core stays inside the overlay that needs it, so an
+  older core that never turns the overlay on never meets it either.
 
 ### Phase 4 — Validate
 
@@ -137,10 +152,15 @@ node scripts/check-profile.mjs --core "$QI_CORE" <profile-dir>
 ```
 
 It checks the contract (manifest, commands, SKILL.md frontmatter, leftover template
-markers, literal secrets, black-box hints, plain files only — no symlink or submodule)
-and runs the engine's own offline check. Fix every `FAIL`; judge every `WARN` — fix it
-or tell the person why it stays. Then the read-only live check, which lists builds from
-the real registry (needs the network and `curl`, `jq`, `node`):
+markers, literal secrets, black-box hints, plain files only — no symlink or submodule),
+runs the engine's own offline check, and classifies every `egress` rule through the core's
+`scripts/egress-rules.sh` the way onboarding hands it to the operator: `by prompt`,
+`by hand` (no prompt ever appears — under a kit deny), `by the kit` (redundant — drop it)
+or `refused` (a `FAIL`: on a GitHub host only the sandbox shapes pass). A rule naming an
+`ask` key needs `--set <key>=<a sample value>` to be classified. Fix every `FAIL`; judge
+every `WARN` — fix it or tell the person why it stays; keep the `by hand` rows few. Then
+the read-only live check, which lists builds from the real registry (needs the network
+and `curl`, `jq`, `node`):
 
 ```bash
 node scripts/check-profile.mjs --core "$QI_CORE" --live <profile-dir>
@@ -154,7 +174,9 @@ silently otherwise. `--set <key>=<value>` checks a non-default setting;
 The acting commands (`bin/env up`, `reset`) need the QA VM's runtime — usually root and
 k3s. Run them only where the person says it is safe
 ([references/custom-bin.md](references/custom-bin.md) → Trying it out); otherwise the
-agent's onboarding smoke test is their first real run — say so.
+agent's onboarding smoke test is their first real run — say so. Say just as plainly what
+else nothing has run yet: a sandbox flow against the real service, a `suite/` helper on a
+third-party page (its labels and button names are assumptions until then).
 
 ### Phase 5 — Hand-off
 
@@ -165,9 +187,17 @@ agent's onboarding smoke test is their first real run — say so.
    - add a skill source — this repository, `path` `.quality-inspector` — and assign the
      profile skill to the agent; the kit's egress already opens that directory, so the
      profile needs no rule of its own;
-   - the egress rules that `scripts/egress-rules.sh` lists (`docs/black-box.md` → Egress
-     rules) — every `egress` entry of `profile.json`;
+   - the egress, as `scripts/egress-rules.sh` lists it (`docs/black-box.md` → Egress
+     rules; run it as in [references/discovery.md](references/discovery.md) → Egress): a
+     `prompt` row is approved when its prompt appears, a `by-hand` row the operator adds in
+     the agent's network settings — given in words (host, method, path, why), never as
+     platform commands;
    - a deny for every `boundary.urls` entry;
-   - the `profile.<key>` values onboarding will ask for.
+   - the `profile.<key>` values onboarding will ask for;
+   - with sandbox accounts: each guide in `sandbox/`, and that the operator writes the
+     credentials straight into the instance's `work/env/credentials.env` (the lines
+     `scripts/sandbox.sh template` adds) — never into chat;
+   - the minimum quality-inspector version, and the order to merge in when a core change
+     or a product change must land first.
 3. Say in three lines what the QA agent will treat as untestable (the "cannot do" list),
    so the first `not-testable` verdicts surprise nobody.
