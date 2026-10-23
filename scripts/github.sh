@@ -68,7 +68,8 @@ create_issue() { # <draft-dir> [--fix] [--again]
   build="$(jq -r '.build // "-"' "$dir/draft.json" 2>/dev/null)"
   [[ "$build" =~ ^[A-Za-z0-9._+-]{1,80}$ ]] || refuse "the draft's build is not a build id"
   title="$(head -1 "$dir/title.txt")"
-  [ -n "$title" ] && [ "${#title}" -le 200 ] && ! printf '%s' "$title" | LC_ALL=C grep -q '[[:cntrl:]]' || refuse "the title is one line of 1–200 characters"
+  # Characters, not bytes (LC_ALL=C above): jq counts code points, issue-draft.mjs cuts at 200 UTF-16 units.
+  [ -n "$title" ] && [ "$(printf '%s' "$title" | jq -Rrs length)" -le 200 ] && ! printf '%s' "$title" | LC_ALL=C grep -q '[[:cntrl:]]' || refuse "the title is one line of 1–200 characters"
   [ "$(wc -c < "$dir/body.md")" -le 60000 ] || refuse "the body exceeds 60000 bytes"
   mp="$(cfg marker_prefix)"
   marker="<!-- ${mp:-quality-inspector}-found refs=\"$(IFS=';'; printf '%s' "${refs[*]}" | sed 's/;/; /g')\" build=$build -->"

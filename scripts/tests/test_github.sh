@@ -57,6 +57,13 @@ grep -qF -- "-X POST repos/acme/widgets/issues -f title=Rename loses sessions; t
 bash "$G" create-issue "$F" >/dev/null 2>&1; assert_eq "a problem with an issue is refused" 3 "$?"
 printf -- '- fix_label: architect:fix\n' >> "$WORK_DIR/CONFIG.md"
 assert "--again --fix: another, for the architect" '.labels == ["qa:found","architect:fix"]' "$(bash "$G" create-issue "$F" --again --fix)"
+# The title's limit counts characters: 200 Czech letters (400 bytes) pass, 201 do not.
+cp "$F/title.txt" "$F/title.bak"
+node -e 'console.log("ř".repeat(200))' > "$F/title.txt"
+bash "$G" create-issue "$F" --again >/dev/null 2>&1; assert_eq "a 200-character non-ASCII title passes" 0 "$?"
+node -e 'console.log("ř".repeat(201))' > "$F/title.txt"
+bash "$G" create-issue "$F" --again >/dev/null 2>&1; assert_eq "a 201-character title is refused" 3 "$?"
+mv "$F/title.bak" "$F/title.txt"
 sed -i.bak 's|refs="#7 AC-1; D-3"|refs="#7 AC-1"|' "$F/body.md" && rm -f "$F/body.md.bak"
 bash "$G" create-issue "$F" --again >/dev/null 2>&1; assert_eq "a marker that does not name every problem is refused" 3 "$?"
 echo '{"refs":["#7 AC-1; rm"],"build":"c1"}' > "$F/draft.json"
