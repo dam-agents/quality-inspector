@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # lock.sh — the environment lock, work/env/LOCK: one run at a time on the nested product
-# (docs/nested-env.md → Shape). Sourced by scripts/env.sh and scripts/preflight.sh.
+# (docs/nested-env.md → Shape). Sourced by scripts/env.sh and scripts/preflight.sh; its
+# short lock (lock_take, lock_mutex) also by scripts/scenarios.sh and scripts/work-backup.sh.
 #
 # One line: `<owner> <ISO since> [<session>]`, <session> being the holder's
 # CLAUDE_CODE_SESSION_ID. The platform runtime says whether that session still runs a
@@ -44,13 +45,19 @@ lock_state() {
   [ "$age" -lt "$2" ] && echo "held $held ${ts:--} ${sess:--}" || echo "stale $held ${ts:--} ${sess:--}"
 }
 
-# lock_mutex <dir>: a short critical section around read-judge-write — mkdir is atomic, so
-# two runs never both judge a lock free. A mutex older than a minute is a crash's leftover.
+# lock_take <file>: create <file> only when nothing is there. bash's noclobber opens it with
+# O_EXCL, so of two callers at once exactly one wins — with any coreutils. Never mkdir as a
+# lock: the uutils mkdir (Ubuntu 26.04) lets several concurrent callers succeed on one path.
+lock_take() { ( set -C; printf '%s\n' "$$" > "$1" ) 2>/dev/null; }
+
+# lock_mutex <file> [<tries>]: a short critical section around read-judge-write, so two runs
+# never both judge a lock free; it waits <tries> × 0.1 s (50). A mutex older than a minute is a
+# crash's leftover — also the directory an older version took — and is removed.
 lock_mutex() {
   local i
-  for i in $(seq 1 50); do
-    mkdir "$1" 2>/dev/null && return 0
-    [ -n "$(find "$1" -maxdepth 0 -mmin +1 2>/dev/null)" ] && rmdir "$1" 2>/dev/null
+  for i in $(seq 1 "${2:-50}"); do
+    lock_take "$1" && return 0
+    [ -n "$(find "$1" -maxdepth 0 -mmin +1 2>/dev/null)" ] && rm -rf "$1" 2>/dev/null
     sleep 0.1
   done
   return 1
