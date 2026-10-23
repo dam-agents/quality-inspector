@@ -7,6 +7,16 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.15.0 — 2026-10-23
+
+**Upgrade:**
+1. `bash "$HOME/scripts/hooks/install.sh"`, effective from the next session: it registers the trace
+   hook ([docs/logging.md](docs/logging.md) → Harness trace), and on Claude Code 2.1.101 or newer
+   also the backup on an API-error stop. Re-running changes nothing; until then the audit's
+   `trace_hooks` warns.
+2. `bash "$HOME/scripts/verify-onboarding.sh"` and read its `trace_hook` line: a harness older than
+   2.1.101 leaves failed tool calls untraced until the platform upgrades it — then repeat step 1.
+
 ## 3.14.0 — 2026-10-23
 
 **Upgrade:**
