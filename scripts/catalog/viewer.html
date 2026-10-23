@@ -73,6 +73,18 @@ svg.tl .ok{fill:var(--ok)}svg.tl .warn{fill:var(--warn)}svg.tl .bad{fill:var(--b
 .att{padding:0;margin:0}
 .linkish{background:none;border:0;padding:0;color:var(--link);cursor:pointer;text-align:left}
 .linkish:hover{text-decoration:underline}
+.lnk{background:none;border:0;padding:0;color:var(--link);cursor:pointer;font:inherit;text-align:left}
+.lnk:hover{text-decoration:underline}
+code.lnk,.lnk code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+.backbar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:6px 0 0;font-size:12.5px;color:var(--dim)}
+.backbar .btn{font-size:12.5px;padding:2px 8px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dtop{position:sticky;top:-14px;margin:-14px -16px 8px;padding:10px 16px;background:var(--bg);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:6px;align-items:center;z-index:2}
+.dtop .sp{flex:1}
+.dtop .btn{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crumbs{font-size:12.5px;color:var(--dim);display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.crumbs .sep{opacity:.6}
+.rep{white-space:nowrap}
+.filterbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
 svg text{fill:var(--dim);font-size:10px}
 .layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:16px}
 .side details{border-bottom:1px solid var(--line);padding:6px 0}
@@ -212,6 +224,7 @@ pre.diff{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--card);bord
 <body>
 <header class="top"><div class="wrap">
   <div class="title"><h1 id="h-title">Test catalog</h1><span class="meta" id="h-meta"></span></div>
+  <div class="backbar" id="h-back" hidden></div>
   <nav class="tabs" role="tablist" aria-label="Views" id="tabs"></nav>
 </div></header>
 <main class="wrap" id="view" tabindex="-1"><noscript><p class="empty">The catalog is drawn by JavaScript: open it where scripts run (the published artifact, or a browser), not in a static preview.</p></noscript></main>
@@ -364,12 +377,22 @@ const nightOf = (build) => runs.find((r) => r.type === 'regression' && r.build =
 const runFor = (i, e) => (e.run === 'regression' ? nightOf(str(e.build))
   : runs.find((r) => r.type !== 'regression' && r.ref === i.ref && r.build === str(e.build) && str(r.utc) === str(e.utc)) || runs.find((r) => r.type !== 'regression' && r.ref === i.ref && r.build === str(e.build)) || null);
 const originTitle = (ref) => { const i = ALL.find((x) => x.ref === ref); return i ? str(i.origin.title) : ''; };
+// An origin — an issue or a scenario — has its own panel: its criteria, its runs, its report.
+const origins = new Map();
+for (const i of ALL) if (!origins.has(i.ref)) origins.set(i.ref, i.origin);
+const originName = (ref) => (str(ref).startsWith('#') ? `Issue ${ref}` : `Scenario ${ref}`);
+const originRuns = (ref) => { const its = ALL.filter((i) => i.ref === ref).map((i) => i.key);
+  return runs.filter((r) => (r.type !== 'regression' && r.ref === ref) || (r.type === 'regression' && r.entries.some((e) => its.includes(e.key)))); };
+// A path a test opens (`/projects/{id}`) on the newest UI map's page pattern (`/projects/:id`).
+const PAT_RE = pagesData.map((p) => [p.pattern, new RegExp(`^${p.pattern.split('/').map((x) => (x.startsWith(':') ? '[^/]+' : x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))).join('/')}/?$`)]);
+const patOf = (path) => { const p = str(path); if (pageOf(p)) return p; const hit = PAT_RE.find(([, re]) => re.test(p)); return hit ? hit[0] : null; };
 
 // ------------------------------------------------------------------ facets
 const FACETS = [
   { id: 'tier', label: 'Tier', get: (i) => [i.tier], order: (a, b) => tierRank(a) - tierRank(b) },
   { id: 'verdict', label: 'Latest verdict', get: (i) => [i.latest || 'none'], fmt: (v) => (v === 'none' ? 'No verdict yet' : vLabel(v)) },
   { id: 'origin', label: 'Origin', get: (i) => [i.origin.kind || 'issue'] },
+  { id: 'ref', label: 'Issue / scenario', get: (i) => [i.ref], order: (a, b) => str(a).localeCompare(str(b), 'en', { numeric: true }), fmt: (v) => `${v}${originTitle(v) ? ` ${originTitle(v).slice(0, 40)}` : ''}` },
   { id: 'kind', label: 'Kind', get: (i) => [i.kind] },
   { id: 'flag', label: 'Flags', get: (i) => [...i.flags, ...(pins.has(i.key) ? ['pinned'] : [])] },
   { id: 'collection', label: 'Collection', get: colls },
@@ -386,34 +409,40 @@ const FACET = Object.fromEntries(FACETS.map((f) => [f.id, f]));
 // ------------------------------------------------------------------- state
 const VIEWS = [['overview', 'Overview'], ['modules', 'Modules'], ['findings', 'Findings'], ['design', 'Design'], ['runs', 'Runs'], ['map', 'Product map'], ['catalog', 'Catalog'], ['gallery', 'Gallery'], ['coverage', 'Coverage'], ['history', 'History'], ['lifecycle', 'Lifecycle']];
 const COLS = {
-  ref: ['Origin', (i) => i.ref, (a, b) => (a.origin.kind || '').localeCompare(b.origin.kind || '') || num(a.ref) - num(b.ref)],
+  ref: ['Origin', (i) => i.ref, (a, b) => (a.origin.kind || '').localeCompare(b.origin.kind || '') || num(a.ref) - num(b.ref), (i) => refLink(i.ref)],
   id: ['ID', (i) => str(i.id), (a, b) => str(a.id).localeCompare(str(b.id)) || num(a.id) - num(b.id)],
   name: ['Criterion', null, (a, b) => str(a.name).localeCompare(str(b.name))],
   tier: ['Tier', null, (a, b) => tierRank(a.tier) - tierRank(b.tier)],
   verdict: ['Latest verdict', null, (a, b) => SEV[a.cls] - SEV[b.cls] || a.latest.localeCompare(b.latest)],
-  area: ['Area', (i) => str(i.area), (a, b) => str(a.area).localeCompare(str(b.area))],
-  surface: ['Surface', (i) => str(i.surface), (a, b) => str(a.surface).localeCompare(str(b.surface))],
-  session: ['Session', (i) => str(i.session), (a, b) => str(a.session).localeCompare(str(b.session))],
+  area: ['Area', (i) => str(i.area), (a, b) => str(a.area).localeCompare(str(b.area)), (i) => (i.area ? facetLink('area', i.area) : '')],
+  surface: ['Surface', (i) => str(i.surface), (a, b) => str(a.surface).localeCompare(str(b.surface)), (i) => (i.surface ? facetLink('surface', i.surface) : '')],
+  session: ['Session', (i) => str(i.session), (a, b) => str(a.session).localeCompare(str(b.session)), (i) => (i.session ? facetLink('session', i.session) : '')],
   last: ['Last run', (i) => (i.verdict ? fmtDate(i.verdict.utc) : ''), (a, b) => str(a.verdict && a.verdict.utc).localeCompare(str(b.verdict && b.verdict.utc))],
-  build: ['Build', (i) => str(i.verdict && i.verdict.build), (a, b) => str(a.verdict && a.verdict.build).localeCompare(str(b.verdict && b.verdict.build))],
+  build: ['Build', (i) => str(i.verdict && i.verdict.build), (a, b) => str(a.verdict && a.verdict.build).localeCompare(str(b.verdict && b.verdict.build)), (i) => (i.verdict && i.verdict.build ? buildLink(i.verdict.build) : '')],
   promoted: ['Promoted', (i) => fmtDate(i.promoted_utc), (a, b) => str(a.promoted_utc).localeCompare(str(b.promoted_utc))],
   duration: ['Duration', (i) => ms(i.dur), (a, b) => (a.dur ?? -1) - (b.dur ?? -1)],
   heals: ['Heals', (i) => (i.heals.length || ''), (a, b) => a.heals.length - b.heals.length],
   flaky: ['Flaky', (i) => (i.flaky.length || ''), (a, b) => a.flaky.length - b.flaky.length],
-  pages: ['Pages', (i) => i.pages.join(', '), (a, b) => a.pages.length - b.pages.length],
+  pages: ['Pages', (i) => i.pages.join(', '), (a, b) => a.pages.length - b.pages.length, (i) => joinNodes(i.pages.map((x) => pageLink(x)))],
+  report: ['Report', (i) => (i.evidence ? 'report' : ''), (a, b) => (a.evidence ? 0 : 1) - (b.evidence ? 0 : 1), (i) => reportBtn(i.evidence, () => openItem(i.key)) || ''],
 };
-const DEFAULT_COLS = ['ref', 'id', 'name', 'tier', 'verdict', 'area', 'last'];
+const DEFAULT_COLS = ['ref', 'id', 'name', 'tier', 'verdict', 'area', 'last', 'report'];
 const GROUPS = { none: 'No grouping', origin: 'Origin', tier: 'Tier', area: 'Area', page: 'Page', verdict: 'Latest verdict', collection: 'Collection', label: 'Issue label' };
 const QUICK = [
   ['Nightly regression', { tier: ['regression'] }], ['Needs attention', { flag: ['needs attention'] }], ['Promotable queue', { tier: ['promotable'] }],
   ['Flaky & healed', { flag: ['flaky', 'healed'] }], ['Costly (agent.assert)', { flag: ['agent.assert'] }], ['Explorations', { kind: ['exploration'] }], ['Scenarios', { origin: ['scenario'] }],
 ];
-const S = { v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS.slice(), i: null, r: null, at: null, pg: null, hs: null, rt: 'all', only: false, hall: false, hsort: 'recent', limit: 100, side: false };
+const S = { v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS.slice(), i: null, r: null, o: null, at: null, pg: null, hs: null, rt: 'all', rb: null, only: false, hall: false, hsort: 'recent', limit: 100, side: false };
+// The Design view's filters, in the address too, so "back" returns to them.
+const DS_DEFAULT = { st: 'open', sev: '', vp: '', ck: '', pg: '', q: '' };
+const DS = { ...DS_DEFAULT };
 
-const DEFAULTS = JSON.stringify({ v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS, i: null, r: null, at: null, pg: null, hs: null, rt: 'all' });
-function readHash() {
+const DEFAULTS = JSON.stringify({ v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS, i: null, r: null, o: null, at: null, pg: null, hs: null, rt: 'all', rb: null });
+// The address holds every place: a view, its filters, the panel open on it. readHash reads one
+// (the location's, or a remembered one for "back" where the page may not change its address).
+function readHash(src) {
   let p;
-  try { p = new URLSearchParams(location.hash.slice(1)); } catch { return; }
+  try { p = new URLSearchParams(String(src ?? location.hash).replace(/^#/, '')); } catch { return; }
   Object.assign(S, JSON.parse(DEFAULTS));
   const v = p.get('v'); if (VIEWS.some(([k]) => k === v)) S.v = v;
   S.q = p.get('q') || '';
@@ -425,29 +454,81 @@ function readHash() {
   if (p.get('c')) { const c = p.get('c').split(',').filter((k) => own(COLS, k)); if (c.length) S.cols = c; }
   S.i = p.get('i') && byKey.has(p.get('i')) ? p.get('i') : null;
   S.r = !S.i && p.get('r') && byRun.has(p.get('r')) ? p.get('r') : null;
+  S.o = !S.i && !S.r && p.get('o') && origins.has(p.get('o')) ? p.get('o') : null;
   S.at = p.get('at') && builds.some((b) => b.id === p.get('at')) ? p.get('at') : null;
   S.pg = p.get('pg') && pageOf(p.get('pg')) ? p.get('pg') : null;
   S.hs = S.pg && /^\d+$/.test(p.get('hs') || '') && +p.get('hs') < pageOf(S.pg).hotspots.length ? +p.get('hs') : null;
   if (own(RUNTYPE, p.get('rt'))) S.rt = p.get('rt');
+  S.rb = p.get('rb') && runs.some((r) => r.build === p.get('rb')) ? p.get('rb') : null;
+  Object.assign(DS, DS_DEFAULT);
+  for (const k of Object.keys(DS_DEFAULT)) if (p.has(`d.${k}`)) DS[k] = str(p.get(`d.${k}`)).slice(0, 200);
 }
-function writeHash() {
+function hashOf(st = S) {
   const p = new URLSearchParams();
-  if (S.v !== 'overview') p.set('v', S.v);
-  if (S.q) p.set('q', S.q);
-  for (const [k, vals] of Object.entries(S.f)) if (vals.length) p.set(`f.${k}`, vals.join('|'));
-  const sk = S.sort.map(([k, d]) => (d < 0 ? '-' : '') + k).join(',');
+  if (st.v !== 'overview') p.set('v', st.v);
+  if (st.q) p.set('q', st.q);
+  for (const [k, vals] of Object.entries(st.f)) if (vals.length) p.set(`f.${k}`, vals.join('|'));
+  const sk = st.sort.map(([k, d]) => (d < 0 ? '-' : '') + k).join(',');
   if (sk !== 'ref,id') p.set('s', sk);
-  if (S.g !== 'none') p.set('g', S.g);
-  if (S.l !== 'table') p.set('l', S.l);
-  if (S.cols.join(',') !== DEFAULT_COLS.join(',')) p.set('c', S.cols.join(','));
-  if (S.i) p.set('i', S.i);
-  if (S.r) p.set('r', S.r);
-  if (S.at) p.set('at', S.at);
-  if (S.pg) p.set('pg', S.pg);
-  if (S.hs != null) p.set('hs', String(S.hs));
-  if (S.rt !== 'all') p.set('rt', S.rt);
-  try { history.replaceState(null, '', `#${p.toString()}`); } catch { /* sandboxed: state stays in memory */ }
+  if (st.g !== 'none') p.set('g', st.g);
+  if (st.l !== 'table') p.set('l', st.l);
+  if (st.cols.join(',') !== DEFAULT_COLS.join(',')) p.set('c', st.cols.join(','));
+  if (st.i) p.set('i', st.i);
+  if (st.r) p.set('r', st.r);
+  if (st.o) p.set('o', st.o);
+  if (st.at) p.set('at', st.at);
+  if (st.pg) p.set('pg', st.pg);
+  if (st.hs != null) p.set('hs', String(st.hs));
+  if (st.rt !== 'all') p.set('rt', st.rt);
+  if (st.rb) p.set('rb', st.rb);
+  if (st.v === 'design') for (const [k, d] of Object.entries(DS_DEFAULT)) if (DS[k] !== d) p.set(`d.${k}`, DS[k]);
+  return p.toString();
 }
+
+// ------------------------------------------------------------------ history
+// Every move to another place — a view, a panel, a page of the map, a build — is a step the
+// browser's back button and the page's own "Back" undo. The steps walked are kept with each
+// history entry; where the page may not touch the browser history (a sandboxed frame), in memory.
+let trail = []; // [{h: an address, label}] — the places before this one, oldest first
+let histOK = true;
+function setLocation(push) {
+  if (!histOK) return;
+  try { history[push ? 'pushState' : 'replaceState']({ qi: trail }, '', `#${hashOf()}`); } catch { histOK = false; }
+}
+const writeHash = () => setLocation(false); // the same place, refined: a filter, a sort, a search
+function where(st = S) {
+  const it = st.i && byKey.get(st.i); if (it) return `${it.label} — ${str(it.name)}`.slice(0, 80);
+  const run = st.r && byRun.get(st.r); if (run) return runName(run);
+  if (st.o) return `${originName(st.o)}${originTitle(st.o) ? ` — ${originTitle(st.o)}` : ''}`.slice(0, 80);
+  const view = (VIEWS.find(([k]) => k === st.v) || VIEWS[0])[1];
+  const pg = st.v === 'map' && pageOf(st.pg);
+  const filt = Object.values(st.f).some((x) => x.length) || st.q;
+  return `${view}${pg ? ` · ${str(pg.title) || pg.pattern}` : ''}${st.v === 'runs' && st.rb ? ` · build ${st.rb}` : ''}${filt && ['catalog', 'gallery', 'history'].includes(st.v) ? ' (filtered)' : ''}${st.at ? ` · as of ${st.at}` : ''}`;
+}
+const DRAWER = ['i', 'r', 'o'];
+// Go to another place: `patch` changes the state; without a panel key, the panel closes.
+function nav(patch) {
+  const from = hashOf(); const label = where();
+  const p = { ...patch }; const ds = p.ds; delete p.ds;
+  const panelOnly = Object.keys(p).length && Object.keys(p).every((k) => DRAWER.includes(k));
+  Object.assign(S, { i: null, r: null, o: null }, panelOnly ? {} : { limit: 100 }, p);
+  if (ds) Object.assign(DS, DS_DEFAULT, ds);
+  if (hashOf() === from) { render(); renderDrawer(); return; }
+  trail = [...trail, { h: from, label }].slice(-100);
+  setLocation(true);
+  if (panelOnly) renderHeader(); else render();
+  renderDrawer();
+}
+function back() {
+  if (!trail.length) return;
+  let st = null; try { st = history.state; } catch { /* sandboxed */ }
+  if (histOK && st && Array.isArray(st.qi) && st.qi.length === trail.length) { history.back(); return; }
+  const prev = trail[trail.length - 1];
+  trail = trail.slice(0, -1);
+  readHash(prev.h); setLocation(false); render(); renderDrawer();
+}
+const prevLabel = () => (trail.length ? trail[trail.length - 1].label : null);
+const backBtn = (cls = 'btn') => (trail.length ? h('button', { class: cls, type: 'button', title: 'Back to where you were (also the browser\'s back button)', onclick: back }, `← ${prevLabel()}`) : null);
 
 // ---------------------------------------------------------------- filtering
 const matchesQ = (i) => !S.q || S.q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => i.text.includes(w));
@@ -510,33 +591,63 @@ function minibar(list, cls = 'minibar') {
 }
 const star = (i) => (storageOK ? h('button', { class: `star${pins.has(i.key) ? ' on' : ''}`, type: 'button', 'aria-pressed': pins.has(i.key) ? 'true' : 'false', title: 'Pin (this browser only)', 'aria-label': `Pin ${i.label}`,
   onclick: (e) => { e.stopPropagation(); pins.has(i.key) ? pins.delete(i.key) : pins.add(i.key); savePins(); render(); } }, pins.has(i.key) ? '★' : '☆') : null);
-const openItem = (key) => { S.i = key; S.r = null; writeHash(); renderDrawer(); };
-const openRun = (r) => { if (!r) return; S.r = r.id; S.i = null; writeHash(); renderDrawer(); };
-const go = (patch) => { Object.assign(S, { i: null, r: null, limit: 100 }, patch); writeHash(); render(); renderDrawer(); };
+const openItem = (key) => { if (byKey.has(key)) nav({ i: key }); };
+const openRun = (r) => { if (r) nav({ r: r.id }); };
+const openOrigin = (ref) => { if (origins.has(ref)) nav({ o: ref }); };
+const go = (patch) => nav(patch);
+// A click on a link or a button inside a clickable row or card is that link's, not the row's.
+const rowClick = (f) => (e) => {
+  const t = e.target instanceof Element ? e.target.closest('a,button,input,select,textarea,summary,label') : null;
+  if (t && t !== e.currentTarget && e.currentTarget.contains(t)) return;
+  f(e);
+};
+// Links between the places: an issue or a scenario, a build, a page of the map, an area, a facet value.
+const issueHref = (n) => { const tpl = str(D.issue_url); return tpl.startsWith('https://') && tpl.includes('{n}') && Number.isInteger(n) ? tpl.replace('{n}', String(n)) : null; };
+const extIssue = (n, text) => (issueHref(n) ? h('a', { href: issueHref(n), target: '_blank', rel: 'noopener noreferrer', title: 'Open the issue' }, text ?? '↗') : null);
+function refLink(ref, text) {
+  const r = str(ref);
+  if (origins.has(r)) return h('button', { class: 'lnk', type: 'button', title: `${originName(r)}: its criteria, runs and report`, onclick: () => openOrigin(r) }, text ?? r);
+  const n = /^#(\d+)$/.exec(r);
+  return n && issueHref(+n[1]) ? extIssue(+n[1], text ?? r) : h('span', {}, text ?? r);
+}
+const issueRef = (n, text) => refLink(`#${n}`, text);
+function buildLink(b) {
+  const id = str(b); if (!id) return '–';
+  return runs.some((r) => r.build === id) ? h('button', { class: 'lnk', type: 'button', title: `Every run on build ${id}`, onclick: () => go({ v: 'runs', rb: id, rt: 'all' }) }, h('code', {}, id)) : h('code', {}, id);
+}
+function pageLink(path, text) {
+  const pat = patOf(path);
+  return pat ? h('button', { class: 'lnk', type: 'button', title: `Show ${pat} on the product map`, onclick: () => go({ v: 'map', pg: pat, hs: null }) }, h('code', {}, text ?? str(path))) : h('code', {}, text ?? str(path));
+}
+const facetLink = (k, v, text) => (v ? h('button', { class: 'lnk', type: 'button', title: `Every test with ${FACET[k].label.toLowerCase()} ${v}`, onclick: () => go({ v: 'catalog', f: { [k]: [str(v)] }, q: '' }) }, text ?? str(v)) : '–');
+const joinNodes = (list, sep = ', ') => list.flatMap((x, k) => (k ? [sep, x] : [x]));
 const cells = (hist, n = 12) => h('span', { class: 'cells', 'aria-hidden': true }, hist.slice(-n).map((e) => h('i', { class: vClass(e.value), title: `${fmtDate(e.utc)} ${str(e.build)}: ${vLabel(e.value)}` })));
 // A report is a private artifact: the page cannot link to it (the app has no address for one), so
 // the agent opens it — "open the report <id>" answers with the platform's chip beside the chat.
 const reportCmd = (ref) => { const m = /^platform:\/\/artifacts\/([A-Za-z0-9_-]{1,64})$/.exec(str(ref)); return m ? `open the report ${m[1]}` : null; };
+const REPORT_TIP = 'The report: the video, the screenshots and the steps of every criterion';
 const artLink = (ref) => {
-  if (/^https:\/\/\S+$/.test(str(ref))) return h('a', { href: str(ref), target: '_blank', rel: 'noopener noreferrer' }, 'open the report');
+  if (/^https:\/\/\S+$/.test(str(ref))) return h('a', { href: str(ref), target: '_blank', rel: 'noopener noreferrer', title: REPORT_TIP }, 'open the report — video, screenshots, steps ↗');
   const c = reportCmd(ref);
   if (!c) return ref ? h('code', {}, str(ref)) : '–';
   return h('div', {}, copyBox(c), h('div', { class: 'meta' }, bridge() ? 'The agent answers in the chat with the report; click it there to open it beside the chat.'
     : 'A private report: paste this in the agent\'s chat and it answers with the report to open, or find it in the app\'s Artifacts.'));
 };
 // In a table: one button — it sends the command where the page can, else opens the run with it.
-const artCell = (ref, open) => {
-  if (/^https:\/\/\S+$/.test(str(ref))) return artLink(ref);
+const artCell = (ref, open, text = 'Open the report') => {
+  if (/^https:\/\/\S+$/.test(str(ref))) return h('a', { class: 'btn rep', href: str(ref), target: '_blank', rel: 'noopener noreferrer', title: REPORT_TIP }, `${text} ↗`);
   const c = reportCmd(ref);
   if (!c) return ref ? h('code', {}, str(ref)) : '–';
-  const b = h('button', { class: 'btn', type: 'button', onclick: () => {
+  const b = h('button', { class: 'btn rep', type: 'button', title: REPORT_TIP, onclick: () => {
     const p = bridge();
     if (!p) { open(); return; }
     b.disabled = true;
     Promise.resolve().then(() => p.sendPrompt(c)).then(() => { b.textContent = 'Sent — see the chat'; }, () => { b.disabled = false; open(); });
-  } }, 'Open the report');
+  } }, text);
   return b;
 };
+// The report of a run or an origin, compact: in a list, a table or a card; nothing without one.
+const reportBtn = (ref, open) => (ref ? artCell(ref, open, 'Report') : null);
 const commands = (i) => {
   const out = [];
   if (i.kind === 'exploration') return out;
@@ -555,7 +666,10 @@ function renderHeader() {
   const meta = $('#h-meta'); meta.textContent = '';
   meta.append([str(D.target), str(a.display_name), a.version ? `v${a.version}` : '', D.generated_utc ? `generated ${rel(D.generated_utc)} (${str(D.generated_utc)})` : ''].filter(Boolean).join(' · '));
   const tabs = $('#tabs'); tabs.textContent = '';
-  for (const [k, label] of VIEWS) tabs.append(h('button', { role: 'tab', type: 'button', 'aria-selected': S.v === k ? 'true' : 'false', onclick: () => { S.v = k; S.limit = 100; writeHash(); render(); } }, label));
+  const bb = $('#h-back'); bb.textContent = '';
+  bb.hidden = !trail.length;
+  if (trail.length) bb.append(backBtn(), h('span', {}, `You are on ${where()}`));
+  for (const [k, label] of VIEWS) tabs.append(h('button', { role: 'tab', type: 'button', 'aria-selected': S.v === k ? 'true' : 'false', onclick: () => go({ v: k }) }, label));
   tabs.append(...[h('span', { class: 'sp' }),
     builds.length ? h('select', { 'aria-label': 'Show the state as of a build', onchange: (e) => go({ at: e.target.value || null }) },
       h('option', { value: '' }, 'As of: now'), builds.slice().reverse().map((b) => h('option', { value: b.id, selected: S.at === b.id ? true : null }, `As of ${fmtDate(b.utc)} · ${b.id}`))) : null,
@@ -654,8 +768,8 @@ function activityNow() {
   const m = mins(since, D.generated_utc ? new Date(D.generated_utc).getTime() : Date.now());
   const frac = m == null ? 0 : m / budget;
   const cls = frac >= 1 ? 'bad' : frac >= 0.75 ? 'warn' : 'ok';
-  const what = active.length ? active.map((x) => [h('b', {}, `#${x.issue}`), x.title ? ` ${str(x.title)}` : '', x.build ? h('span', { class: 'meta' }, ` · build ${str(x.build)}${x.baseline ? ` vs ${str(x.baseline)}` : ''}`) : null])
-    : scen.length ? scen.map((x) => [h('b', {}, str(x.id)), x.title ? ` ${str(x.title)}` : '', x.build ? h('span', { class: 'meta' }, ` · build ${str(x.build)}`) : null])
+  const what = active.length ? active.map((x) => [h('b', {}, issueRef(x.issue)), x.title ? ` ${str(x.title)}` : '', x.build ? h('span', { class: 'meta' }, ` · build ${str(x.build)}${x.baseline ? ` vs ${str(x.baseline)}` : ''}`) : null])
+    : scen.length ? scen.map((x) => [h('b', {}, refLink(str(x.id))), x.title ? ` ${str(x.title)}` : '', x.build ? h('span', { class: 'meta' }, ` · build ${str(x.build)}`) : null])
       : [lockBy(lock.owner)];
   card.append(h('div', { class: 'now-head' }, h('span', { class: 'pulse', 'aria-hidden': 'true' }), h('h2', {}, 'Working now'),
     lock ? h('span', { class: 'chip-s' }, lockBy(lock.owner)) : null),
@@ -671,13 +785,12 @@ function activityQueue() {
   const pending = arr(A.issues).filter((x) => x && x.status === 'report_pending');
   const rq = arr(F.requests).filter((x) => x && x.status === 'queued');
   const rp = arr(F.requests).filter((x) => x && x.status === 'report_pending');
-  const tpl = str(D.issue_url);
-  const issueA = (n) => (tpl.startsWith('https://') && tpl.includes('{n}') ? h('a', { href: tpl.replace('{n}', String(n)), target: '_blank', rel: 'noopener noreferrer' }, `#${n}`) : `#${n}`);
+  const issueA = (n) => issueRef(n);
   const groups = [
     ['New issues', 'q-new', waiting.filter((x) => x.kind === 'new').map((x) => [issueA(x.issue), ' ', str(x.title)])],
     ['Retests', 'q-re', waiting.filter((x) => x.kind === 'retest').map((x) => [issueA(x.issue), ' ', str(x.title)])],
-    ['Requested scenarios', 'q-sc', rq.map((x) => [h('b', {}, str(x.id)), ' ', str(x.title) || h('span', { class: 'meta' }, `from ${str(x.source)} · ${rel(x.utc)}`)])],
-    ['Reports on their way', 'q-rp', [...pending.map((x) => [issueA(x.issue), ' ', str(x.title), ' ', badge(x.verdict)]), ...rp.map((x) => [h('b', {}, str(x.id)), ' ', str(x.title), ' ', badge(x.verdict)])]],
+    ['Requested scenarios', 'q-sc', rq.map((x) => [h('b', {}, refLink(str(x.id))), ' ', str(x.title) || h('span', { class: 'meta' }, `from ${str(x.source)} · ${rel(x.utc)}`)])],
+    ['Reports on their way', 'q-rp', [...pending.map((x) => [issueA(x.issue), ' ', str(x.title), ' ', badge(x.verdict)]), ...rp.map((x) => [h('b', {}, refLink(str(x.id))), ' ', str(x.title), ' ', badge(x.verdict)])]],
   ];
   const total = groups.reduce((n, g) => n + g[2].length, 0);
   const card = h('section', { class: 'panel' }, h('h2', {}, `Queue (${total})`));
@@ -771,7 +884,7 @@ function viewOverview() {
       ['Pages covered', pagesData.length ? `${cov} / ${pagesData.length}` : '–', null], ['Last night', lastTxt, last ? () => openRun(nightOf(str(last.build))) : null],
       ['Flaky', items.filter((i) => i.flags.includes('flaky')).length, { flag: ['flaky'] }], ['Drift', items.filter((i) => i.flags.includes('drift')).length, { flag: ['drift'] }]]
       .map(([label, val, f]) => h(f ? 'button' : 'div', { class: 'kpi', type: f ? 'button' : null, style: f ? 'text-align:left;cursor:pointer' : null,
-        onclick: typeof f === 'function' ? f : f ? () => { S.f = JSON.parse(JSON.stringify(f)); S.v = 'catalog'; writeHash(); render(); } : null }, h('b', {}, String(val)), h('span', {}, label)))));
+        onclick: typeof f === 'function' ? f : f ? () => go({ v: 'catalog', f: JSON.parse(JSON.stringify(f)), q: '' }) : null }, h('b', {}, String(val)), h('span', {}, label)))));
   const att = items.filter((i) => i.flags.includes('needs attention')).sort((a, b) => SEV[a.cls] - SEV[b.cls] || str(b.verdict && b.verdict.utc).localeCompare(str(a.verdict && a.verdict.utc)));
   const labels = buildsAt.map((b) => fmtDate(b.utc) || b.id);
   const all = buildsAt.map((b) => items.filter((i) => i.file && i.history.length && str(i.history[0].utc) <= b.utc).length);
@@ -784,14 +897,14 @@ function viewOverview() {
       m.last_run && m.last_run.utc ? h('span', { class: 'meta' }, ` · ${rel(m.last_run.utc)}`) : null))),
       h('p', { class: 'meta' }, openD.length ? h('button', { class: 'linkish', type: 'button', onclick: () => go({ v: 'design' }) }, `${openD.length} open design finding(s), ${openD.filter((d) => d.severity === 'major').length} major →`) : 'No open design finding.')) : null,
     h('section', { class: 'panel' }, h('h2', {}, `Needs attention (${att.length})`), att.length ? h('ul', { class: 'att' }, att.slice(0, 14).map((i) => h('li', {}, badge(i.latest || (i.flags.includes('drift') ? 'drift' : '')), ' ',
-      h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key) }, `${i.label} — ${str(i.name)}`)))) : h('p', { class: 'muted-t' }, 'Nothing needs attention.')),
+      h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key) }, `${i.label} — ${str(i.name)}`), i.evidence ? [' ', reportBtn(i.evidence, () => openItem(i.key))] : null))) : h('p', { class: 'muted-t' }, 'Nothing needs attention.')),
     h('section', { class: 'panel' }, h('h2', {}, 'Suite size over builds'), buildsAt.length ? lineChart([{ name: 'tests', color: 'var(--link)', values: all }, { name: 'regression tier', color: 'var(--ok)', values: reg }], labels) : h('p', { class: 'muted-t' }, 'No builds yet.')),
     h('section', { class: 'panel' }, h('h2', {}, 'Latest runs'), runsAt.length ? [h('ul', { class: 'att' }, runsAt.slice(0, 8).map((r) => h('li', {}, badge(r.verdict), ' ',
-      h('button', { class: 'linkish', type: 'button', onclick: () => openRun(r) }, `${fmtDate(r.utc)} · ${runName(r)}`)))),
+      h('button', { class: 'linkish', type: 'button', onclick: () => openRun(r) }, `${fmtDate(r.utc)} · ${runName(r)}`), r.report ? [' ', reportBtn(r.report, () => openRun(r))] : null))),
       h('button', { class: 'linkish', type: 'button', onclick: () => go({ v: 'runs' }) }, `All ${runs.length} runs →`)] : h('p', { class: 'muted-t' }, 'No run yet.')),
     h('section', { class: 'panel' }, h('h2', {}, `Nightly outcomes (${Math.min(30, nightsAt.length)} nights)`), nightsAt.length ? nightsChart(nightsAt.slice(-30)) : h('p', { class: 'muted-t' }, 'The nightly regression has not run yet.')),
     h('section', { class: 'panel' }, h('h2', {}, 'Latest verdicts'), h('ul', { class: 'att' }, Object.entries(dist).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
-      h('li', {}, h('button', { class: 'linkish', type: 'button', onclick: () => { S.f = { verdict: [k] }; S.v = 'catalog'; writeHash(); render(); } }, badge(k === 'none' ? '' : k)), ` ${n}`))))));
+      h('li', {}, h('button', { class: 'linkish', type: 'button', onclick: () => go({ v: 'catalog', f: { verdict: [k] }, q: '' }) }, badge(k === 'none' ? '' : k)), ` ${n}`))))));
 }
 
 // ----------------------------------------------------------------- catalog
@@ -841,11 +954,11 @@ function table(list) {
       onclick: (e) => sortBy(k, e.shiftKey), onkeydown: (e) => { if (e.key === 'Enter') sortBy(k, e.shiftKey); } },
     COLS[k][0], pos >= 0 ? h('span', { class: 'arr' }, ` ${S.sort[pos][1] > 0 ? '▲' : '▼'}${S.sort.length > 1 ? pos + 1 : ''}`) : '');
   }));
-  const body = h('tbody', {}, list.map((i) => h('tr', { tabindex: 0, onclick: () => openItem(i.key), onkeydown: (e) => { if (e.key === 'Enter') openItem(i.key); } },
+  const body = h('tbody', {}, list.map((i) => h('tr', { tabindex: 0, onclick: rowClick(() => openItem(i.key)), onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(i.key); } },
     storageOK ? h('td', {}, star(i)) : null,
-    S.cols.map((k) => h('td', { class: k === 'name' ? 'name' : ['last', 'promoted', 'build', 'duration', 'ref', 'id'].includes(k) ? 'nw' : null },
+    S.cols.map((k) => h('td', { class: k === 'name' ? 'name' : ['last', 'promoted', 'build', 'duration', 'ref', 'id', 'report'].includes(k) ? 'nw' : null },
       k === 'name' ? [h('div', {}, str(i.name) || str(i.then)), i.kind === 'exploration' ? h('span', { class: 'meta' }, 'exploration') : null]
-        : k === 'tier' ? tierB(i.tier) : k === 'verdict' ? badge(i.latest) : COLS[k][1](i))))));
+        : k === 'tier' ? tierB(i.tier) : k === 'verdict' ? badge(i.latest) : COLS[k][3] ? COLS[k][3](i) : COLS[k][1](i))))));
   return h('div', { class: 'tablewrap' }, h('table', { class: 'list' }, h('thead', {}, head), body));
 }
 function sortBy(k, add) {
@@ -858,9 +971,9 @@ function sortBy(k, add) {
 function cards(list, gallery) {
   return h('div', { class: gallery ? 'gal' : 'cards' }, list.map((i) => {
     const src = img(i.still);
-    return h('div', { class: 'card', role: 'button', tabindex: 0, onclick: () => openItem(i.key), onkeydown: (e) => { if (e.key === 'Enter') openItem(i.key); } },
+    return h('div', { class: 'card', role: 'button', tabindex: 0, onclick: rowClick(() => openItem(i.key)), onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(i.key); } },
       gallery ? (src ? h('img', { src, alt: `${i.label}: ${str(i.then)}`, loading: 'lazy' }) : h('div', { class: 'ph' }, 'no still yet')) : null,
-      h('div', { style: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' }, h('b', {}, i.label), tierB(i.tier), badge(i.latest), star(i)),
+      h('div', { style: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' }, h('b', {}, refLink(i.ref), ` ${str(i.id)}`), tierB(i.tier), badge(i.latest), star(i), h('span', { style: 'flex:1' }), reportBtn(i.evidence, () => openItem(i.key))),
       h('div', {}, str(i.name)), i.then ? h('div', { class: 'then' }, `Then ${str(i.then)}`) : null,
       !gallery && src ? h('img', { src, alt: '', loading: 'lazy', style: 'max-height:120px;object-fit:cover;object-position:top' }) : null);
   }));
@@ -884,7 +997,8 @@ function viewList(gallery) {
     if (budget <= 0) break;
     const part = gl.slice(0, budget); budget -= part.length;
     const body = gallery || S.l === 'cards' ? cards(part, gallery) : table(part);
-    main.append(g == null ? body : h('details', { class: 'group', open: true }, h('summary', {}, h('span', {}, g), h('span', { class: 'count' }, `${gl.length}`), minibar(gl)), body));
+    main.append(g == null ? body : h('details', { class: 'group', open: true }, h('summary', {}, h('span', {}, g), h('span', { class: 'count' }, `${gl.length}`), minibar(gl),
+      S.g === 'origin' && origins.has(g.split(' — ')[0]) ? refLink(g.split(' — ')[0], `${originName(g.split(' — ')[0])}: runs and report →`) : null), body));
   }
   const total = S.g === 'none' ? list.length : groupsOf(list).reduce((t, [, gl]) => t + gl.length, 0);
   if (total > S.limit) main.append(h('div', { class: 'more-row' }, h('button', { class: 'btn', type: 'button', onclick: () => { S.limit += 100; render(); } }, `Show more (${total - S.limit} left)`)));
@@ -906,7 +1020,7 @@ function viewCoverage() {
     h('div', { class: 'pages' }, ps.map((p) => {
       const src = img(p.shot); const its = arr(p.items).filter(present);
       return h('div', { class: `page cov-${p.covered in c ? p.covered : 'none'}`, role: 'button', tabindex: 0, title: 'Show this page on the product map',
-        onclick: () => go({ v: 'map', pg: p.pattern, hs: null }), onkeydown: (e) => { if (e.key === 'Enter') go({ v: 'map', pg: p.pattern, hs: null }); } },
+        onclick: rowClick(() => go({ v: 'map', pg: p.pattern, hs: null })), onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) go({ v: 'map', pg: p.pattern, hs: null }); } },
       src ? h('img', { src, alt: str(p.title), loading: 'lazy' }) : null, h('b', {}, str(p.title) || str(p.pattern)), h('code', {}, str(p.pattern)),
       h('div', {}, h('span', { class: `badge ${{ regression: 'ok', exploratory: 'warn' }[p.covered] || 'bad'}` }, p.covered === 'regression' ? 'regression' : p.covered === 'exploratory' ? 'exploratory only' : 'not covered'),
         ' ', h('span', { class: 'count' }, `${its.length} item(s)`), p.golden_path === false ? h('span', { class: 'badge warn', style: 'margin-left:6px' }, 'no golden path') : null));
@@ -932,8 +1046,11 @@ function viewHistory() {
   v.append(h('div', { class: 'heat' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', { style: 'writing-mode:horizontal-tb;transform:none;left:0;z-index:2' }, ''), cols.map((b) => h('th', { title: `${b.id} · ${b.utc}${nightOf(b.id) ? ' — open the night' : ''}`, style: nightOf(b.id) ? 'cursor:pointer' : null, onclick: () => openRun(nightOf(b.id)) }, `${fmtDate(b.utc)} ${b.id}`.trim())))),
     h('tbody', {}, shown.map((i) => {
       const at = new Map(); for (const e of i.history) at.set(str(e.build), e);
-      return h('tr', {}, h('td', { class: 'rowh', title: str(i.name), onclick: () => openItem(i.key) }, `${i.label} ${str(i.name)}`),
-        cols.map((b) => { const e = at.get(b.id); return h('td', { class: `c ${e ? vClass(e.value) : 'e'}`, title: `${i.label} · ${b.id}: ${e ? `${vLabel(e.value)} (${str(e.run)})` : 'not run'}` }); }));
+      const enter = (f) => (ev) => { if (ev.key === 'Enter') f(); };
+      return h('tr', {}, h('td', { class: 'rowh', title: str(i.name), tabindex: 0, role: 'button', onclick: () => openItem(i.key), onkeydown: enter(() => openItem(i.key)) }, `${i.label} ${str(i.name)}`),
+        cols.map((b) => { const e = at.get(b.id); const r = e ? runFor(i, e) : null;
+          return h('td', { class: `c ${e ? vClass(e.value) : 'e'}`, title: `${i.label} · ${b.id}: ${e ? `${vLabel(e.value)} (${str(e.run)})` : 'not run'}${r ? ' — open the run' : ''}`, style: r ? 'cursor:pointer' : null, tabindex: r ? 0 : null, role: r ? 'button' : null,
+            'aria-label': r ? `${i.label} · ${b.id}: ${vLabel(e.value)} — open the run` : null, onclick: r ? () => openRun(r) : null, onkeydown: r ? enter(() => openRun(r)) : null }); }));
     })))));
   if (list.length > S.limit) v.append(h('div', { class: 'more-row' }, h('button', { class: 'btn', type: 'button', onclick: () => { S.limit += 100; render(); } }, `Show more (${list.length - S.limit} left)`)));
 }
@@ -946,16 +1063,16 @@ function viewLifecycle() {
   const tests = crit.filter((i) => i.file);
   const tier = (t) => tests.filter((i) => i.tier === t).length;
   const rows = [
-    ['Issues & scenarios', origins.size], ['Criteria', crit.length], ['…not testable', crit.filter((i) => i.testable === false).length],
-    ['Criterion tests', tests.length], ['…exploratory', tier('exploratory')], ['…promotable', tier('promotable')], ['…regression tier', tier('regression')],
-    ['…retired', tier('retired')], ['…quarantined', tier('quarantined')], ['Exploration tests (outside every verdict)', items.filter((i) => i.kind === 'exploration' && i.file).length]];
+    ['Issues & scenarios', origins.size], ['Criteria', crit.length, { kind: ['criterion'] }], ['…not testable', crit.filter((i) => i.testable === false).length, { flag: ['not testable'] }],
+    ['Criterion tests', tests.length], ['…exploratory', tier('exploratory'), { tier: ['exploratory'], kind: ['criterion'] }], ['…promotable', tier('promotable'), { tier: ['promotable'] }], ['…regression tier', tier('regression'), { tier: ['regression'] }],
+    ['…retired', tier('retired'), { tier: ['retired'] }], ['…quarantined', tier('quarantined'), { tier: ['quarantined'] }], ['Exploration tests (outside every verdict)', items.filter((i) => i.kind === 'exploration' && i.file).length, { kind: ['exploration'] }]];
   const max = Math.max(1, ...rows.map((r) => r[1]));
-  v.append(h('section', { class: 'panel funnel' }, h('h2', {}, 'From issue to nightly regression'), rows.map(([l, n]) => h('div', { class: 'row' }, h('span', {}, l), h('div', {}, h('div', { class: 'fill', style: `width:${(100 * n) / max}%` })), h('b', {}, String(n))))));
+  v.append(h('section', { class: 'panel funnel' }, h('h2', {}, 'From issue to nightly regression'), rows.map(([l, n, f]) => h('div', { class: 'row' }, f ? h('button', { class: 'lnk', type: 'button', title: 'Show them in the catalog', onclick: () => go({ v: 'catalog', f, q: '' }) }, l) : h('span', {}, l), h('div', {}, h('div', { class: 'fill', style: `width:${(100 * n) / max}%` })), h('b', {}, String(n))))));
   const queue = items.filter((i) => i.tier === 'promotable');
   const refs = [...new Set(queue.map((i) => (i.origin.kind === 'scenario' ? i.ref : `#${num(i.ref)}`)))];
   v.append(h('section', { class: 'panel', style: 'margin-top:14px' }, h('h2', {}, `Promotable queue (${refs.length})`),
     refs.length ? [h('p', {}, 'Paste into the agent\'s direct session: ', copyBox('promote all pending')),
-      h('ul', { class: 'att' }, refs.map((r) => h('li', {}, copyBox(`promote ${r}`), ' ', queue.filter((i) => i.ref === r || `#${num(i.ref)}` === r).map((i) => h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key), style: 'margin-right:8px' }, `${i.id}`)))))]
+      h('ul', { class: 'att' }, refs.map((r) => h('li', {}, copyBox(`promote ${r}`), ' ', refLink(queue.find((i) => i.ref === r || `#${num(i.ref)}` === r)?.ref || r), ' ', queue.filter((i) => i.ref === r || `#${num(i.ref)}` === r).map((i) => h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key), style: 'margin-right:8px' }, `${i.id}`)))))]
       : h('p', { class: 'muted-t' }, 'Nothing waits for promotion.')));
 }
 
@@ -967,56 +1084,126 @@ function sparkline(vals, w = 220, hh = 36) {
     s('polyline', { fill: 'none', stroke: 'var(--link)', 'stroke-width': 1.5, points: vals.map((v, k) => `${x(k)},${y(v)}`).join(' ') })), ` latest ${ms(vals[vals.length - 1])}`);
 }
 let lastFocus = null;
+// Close: back to the place under the panel when that was the step before, else a step to it.
+function closeDrawer() {
+  const base = hashOf({ ...S, i: null, r: null, o: null });
+  if (trail.length && trail[trail.length - 1].h === base) back(); else nav({});
+}
+// The items of the list the panel was opened from, for "previous" and "next".
+function siblingsOf(key) {
+  const list = ['catalog', 'gallery'].includes(S.v) ? sorted(filtered()) : [];
+  const k = list.findIndex((x) => x.key === key);
+  return k < 0 ? [null, null] : [list[k - 1] || null, list[k + 1] || null];
+}
+function drawerShell(label, step, kids) {
+  const [prev, next] = step || [null, null];
+  const top = h('div', { class: 'dtop' }, backBtn(),
+    h('span', { class: 'sp' }),
+    prev ? h('button', { class: 'btn', type: 'button', title: prev.title, onclick: prev.go }, `‹ ${prev.text}`) : null,
+    next ? h('button', { class: 'btn', type: 'button', title: next.title, onclick: next.go }, `${next.text} ›`) : null,
+    h('button', { class: 'btn', type: 'button', title: 'Close (Esc)', onclick: closeDrawer }, 'Close'));
+  const d = h('div', { id: 'drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': label, tabindex: -1, onkeydown: (e) => { if (e.key === 'Escape') closeDrawer(); } }, top, kids);
+  document.body.append(h('div', { id: 'scrim', onclick: closeDrawer }), d);
+  d.focus();
+}
 function renderDrawer() {
   const had = !!$('#drawer');
   for (const e of ['#drawer', '#scrim']) { const n = $(e); if (n) n.remove(); }
   derive();
   const i = S.i && byKey.get(S.i);
   const run = !i && S.r && byRun.get(S.r);
-  if (!i && !run) { if (lastFocus && lastFocus.isConnected) lastFocus.focus(); return; }
+  const org = !i && !run && S.o && origins.has(S.o) ? S.o : null;
+  if (!i && !run && !org) { if (lastFocus && lastFocus.isConnected) lastFocus.focus(); return; }
   if (!had) lastFocus = document.activeElement;
-  if (run) { runDrawer(run); return; }
-  const close = () => { S.i = null; writeHash(); renderDrawer(); };
+  if (run) runDrawer(run); else if (org) originDrawer(org); else itemDrawer(i);
+}
+const labelChips = (labels) => (arr(labels).length ? h('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin-top:4px' }, labels.map((l) => h('span', { class: 'tier' }, facetLink('label', str(l))))) : null);
+// One run per row: when, which run, the build, the verdict, the report with its video and screenshots.
+function runTable(list, verdictOf) {
+  return h('div', { class: 'tablewrap' }, h('table', { class: 'list' },
+    h('thead', {}, h('tr', {}, ['Date', 'Run', 'Build', 'Verdict', 'Report'].map((c) => h('th', { scope: 'col', style: 'cursor:default' }, c)))),
+    h('tbody', {}, list.map(([r, e]) => h('tr', { tabindex: r ? 0 : null, style: r ? null : 'cursor:default', onclick: r ? rowClick(() => openRun(r)) : null, onkeydown: r ? (ev) => { if (ev.key === 'Enter' && ev.target === ev.currentTarget) openRun(r); } : null },
+      h('td', { class: 'nw', title: str((e || r).utc) }, fmtDate((e || r).utc)),
+      h('td', {}, r ? h('button', { class: 'lnk', type: 'button', onclick: () => openRun(r) }, r.type === 'regression' ? RUNTYPE.regression : RUNTYPE[r.type]) : str(e && e.run)),
+      h('td', { class: 'nw' }, buildLink(str((e || r).build))),
+      h('td', {}, badge(verdictOf ? verdictOf(r, e) : r.verdict)),
+      h('td', { class: 'nw' }, r ? reportBtn(r.report, () => openRun(r)) || h('span', { class: 'muted-t' }, '–') : h('span', { class: 'muted-t' }, '–')))))));
+}
+function itemDrawer(i) {
   const o = i.origin;
-  let link = null;
-  const tpl = str(D.issue_url);
-  if (o.kind === 'issue' && tpl.startsWith('https://') && tpl.includes('{n}') && Number.isInteger(o.number)) link = h('a', { href: tpl.replace('{n}', String(o.number)), target: '_blank', rel: 'noopener noreferrer' }, 'open the issue');
-  const sib = items.filter((x) => x.key !== i.key && ((i.file && x.file === i.file) || (!i.file && x.ref === i.ref)));
+  const sib = items.filter((x) => x.key !== i.key && x.ref === i.ref);
   const src = img(i.still);
-  const d = h('div', { id: 'drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${i.label} details`, tabindex: -1, onkeydown: (e) => { if (e.key === 'Escape') close(); } },
-    h('button', { class: 'btn close', type: 'button', onclick: close }, 'Close'),
-    h('div', { class: 'meta' }, o.kind === 'scenario' ? `Scenario ${i.ref}${o.source ? ` · from ${str(o.source)}` : ''}` : `Issue ${i.ref}${o.state ? ` · ${str(o.state)}` : ''}`, link ? ' · ' : '', link),
+  const [pv, nx] = siblingsOf(i.key);
+  const stepOf = (x, text) => (x ? { text, title: `${x.label} — ${str(x.name)}`, go: () => openItem(x.key) } : null);
+  drawerShell(`${i.label} details`, [stepOf(pv, 'Previous'), stepOf(nx, 'Next')], [
+    h('div', { class: 'crumbs' }, refLink(i.ref, `${originName(i.ref)}${o.title ? ` — ${str(o.title)}` : ''}`), h('span', { class: 'sep' }, '›'), h('span', {}, str(i.id)),
+      o.kind === 'issue' && issueHref(o.number) ? [h('span', { class: 'sep' }, '·'), extIssue(o.number, 'open the issue ↗')] : null),
+    h('div', { class: 'meta' }, o.kind === 'scenario' ? `Scenario${o.source ? ` · from ${str(o.source)}` : ''}` : `Issue${o.state ? ` · ${str(o.state)}` : ''}`),
     h('h2', {}, `${i.label} — ${str(i.name)}`, ' ', star(i)),
-    o.title ? h('div', {}, str(o.title)) : null,
-    arr(o.labels).length ? h('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin-top:4px' }, o.labels.map((l) => h('span', { class: 'tier' }, str(l)))) : null,
+    labelChips(o.labels),
     h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' }, tierB(i.tier), badge(i.latest), i.kind === 'exploration' ? h('span', { class: 'badge muted' }, 'exploration — outside every verdict') : null,
       i.drift ? h('span', { class: 'badge muted' }, 'drift — not run until re-promoted') : null, i.testable === false ? h('span', { class: 'badge muted' }, 'not testable') : null),
     i.summary ? h('p', {}, str(i.summary)) : null,
     h('div', { class: 'gwt' }, h('p', {}, h('b', {}, 'Given'), str(i.given) || '–'), h('p', {}, h('b', {}, 'When'), str(i.when) || '–'), h('p', {}, h('b', {}, i.kind === 'exploration' ? 'Expect' : 'Then'), str(i.then) || '–')),
-    src ? h('figure', { style: 'margin:10px 0' }, h('img', { src, alt: `The screen ${i.id} is checked on`, style: 'width:100%;border-radius:6px;border:1px solid var(--line);background:#fff' }), h('figcaption', { class: 'meta' }, `The screen right before the ${i.id} check`)) : null,
+    src ? h('figure', { style: 'margin:10px 0' }, h('img', { src, alt: `The screen ${i.id} is checked on`, style: 'width:100%;border-radius:6px;border:1px solid var(--line);background:#fff' }),
+      h('figcaption', { class: 'meta', style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:center' }, `The screen right before the ${i.id} check.`, i.evidence ? ['The video and every screenshot:', reportBtn(i.evidence, () => { const n = $('#drawer dl'); if (n) n.scrollIntoView({ block: 'center' }); })] : null)) : null,
     h('dl', { class: 'dl' },
+      h('dt', {}, 'Report'), h('dd', {}, artLink(i.evidence)),
       h('dt', {}, 'File'), h('dd', {}, i.file ? h('code', {}, str(i.file)) : '– (no test)'),
-      h('dt', {}, 'Area'), h('dd', {}, str(i.area) || '–'), h('dt', {}, 'Pages'), h('dd', {}, i.pages.length ? i.pages.map((p, k) => [k ? ', ' : '', h('code', {}, p)]) : '–'),
-      h('dt', {}, 'Session'), h('dd', {}, str(i.session) || '–'), h('dt', {}, 'Surface'), h('dd', {}, str(i.surface) || '–'),
+      h('dt', {}, 'Area'), h('dd', {}, facetLink('area', i.area)), h('dt', {}, 'Pages'), h('dd', {}, i.pages.length ? joinNodes(i.pages.map((p) => pageLink(p))) : '–'),
+      h('dt', {}, 'Session'), h('dd', {}, facetLink('session', i.session)), h('dt', {}, 'Surface'), h('dd', {}, facetLink('surface', i.surface)),
       h('dt', {}, 'Promoted'), h('dd', {}, i.promoted_utc ? fmtDate(i.promoted_utc) : '–'),
       h('dt', {}, 'Checks'), h('dd', {}, i.checks ? `${i.checks.expects ?? 0} expect · ${i.checks.agent_asserts ?? 0} agent.assert` : '–', i.checks && i.checks.agent_asserts ? h('div', { class: 'meta' }, 'agent.assert calls the model on every run — it costs tokens every night.') : null),
       h('dt', {}, 'Duration'), h('dd', {}, sparkline(i.duration_ms) || '–'),
-      h('dt', {}, 'Evidence'), h('dd', {}, artLink(i.evidence)),
-      h('dt', {}, 'Collections'), h('dd', {}, colls(i).join(', ') || '–')),
-    i.steps.length ? h('section', { class: 'sec' }, h('h3', {}, 'Steps'), h('ol', { class: 'steps' }, i.steps.map((st) => h('li', { 'data-k': { open: '↗', act: '▶', assert: '?', expect: '=', shot: '◉' }[st.kind] || '•', class: st.kind }, h('span', { class: 'meta' }, `${str(st.kind)} `), stepText(st.text))))) : null,
-    h('section', { class: 'sec' }, h('h3', {}, `History (${i.history.length})${S.at ? ` up to ${S.at}` : ''}`), i.history.length ? h('div', { class: 'hist' }, i.history.map((e) => {
-      const r = runFor(i, e); const t = `${str(e.build)} · ${str(e.run)} · ${vLabel(e.value)} · ${str(e.utc)}`;
-      return r ? h('button', { class: `badge ${vClass(e.value)}`, type: 'button', style: 'border:0;cursor:pointer;font-weight:400', title: `${t} — open the run`, onclick: () => openRun(r) }, `${fmtDate(e.utc)} ${vLabel(e.value)}`)
-        : h('span', { class: vClass(e.value), title: t }, `${fmtDate(e.utc)} ${vLabel(e.value)}`);
-    })) : h('p', { class: 'muted-t' }, 'Not run yet.')),
+      h('dt', {}, 'Collections'), h('dd', {}, colls(i).length ? joinNodes(colls(i).map((c) => facetLink('collection', c))) : '–')),
+    i.steps.length ? h('section', { class: 'sec' }, h('h3', {}, 'Steps'), h('ol', { class: 'steps' }, i.steps.map((st) => h('li', { 'data-k': { open: '↗', act: '▶', assert: '?', expect: '=', shot: '◉' }[st.kind] || '•', class: st.kind },
+      h('span', { class: 'meta' }, `${str(st.kind)} `), st.kind === 'open' && patOf(str(st.text).replace(/\?.*$/, '')) ? pageLink(str(st.text).replace(/\?.*$/, ''), str(st.text)) : stepText(st.text))))) : null,
+    h('section', { class: 'sec' }, h('h3', {}, `Runs (${i.history.length})${S.at ? ` up to ${S.at}` : ''}`), i.history.length
+      ? [h('div', { style: 'margin-bottom:6px' }, cells(i.history, 30)), runTable(i.history.slice().reverse().map((e) => [runFor(i, e), e]), (r, e) => e.value)]
+      : h('p', { class: 'muted-t' }, 'Not run yet.')),
     onMap(i).length ? h('section', { class: 'sec' }, h('h3', {}, 'On the product map'), h('ul', { class: 'att' }, onMap(i).map(([p, k]) => h('li', {},
       h('button', { class: 'linkish', type: 'button', onclick: () => go({ v: 'map', pg: p.pattern, hs: k }) }, k == null ? `${str(p.title) || p.pattern} — the page` : `${str(p.title) || p.pattern} — ${KIND[p.hotspots[k].kind] || 'control'} "${p.hotspots[k].name}"`))))) : null,
-    i.heals.length ? h('section', { class: 'sec' }, h('h3', {}, 'Repaired checks'), h('ul', {}, i.heals.map((x) => h('li', {}, `${fmtDate(x.utc)} on ${str(x.build)} — basis: ${str(x.basis)}`)))) : null,
-    i.flaky.length ? h('section', { class: 'sec' }, h('h3', {}, 'Flaky confirmations'), h('ul', {}, i.flaky.map((x) => h('li', {}, `${fmtDate(x.utc)} on ${str(x.build)} — ${x.passes ?? '?'} of ${x.runs ?? '?'} runs passed`)))) : null,
+    i.heals.length ? h('section', { class: 'sec' }, h('h3', {}, 'Repaired checks'), h('ul', {}, i.heals.map((x) => h('li', {}, `${fmtDate(x.utc)} on `, buildLink(x.build), ` — basis: ${str(x.basis)}`)))) : null,
+    i.flaky.length ? h('section', { class: 'sec' }, h('h3', {}, 'Flaky confirmations'), h('ul', {}, i.flaky.map((x) => h('li', {}, `${fmtDate(x.utc)} on `, buildLink(x.build), ` — ${x.passes ?? '?'} of ${x.runs ?? '?'} runs passed`)))) : null,
     commands(i).length ? h('section', { class: 'sec' }, h('h3', {}, 'Commands for the agent\'s direct session'), commands(i).map((c) => h('div', { style: 'margin:4px 0' }, copyBox(c)))) : null,
-    sib.length ? h('section', { class: 'sec' }, h('h3', {}, 'Same file'), h('ul', { class: 'att' }, sib.map((x) => h('li', {}, badge(x.latest), ' ', h('button', { class: 'linkish', type: 'button', onclick: () => openItem(x.key) }, `${x.label} — ${str(x.name)}`))))) : null);
-  document.body.append(h('div', { id: 'scrim', onclick: close }), d);
-  d.focus();
+    sib.length ? h('section', { class: 'sec' }, h('h3', {}, `Other criteria of ${i.ref}`), h('ul', { class: 'att' }, sib.map((x) => h('li', {}, badge(x.latest), ' ', h('button', { class: 'linkish', type: 'button', onclick: () => openItem(x.key) }, `${x.label} — ${str(x.name)}`))))) : null,
+  ]);
+}
+// An issue or a scenario: its criteria and explorations, every run that judged them, its report.
+function originDrawer(ref) {
+  const o = origins.get(ref) || {};
+  const its = items.filter((x) => x.ref === ref).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'criterion' ? -1 : 1) || num(a.id) - num(b.id));
+  const all = ALL.filter((x) => x.ref === ref);
+  const ev = (all.find((x) => x.evidence) || {}).evidence || null;
+  const rs = originRuns(ref).filter((r) => runsAt.includes(r));
+  const pages = [...new Set(all.flatMap((x) => x.pages))];
+  const areas2 = [...new Set(all.map((x) => str(x.area)).filter(Boolean))];
+  const cs = [...new Set(all.flatMap(colls))];
+  const crit = all.find((x) => x.kind === 'criterion');
+  // A night stands for these tests by their worst result that night; an issue or scenario run by its own verdict.
+  const own2 = (r) => (r.type !== 'regression' ? r.verdict : r.entries.filter((x) => all.some((i) => i.key === x.key)).sort((a, b) => SEV[vClass(a.value)] - SEV[vClass(b.value)])[0]?.value || 'unchanged');
+  const keys = [...origins.keys()].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
+  const k = keys.indexOf(ref);
+  const stepOf = (x, text) => (x ? { text, title: `${originName(x)} — ${originTitle(x)}`, go: () => openOrigin(x) } : null);
+  drawerShell(`${originName(ref)} details`, [stepOf(keys[k - 1], keys[k - 1]), stepOf(keys[k + 1], keys[k + 1])], [
+    h('div', { class: 'meta' }, o.kind === 'scenario' ? `Scenario${o.source ? ` · from ${str(o.source)}` : ''}` : `Issue${o.state ? ` · ${str(o.state)}` : ''}`,
+      o.kind === 'issue' && issueHref(o.number) ? [' · ', extIssue(o.number, 'open the issue ↗')] : null),
+    h('h2', {}, `${ref}${o.title ? ` — ${str(o.title)}` : ''}`),
+    labelChips(o.labels),
+    h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px' }, minibar(its), h('span', { class: 'count' }, `${its.length} criteria and explorations · ${rs.length} runs`)),
+    h('dl', { class: 'dl' },
+      h('dt', {}, 'Report'), h('dd', {}, ev ? artLink(ev) : '– (none published yet)'),
+      h('dt', {}, 'Areas'), h('dd', {}, areas2.length ? joinNodes(areas2.map((a) => facetLink('area', a))) : '–'),
+      h('dt', {}, 'Pages'), h('dd', {}, pages.length ? joinNodes(pages.map((p) => pageLink(p))) : '–'),
+      h('dt', {}, 'Collections'), h('dd', {}, cs.length ? joinNodes(cs.map((c) => facetLink('collection', c))) : '–')),
+    h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
+      h('button', { class: 'btn', type: 'button', onclick: () => go({ v: 'catalog', f: { ref: [ref] }, q: '' }) }, 'Show in the catalog'),
+      h('button', { class: 'btn', type: 'button', onclick: () => go({ v: 'gallery', f: { ref: [ref] }, q: '' }) }, 'Its screenshots')),
+    h('section', { class: 'sec' }, h('h3', {}, `Criteria and explorations (${its.length})`), its.length ? h('ul', { class: 'att' }, its.map((x) => itemRow(x, false))) : h('p', { class: 'muted-t' }, S.at ? 'None judged by then.' : 'None yet.')),
+    h('section', { class: 'sec' }, h('h3', {}, `Runs (${rs.length})`), rs.length ? runTable(rs.map((r) => [r, null]), (r) => own2(r)) : h('p', { class: 'muted-t' }, 'Not run yet.'),
+      rs.some((r) => r.type === 'regression') ? h('p', { class: 'meta' }, 'A night is listed when one of these tests had a result other than unchanged.') : null),
+    crit && commands(crit).length ? h('section', { class: 'sec' }, h('h3', {}, 'Commands for the agent\'s direct session'), commands(crit).map((c) => h('div', { style: 'margin:4px 0' }, copyBox(c)))) : null,
+  ]);
 }
 
 // -------------------------------------------------------------------- runs
@@ -1027,56 +1214,71 @@ function outcome(r) {
   const c = {}; for (const e of r.entries) c[e.value] = (c[e.value] || 0) + 1;
   return Object.entries(c).map(([k, n]) => `${n} ${vLabel(k).toLowerCase()}`).join(' · ');
 }
+// A run type refines the Runs view, like a filter: it replaces the current step, never adds one.
+const pickRt = (k) => { S.rt = k; S.limit = 100; writeHash(); render(); };
 function viewRuns() {
   const v = $('#view');
   if (!runs.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No runs yet.'), h('p', {}, 'Issue runs, scenario runs and every nightly regression appear here, each with its report.'))); return; }
-  const list = runs.filter((r) => S.rt === 'all' || r.type === S.rt);
+  const inBuild = runs.filter((r) => !S.rb || r.build === S.rb);
+  const list = inBuild.filter((r) => S.rt === 'all' || r.type === S.rt);
+  if (S.rb) {
+    const b = builds.find((x) => x.id === S.rb);
+    v.append(h('div', { class: 'filterbar panel' }, h('b', {}, 'Build '), h('code', {}, S.rb), b ? h('span', { class: 'meta' }, `first seen ${fmtDate(b.utc)}`) : null,
+      b ? h('button', { class: 'btn', type: 'button', onclick: () => go({ at: S.rb, v: 'catalog' }) }, 'Catalog as of this build') : null,
+      b ? h('button', { class: 'btn', type: 'button', onclick: () => go({ at: S.rb, v: 'map' }) }, 'Product map as of this build') : null,
+      h('button', { class: 'btn', type: 'button', onclick: () => go({ rb: null }) }, '✕ Every build')));
+  }
   v.append(h('div', { class: 'chips' }, [['all', 'All runs'], ...Object.entries(RUNTYPE)].map(([k, l]) => {
-    const n = k === 'all' ? runs.length : runs.filter((r) => r.type === k).length;
-    return h('button', { class: `chip${S.rt === k ? ' on' : ''}`, type: 'button', 'aria-pressed': S.rt === k ? 'true' : 'false', onclick: () => go({ rt: k }) }, `${l} (${n})`);
+    const n = k === 'all' ? inBuild.length : inBuild.filter((r) => r.type === k).length;
+    return h('button', { class: `chip${S.rt === k ? ' on' : ''}`, type: 'button', 'aria-pressed': S.rt === k ? 'true' : 'false', onclick: () => pickRt(k) }, `${l} (${n})`);
   })));
   const shown = list.slice(0, S.limit);
   v.append(h('div', { class: 'tablewrap' }, h('table', { class: 'list' },
     h('thead', {}, h('tr', {}, ['Date', 'Run', 'Build', 'Result', 'Outcome', 'Report'].map((c) => h('th', { scope: 'col', style: 'cursor:default' }, c)))),
-    h('tbody', {}, shown.map((r) => h('tr', { tabindex: 0, onclick: () => openRun(r), onkeydown: (e) => { if (e.key === 'Enter') openRun(r); } },
+    h('tbody', {}, shown.map((r) => h('tr', { tabindex: 0, onclick: rowClick(() => openRun(r)), onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openRun(r); } },
       h('td', { class: 'nw', title: r.utc }, `${fmtDate(r.utc)} ${r.utc.slice(11, 16)}`),
-      h('td', { class: 'name' }, h('div', {}, r.type === 'regression' ? RUNTYPE.regression : `${RUNTYPE[r.type]} ${r.ref}`), r.type !== 'regression' && originTitle(r.ref) ? h('div', { class: 'meta' }, originTitle(r.ref)) : null),
-      h('td', { class: 'nw' }, h('code', {}, r.build), r.baseline ? h('div', { class: 'meta' }, `vs ${str(r.baseline)}`) : r.previous ? h('div', { class: 'meta' }, `since ${str(r.previous)}`) : null),
+      h('td', { class: 'name' }, h('div', {}, r.type === 'regression' ? RUNTYPE.regression : [`${RUNTYPE[r.type]} `, refLink(r.ref)]), r.type !== 'regression' && originTitle(r.ref) ? h('div', { class: 'meta' }, originTitle(r.ref)) : null),
+      h('td', { class: 'nw' }, buildLink(r.build), r.baseline ? h('div', { class: 'meta' }, 'vs ', buildLink(r.baseline)) : r.previous ? h('div', { class: 'meta' }, 'since ', buildLink(r.previous)) : null),
       h('td', {}, badge(r.verdict)), h('td', {}, outcome(r)),
-      h('td', { onclick: (e) => e.stopPropagation() }, artCell(r.report, () => openRun(r)))))))));
+      h('td', { class: 'nw' }, artCell(r.report, () => openRun(r)))))))));
   if (list.length > S.limit) v.append(h('div', { class: 'more-row' }, h('button', { class: 'btn', type: 'button', onclick: () => { S.limit += 100; render(); } }, `Show more (${list.length - S.limit} left)`)));
 }
 function runDrawer(r) {
-  const close = () => { S.r = null; writeHash(); renderDrawer(); };
-  const tpl = str(D.issue_url);
-  const issueLink = (n, text) => (tpl.startsWith('https://') && tpl.includes('{n}') && Number.isInteger(n) ? h('a', { href: tpl.replace('{n}', String(n)), target: '_blank', rel: 'noopener noreferrer' }, text) : text);
   const night = r.type === 'regression';
   const ents = r.entries.slice().sort((a, b) => SEV[vClass(a.value)] - SEV[vClass(b.value)]);
   const hasBuild = builds.some((b) => b.id === r.build);
-  const d = h('div', { id: 'drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${runName(r)} details`, tabindex: -1, onkeydown: (e) => { if (e.key === 'Escape') close(); } },
-    h('button', { class: 'btn close', type: 'button', onclick: close }, 'Close'),
-    h('div', { class: 'meta' }, `${RUNTYPE[r.type]} · ${r.utc}`),
+  // The runs before and after this one: every night, or the runs of the same issue or scenario.
+  const same = runs.filter((x) => (night ? x.type === 'regression' : x.type === r.type && x.ref === r.ref)).sort((a, b) => a.utc.localeCompare(b.utc));
+  const k = same.indexOf(r);
+  const stepOf = (x, text) => (x ? { text, title: `${fmtDate(x.utc)} · ${runName(x)}`, go: () => openRun(x) } : null);
+  const prevNight = night && r.previous ? nightOf(str(r.previous)) : null;
+  drawerShell(`${runName(r)} details`, [stepOf(same[k - 1], night ? 'Night before' : 'Run before'), stepOf(same[k + 1], night ? 'Night after' : 'Run after')], [
+    h('div', { class: 'crumbs' }, h('button', { class: 'lnk', type: 'button', onclick: () => go({ v: 'runs', rt: r.type, rb: null }) }, `${RUNTYPE[r.type]}s`),
+      night ? null : [h('span', { class: 'sep' }, '›'), refLink(r.ref, `${originName(r.ref)}${originTitle(r.ref) ? ` — ${originTitle(r.ref)}` : ''}`)],
+      h('span', { class: 'sep' }, '›'), h('span', {}, r.utc)),
     h('h2', {}, night ? `Night of ${fmtDate(r.utc)} · ${r.build}` : `${r.ref} · ${r.build}`),
-    !night && originTitle(r.ref) ? h('div', {}, originTitle(r.ref)) : null,
     h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' }, badge(r.verdict)),
     h('dl', { class: 'dl' },
-      h('dt', {}, 'Build'), h('dd', {}, h('code', {}, r.build)),
-      night ? [h('dt', {}, 'Since'), h('dd', {}, r.previous ? h('code', {}, str(r.previous)) : 'the first night')] : [h('dt', {}, 'Baseline'), h('dd', {}, r.baseline ? h('code', {}, str(r.baseline)) : '–')],
+      h('dt', {}, 'Report'), h('dd', {}, artLink(r.report)),
+      h('dt', {}, 'Build'), h('dd', {}, buildLink(r.build)),
+      night ? [h('dt', {}, 'Since'), h('dd', {}, prevNight ? h('button', { class: 'lnk', type: 'button', title: 'Open that night', onclick: () => openRun(prevNight) }, h('code', {}, str(r.previous))) : r.previous ? buildLink(r.previous) : 'the first night')]
+        : [h('dt', {}, 'Baseline'), h('dd', {}, r.baseline ? buildLink(r.baseline) : '–')],
       r.window ? [h('dt', {}, 'Window'), h('dd', {}, typeof r.window === 'object' ? Object.values(r.window).map(str).join(' → ') : str(r.window))] : null,
-      h('dt', {}, 'Report'), h('dd', {}, artLink(r.report)), h('dt', {}, 'Outcome'), h('dd', {}, outcome(r) || '–')),
+      h('dt', {}, 'Outcome'), h('dd', {}, outcome(r) || '–')),
     hasBuild ? h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
       h('button', { class: 'btn', type: 'button', onclick: () => go({ at: r.build, v: 'catalog' }) }, 'Catalog as of this build'),
-      h('button', { class: 'btn', type: 'button', onclick: () => go({ at: r.build, v: 'map' }) }, 'Product map as of this build')) : null,
+      h('button', { class: 'btn', type: 'button', onclick: () => go({ at: r.build, v: 'map' }) }, 'Product map as of this build'),
+      h('button', { class: 'btn', type: 'button', onclick: () => go({ v: 'runs', rb: r.build, rt: 'all' }) }, 'Every run on this build')) : null,
     r.verdict === 'environment' ? h('p', { class: 'muted-t' }, 'The product did not come up on this build: nothing was replayed, and no test has a result from this night.') : null,
     h('section', { class: 'sec' }, h('h3', {}, night ? `Results that were not unchanged (${ents.length})` : `Verdicts (${ents.length})`),
       ents.length ? h('ul', { class: 'att' }, ents.map((e) => { const i = byKey.get(e.key); return h('li', {}, badge(e.value), ' ',
-        i ? h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key) }, `${i.label} — ${str(i.name)}`) : h('code', {}, e.key)); })) : null,
+        i ? [h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key) }, `${i.label} — ${str(i.name)}`), night ? [' ', h('span', { class: 'meta' }, 'of '), refLink(i.ref)] : null] : h('code', {}, e.key)); })) : null,
       night && r.verdict !== 'environment' ? h('p', { class: 'muted-t' }, 'Every other regression-tier test that night: unchanged (drifted ones are not run).') : null),
-    r.signals && Object.values(r.signals).some((n) => +n > 0) ? h('section', { class: 'sec' }, h('h3', {}, 'Signals no test covers'), h('ul', {}, Object.entries(r.signals).filter(([, n]) => +n > 0).map(([k, n]) => h('li', {}, `${k.replace(/_/g, ' ')}: ${+n}`)))) : null,
-    r.issues.length ? h('section', { class: 'sec' }, h('h3', {}, `Completed issues in the window (${r.issues.length})`), h('ul', { class: 'att' }, r.issues.map((x) => h('li', {}, issueLink(+x.number, `#${str(x.number)}`), ' ', str(x.title))))) : null,
-    r.ui_diff ? h('section', { class: 'sec' }, h('h3', {}, 'What moved in the UI'), h('pre', { class: 'diff' }, str(r.ui_diff))) : null);
-  document.body.append(h('div', { id: 'scrim', onclick: close }), d);
-  d.focus();
+    r.signals && Object.values(r.signals).some((n) => +n > 0) ? h('section', { class: 'sec' }, h('h3', {}, 'Signals no test covers'), h('ul', {}, Object.entries(r.signals).filter(([, n]) => +n > 0).map(([key, n]) => h('li', {}, `${key.replace(/_/g, ' ')}: ${+n}`)))) : null,
+    r.issues.length ? h('section', { class: 'sec' }, h('h3', {}, `Completed issues in the window (${r.issues.length})`), h('ul', { class: 'att' }, r.issues.map((x) => h('li', {}, issueRef(+x.number), ' ', str(x.title),
+      origins.has(`#${+x.number}`) && issueHref(+x.number) ? [' ', extIssue(+x.number)] : null)))) : null,
+    r.ui_diff ? h('section', { class: 'sec' }, h('h3', {}, 'What moved in the UI'), h('pre', { class: 'diff' }, str(r.ui_diff))) : null,
+  ]);
 }
 
 // --------------------------------------------------------------------- map
@@ -1091,13 +1293,16 @@ function onMap(i) {
   }
   return out.slice(0, 12);
 }
-function itemRow(i) {
+// An item in a list: its verdict, a link to it, its tier, its last runs; with `full`, its origin and report too.
+function itemRow(i, full = true) {
   return h('li', { style: 'margin:6px 0' }, badge(i.latest), ' ', h('button', { class: 'linkish', type: 'button', onclick: () => openItem(i.key) }, `${i.label} — ${str(i.name)}`),
-    ' ', tierB(i.tier), i.history.length ? h('div', {}, cells(i.history)) : null);
+    ' ', tierB(i.tier), full && i.evidence ? [' ', reportBtn(i.evidence, () => openItem(i.key))] : null,
+    i.history.length ? h('div', {}, cells(i.history), full ? [' ', h('span', { class: 'meta' }, 'of '), refLink(i.ref, `${originName(i.ref)}${i.origin.title ? ` — ${str(i.origin.title).slice(0, 60)}` : ''}`)] : null) : null);
 }
-// The pages walked through on the map, for its "back" (this view only, never in the address).
-const mapTrail = [];
-const walk = (from, to) => { mapTrail.push(from); if (mapTrail.length > 50) mapTrail.shift(); go({ pg: to, hs: null }); };
+// A walk through the map is a step like any other: "back" returns to the page before.
+const walk = (to) => go({ pg: to, hs: null });
+// Picking a control refines the page, like a filter: it replaces the current step, never adds one.
+const pickHs = (k) => { S.hs = k; writeHash(); render(); };
 function viewMap() {
   const v = $('#view');
   if (!pagesData.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No UI map yet.'), h('p', {}, 'The product map appears after the first nightly regression run walks the product.'))); return; }
@@ -1128,15 +1333,15 @@ function viewMap() {
     stage.append(h('button', { class: `hs ${st}${to ? ' go' : ''}${S.hs === k ? ' sel' : ''}`, type: 'button', style: `left:${bx}%;top:${by}%;width:${bw}%;height:${bh}%`,
       title: to ? `${what} — opens ${to} on the map (${tests})` : `${what} — ${tests}`,
       'aria-label': to ? `${what}: open ${to}` : `${what}: ${its.length} test(s)`, 'aria-pressed': to ? null : S.hs === k ? 'true' : 'false',
-      onclick: () => (to ? walk(p.pattern, to) : go({ hs: S.hs === k ? null : k })) },
+      onclick: () => (to ? walk(to) : pickHs(S.hs === k ? null : k)) },
     src ? null : h('span', {}, to ? `${x.name} ↗` : x.name)));
   }
   const pageItems = p.items.filter(present).map((k) => byKey.get(k)).sort((a, b) => SEV[a.cls] - SEV[b.cls]);
   const named = p.hotspots.filter((x) => hsItems(x).length).length;
-  const back = mapTrail.length && pageOf(mapTrail[mapTrail.length - 1]) ? mapTrail[mapTrail.length - 1] : null;
+  const fromMap = trail.length && /^Product map · /.test(prevLabel()) ? prevLabel().replace(/^Product map · /, '') : null;
   const head = h('div', {},
     h('div', { style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:baseline' },
-      back ? h('button', { class: 'btn', type: 'button', onclick: () => { mapTrail.pop(); go({ pg: back, hs: null }); } }, `← ${str(pageOf(back).title) || back}`) : null, h('h2', { style: 'font-size:16px;margin:0' }, str(p.title) || p.pattern), h('code', {}, p.pattern),
+      fromMap ? h('button', { class: 'btn', type: 'button', onclick: back }, `← ${fromMap}`) : null, h('h2', { style: 'font-size:16px;margin:0' }, str(p.title) || p.pattern), h('code', {}, p.pattern),
       h('span', { class: `badge ${{ regression: 'ok', exploratory: 'warn' }[p.covered] || 'bad'}` }, p.covered === 'regression' ? 'regression' : p.covered === 'exploratory' ? 'exploratory only' : 'not covered')),
     h('div', { class: 'legend-row' },
       p.hotspots.length ? h('span', {}, `${named} of ${p.hotspots.length} controls named by a test`) : h('span', {}, 'This UI map has no control positions yet — they appear after the next nightly run.'),
@@ -1148,10 +1353,12 @@ function viewMap() {
   const its = x ? hsItems(x) : [];
   const detail = h('section', { class: 'panel mapdetail' },
     x ? [h('div', { class: 'meta' }, KIND[x.kind] || 'Control'), h('h3', {}, `"${x.name}"`),
-      x.to ? h('p', { class: 'meta' }, `Leads to ${x.to}: the tests that reach that page.`, pageOf(x.to) ? [' ', h('button', { class: 'linkish', type: 'button', onclick: () => go({ pg: x.to, hs: null }) }, 'Open it on the map →')] : null) : null,
-      its.length ? h('ul', { class: 'att' }, its.map(itemRow)) : h('p', { class: 'muted-t' }, x.to ? 'No test reaches that page.' : 'No test names this control.'),
-      h('button', { class: 'linkish', type: 'button', onclick: () => go({ hs: null }) }, '← the whole page')]
-      : [h('h3', {}, `Tests that reach this page (${pageItems.length})`), pageItems.length ? h('ul', { class: 'att' }, pageItems.map(itemRow)) : h('p', { class: 'muted-t' }, 'No test reaches this page.'),
+      x.to ? h('p', { class: 'meta' }, `Leads to ${x.to}: the tests that reach that page.`, pageOf(x.to) ? [' ', h('button', { class: 'linkish', type: 'button', onclick: () => walk(x.to) }, 'Open it on the map →')] : null) : null,
+      its.length ? h('ul', { class: 'att' }, its.map((x) => itemRow(x))) : h('p', { class: 'muted-t' }, x.to ? 'No test reaches that page.' : 'No test names this control.'),
+      h('button', { class: 'linkish', type: 'button', onclick: () => pickHs(null) }, '← the whole page')]
+      : [h('h3', {}, `Tests that reach this page (${pageItems.length})`), pageItems.length ? h('ul', { class: 'att' }, pageItems.map((x) => itemRow(x))) : h('p', { class: 'muted-t' }, 'No test reaches this page.'),
+        design.some((d) => str(d.pattern) === p.pattern) ? h('p', {}, h('button', { class: 'linkish', type: 'button', onclick: () => go({ v: 'design', ds: { pg: p.pattern, st: '' } }) },
+          `Design findings on this page (${design.filter((d) => str(d.pattern) === p.pattern && d.status === 'open').length} open) →`)) : null,
         h('p', { class: 'meta' }, p.hotspots.length ? 'Click any outlined control on the screenshot: its tests, or ask for a test of it. A control that leads to another page (↗) — a navigation item, tab, link, or a list\'s first row — opens that page.' : '')]);
   detail.append(askForm(p, x));
   v.append(h('div', { class: 'maplayout' }, list, h('div', { style: 'min-width:0' }, sel, head, stage), detail));
@@ -1238,7 +1445,7 @@ function moduleCard(m) {
   return h('section', { class: 'mod', 'aria-label': str(m.title) || id },
     h('header', {}, h('h3', {}, str(m.title) || id), stateB(str(m.state)), h('span', { class: 'meta' }, MKIND[m.kind] || str(m.kind))),
     m.what ? h('p', { class: 'meta' }, str(m.what)) : null,
-    h('p', { class: 'meta' }, lr ? `Last run ${rel(lr.utc)}${lr.candidate ? ` on ${str(lr.candidate)}` : ''}` : 'Not run yet',
+    h('p', { class: 'meta' }, lr ? [`Last run ${rel(lr.utc)}`, lr.candidate ? [' on ', buildLink(lr.candidate)] : ''] : 'Not run yet',
       sc ? ` · schedule ${sc.enabled === true ? 'on' : sc.enabled === false ? 'off' : 'state unknown'}${sc.cron ? ` (${str(sc.cron)})` : ''}` : ''),
     settings.length ? h('dl', { class: 'set' }, settings.map(([k, spec]) => settingRow(id, k, spec))) : null,
     focus, actions.filter(Boolean).length ? h('div', { class: 'cmd' }, actions) : null,
@@ -1284,16 +1491,16 @@ function viewFindings() {
     kpi('Validation findings', val ? vf.filter((c) => c.result === 'finding').length : '–'),
     kpi('Stress: failed checks', st ? sf.filter((c) => c.status === 'fail').length : '–'),
     kpi('Security: critical + high', secN == null ? '–' : secN),
-    kpi('Edge-case observations', obs.length, null, obs.length ? () => { S.f = { kind: ['exploration'], verdict: ['observation'] }; S.v = 'catalog'; writeHash(); render(); } : null)));
+    kpi('Edge-case observations', obs.length, null, obs.length ? () => go({ v: 'catalog', f: { kind: ['exploration'], verdict: ['observation'] }, q: '' }) : null)));
   const tableOf = (cols, rows) => h('div', { class: 'tablewrap' }, h('table', { class: 'list' }, h('thead', {}, h('tr', {}, cols.map((c) => h('th', { style: 'cursor:default' }, c)))),
     h('tbody', {}, rows.map((r) => h('tr', { style: 'cursor:default' }, r.map((c) => h('td', {}, c)))))));
   const sec2 = (title, sub, body) => h('section', { class: 'panel', style: 'margin-top:14px' }, h('h2', {}, title), sub ? h('p', { class: 'meta' }, sub) : null, body);
-  v.append(sec2('Form validation', val ? `Build ${str(val.build)} · run ${str(val.run)} · ${fmtDate(val.utc)} · ${arr(val.cases).length} cases` : null,
+  v.append(sec2('Form validation', val ? ['Build ', buildLink(val.build), ` · run ${str(val.run)} · ${fmtDate(val.utc)} · ${arr(val.cases).length} cases`] : null,
     !val ? h('p', { class: 'muted-t' }, 'The validation module has not run yet.') : vf.length ? tableOf(['Case', 'Page', 'Form · field', 'Input', 'Result', 'Severity', 'What broke'],
       vf.sort((a, b) => (a.result === 'finding' ? 0 : 1) - (b.result === 'finding' ? 0 : 1) || (SEVC[a.severity] === 'bad' ? 0 : 1) - (SEVC[b.severity] === 'bad' ? 0 : 1))
-        .map((c) => [h('code', {}, str(c.id)), h('code', {}, str(c.page)), `${str(c.form)}${c.field ? ` · ${str(c.field)}` : ''}`, str(c.kind),
+        .map((c) => [h('code', {}, str(c.id)), pageLink(str(c.page)), `${str(c.form)}${c.field ? ` · ${str(c.field)}` : ''}`, str(c.kind),
           h('span', { class: `badge ${c.result === 'finding' ? 'bad' : c.result === 'flaky' ? 'warn' : 'muted'}` }, str(c.result)), c.severity ? sevB(c.severity) : '', str(c.message)])) : h('p', { class: 'muted-t' }, 'Every case passed.')));
-  v.append(sec2('Stress', st ? `Build ${str(st.build)} · ${fmtDate(st.utc)}${st.config ? ` · ${str(st.config.concurrency)} workers × ${str(st.config.duration_s)} s` : ''}` : null,
+  v.append(sec2('Stress', st ? ['Build ', buildLink(st.build), ` · ${fmtDate(st.utc)}${st.config ? ` · ${str(st.config.concurrency)} workers × ${str(st.config.duration_s)} s` : ''}`] : null,
     !st ? h('p', { class: 'muted-t' }, 'The stress module has not run yet.') : sf.length ? tableOf(['Check', 'Target', 'Status', 'Severity', 'Evidence'],
       sf.map((c) => [h('code', {}, str(c.id)), h('code', {}, str(c.target)), h('span', { class: `badge ${c.status === 'fail' ? 'bad' : 'muted'}` }, str(c.status)), sevB(c.severity),
         str(c.evidence || c.reason)])) : h('p', { class: 'muted-t' }, 'Every check passed.')));
@@ -1301,19 +1508,18 @@ function viewFindings() {
   const RQ = { queued: ['waiting for the environment', 'muted'], in_progress: ['being tested', 'warn'], report_pending: ['tested, report on its way', 'ok'], rejected: ['not testable as written', 'bad'] };
   v.append(sec2('Requested tests', rq.length ? 'Scenarios asked for in Slack, in the chat or from this page, not yet reported. A finished one is under Runs.' : null,
     !rq.length ? h('p', { class: 'muted-t' }, 'No request is waiting. Ask for one on the Product map.') : tableOf(['Scenario', 'From', 'State', 'Title', 'Updated'],
-      rq.map((x) => [h('code', {}, str(x.id)), str(x.source), h('span', { class: `badge ${(RQ[x.status] || ['', 'none'])[1]}` }, (RQ[x.status] || [str(x.status)])[0]),
+      rq.map((x) => [refLink(str(x.id)), str(x.source), h('span', { class: `badge ${(RQ[x.status] || ['', 'none'])[1]}` }, (RQ[x.status] || [str(x.status)])[0]),
         str(x.title) || h('span', { class: 'muted-t' }, 'criteria not frozen yet'), x.utc ? rel(x.utc) : '']))));
   const fo = arr(F.focus).filter((x) => x && typeof x === 'object');
   v.append(sec2('Feature focus', fo.length ? `${fo.length} newest focus run(s)` : null, !fo.length ? h('p', { class: 'muted-t' }, 'No area has been tested in depth yet — queue one in Modules.')
-    : fo.map((x) => h('div', { style: 'margin-top:8px' }, h('h3', {}, `${str(x.area) || str(x.run)}${x.build ? ` · ${str(x.build)}` : ''}${x.utc ? ` · ${fmtDate(x.utc)}` : ''}`),
+    : fo.map((x) => h('div', { style: 'margin-top:8px' }, h('h3', {}, x.area && items.some((i) => str(i.area) === str(x.area)) ? facetLink('area', str(x.area)) : str(x.area) || str(x.run), x.build ? [' · ', buildLink(x.build)] : '', x.utc ? ` · ${fmtDate(x.utc)}` : ''),
       tableOf(['Check', 'Heuristic', 'Expected', 'Result', 'Severity'], arr(x.checks).map((c) => [h('code', {}, str(c.id)), str(c.heuristic), str(c.expected), badge(str(c.verdict)), c.severity ? sevB(c.severity) : '']))))));
-  v.append(sec2('Security', sec ? `Build ${str(sec.candidate)} · ${fmtDate(sec.utc)} — the findings stay in the private report` : null,
+  v.append(sec2('Security', sec ? ['Build ', buildLink(sec.candidate), ` · ${fmtDate(sec.utc)} — the findings stay in the private report`] : null,
     !sec ? h('p', { class: 'muted-t' }, 'The security run has not run yet.') : h('div', {}, h('p', {}, ['critical', 'high', 'medium', 'low', 'info', 'skipped'].map((k) =>
       h('span', { style: 'margin-right:10px' }, sevB(k), ` ${+((sec.counts || {})[k]) || 0}`))), h('p', {}, sec.report ? artLink(sec.report) : h('span', { class: 'muted-t' }, 'No report reference recorded for this run.')))));
 }
 
 // ------------------------------------------------------------------ design
-const DS = { st: 'open', sev: '', vp: '', ck: '', pg: '', q: '' };
 const dCheck = (d) => str(d.check).replace(/^review:.*/, 'review').replace(/^a11y:.*/, 'a11y');
 function designMarkdown(list) {
   return list.map((d) => `- **${str(d.id)}** (${str(d.severity)}${d.suspect ? ', suspect' : ''}) \`${str(d.pattern)}\`${d.viewport && d.viewport !== '-' ? ` @ ${str(d.viewport)}` : ''} — ${str(d.saw)}`
@@ -1332,14 +1538,14 @@ function viewDesign() {
     ['New in the newest build', open.filter((d) => str(d.first_seen) === newest).length], ['Suspect (model unsure)', open.filter((d) => d.suspect).length],
     ['Resolved', design.filter((d) => d.status === 'resolved').length], ['Dismissed', design.filter((d) => d.status === 'dismissed').length]]
     .map(([l, n]) => h('div', { class: 'kpi' }, h('b', {}, String(n)), h('span', {}, l)))));
-  const sel = (label, key, opts, fmt) => h('select', { 'aria-label': label, onchange: (e) => { DS[key] = e.target.value; render(); } },
+  const sel = (label, key, opts, fmt) => h('select', { 'aria-label': label, onchange: (e) => { DS[key] = e.target.value; writeHash(); render(); } },
     h('option', { value: '' }, `${label}: all`), opts.map((o) => h('option', { value: o, selected: DS[key] === o ? true : null }, fmt ? fmt(o) : o)));
   const copyMd = h('button', { class: 'btn', type: 'button', onclick: async () => {
     const md = designMarkdown(list);
     try { await navigator.clipboard.writeText(md); copyMd.textContent = `Copied ${list.length}`; setTimeout(() => { copyMd.textContent = 'Copy as Markdown'; }, 1500); return; } catch { /* no clipboard */ }
     const ta = h('textarea', { readonly: true, rows: 8, style: 'width:100%', 'aria-label': 'Findings as Markdown' }); ta.value = md; copyMd.replaceWith(ta); ta.select();
   } }, 'Copy as Markdown');
-  const q = h('input', { type: 'search', placeholder: 'Search findings', value: DS.q, 'aria-label': 'Search findings', oninput: debounce((e) => { DS.q = e.target.value; render(true); }, 200) });
+  const q = h('input', { type: 'search', placeholder: 'Search findings', value: DS.q, 'aria-label': 'Search findings', oninput: debounce((e) => { DS.q = e.target.value; writeHash(); render(true); }, 200) });
   v.append(h('div', { class: 'toolbar', style: 'margin-top:14px' }, q, sel('Status', 'st', ['open', 'resolved', 'dismissed']), sel('Severity', 'sev', ['major', 'minor']),
     sel('Screen', 'vp', uniq((d) => str(d.viewport))), sel('Check', 'ck', uniq(dCheck)), sel('Page', 'pg', uniq((d) => str(d.pattern))),
     h('span', { class: 'count' }, `${list.length} of ${design.length}`), copyMd));
@@ -1351,11 +1557,11 @@ function viewDesign() {
       h('div', { style: 'display:flex;flex-wrap:wrap;gap:4px;align-items:center' }, h('b', {}, str(d.id)), sevB(d.severity),
         h('span', { class: `badge ${d.status === 'open' ? 'warn' : d.status === 'resolved' ? 'ok' : 'muted'}` }, str(d.status)), d.suspect ? h('span', { class: 'badge muted', title: 'The model was unsure — check before acting' }, 'suspect') : null),
       h('div', { class: 'saw' }, str(d.saw)),
-      h('div', { class: 'meta' }, h('code', {}, str(d.pattern)), d.viewport && d.viewport !== '-' ? ` @ ${str(d.viewport)}` : '', ` · ${str(d.check)}`),
+      h('div', { class: 'meta' }, pageLink(str(d.pattern)), d.viewport && d.viewport !== '-' ? ` @ ${str(d.viewport)}` : '', ` · ${str(d.check)}`),
       h('details', {}, h('summary', {}, 'Details'), h('dl', { class: 'dl' },
         h('dt', {}, 'Element'), h('dd', {}, str(d.target) || '–'), h('dt', {}, 'Source'), h('dd', {}, { sweep: 'UI sweep check', review: 'model review of the screenshot', noticed: 'noticed while testing' }[d.source] || str(d.source)),
-        h('dt', {}, 'First seen'), h('dd', {}, str(d.first_seen) || '–'), h('dt', {}, 'Last seen'), h('dd', {}, str(d.last_seen) || '–'),
-        d.resolved_build ? [h('dt', {}, 'Resolved in'), h('dd', {}, str(d.resolved_build))] : null),
+        h('dt', {}, 'First seen'), h('dd', {}, d.first_seen ? buildLink(d.first_seen) : '–'), h('dt', {}, 'Last seen'), h('dd', {}, d.last_seen ? buildLink(d.last_seen) : '–'),
+        d.resolved_build ? [h('dt', {}, 'Resolved in'), h('dd', {}, buildLink(d.resolved_build))] : null),
         d.status === 'open' ? h('div', {}, h('span', { class: 'meta' }, 'Not a defect? '), copyBox(`dismiss ${str(d.id)}`)) : null));
   })));
   if (list.length > S.limit) v.append(h('div', { class: 'more-row' }, h('button', { class: 'btn', type: 'button', onclick: () => { S.limit += 100; render(); } }, `Show more (${list.length - S.limit})`)));
@@ -1376,12 +1582,26 @@ function render(keepSearchFocus) {
   ({ overview: viewOverview, modules: viewModules, findings: viewFindings, design: viewDesign, runs: viewRuns, map: viewMap, catalog: () => viewList(false), gallery: () => viewList(true), coverage: viewCoverage, history: viewHistory, lifecycle: viewLifecycle }[S.v] || viewOverview)();
   if (pos != null) { const q = $('input[type=search]'); if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch { /* ignore */ } } }
 }
+// The steps kept with a history entry: a reload or a "forward" finds its own way back.
+const trailOf = (st) => arr(st && st.qi).filter((x) => x && typeof x.h === 'string' && typeof x.label === 'string').slice(-100);
 readHash();
+try { trail = trailOf(history.state); } catch { trail = []; }
+setLocation(false);
 render();
 renderDrawer();
 // The platform may inject its bridge after this script ran: draw the send buttons then.
 if (!bridge()) window.addEventListener('load', () => { if (bridge()) { render(); renderDrawer(); } });
-window.addEventListener('hashchange', () => { readHash(); render(); renderDrawer(); });
+// Back or forward: the entry's own steps. An address typed by hand: a step from where the page was.
+function arrived(state) {
+  const mine = state && Array.isArray(state.qi);
+  if (mine) trail = trailOf(state); else trail = [...trail, { h: hashOf(), label: where() }].slice(-100);
+  readHash();
+  if (!mine) setLocation(false);
+  render(); renderDrawer();
+}
+let popped = null;
+window.addEventListener('popstate', (e) => { popped = location.hash; arrived(e.state); });
+window.addEventListener('hashchange', () => { if (location.hash === popped) { popped = null; return; } let st = null; try { st = history.state; } catch { /* sandboxed */ } arrived(st); });
 })();
 </script>
 </body>
