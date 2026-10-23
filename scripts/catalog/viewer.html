@@ -1046,9 +1046,11 @@ function viewHistory() {
   v.append(h('div', { class: 'heat' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', { style: 'writing-mode:horizontal-tb;transform:none;left:0;z-index:2' }, ''), cols.map((b) => h('th', { title: `${b.id} · ${b.utc}${nightOf(b.id) ? ' — open the night' : ''}`, style: nightOf(b.id) ? 'cursor:pointer' : null, onclick: () => openRun(nightOf(b.id)) }, `${fmtDate(b.utc)} ${b.id}`.trim())))),
     h('tbody', {}, shown.map((i) => {
       const at = new Map(); for (const e of i.history) at.set(str(e.build), e);
-      return h('tr', {}, h('td', { class: 'rowh', title: str(i.name), onclick: () => openItem(i.key) }, `${i.label} ${str(i.name)}`),
+      const enter = (f) => (ev) => { if (ev.key === 'Enter') f(); };
+      return h('tr', {}, h('td', { class: 'rowh', title: str(i.name), tabindex: 0, role: 'button', onclick: () => openItem(i.key), onkeydown: enter(() => openItem(i.key)) }, `${i.label} ${str(i.name)}`),
         cols.map((b) => { const e = at.get(b.id); const r = e ? runFor(i, e) : null;
-          return h('td', { class: `c ${e ? vClass(e.value) : 'e'}`, title: `${i.label} · ${b.id}: ${e ? `${vLabel(e.value)} (${str(e.run)})` : 'not run'}${r ? ' — open the run' : ''}`, style: r ? 'cursor:pointer' : null, onclick: r ? () => openRun(r) : null }); }));
+          return h('td', { class: `c ${e ? vClass(e.value) : 'e'}`, title: `${i.label} · ${b.id}: ${e ? `${vLabel(e.value)} (${str(e.run)})` : 'not run'}${r ? ' — open the run' : ''}`, style: r ? 'cursor:pointer' : null, tabindex: r ? 0 : null, role: r ? 'button' : null,
+            'aria-label': r ? `${i.label} · ${b.id}: ${vLabel(e.value)} — open the run` : null, onclick: r ? () => openRun(r) : null, onkeydown: r ? enter(() => openRun(r)) : null }); }));
     })))));
   if (list.length > S.limit) v.append(h('div', { class: 'more-row' }, h('button', { class: 'btn', type: 'button', onclick: () => { S.limit += 100; render(); } }, `Show more (${list.length - S.limit} left)`)));
 }
@@ -1212,6 +1214,8 @@ function outcome(r) {
   const c = {}; for (const e of r.entries) c[e.value] = (c[e.value] || 0) + 1;
   return Object.entries(c).map(([k, n]) => `${n} ${vLabel(k).toLowerCase()}`).join(' · ');
 }
+// A run type refines the Runs view, like a filter: it replaces the current step, never adds one.
+const pickRt = (k) => { S.rt = k; S.limit = 100; writeHash(); render(); };
 function viewRuns() {
   const v = $('#view');
   if (!runs.length) { v.append(h('div', { class: 'empty' }, h('p', {}, 'No runs yet.'), h('p', {}, 'Issue runs, scenario runs and every nightly regression appear here, each with its report.'))); return; }
@@ -1226,7 +1230,7 @@ function viewRuns() {
   }
   v.append(h('div', { class: 'chips' }, [['all', 'All runs'], ...Object.entries(RUNTYPE)].map(([k, l]) => {
     const n = k === 'all' ? inBuild.length : inBuild.filter((r) => r.type === k).length;
-    return h('button', { class: `chip${S.rt === k ? ' on' : ''}`, type: 'button', 'aria-pressed': S.rt === k ? 'true' : 'false', onclick: () => go({ rt: k }) }, `${l} (${n})`);
+    return h('button', { class: `chip${S.rt === k ? ' on' : ''}`, type: 'button', 'aria-pressed': S.rt === k ? 'true' : 'false', onclick: () => pickRt(k) }, `${l} (${n})`);
   })));
   const shown = list.slice(0, S.limit);
   v.append(h('div', { class: 'tablewrap' }, h('table', { class: 'list' },

@@ -132,6 +132,10 @@ assert_eq "the viewer's script parses" 0 "$?"
 nav="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
 process.stdout.write([/history\[push \? .pushState. : .replaceState.\]/, /addEventListener\(.popstate./, /^function back\(\)/m, /^function originDrawer\(/m, /onclick: back \}/].map((re)=>re.test(s)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "the viewer: history steps, popstate, back, the origin panel" 11111 "$nav"
+# A filter of a view refines the place: the run-type chips and a picked map control add no history step.
+refine="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
+process.stdout.write([/go\(\{ rt: /.test(s), /go\(\{ hs: /.test(s), /onclick: \(\) => pickRt\(k\)/.test(s), /pickHs\(S\.hs === k/.test(s)].map((x)=>x?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "the viewer: a run type and a map control are refinements, not steps" 0011 "$refine"
 # A scenario request the page sends has one shape (docs/scenarios.md → A request from the dashboard).
 scen="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const m=s.match(/^const SCEN_RE = (\/.*\/);$/m);const re=eval(m[1]);
 const w="Rename a project and save: the new name shows in the list.";
