@@ -475,7 +475,9 @@ if (egressRules && existsSync(egressRules)) {
       for (const x of rows) {
         const at = `${x.method} ${x.host} ${x.path}`;
         if (x.how === 'refused') {
-          if (/\{profile\./.test(`${x.host}${x.path}`)) warn(`egress ${at}: its profile key has no value here — --set <key>=<value> to classify it`);
+          // Unclassified only while a key it names is empty; a value that is set but not a
+          // plain name is refused at onboarding too.
+          if ([...`${x.host}${x.path}`.matchAll(/\{profile\.([a-z0-9_]+)\}/g)].some((k) => (resolved[k[1]] ?? '') === '')) warn(`egress ${at}: its profile key has no value here — --set <key>=<value> to classify it`);
           else fail(`egress ${at}: refused — ${x.why}`);
         } else {
           n[x.how] = (n[x.how] ?? 0) + 1;
