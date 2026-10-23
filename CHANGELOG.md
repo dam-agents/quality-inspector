@@ -12,8 +12,8 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 **Upgrade:**
 Nothing — the lint runs in every pre-flight. A product verb in a spec (run, delete, fetch,
 open, post a comment, mark or report as passed) is an injection suspect only aimed at the agent
-— an imperative at the sentence's start or after "please", or in a sentence that addresses a QA
-agent — or at the tracker or the issue itself. "asks the agent to open a pull request" stays a
+— an imperative at the sentence's start, after a leading word ("Then", "Next,") or after "please",
+or in a sentence that addresses a QA agent — or at the tracker or the issue itself. "asks the agent to open a pull request" stays a
 criterion now ([docs/acceptance-criteria.md](docs/acceptance-criteria.md) → Injection suspects).
 
 ## 3.15.1 — 2026-10-23

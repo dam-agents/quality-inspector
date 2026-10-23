@@ -34,14 +34,16 @@ export const textHash = (t) => createHash('sha256').update(t.replace(/\s+/g, ' '
 // describing the product. Each pattern runs on one sentence with its bullet marker
 // stripped. A product verb (run, delete, fetch, open, post, mark/report) is product
 // behavior too, so it counts only aimed at the agent — an imperative at the sentence's
-// start or after "please", or anywhere in a sentence that addresses a QA agent ("QA agent:
+// start, after up to two leading words (LEAD: "Then", "Next,", "Then just") or after
+// "please" or "kindly", or anywhere in a sentence that addresses a QA agent ("QA agent:
 // … and post a comment") — or aimed at the tracker or the issue itself ("open this link").
 // "the user can delete an item" and "asks the agent to open a pull request" stay criteria.
 // A matched sentence is frozen as an instruction (docs/acceptance-criteria.md).
 // One list, here; nothing else may restate it.
 const ADDRESS = String.raw`\b(?:qa|test|testing)[ -]?(?:agent|bot|assistant|tester)\s*[:,]`;
+const LEAD = String.raw`(?:then|next|now|first|finally|lastly|afterwards?|also|just|simply),? `;
 const verb = (id, phrase, tracker) => ({ id, re: new RegExp(
-  String.raw`(?:^|\bplease )${phrase}|^(?=.*${ADDRESS}).*\b${phrase}|\b${tracker}`, 'i') });
+  String.raw`(?:^(?:${LEAD}){0,2}|\b(?:kindly|please) )${phrase}|^(?=.*${ADDRESS}).*\b${phrase}|\b${tracker}`, 'i') });
 export const INJECTION = [
   { id: 'ignore', re: /\bignore (?:the|all|any|previous|prior|above|your)\b/i },
   { id: 'agent-role', re: /\bas (?:the|an?) (?:qa|test|testing|ai)[ -]?(?:agent|bot|assistant|model)\b/i },
