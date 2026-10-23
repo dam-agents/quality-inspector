@@ -170,6 +170,12 @@ PCFG='{"img":"x","mock":""}'
 c() { QI_ENGINE_CONFIG="$1" QI_PROFILE_CONFIG="$PCFG" QI_PROFILE_DIR="$SANDBOX/pd" bash "$ENG/bin/check"; }
 out="$(c "$(cfg oci)")"; rc=$?
 assert_eq "check: a complete config passes" "0 " "$rc $(grep '^FAIL' <<<"$out")"
+out="$(c "$(cfg oci | jq -c '.prune_below_gi = 10')")"; rc=$?
+assert_eq "check: prune_below_gi is a known key" "0 " "$rc $(grep -E '^FAIL|unknown key' <<<"$out")"
+for bad in '10.5' '-1' '"10"'; do
+  c "$(cfg oci | jq -c --argjson p "$bad" '.prune_below_gi = $p')" | grep -q '^FAIL prune_below_gi ' \
+    || { echo "  check: prune_below_gi $bad must fail"; FAILED=1; }
+done
 c "$(cfg oci | jq -c '.default_candidate = "nightly"')" | grep -q "^FAIL default_candidate 'nightly' is not a channel" \
   || { echo "  check: an unknown default channel must fail"; FAILED=1; }
 c "$(cfg oci | jq -c '.overlays[0].when = "nope"')" | grep -q "^FAIL overlay when 'nope' is not a profile config key" \

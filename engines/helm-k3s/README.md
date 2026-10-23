@@ -12,7 +12,9 @@ starves the agent's own runtime. `up` of the build already recorded in
 `$QI_ENV_DIR/STATE.json`, with the same rendered values, returns as soon as the UI answers
 (within 5 minutes — a restarted VM's cluster comes back from disk); anything else installs.
 `reset` uninstalls the release, deletes its volumes and removes every image no container
-uses, so it is also the repair for a full disk.
+uses, so it is also the repair for a full disk. **Limit:** the prune also removes an image only
+a short-lived pod uses (the local-path provisioner's helper, for one); the next such pod
+pulls it again, so its registry must be reachable unless k3s keeps it pinned.
 
 ## Configuration (`engine_config` in the profile's `profile.json`)
 
