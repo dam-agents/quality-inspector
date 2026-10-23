@@ -7,6 +7,12 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.11.0 — 2026-10-23
+
+**Upgrade:**
+Nothing to run — only the `qi-profile-creator` skill changed, which a product team runs on its
+own profile and an instance never does.
+
 ## 3.10.1 — 2026-10-23
 
 **Upgrade:**
