@@ -109,7 +109,7 @@ every test of its issue), retest the whole issue (`test #42`), promote or demote
 take it out of a collection, and report it as a GitHub issue (`create issue for #42 AC-1`, plus
 `… for the architect` when `fix_label` is set). A design finding's card has "Manage":
 categorize it, dismiss it with a reason or reopen it, report it. **Several problems as one
-issue:** every failed test (catalog table and cards, Needs attention), design finding,
+issue:** every test (catalog table and cards; the failing ones in Needs attention), design finding,
 validation finding and failed stress check has a ☐; the ticked ones gather in a bar at the bottom
 of every view with one command, `create issue for <ref>, <ref>…` (at most 20), and its
 architect variant. The selection is the viewer's own, kept in their browser. A problem an issue
