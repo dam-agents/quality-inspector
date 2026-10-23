@@ -89,7 +89,9 @@ A check one test already makes is not made again by another. Before freezing a s
 criteria or an issue's explorations, look where each check may already be made:
 
 - a `regression`-tier row of `work/SUITE.md` — a promoted issue test, a saved scenario, an
-  adopted profile scenario —, by the `## AC-<k> — <name>` lines of its criteria file;
+  adopted profile scenario —, by the `## AC-<k> — <name>` lines of its criteria file. A row
+  of the same id as the test being frozen (`#<n>`, `S-<k>`, `P-<slug>`) never counts: it is
+  that test's own earlier version, not another test;
 - the security run's check catalogue ([security.md](security.md)), while `security_checks`
   is not `disabled`, and the checks of a testing module that is switched on
   ([modules.md](modules.md));

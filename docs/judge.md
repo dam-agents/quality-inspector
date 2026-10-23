@@ -23,7 +23,8 @@ Inputs: `request.md`, the draft criteria, the profile's `SKILL.md`, the titles o
 existing criteria files (the first line of each `work/issues/*/criteria-*.md` and
 `work/scenarios/*/criteria-*.md`), `work/SUITE.md` with the `## AC-<k>` lines of its
 `regression` rows' criteria files, `$HOME/docs/security.md` → Check catalogue, and the
-testing modules switched on.
+testing modules switched on. Every criteria file and row of the scenario's own id (`S-<k>`,
+`P-<slug>`) is left out: it is the scenario's own earlier version, not another test.
 
 Per AC:
 
