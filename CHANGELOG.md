@@ -7,6 +7,17 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.13.0 — 2026-10-23
+
+**Upgrade:**
+Nothing to run — scripts and docs are re-read per run. Every `suite.sh run <label>` now runs as
+a harness background task, followed by the new `suite.sh wait <label>` (exit 0 prints the
+summary, 3 = call again), like `env.sh up` / `wait` ([docs/nested-env.md](docs/nested-env.md) →
+Shape). A test whose criterion waits minutes sets its own `timeout`
+([docs/test-authoring.md](docs/test-authoring.md) → Long waits). "test scenario <slug>" now
+resets the nested product before the candidate comes up ([docs/scenarios.md](docs/scenarios.md)
+→ Profile scenarios → On demand).
+
 ## 3.12.1 — 2026-10-23
 
 **Upgrade:**
