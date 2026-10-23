@@ -27,8 +27,9 @@ The operator may share the page beyond themselves, so it carries only what conce
   address a page can link to).
 - **Product map:** per page of the newest map, every named control the map saw on screen (its
   `boxes`, [change-awareness.md](change-awareness.md) → The three sources) with the items that
-  name it in a quoted string — on that page only, or in a test that opens the page; a navigation
-  item stands for the items that reach the page it leads to.
+  name it in a quoted string — on that page only, or in a test that opens the page; a control
+  that leads to another page (a navigation item, a tab, a link, a list's first row) stands for
+  the items that reach that page.
 - **Activity** (Overview, as of the page's build): the environment lock's holder and since (never
   its session), the `work/QA.md` rows `in_progress` or `report_pending`, the labelled open issues
   with no row yet or carrying `retest_label` (unknown, not empty, when the listing failed), the queued scenario requests, the time budget
@@ -69,8 +70,8 @@ Views: Overview, Modules (each module's switches and settings), Findings (valida
 security counts, edge-case observations), Design (the design findings: crops, filters, "copy as
 Markdown" for the design team), Runs, Product map (the page shots with every control clickable, coloured by
 its tests' worst verdict, dashed where no test names it; a drawn outline where a shot did not fit; a
-navigation item or link to a mapped page opens that page, like a click-through wireframe, with a
-"back"), Catalog, Gallery, Coverage,
+navigation item, tab, link or list row that leads to a mapped page opens that page, like a
+click-through wireframe, with a "back"), Catalog, Gallery, Coverage,
 History (item × build) and Lifecycle, plus a detail panel per item and per run. **As of a
 build** shows every view with the verdicts as they stood when that build last ran (files, tiers
 and steps stay today's); older catalogs are the artifact's earlier revisions. An action appears

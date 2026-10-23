@@ -7,6 +7,14 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.12.0 — 2026-10-23
+
+**Upgrade:**
+Nothing to run. On the dashboard's next build, a tab or a navigation button walks the Product map
+to the page it led to where the current UI map recorded it. From the next regression run on, the UI
+map records where each link leads, the first row of a list per detail page, and every tab per page
+([docs/change-awareness.md](docs/change-awareness.md)), so links, list rows and tabs walk too.
+
 ## 3.11.1 — 2026-10-23
 
 **Upgrade:**
