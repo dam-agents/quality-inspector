@@ -348,7 +348,7 @@ if [ "$LIVE" = 1 ]; then
       || fail lend_model "this agent has no model connection to lend" "give it one in its settings, or set lend_model: disabled"
   fi
   case "$(cfg live_browser)" in (''|disabled) ;;
-    (*) live_cdp >/dev/null 2>&1 && ok live_browser "answers" || warn live_browser "does not answer, or this session is not shown direct (a fresh run marker, a channel turn, no transcript) — runs stay headless";; esac
+    (*) live_cdp >/dev/null 2>&1 && ok live_browser "answers" || warn live_browser "does not answer, or this session is not shown direct (a scheduled run, a channel turn, no transcript) — runs stay headless";; esac
   if [ "$(profile_field '.requires.root')" = true ]; then
     [ "$(id -u)" = 0 ] && ok vm_root "root" || fail vm_root "not running as root" "recreate the agent on the vm backend (README → Setup)"
   fi

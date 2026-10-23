@@ -7,6 +7,16 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.10.1 — 2026-10-23
+
+**Upgrade:**
+Nothing to run — scripts are re-read per run. A scheduled run is now known by the
+`<qi-scheduled-run>` line its Precheck puts into the prompt, not by a run marker younger than
+`lock_ttl_min`: a direct session opened soon after a scheduled run (the **Update** button's
+included) is no longer refused `git fetch origin`, commits or `work/CONFIG.md` edits. A
+`scheduled …` line left in `work/env/RUN_MODE` means nothing now. A Slack-ordered "test #N" is
+marked only when the shell knows its session id, and its marker no longer expires.
+
 ## 3.10.0 — 2026-10-22
 
 **Upgrade:**

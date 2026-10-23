@@ -37,7 +37,7 @@ connection can push to, never the target or a fork of it — and restores it on 
   retries (3 attempts), a failure is logged and the next turn retries. Overlapping turns share a
   lock; a deferred one makes the holder run once more. Nothing changed since the last persist
   (by mtime, `logs/` aside) → no git at all.
-- **What travels:** all of `work/` except `env/` (credentials, locks, the run marker),
+- **What travels:** all of `work/` except `env/` (credentials, locks, the Slack marker),
   `suite/node_modules`, `suite/.e2e/runs`, `.cache`, transient files (`*.lock`, `*.tmp`, …),
   the rebuilt catalog page, evidence media (videos, images, trace zips — they live in the
   artifacts; the catalog's small thumbnails do travel) and any file over 20 MiB (logged).
@@ -130,28 +130,38 @@ instance the same shape as a fresh one.
 
 ## Scheduled or direct session
 
-Only a schedule runs a Precheck before the agent wakes. Every `scripts/precheck.sh` exit
-that lets the turn run writes `work/env/RUN_MODE` = `scheduled <ISO> <schedule id>`; a
-decline writes nothing, nor does a timed health check (`QI_PRECHECK_PROBE=1`). A
-Slack-ordered "test #N" writes `slack <ISO> - <n> <session>` through `precheck.sh slack <n>`
-([slack.md](slack.md)). The policy
-hook ([black-box.md](black-box.md) → **Enforcement layers**) reads a marker younger than
-`lock_ttl_min` — by its timestamp or its mtime, whichever is newer — as a **scheduled
-run**: `git commit`, the Kit Update's `git fetch origin`, edits of `work/CONFIG.md`, and any
-command naming the marker, `scripts/hooks/` or `.claude/settings` are refused. No fresh
-marker is a **direct session**.
+A session's kind is read from its own transcript, never from a clock (`scripts/lib/channel.sh`).
+Only a schedule runs a Precheck before the agent wakes, and every `scripts/precheck.sh` run but
+`slack` prints the frame `<qi-scheduled-run><mode></qi-scheduled-run>` as its first line, which
+the platform appends to the task's prompt. A session whose transcript holds that frame **in a
+prompt** is a **scheduled run**: the policy hook ([black-box.md](black-box.md) → **Enforcement
+layers**) refuses `git commit`, the Kit Update's `git fetch origin`, edits of `work/CONFIG.md`,
+and any command naming `work/env/RUN_MODE`, `scripts/hooks/` or `.claude/settings`, and the
+scripts' `lib/config.sh` → `direct_session` (the modules' settings, the live browser) answers
+no. A session with neither this frame nor a channel frame
+(below) is a **direct session**, whenever it starts — the platform's Kit Update included, which
+runs no Precheck.
 
-- It fails closed: a direct session opened within `lock_ttl_min` of a scheduled turn
-  counts as scheduled until the marker ages out (its timestamp says since when).
-- It fails open only when a scheduled turn ran without its Precheck — every `kit.yaml`
-  schedule carries one for that reason.
+- The frame in a tool's output (this file, `precheck.sh` run by hand), in the agent's own
+  message or in a compaction summary is data and does not count; a line that holds it but does
+  not parse counts.
+- It fails closed: a session whose transcript the hook or the script cannot read counts as
+  scheduled; the operator who pastes a Precheck's output into the chat makes the session
+  scheduled; a scheduled session continued from the UI stays scheduled.
+- It fails open only when a scheduled turn's prompt lacks the frame — a schedule without its
+  Precheck (every `kit.yaml` schedule carries one), or a Precheck that broke before its first
+  line and whose output the platform did not append.
+- `work/env/RUN_MODE` now holds only the Slack marker (below); a `scheduled …` line left by an
+  earlier version means nothing.
 - A **channel turn** counts the same: a session whose transcript holds the platform's Slack
   frame (`<how-to-respond>`) in a prompt is never direct, whoever sent the message — a session
   continued from the UI included; a definition change needs a fresh direct session. The frame
   in a tool's output (this file, an issue body) does not count. A channel turn writes to GitHub
   only the delivery of a Slack-ordered "test #N": `scripts/github.sh comment|unlabel` on that one
-  issue, while the `slack` marker names it and its `work/QA.md` row is `report_pending` (rule
-  `channel-write`; [slack.md](slack.md), with its limit). Every other write is refused.
+  issue, while the `slack` marker names it and this session and its `work/QA.md` row is
+  `report_pending` (rule `channel-write`; [slack.md](slack.md), with its limit). Every other
+  write is refused. `precheck.sh slack <n>` writes that marker,
+  `slack <ISO> - <n> <session>`, only when the shell knows its session id.
 - A prompt from a button of the shared interactive dashboard pressed by a viewer is framed by
   the platform (`<viewer> sent this from a button on the interactive artifact "…"`) and counts
   the same ([modules.md](modules.md) → **Control**); the operator's own button press is a chat message.

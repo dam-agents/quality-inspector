@@ -54,9 +54,10 @@ err="$(bash "$M" set stress stress_checks=per-build 2>&1 >/dev/null)"; rc=$?
 assert_eq "a dashboard viewer's turn cannot set" "2:modules.sh: set is the operator's, in the direct session only (a channel turn)" "$rc:$err"
 bash "$M" focus Upload >/dev/null 2>&1; assert_eq "nor queue a focus" 2 "$?"
 cp "$TR.direct" "$TR"
-printf 'scheduled %s -\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$WORK_DIR/env/RUN_MODE"
-bash "$M" set stress stress_checks=per-build >/dev/null 2>&1; assert_eq "a scheduled turn cannot set" 2 "$?"
-rm -f "$WORK_DIR/env/RUN_MODE"
+printf '{"type":"user","message":{"content":"QA issues run.\\n<qi-scheduled-run>issues</qi-scheduled-run>\\n{}"}}\n' >> "$TR"
+err="$(bash "$M" set stress stress_checks=per-build 2>&1 >/dev/null)"; rc=$?
+assert_eq "a scheduled run cannot set" "2:modules.sh: set is the operator's, in the direct session only (a scheduled run)" "$rc:$err"
+cp "$TR.direct" "$TR"
 CLAUDE_CODE_SESSION_ID=unknown bash "$M" set stress stress_checks=per-build >/dev/null 2>&1; assert_eq "no transcript fails closed" 2 "$?"
 grep -q '^- stress_checks:' "$WORK_DIR/CONFIG.md"; assert_eq "nothing was written" 1 "$?"
 
@@ -65,8 +66,12 @@ bash "$M" dismiss 'D-1; rm -rf ~' >/dev/null 2>&1; assert_eq "a finding id is D-
 assert "dismiss seeds the table" '.dismissed == true' "$(bash "$M" dismiss D-4)"
 assert "dismissed twice is one row" '.dismissed == false' "$(bash "$M" dismiss D-4)"
 assert_eq "header, separator, one row" "3 | D-4 |" "$(wc -l < "$WORK_DIR/design/DISMISSED.md" | tr -d ' ') $(tail -1 "$WORK_DIR/design/DISMISSED.md" | cut -c1-7)"
+printf '{"type":"user","message":{"content":"QA issues run.\\n<qi-scheduled-run>issues</qi-scheduled-run>\\n{}"}}\n' >> "$TR"
+bash "$M" dismiss D-5 >/dev/null 2>&1; assert_eq "a scheduled run cannot dismiss" 2 "$?"
+cp "$TR.direct" "$TR"
+# No clock: a run marker of an earlier version, however fresh, leaves a direct session direct.
 printf 'scheduled %s -\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$WORK_DIR/env/RUN_MODE"
-bash "$M" dismiss D-5 >/dev/null 2>&1; assert_eq "a scheduled turn cannot dismiss" 2 "$?"
+assert "a fresh old-style marker does not block" '.dismissed == true' "$(bash "$M" dismiss D-6)"
 rm -f "$WORK_DIR/env/RUN_MODE"
 
 # ---------------------------------------------------------------- focus queue

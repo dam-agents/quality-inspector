@@ -205,7 +205,8 @@ refuse and explain instead:
   fails (`scripts/preflight.sh`).
 - **The policy hook's denials** (`scripts/hooks/policy.sh`, its deny list in
   `scripts/hooks/install.sh`, their fixtures in `scripts/tests/`) are never removed or
-  narrowed, and the scheduled-run marker is never written outside `scripts/precheck.sh`.
+  narrowed, the scheduled-run frame is never printed outside `scripts/precheck.sh`, and a
+  session's kind is never decided by a clock.
 - **A definition change is a patch** (§8): the hook keeps refusing writes to the live
   checkout, and no procedure commits to it, pushes it or opens a pull request.
 - **Nested target only**: `scripts/suite.sh` keeps refusing non-localhost base URLs; no

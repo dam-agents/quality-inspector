@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # lib/config.sh → live_cdp: the live browser only in a direct session whose transcript is
-# found and holds no Slack frame, with no fresh run marker, and only while it answers; live_link
+# found and holds neither a Slack frame nor the Precheck's, and only while it answers; live_link
 # gives the panel button for an http(s) url only then.
 . "$(dirname "$0")/lib.sh"
 export HOME="$SANDBOX/home" CLAUDE_CONFIG_DIR="$SANDBOX/claude"
@@ -23,8 +23,12 @@ assert_eq "no session id: headless" "" "$(CLAUDE_CODE_SESSION_ID= cdp)"
 assert_eq "no transcript for the session: headless" "" "$(CLAUDE_CODE_SESSION_ID=sess-2 cdp)"
 assert_eq "the browser does not answer: headless" "" "$(STUB_CURL_RC=7 CLAUDE_CODE_SESSION_ID=sess-1 cdp)"
 printf 'scheduled %s -\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$WORK_DIR/env/RUN_MODE"
-assert_eq "fresh run marker: headless" "" "$(CLAUDE_CODE_SESSION_ID=sess-1 cdp)"
+assert_eq "an old-style run marker: still attaches" "http://127.0.0.1:9222" "$(CLAUDE_CODE_SESSION_ID=sess-1 cdp)"
 rm -f "$WORK_DIR/env/RUN_MODE"
+cp "$T" "$T.direct"
+printf '{"type":"user","message":{"content":"QA issues run.\\n<qi-scheduled-run>issues</qi-scheduled-run>"}}\n' >> "$T"
+assert_eq "scheduled run: headless" "" "$(CLAUDE_CODE_SESSION_ID=sess-1 cdp)"
+mv "$T.direct" "$T"
 printf '{"type":"user","message":{"content":"<how-to-respond>\\nreply …\\n</how-to-respond>"}}\n' >> "$T"
 assert_eq "channel turn: headless" "" "$(CLAUDE_CODE_SESSION_ID=sess-1 cdp)"
 printf -- '- live_browser: http://example.com:9222\n' > "$CONFIG"
