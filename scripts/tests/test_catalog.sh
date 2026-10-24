@@ -177,6 +177,10 @@ assert_eq "no command opens a report" 000 "$cmd"
 kinds="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
 process.stdout.write([/^function goLink\(/m, /^const extLink = /m, /class: .btn agent., type: .button., .data-kind.: .agent./, /^const prepBtn = /m, /^function showTip\(/m].map((re)=>re.test(s)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "the viewer: go links, new-tab links, agent commands, prepared commands, tooltips" 11111 "$kinds"
+# A link to another site opens by the page's script, also in a frame; with no new tab, a box shows the address.
+ext="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
+process.stdout.write([/^function openExt\(/m, /window\.open\(href, ._blank.\)/, /^\s*linkBox\(href\);/m, /document\.addEventListener\(.click., \(e\) => \{\n\s*if \(e\.defaultPrevented/].map((re)=>re.test(s)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "the viewer opens a link to another site by its script, else shows its address" 1111 "$ext"
 assert "activity: lock without its session, rows on their way, waiting issues, own schedules only" '.activity.lock == {"owner":"issues","since":"2026-10-22T19:35:00Z"}
   and ([.activity.issues[] | {issue, status, build}] == [{"issue":57,"status":"in_progress","build":"c4"},{"issue":67,"status":"in_progress","build":"c4"}])
   and .activity.budget_min == 150
