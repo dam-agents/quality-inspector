@@ -7,6 +7,12 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.26.0 — 2026-10-24
+
+**Upgrade:**
+Nothing — the next catalog build ([docs/catalog.md](docs/catalog.md) → Build and publish) ships the
+header with wrapped tabs, the day / night switch and a side panel that changes width by drag.
+
 ## 3.25.0 — 2026-10-24
 
 **Upgrade:**

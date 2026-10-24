@@ -95,6 +95,10 @@ The operator may share the page beyond themselves, so it carries only what conce
 - **Where you are:** the header always names the view and the panel open on it, beside **Back**;
   each view opens with its icon, its name and one line of what it is for (the line hideable, per
   browser); a panel names its kind (test case, test run, issue, scenario).
+- **Day / night:** the header switch picks the colours — Auto (as the system), Day or Night — per
+  browser; the tabs wrap to more lines, never scroll sideways.
+- **Panel width:** drag the left edge of a side panel (or focus it and use the arrow keys) to make the
+  panel wider or narrower; the width stays per browser, and a double click on the edge resets it.
 - Overview has a "How this page works" guide (the kinds of control, then issue, test case, test
   run, verdict, tier, report, commands, reporting a bug); every verdict badge, tier, severity,
   design check, validation input, run type, column, filter, quick filter, label of a panel and
