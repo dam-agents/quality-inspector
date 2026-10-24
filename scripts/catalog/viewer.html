@@ -15,10 +15,15 @@
 --link:#2d58d0;--gobg:#e7edfd;--ext:#0a7570;--extbg:#ddf3f1;--agent:#7438ec;--agentbg:#f1e8ff;--sel:#e7edfd;
 --grad:linear-gradient(120deg,#7438ec 0%,#2d58d0 55%,#0a9a8e 100%);
 --shadow:0 1px 2px rgba(30,20,80,.05),0 6px 20px rgba(30,20,80,.07);--shadow2:0 2px 4px rgba(30,20,80,.08),0 14px 34px rgba(30,20,80,.14);--r:12px}
-@media (prefers-color-scheme:dark){:root{--bg:#121220;--surface:#1a1a2a;--fg:#ececf5;--dim:#a3a2b9;--card:#222238;--line:#2f2f48;
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#121220;--surface:#1a1a2a;--fg:#ececf5;--dim:#a3a2b9;--card:#222238;--line:#2f2f48;
 --ok:#6fdc9a;--okbg:#15301f;--bad:#ff8f8f;--badbg:#3a1a1d;--warn:#f6c76b;--warnbg:#3a2d10;--muted:#b6b6c8;--mutedbg:#2a2a3e;
 --link:#8eaaff;--gobg:#1f2850;--ext:#4fd1c5;--extbg:#0f2e2c;--agent:#b794ff;--agentbg:#2a1f45;--sel:#1f2850;
---shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.35);--shadow2:0 2px 4px rgba(0,0,0,.5),0 14px 34px rgba(0,0,0,.5)}}
+--shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.35);--shadow2:0 2px 4px rgba(0,0,0,.5),0 14px 34px rgba(0,0,0,.5);color-scheme:dark}}
+:root[data-theme=dark]{--bg:#121220;--surface:#1a1a2a;--fg:#ececf5;--dim:#a3a2b9;--card:#222238;--line:#2f2f48;
+--ok:#6fdc9a;--okbg:#15301f;--bad:#ff8f8f;--badbg:#3a1a1d;--warn:#f6c76b;--warnbg:#3a2d10;--muted:#b6b6c8;--mutedbg:#2a2a3e;
+--link:#8eaaff;--gobg:#1f2850;--ext:#4fd1c5;--extbg:#0f2e2c;--agent:#b794ff;--agentbg:#2a1f45;--sel:#1f2850;
+--shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.35);--shadow2:0 2px 4px rgba(0,0,0,.5),0 14px 34px rgba(0,0,0,.5);color-scheme:dark}
+:root[data-theme=light]{color-scheme:light}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -38,8 +43,8 @@ header.top::before{content:"";display:block;height:4px;background:var(--grad)}
 .title h1{font-size:18px;margin:0;letter-spacing:-.01em}
 .title .sp{flex:1}
 .title select{border:1px solid var(--line);border-radius:999px;background:var(--surface);padding:4px 10px;max-width:240px}
-.tabs{display:flex;gap:4px;overflow-x:auto;margin-top:8px;padding-bottom:8px;scrollbar-width:thin;align-items:center}
-.tabs .grp{display:flex;gap:2px;align-items:center;padding:3px;border-radius:999px;background:var(--card)}
+.tabs{display:flex;flex-wrap:wrap;gap:6px 4px;margin-top:8px;padding-bottom:8px;align-items:center}
+.tabs .grp{display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding:3px;border-radius:18px;background:var(--card);max-width:100%}
 .tabs .gl{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);padding:0 6px 0 8px;white-space:nowrap}
 .tabs button{background:none;border:0;border-radius:999px;padding:5px 11px;cursor:pointer;color:var(--dim);white-space:nowrap;display:inline-flex;gap:6px;align-items:center;transition:background .15s,color .15s}
 .tabs button:hover{color:var(--fg);background:var(--surface)}
@@ -250,9 +255,15 @@ td.nw{white-space:nowrap}
 .funnel .fill{height:20px;border-radius:999px;background:var(--grad);opacity:.85;min-width:4px}
 
 /* The side panel of a test, a run, an issue or a scenario. */
-#drawer{position:fixed;inset:0 0 0 auto;width:min(640px,100%);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow2);overflow:auto;z-index:20;padding:14px 18px 48px;animation:qi-in .18s ease-out}
+#drawer{position:fixed;inset:0 0 0 auto;width:min(var(--dw,640px),100%);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow2);overflow:auto;z-index:20;padding:14px 18px 48px;animation:qi-in .18s ease-out}
 @keyframes qi-in{from{transform:translateX(24px)}to{transform:none}}
 #scrim{position:fixed;inset:0;background:rgba(20,16,50,.28);z-index:19}
+/* Drag the panel's left edge to make it wider or narrower; the width stays in this browser. */
+#dgrip{position:fixed;top:0;bottom:0;right:min(var(--dw,640px),100%);width:10px;transform:translateX(50%);cursor:col-resize;z-index:21;touch-action:none}
+#dgrip::after{content:"";position:absolute;top:0;bottom:0;left:4px;width:2px;background:transparent;transition:background .15s}
+#dgrip:hover::after,#dgrip:focus-visible::after,#dgrip.drag::after{background:var(--link)}
+body.dragging{user-select:none;cursor:col-resize}
+@media (max-width:700px){#dgrip{display:none}}
 #drawer h2{font-size:18px;margin:6px 0;letter-spacing:-.01em}
 .dl{display:grid;grid-template-columns:120px minmax(0,1fr);gap:6px 12px;font-size:13px;margin:12px 0}
 .dl dt{color:var(--dim)}
@@ -1137,6 +1148,16 @@ const keysRow = () => h('div', { class: 'keys' },
   h('span', { class: 'key k-local', title: 'Filters, sorting, pins and selections change only what you see, in this browser.' }, ico('eye'), 'Changes only this page'));
 // The names of the things on this page, with their icons.
 const namesList = () => h('ul', { class: 'names' }, Object.values(ENT).map(([n, e, d]) => h('li', {}, h('b', {}, `${e} ${n}`), ' — ', h('span', { class: 'muted-t' }, d))));
+// Day / night: follows the system until you pick one; the pick stays in this browser.
+const THEME_KEY = 'qi-catalog:theme';
+const THEMES = { auto: ['🌗', 'Auto'], light: ['☀️', 'Day'], dark: ['🌙', 'Night'] };
+let theme = 'auto';
+if (storageOK) try { const t = localStorage.getItem(THEME_KEY); if (t in THEMES) theme = t; } catch { /* default auto */ }
+const applyTheme = () => { if (theme === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', theme); };
+applyTheme();
+const themeBtn = () => h('button', { class: 'btn', type: 'button', 'aria-label': `Colour mode: ${THEMES[theme][1]}`, title: 'Changes the colours: Auto (as the system), Day or Night. Only in this browser.',
+  onclick: () => { theme = { auto: 'light', light: 'dark', dark: 'auto' }[theme]; applyTheme(); try { localStorage.setItem(THEME_KEY, theme); } catch { /* this browser only */ } renderHeader(); } },
+  `${THEMES[theme][0]} ${THEMES[theme][1]}`);
 function renderHeader() {
   const a = D.agent || {};
   $('#h-title').textContent = `${D.product ? `${str(D.product)} · ` : ''}Quality control center`;
@@ -1146,6 +1167,7 @@ function renderHeader() {
   const tools = $('#h-tools'); tools.textContent = '';
   tools.append(...[builds.length ? h('select', { 'aria-label': 'Show the state as of a build', 'data-kind': 'go', title: 'Shows all views with the verdicts as they were when that build was tested.', onchange: (e) => go({ at: e.target.value || null }) },
     h('option', { value: '' }, '⏱ As of: now'), builds.slice().reverse().map((b) => h('option', { value: b.id, selected: S.at === b.id ? true : null }, `⏱ As of ${fmtDate(b.utc)} · ${b.id}`))) : null,
+  themeBtn(),
   h('button', { class: 'btn', type: 'button', onclick: toggleLegend, 'aria-expanded': $('#legend') ? 'true' : 'false', title: 'The meaning of the icons, colours, verdicts, tiers and test runs.' }, '📖 Legend')].filter(Boolean)); // DOM append writes a null as text
   const tabs = $('#tabs'); tabs.textContent = '';
   let grp = null;
@@ -1652,12 +1674,30 @@ function drawerShell(kind, label, step, kids) {
     next ? stepBtn(next, `${next.text} ›`) : null,
     h('button', { class: 'btn', type: 'button', 'data-kind': 'go', 'data-dest': `${viewOf(S.v)[2]} ${under}`, title: 'Closes this panel (also the Esc key).', onclick: closeDrawer }, ico('close'), 'Close'));
   const d = h('div', { id: 'drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': label, tabindex: -1, onkeydown: (e) => { if (e.key === 'Escape') closeDrawer(); } }, top, kids);
-  document.body.append(h('div', { id: 'scrim', onclick: closeDrawer }), d);
+  document.body.append(h('div', { id: 'scrim', onclick: closeDrawer }), d, drawerGrip());
   d.focus();
+}
+// The panel's width: drag its left edge, or focus the edge and use the arrow keys.
+const DW_KEY = 'qi-catalog:drawer-width';
+const dwRight = () => document.documentElement.clientWidth; // the panel's right edge: the page without its scrollbar
+const dwClamp = (w) => Math.round(Math.max(360, Math.min(w, dwRight() - 80)));
+const dwNow = () => { const d = $('#drawer'); return d ? d.getBoundingClientRect().width : 640; };
+const dwSet = (w) => document.documentElement.style.setProperty('--dw', `${dwClamp(w)}px`);
+const dwSave = () => { try { localStorage.setItem(DW_KEY, String(Math.round(dwNow()))); } catch { /* this browser only */ } };
+if (storageOK) try { const w = Number(localStorage.getItem(DW_KEY)); if (w > 0) document.documentElement.style.setProperty('--dw', `${Math.round(w)}px`); } catch { /* default width */ }
+function drawerGrip() {
+  const g = h('div', { id: 'dgrip', role: 'separator', 'aria-orientation': 'vertical', 'aria-label': 'Panel width', tabindex: 0, title: 'Drag to change the width of the panel (or use the arrow keys). Only in this browser.',
+    onpointerdown: (e) => { if (e.button !== 0) return; e.preventDefault(); g.setPointerCapture(e.pointerId); g.classList.add('drag'); document.body.classList.add('dragging'); },
+    onpointermove: (e) => { if (g.hasPointerCapture(e.pointerId)) dwSet(dwRight() - e.clientX); },
+    onpointerup: (e) => { if (!g.hasPointerCapture(e.pointerId)) return; g.releasePointerCapture(e.pointerId); g.classList.remove('drag'); document.body.classList.remove('dragging'); dwSave(); },
+    onpointercancel: () => { g.classList.remove('drag'); document.body.classList.remove('dragging'); },
+    ondblclick: () => { document.documentElement.style.removeProperty('--dw'); try { localStorage.removeItem(DW_KEY); } catch { /* ignore */ } },
+    onkeydown: (e) => { if (e.key === 'Escape') { closeDrawer(); return; } const k = { ArrowLeft: 40, ArrowRight: -40 }[e.key]; if (!k) return; e.preventDefault(); dwSet(dwNow() + k); dwSave(); } });
+  return g;
 }
 function renderDrawer() {
   const had = !!$('#drawer');
-  for (const e of ['#drawer', '#scrim']) { const n = $(e); if (n) n.remove(); }
+  for (const e of ['#drawer', '#scrim', '#dgrip']) { const n = $(e); if (n) n.remove(); }
   derive();
   const i = S.i && byKey.get(S.i);
   const run = !i && S.r && byRun.get(S.r);
