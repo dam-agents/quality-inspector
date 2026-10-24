@@ -138,10 +138,12 @@ echo "- validation_checks: per-build" >> "$WORK_DIR/CONFIG.md"
 out="$(bash "$SCRIPTS/preflight.sh" modules)"
 assert "on -> due with the candidate and baseline" '.nothing_to_do == false and .modules_due == ["validation"] and .candidate == "0.0.0-main.bbb2222"
   and .baseline == "0.2.19" and .inventory == null and .max_wallclock_min == 90 and .focus == []' "$out"
+assert "title: the build and the module ids" '.title == "Run modules on 0.0.0-main.bbb2222 (validation)"' "$out"
 bash "$M" ran validation 0.0.0-main.bbb2222 >/dev/null
 assert "ran on this candidate -> idle" '.nothing_to_do == true' "$(bash "$SCRIPTS/preflight.sh" modules)"
 bash "$M" focus Billing >/dev/null
-assert "a queued focus wakes it" '.nothing_to_do == false and .modules_due == [] and .focus == ["Billing"]' "$(bash "$SCRIPTS/preflight.sh" modules)"
+assert "a queued focus wakes it, counted in the title, never named" '.nothing_to_do == false and .modules_due == [] and .focus == ["Billing"]
+  and .title == "Run modules on 0.0.0-main.bbb2222 (1 focus area)"' "$(bash "$SCRIPTS/preflight.sh" modules)"
 printf 'operator %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$WORK_DIR/env/LOCK"
 assert "busy environment -> idle" '.nothing_to_do == true and (.logs | map(select(test("busy"))) | length == 1)' "$(bash "$SCRIPTS/preflight.sh" modules)"
 grep -q 'due candidate=0.0.0-main.bbb2222 modules=validation' "$WORK_DIR/MODULES.log"; assert_eq "the pre-flight logs its decision" 0 "$?"

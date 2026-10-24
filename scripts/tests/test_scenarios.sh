@@ -59,6 +59,7 @@ out="$(bash "$SCRIPTS/preflight.sh" issues)"
 rm -f "$WORK_DIR/env/LOCK"
 assert "waiting scenarios make work" '.nothing_to_do == false and .issues_due == []' "$out"
 assert "queued, stale and undelivered, oldest first" '.scenarios_due == [{"id":"S-4","kind":"takeover"},{"id":"S-5","kind":"report"},{"id":"S-1","kind":"queued"}]' "$out"
+assert "title: each scenario by its id and kind" '.title == "Resume scenario S-4 · Deliver report for scenario S-5 · Test scenario S-1"' "$out"
 # No run holds the environment: a fresh in_progress row is an orphan, taken over at once.
 out="$(bash "$SCRIPTS/preflight.sh" issues)"
 assert "an orphaned fresh scenario is taken over" '.scenarios_due[-1] == {"id":"S-3","kind":"takeover"}' "$out"
@@ -66,6 +67,10 @@ grep -q 'scenarios=3' "$WORK_DIR/ISSUES.log" || { echo "  ISSUES.log has no scen
 sed -i.bak 's/^- max_scenarios_per_day: 10$/- max_scenarios_per_day: 2/' "$WORK_DIR/CONFIG.md"
 out="$(bash "$SCRIPTS/preflight.sh" issues)"
 assert "a full cap holds back runs, not deliveries" '.scenarios_due == [{"id":"S-5","kind":"report"}] and (.logs | map(select(test("cap reached"))) | length) == 1' "$out"
+sed -i.bak 's/^| S-5 |/| S-5 x |/' "$WORK_DIR/SCENARIOS.md"
+out="$(bash "$SCRIPTS/preflight.sh" issues)"
+assert "title: only an unsafe id due -> the run name, never empty" '.scenarios_due == [{"id":"S-5 x","kind":"report"}] and .title == "Issues run"' "$out"
+sed -i.bak 's/^| S-5 x |/| S-5 |/' "$WORK_DIR/SCENARIOS.md"
 
 # discovery: off by default; due once per candidate; bounded by the daily cap in run mode
 out="$(bash "$SCRIPTS/preflight.sh" discovery)"

@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.22.0 — 2026-10-24
+## 3.23.0 — 2026-10-24
 
 **Upgrade:**
 1. A report is now published as one file: `scripts/report-media.mjs` makes `publish.html` from the
@@ -19,6 +19,12 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 2. A verdicts file now carries `started_utc` (and `cost_usd` when the platform states the cost;
    [docs/reporting.md](docs/reporting.md) → Verdicts file): write them from the next run on. Older
    runs show their length from the logs, or none. The next catalog build ships the page.
+
+## 3.22.0 — 2026-10-24
+
+**Upgrade:**
+Nothing to run — every session from the next one on names itself first, a scheduled run with the
+pre-flight's new `title` ([docs/logging.md](docs/logging.md) → **Session titles**).
 
 ## 3.21.0 — 2026-10-24
 
