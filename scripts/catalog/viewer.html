@@ -2008,7 +2008,7 @@ function viewFindings() {
       rq.map((x) => [refLink(str(x.id)), str(x.source), h('span', { class: `badge ${(RQ[x.status] || ['', 'none'])[1]}` }, (RQ[x.status] || [str(x.status)])[0]),
         str(x.title) || h('span', { class: 'muted-t' }, 'criteria not frozen yet'), x.utc ? rel(x.utc) : '']))));
   const pq = profileQueue();
-  if (pq) v.append(sec2('Profile scenarios to adopt', pq.list.length ? `The nightly regression adopts ${pq.cap} each night, in this order.` : null,
+  if (pq) v.append(sec2(`${ENT.scenario[1]} Profile scenarios to adopt`, pq.list.length ? `Scenarios of the product profile that the agent did not adopt yet. The nightly regression adopts ${pq.cap} each night, in this sequence.` : null,
     !pq.list.length ? h('p', { class: 'muted-t' }, 'No profile scenario waits. The nightly regression adopted each file of the profile.')
       : pq.cap === 0 ? [h('p', { class: 'meta', style: 'color:var(--warn)' }, 'max_scenarios_per_run is 0: no night adopts these scenarios.'), pqTable(pq, tableOf)] : pqTable(pq, tableOf)));
   const fo = arr(F.focus).filter((x) => x && typeof x === 'object');
