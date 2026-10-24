@@ -1257,7 +1257,7 @@ function activityQueue() {
     [`${ENT.issue[1]} Retests`, 'q-re', waiting.filter((x) => x.kind === 'retest').map((x) => [issueA(x.issue), ' ', str(x.title)])],
     [`${ENT.scenario[1]} Requested scenarios`, 'q-sc', rq.map((x) => [h('b', {}, refLink(str(x.id))), ' ', str(x.title) || h('span', { class: 'meta' }, `from ${str(x.source)} · ${rel(x.utc)}`)])],
     [`${ENT.report[1]} Reports on their way`, 'q-rp', [...pending.map((x) => [issueA(x.issue), ' ', str(x.title), ' ', badge(x.verdict)]), ...rp.map((x) => [h('b', {}, refLink(str(x.id))), ' ', str(x.title), ' ', badge(x.verdict)])]],
-    [`${ENT.scenario[1]} Profile scenarios to adopt`, 'q-ps', (pq ? pq.list : []).map((x) => [h('b', {}, refLink(str(x.id))), ' ', str(x.title), ' ', h('span', { class: 'meta' }, `· ${PQ_WHEN[x.when] || str(x.when)}`)])],
+    [`${ENT.scenario[1]} Profile scenarios to adopt`, 'q-ps', (pq ? pq.list : []).map((x) => [h('b', {}, refLink(str(x.id))), ' ', str(x.title), ' ', h('span', { class: 'meta' }, `· ${PQ_KIND[x.kind] || str(x.kind)} · ${PQ_WHEN[x.when] || str(x.when)}`)])],
   ];
   const total = groups.reduce((n, g) => n + g[2].length, 0);
   const card = h('section', { class: 'panel' }, h('h2', {}, `📥 Queue (${total})`, tip('The issues and scenarios that wait for a test run, and the reports that the agent did not deliver yet.')));
