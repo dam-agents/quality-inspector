@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.23.0 — 2026-10-24
+## 3.24.0 — 2026-10-24
 
 **Upgrade:**
 Nothing — docs are re-read per run. The regression worklist's `profile_scenarios.deferred` is now a
@@ -15,6 +15,9 @@ list of the waiting scenarios (the same shape as `adopt[]`), not a count; the ni
 them, `scenarios.sh queue` prints the whole adoption queue, and the next catalog build
 ([docs/catalog.md](docs/catalog.md) → Build and publish) shows it under Activity and Requests.
 
+## 3.23.0 — 2026-10-24
+
+**Upgrade:**
 Nothing to run — the next catalog build ([docs/catalog.md](docs/catalog.md) → Build and publish) ships
 the Test builder view. It sends the existing scenario request shape, and one new operator command,
 `walk these steps live: …` ([docs/on-demand.md](docs/on-demand.md)); the live part needs `live_browser`
