@@ -148,11 +148,14 @@ const t=[`test this scenario: On the page /projects/:id, the button "Save": ${w}
   `test this scenario: On the page /x: ${w}\u0007`, `test this scenario: On the page /x: ${"a".repeat(2001)}`];
 process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "a scenario request: the composed shape only, bounded, no control characters" 1100000 "$scen"
-# "Open the report": an artifact id only (docs/on-demand.md).
+# A report opens only by its own link: the page never asks the agent to open one (docs/catalog.md → Content).
 cmd="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const re=eval(s.match(/^const CMD_RE = (\/.*\/);$/m)[1]);
-const t=["open the report abc123", "open the report 9f1c-AB_2", "open the report ../x", "open the report a b", `open the report ${"a".repeat(65)}`, "open the report "];
-process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
-assert_eq "open the report: an artifact id only" 110000 "$cmd"
+process.stdout.write([re.test("open the report abc123"), /open the report/.test(s), /sendPrompt\(c\)/.test(s)].map((x)=>x?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "no command opens a report" 000 "$cmd"
+# Each kind of control says what it does (docs/catalog.md → Explained on the page): a move, a new tab, a command.
+kinds="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
+process.stdout.write([/^function goLink\(/m, /^const extLink = /m, /class: .btn agent., type: .button., .data-kind.: .agent./, /^const prepBtn = /m, /^function showTip\(/m].map((re)=>re.test(s)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "the viewer: go links, new-tab links, agent commands, prepared commands, tooltips" 11111 "$kinds"
 assert "activity: lock without its session, rows on their way, waiting issues, own schedules only" '.activity.lock == {"owner":"issues","since":"2026-10-22T19:35:00Z"}
   and ([.activity.issues[] | {issue, status, build}] == [{"issue":57,"status":"in_progress","build":"c4"},{"issue":67,"status":"in_progress","build":"c4"}])
   and .activity.budget_min == 150

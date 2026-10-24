@@ -60,10 +60,6 @@ A session whose prompt carries a schedule's Precheck frame or a Slack frame is n
   [skills/create-issue](../skills/create-issue/SKILL.md). The operator sees the draft and says yes
   before anything is posted.
 - **"show the environment"** — `env.sh status` plus non-running pods; read-only.
-- **"open the report <id>"** — read-only, the dashboard's "Open the report": find the
-  `artifact.id` under `work/issues/`, `work/scenarios/`, `work/regression/` or `work/security/`
-  that holds exactly `<id>` and answer with one line: a Markdown link titled `<run> · <build> — report` to `platform://artifacts/<id>`
-  (the platform's chip opens it beside the chat). No such file → say so; never another artifact.
 - **"add #N to the collection <name>"** / **"remove … from the collection <name>"** / **"show the catalog"** — edit
   `work/CATALOG.md` ([catalog.md](catalog.md) → Describing and categorizing), then build and
   publish it; "show" just builds, publishes and gives the artifact reference.
