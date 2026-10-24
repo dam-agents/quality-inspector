@@ -63,8 +63,9 @@ This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
 
 1. **Find it under Starter kits** and open its setup page.
 2. **Grant the GitHub connection** (required) — reads the target's issues; with issue
-   comments enabled it also posts verdicts and removes the retest label, so the account
-   needs issue write access on the target. Use a dedicated bot account, and where the
+   comments enabled it also posts verdicts and removes the retest label, and on the
+   operator's word it opens issues about the problems it found (the dashboard's "Report it as
+   a GitHub issue"), so the account needs issue write access on the target. Use a dedicated bot account, and where the
    connection allows it (a GitHub App installation, a fine-grained token) only Issues on
    the target — no Contents, Pull requests or Actions. The egress, not the token, keeps
    forks and mirrors out of reach: a public target's are readable by anyone. With a work
@@ -205,6 +206,7 @@ configuration.
 | `ui_sweep`, `validation_checks`, `stress_checks` and their tunables, `focus_max_checks`, `modules_max_wallclock_min` | offered, default `disabled` | The testing modules of the nightly modules run; registry `scripts/lib/modules.json` ([docs/modules.md](docs/modules.md)). |
 | `dashboard_interactive` | offered, default `disabled` | The dashboard's buttons send their command to the agent's chat (needs the platform's Interactive artifacts). |
 | `slack_channel`, `slack_tests_per_day` | asked (optional), default `3` | Slack test requests ([docs/slack.md](docs/slack.md)). |
+| `report_visibility` | default `private` | `public`: every report but the security run's gets a link anyone holding it opens, and the dashboard opens it in one click ([docs/reporting.md](docs/reporting.md) → Delivery). |
 | `slack_report_visibility` | default `private` | `public`: a report answered in a Slack thread gets a link anyone holding it opens, posted in that thread only ([docs/slack.md](docs/slack.md) → The answer in the thread). |
 | `lend_model`, `live_browser` | offered, default `disabled` | The product calls the agent's model by placeholder; exploration in the browser the operator watches. |
 
@@ -220,7 +222,9 @@ configuration.
   target's issues, plus issues write when comments are enabled.
 - **External surfaces:** artifacts in the platform's artifact library (private by
   default); with `issue_comments: enabled`, **public comments** on the target's issues,
-  and removal of the retest label; optionally a Slack channel bound to the agent (replies
+  and removal of the retest label; on the operator's "create issue for …" only, **new issues**
+  on the target about found problems, labelled `found_label` (and `fix_label` for the software
+  architect) — [`skills/create-issue`](skills/create-issue/SKILL.md); optionally a Slack channel bound to the agent (replies
   in request threads; with `scenario_channel`, one weekly digest post; with `regression_channel`, one nightly summary post and a black-box breach alert; with `slack_channel`,
   issue tests people order there); with `work_repo`, pushes of the `work/` backup to that
   private repository. The platform runtime's session state (`PLATFORM_RUNTIME_URL`) frees a
@@ -253,6 +257,8 @@ loses it. Definition updates arrive as the platform's Kit Update and never touch
 - [`engines/`](engines/) — reusable runners of the profile's `bin/` contract.
 - [`skills/qi-profile-creator/`](skills/qi-profile-creator/SKILL.md) — the skill a product
   team writes and checks its profile with; the agent never uses it.
+- [`skills/create-issue/`](skills/create-issue/SKILL.md) — the agent's own: one GitHub issue
+  about found problems (failed tests, design, validation, stress findings) on the operator's word.
 - [`scripts/`](scripts/) — pre-flight and Precheck, the environment lock and profile
   dispatch (`env.sh`),
   the suite runner (`suite.sh`), the evidence page renderer (`render-report.mjs`), the

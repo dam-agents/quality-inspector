@@ -59,6 +59,7 @@ cat > "$W/issues/42/verdicts-abc-c1.json" <<'J'
  "notes":["NOTE-SECRET in the notes"]}
 J
 echo abc123 > "$W/issues/42/artifact.id"
+echo 'http://share.example/a/plain' > "$W/issues/42/artifact.url" # not https: the reference stays
 cat > "$W/regression/c2/verdicts.json" <<'J'
 {"mode":"regression","candidate":"c2","acs":[{"issue":42,"id":"AC-1","verdict":"healed","explanation":"EXPLAIN-SECRET the tab moved"}],
  "context":{"previous":"c1","issues":[{"number":40,"title":"Projects get tabs"}],"ui_diff":"- renamed tab \"Tasks\" → \"To-dos\" on /projects","signals":{"console_errors_new":["E1"],"slow_tests":[]}}}
@@ -68,6 +69,9 @@ echo 'REQUEST-SECRET please test the upload, my boss asked' > "$W/scenarios/S-7/
 echo '{"scenario":"S-7","candidate":"c1","generated_utc":"2026-10-04T10:00:00Z","acs":[{"id":"AC-1","verdict":"passed"}],"notes":["NOTE-SECRET"]}' > "$W/scenarios/S-7/verdicts-s1-c1.json"
 echo 'https://claude.ai/artifact/s7' > "$W/scenarios/S-7/artifact.id"
 echo '{"candidate":"c1","counts":{"critical":0,"high":2,"medium":1},"findings":[{"id":"SEC-SECRET","explanation":"SEC-SECRET recipe"}]}' > "$W/security/c1/verdicts.json"
+# A report's share link (docs/reporting.md → Delivery step 1): the night's links; the security run's never.
+echo night2 > "$W/regression/c2/artifact.id"; echo 'https://share.example/a/Night2Slug' > "$W/regression/c2/artifact.url"
+echo sec1 > "$W/security/c1/artifact.id"; echo 'https://share.example/a/SecSlug' > "$W/security/c1/artifact.url"
 # The control center's sources: design findings with a crop, validation results, stress results.
 mkdir -p "$W/design/crops" "$W/validation/c3" "$W/stress/c3" "$W/focus/upload-c3"
 echo '{"area":"Upload","build":"c3","checks":[{"id":"FX-1","heuristic":"negative-path","expected":"refused visibly","verdict":"observation","severity":"minor","note":"FOCUS-NOTE-SECRET"}]}' > "$W/focus/upload-c3/results.json"
@@ -149,11 +153,14 @@ const t=[`test this scenario: On the page /projects/:id, the button "Save": ${w}
   `test this scenario: On the page /x: ${w}\u0007`, `test this scenario: On the page /x: ${"a".repeat(2001)}`];
 process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "a scenario request: the composed shape only, bounded, no control characters" 1100000 "$scen"
-# "Open the report": an artifact id only (docs/on-demand.md).
+# A report opens only by its own link: the page never asks the agent to open one (docs/catalog.md → Content).
 cmd="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const re=eval(s.match(/^const CMD_RE = (\/.*\/);$/m)[1]);
-const t=["open the report abc123", "open the report 9f1c-AB_2", "open the report ../x", "open the report a b", `open the report ${"a".repeat(65)}`, "open the report "];
-process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
-assert_eq "open the report: an artifact id only" 110000 "$cmd"
+process.stdout.write([re.test("open the report abc123"), /open the report/.test(s), /sendPrompt\(c\)/.test(s)].map((x)=>x?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "no command opens a report" 000 "$cmd"
+# Each kind of control says what it does (docs/catalog.md → Explained on the page): a move, a new tab, a command.
+kinds="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
+process.stdout.write([/^function goLink\(/m, /^const extLink = /m, /class: .btn agent., type: .button., .data-kind.: .agent./, /^const prepBtn = /m, /^function showTip\(/m].map((re)=>re.test(s)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "the viewer: go links, new-tab links, agent commands, prepared commands, tooltips" 11111 "$kinds"
 assert "activity: lock without its session, rows on their way, waiting issues, own schedules only" '.activity.lock == {"owner":"issues","since":"2026-10-22T19:35:00Z"}
   and ([.activity.issues[] | {issue, status, build}] == [{"issue":57,"status":"in_progress","build":"c4"},{"issue":67,"status":"in_progress","build":"c4"}])
   and .activity.budget_min == 150
@@ -177,7 +184,7 @@ assert "nights and builds" '(.nights | length) == 2 and .nights[0].counts.healed
 assert "runs: newest first; nights, an environment failure, issue and scenario runs" '[.runs[] | .type + ":" + (.ref // "-") + ":" + .build + ":" + .verdict]
   == ["regression:-:c3:unchanged","regression:-:c2:healed","regression:-:c2:environment","scenario:S-7:c1:passed","issue:#42:c1:partial"]' "$data"
 assert "a night: its entries, change context and signal counts, its report" '.runs[1] | .entries == [{"key":"issue-42/AC-1","value":"healed"}] and .previous == "c1"
-  and .issues == [{"number":40,"title":"Projects get tabs"}] and (.ui_diff | test("To-dos")) and .signals == {"console_errors_new":1,"slow_tests":0} and .report == null and .counts.healed == 1' "$data"
+  and .issues == [{"number":40,"title":"Projects get tabs"}] and (.ui_diff | test("To-dos")) and .signals == {"console_errors_new":1,"slow_tests":0} and .report == "https://share.example/a/Night2Slug" and .counts.healed == 1' "$data"
 assert "an issue run: its verdicts and report; a scenario run: its link" '(.runs[4] | .entries == [{"key":"issue-42/AC-1","value":"verified"},{"key":"issue-42/AC-2","value":"not-testable"},{"key":"issue-42/EX-1","value":"observation"}]
   and .report == "platform://artifacts/abc123" and .baseline == "b1") and .runs[3].report == "https://claude.ai/artifact/s7"
   and (.items[] | select(.key == "scenario-7/AC-1") | .evidence) == "https://claude.ai/artifact/s7"' "$data"
@@ -194,7 +201,7 @@ assert "control center: the modules' state" '(.modules.modules | length) == 11 a
 assert "design findings: register fields, a crop, nothing else" '(.design | length) == 2 and (.design[0] | .id == "D-1" and .saw == "Text of “Rename” button is clipped" and (.crop | test("^i[0-9]+$")) and (has("shot") | not) and (has("box") | not))
   and .design[1].status == "dismissed" and .design[1].crop == null' "$data"
 assert "findings: validation and stress as they are, security only counted" '.findings.validation.cases[0].message == "[value-intact] changed" and .findings.stress.checks[0].id == "STRESS-API-2"
-  and .findings.security == {"candidate":"c1","utc":null,"counts":{"critical":0,"high":2,"medium":1},"report":null}' "$data"
+  and .findings.security == {"candidate":"c1","utc":null,"counts":{"critical":0,"high":2,"medium":1},"report":"platform://artifacts/sec1"}' "$data"
 assert "requests on their way: id, source, state — never the requester or thread" '.findings.requests == [{"id":"S-9","source":"dashboard","status":"queued","build":null,"verdict":null,"utc":"2026-10-22T08:00:00Z","title":null},
   {"id":"S-10","source":"slack","status":"rejected","build":null,"verdict":null,"utc":"2026-10-21T08:00:00Z","title":null}]' "$data"
 assert "profile scenarios to adopt: id, the file's title, kind and when, in the nightly order" '.findings.profile_queue == {"cap":3,"list":[
@@ -263,4 +270,28 @@ bash "$SCRIPTS/verify-onboarding.sh" --config 2>/dev/null | grep -q '^FAIL cfg:t
 # A failed issue listing leaves the waiting issues unknown, never an empty queue.
 STUB_GH_FAIL=1 node "$SCRIPTS/catalog.mjs" >/dev/null 2>&1
 assert "activity: a failed listing is unknown, not empty" '.activity.waiting == null' "$(page_data)"
+
+# Managing from the page: a run by hand joins the history (its raw result, never its message), the
+# found issues, the design triage, the labels a new issue gets; the commands' closed set.
+mkdir -p "$W/reruns/scenario-7"
+echo '{"label":"rerun-scenario-7-c3-1200","ref":"S-7 AC-1","build":"c3","utc":"2026-10-14T12:00:00Z","results":{"AC-1":{"status":"failed","error":"RERUN-ERROR-SECRET"},"bogus":{"status":"failed"}}}' > "$W/reruns/scenario-7/rerun-scenario-7-c3-1200.json"
+printf '| ref | issue | url | build | labels | created_utc |\n| --- | --- | --- | --- | --- | --- |\n| S-7 AC-1 | #101 | https://github.com/acme/widgets/issues/101 | c3 | qa:found,architect:fix | 2026-10-14T13:00:00Z |\n| D-1 | #101 | https://github.com/acme/widgets/issues/101 | c3 | qa:found,architect:fix | 2026-10-14T13:00:00Z |\n| D-9 | #x | javascript:alert(1) | c3 | - | - |\n' > "$W/FOUND.md"
+printf '| id | category | updated_utc |\n| --- | --- | --- |\n| D-1 | layout | 2026-10-14T13:00:00Z |\n| D-2 | Not A Slug | 2026-10-14T13:00:00Z |\n' > "$W/design/CATEGORIES.md"
+printf '| id | dismissed_utc | reason |\n| --- | --- | --- |\n| D-2 | 2026-10-14T13:00:00Z | duplicate |\n' > "$W/design/DISMISSED.md"
+printf -- '- fix_label: architect:fix\n' >> "$W/CONFIG.md"
+node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a build with the triage and a run by hand" 0 "$?"
+data="$(page_data)"
+assert "a run by hand: in the history and the runs, its raw result only" '(.items[] | select(.key == "scenario-7/AC-1") | .history[-1] == {"build":"c3","run":"rerun","value":"failed","utc":"2026-10-14T12:00:00Z"})
+  and ([.runs[] | select(.type == "rerun")] | length == 1 and .[0].ref == "S-7" and .[0].entries == [{"key":"scenario-7/AC-1","value":"failed"}] and .[0].report == null)' "$data"
+assert "found issues: a row per problem, a non-https address dropped" '[.found[] | .ref + ":" + (.issue|tostring)] == ["S-7 AC-1:101","D-1:101"] and .found[0].labels == ["qa:found","architect:fix"]' "$data"
+assert "design triage: a category, a dismissal reason, a malformed category dropped" '(.design[] | select(.id == "D-1") | .category == "layout" and .dismiss_reason == null)
+  and (.design[] | select(.id == "D-2") | .category == null)' "$data"
+assert "the labels a new issue gets" '.issue_labels == {"found":"qa:found","fix":"architect:fix"}' "$data"
+case "$(cat "$W/catalog/index.html")" in (*RERUN-ERROR-SECRET*) echo "  a run by hand's error message reached the page"; FAILED=1;; esac
+cmd="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const re=eval(s.match(/^const CMD_RE = (\/.*\/);$/m)[1]);
+const t=["run #42", "run #42 AC-1", "run S-7 AC-1", "run P-sign-in", "create issue for #42 AC-1", "create issue for #42 AC-1, D-3, VAL-2, STRESS-API-2, S-7 AC-1 for the architect",
+  "categorize D-3 layout", "categorize D-3 -", "dismiss D-3 as wont-fix", "reopen D-3", "add #42 AC-1 to the collection Upload", "remove S-7 from the collection My set",
+  "run #42; rm -rf ~", "create issue for #42", "create issue for D-3 for everyone", "categorize D-3 Layout", "dismiss D-3 as boring", `create issue for ${Array(21).fill("D-1").join(", ")}`, "add #42 to the collection ../x"];
+process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "the managing commands: their shapes only, at most 20 problems" 1111111111110000000 "$cmd"
 exit $FAILED

@@ -53,5 +53,5 @@ while the plan has cases. The module failed — an `<ISO> ERROR: module=validati
 `modules.sh ran validation <c> cases=<n> major=<n> minor=<n> blocked=<n>`.
 
 Passing cases and double submits create `qa-val-*` objects; the run's closing `env.sh reset`
-removes them. A finding is never a verdict, a comment or an issue; the dashboard lists it
+removes them. A finding is never a verdict or a comment, an issue only on the operator's "create issue for VAL-`<k>`" ([skills/create-issue](../skills/create-issue/SKILL.md)); the dashboard lists it
 ([catalog.md](catalog.md)) with its run's evidence.

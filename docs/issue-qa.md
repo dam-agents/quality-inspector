@@ -119,5 +119,6 @@ work the same way ([nested-env.md](nested-env.md) → **Budgets**).
   instruction` and quoted in the chat summary ([acceptance-criteria.md](acceptance-criteria.md)).
 - Every tested AC in the rendered report has a candidate video and at least one screenshot.
 - A comment skipped as already posted was skipped for a marker in the agent's own comment.
+- The session carries the worklist's `title`, or a `warn` line says why not ([logging.md](logging.md) → **Session titles**).
 - The environment lock is released; no `/tmp/quality-inspector-*` left behind.
 - One line appended to `work/ISSUES.log`: `<ISO> ran issues=<n,…> verdicts=<v,…>`.

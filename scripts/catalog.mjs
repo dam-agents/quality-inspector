@@ -16,8 +16,8 @@
 // generation time; `changed` = it differs from work/catalog/published.hash, which the agent
 // writes after a publish. Stills and page shots are cached as small JPEGs in
 // work/catalog/thumbs/ (rendered by the suite's own playwright-core; none without it).
-// `runs` lists every night, issue run and scenario run with its build, verdicts and report
-// reference — the page is the way into all of them; `pages[].hotspots` are the controls of the
+// `runs` lists every night, issue run, scenario run and run by hand with its build, verdicts and report
+// reference — the page is the way into all of them; `found` the issues opened from its problems; `pages[].hotspots` are the controls of the
 // newest UI map with the items that name them, or reach the page the control leads to (the product map). `modules`, `design` and
 // `findings` make it the control center (docs/modules.md): the modules' state, the design
 // findings with their crops, the newest validation and stress results — of the security run its
@@ -143,8 +143,16 @@ const stillRuns = new Map(); // item key -> [{label, utc}] candidate runs, newes
 const evidence = new Map(); // origin key -> artifact reference
 const titles = new Map(); // origin key -> title from a verdicts file
 const runs = []; // every run: nights, issue runs, scenario runs (the Runs view)
-// artifact.id holds the platform's reference; a link when it is one.
-const artRef = (dir) => { const a = read(join(dir, 'artifact.id'))?.trim(); return a ? (/^https:\/\/\S+$/.test(a) ? a : `platform://artifacts/${a}`) : null; };
+// artifact.id holds the platform's reference; a link when it is one. artifact.url, beside it, the
+// report's share link (docs/reporting.md → Delivery step 1) — a link the page opens in one click.
+// The security report never links: its findings stay out of the page (docs/catalog.md → Never).
+const HTTPS = /^https:\/\/\S+$/;
+const artRef = (dir, { link = true } = {}) => {
+  const u = link ? read(join(dir, 'artifact.url'))?.trim() : null;
+  if (u && HTTPS.test(u)) return u;
+  const a = read(join(dir, 'artifact.id'))?.trim();
+  return a ? (HTTPS.test(a) ? a : `platform://artifacts/${a}`) : null;
+};
 
 const WORST = ['regression', 'failed', 'needs-review', 'flaky', 'inconclusive', 'partial', 'blocked', 'not-testable', 'passed', 'verified'];
 const rank = (v) => (WORST.includes(v) ? WORST.indexOf(v) : WORST.length);
@@ -174,6 +182,22 @@ function readVerdicts(dir, okey, run, ref) {
 }
 for (const n of ls(join(work, 'issues')).filter((x) => /^\d+$/.test(x))) readVerdicts(join(work, 'issues', n), `issue-${n}`, 'issue', `#${n}`);
 for (const s of ls(join(work, 'scenarios')).filter((x) => /^(S-\d+|P-[a-z0-9][a-z0-9-]*)$/.test(x))) readVerdicts(join(work, 'scenarios', s), scenKey(s), 'scenario', s);
+// Runs by hand (scripts/rerun.mjs, docs/on-demand.md → "run #N"): each criterion's raw result —
+// passed, failed or blocked — never a verdict, and no report of their own.
+const stemRef = (stem) => (stem.startsWith('issue-') ? `#${stem.slice(6)}` : stem.startsWith('profile-') ? `P-${stem.slice(8)}` : `S-${stem.slice(9)}`);
+for (const stem of ls(join(work, 'reruns')).filter((x) => /^(issue-\d+|scenario-\d+|profile-[a-z0-9][a-z0-9-]*)$/.test(x))) {
+  for (const f of ls(join(work, 'reruns', stem)).filter((x) => x.endsWith('.json'))) {
+    const v = readJson(join(work, 'reruns', stem, f));
+    if (!v || typeof v.results !== 'object') continue;
+    const utc = v.utc ?? new Date(mtime(join(work, 'reruns', stem, f))).toISOString().replace(/\.\d+Z$/, 'Z');
+    const entries = Object.entries(v.results).filter(([id, r]) => /^(AC|EX)-\d+$/.test(id) && ['passed', 'failed', 'blocked'].includes(r?.status))
+      .map(([id, r]) => ({ key: `${stem}/${id}`, value: r.status }));
+    for (const e of entries) addHist(e.key, { build: v.build ?? null, run: 'rerun', value: e.value, utc });
+    const worst = entries.map((e) => e.value).sort((a, b) => rank(a) - rank(b))[0] ?? null;
+    runs.push({ type: 'rerun', ref: stemRef(stem), build: v.build ?? null, utc, verdict: worst, report: null,
+      label: /^[A-Za-z0-9._-]{1,120}$/.test(String(v.label)) ? v.label : null, entries });
+  }
+}
 
 // Nightly runs: REGRESSION.log `ran candidate=` lines, and per run the criteria that were not
 // unchanged (work/regression/<candidate>/verdicts.json); every other regression-tier item of
@@ -378,8 +402,18 @@ try {
 const newestOf = (dir, file) => ls(join(work, dir)).map((b) => join(work, dir, b, file)).filter(existsSync)
   .sort((a, b) => mtime(a) - mtime(b)).at(-1) ?? null;
 const DESIGN_KEYS = ['id', 'source', 'check', 'severity', 'suspect', 'pattern', 'viewport', 'target', 'saw', 'first_seen', 'last_seen', 'status', 'resolved_build'];
+// The operator's triage of the findings (docs/ui-sweep.md → Triage): a category, a dismissal's reason.
+const CATEGORY_RE = /^[a-z0-9][a-z0-9-]{0,29}$/;
+const categoryOf = new Map(rows(join(work, 'design', 'CATEGORIES.md')).filter(([id, c]) => /^D-\d+$/.test(id) && CATEGORY_RE.test(c ?? '')).map(([id, c]) => [id, c]));
+const dismissWhy = new Map(rows(join(work, 'design', 'DISMISSED.md')).filter(([id, , why]) => /^D-\d+$/.test(id) && /^(false-positive|wont-fix|duplicate|by-design)$/.test(why ?? '')).map(([id, , why]) => [id, why]));
 const design = (readJson(join(work, 'design', 'findings.json'))?.findings ?? []).filter((f) => f && /^D-\d+$/.test(String(f.id)))
-  .map((f) => ({ ...Object.fromEntries(DESIGN_KEYS.map((k) => [k, f[k] ?? null])), crop: null, _crop: join(work, 'design', 'crops', `${f.id}.jpg`) }));
+  .map((f) => ({ ...Object.fromEntries(DESIGN_KEYS.map((k) => [k, f[k] ?? null])), category: categoryOf.get(f.id) ?? null,
+    dismiss_reason: f.status === 'dismissed' ? dismissWhy.get(f.id) ?? null : null, crop: null, _crop: join(work, 'design', 'crops', `${f.id}.jpg`) }));
+// The issues opened from the dashboard's problems (skills/create-issue, work/FOUND.md): per problem
+// its issue's number and address — one issue may stand for several problems.
+const found = rows(join(work, 'FOUND.md')).filter(([ref, issue, url]) => ref && /^#\d+$/.test(issue ?? '') && /^https:\/\/\S+$/.test(url ?? ''))
+  .map(([ref, issue, url, build, labels, utc]) => ({ ref, issue: +issue.slice(1), url, build: build && build !== '-' ? build : null,
+    labels: String(labels ?? '').split(',').map((x) => x.trim()).filter((x) => x && x !== '-'), utc: utc || null }));
 const valFile = newestOf('validation', 'results.json');
 const val = valFile ? readJson(valFile) : null;
 const stressFile = newestOf('stress', 'stress.json');
@@ -426,7 +460,7 @@ const findings = {
       result: c.result, severity: c.severity ?? null, message: c.message ?? null })) } : null,
   stress: stress ? { build: stress.build ?? null, utc: stress.generated_utc ?? null, config: stress.config ?? null, counts: stress.counts ?? null,
     checks: (stress.checks ?? []).map((c) => ({ id: c.id, target: c.target, status: c.status, severity: c.severity, evidence: c.evidence ?? null, reason: c.reason ?? null })) } : null,
-  security: sec ? { candidate: sec.candidate ?? null, utc: sec.generated_utc ?? null, counts: sec.counts ?? null, report: artRef(dirname(secFile)) } : null,
+  security: sec ? { candidate: sec.candidate ?? null, utc: sec.generated_utc ?? null, counts: sec.counts ?? null, report: artRef(dirname(secFile), { link: false }) } : null,
 };
 // What the agent does now, what waits, and when it runs (Overview → Activity): the lock's holder
 // and since (never its session), the rows in progress or awaiting delivery, the labelled open
@@ -534,7 +568,7 @@ for (const f of ls(thumbsDir).filter((x) => x.endsWith('.jpg'))) if (!wanted.has
 // other stills by tier, newest verdict first. A page without its shot still shows its controls.
 const images = {};
 let used = 0; let dropped = 0; let seq = 0;
-const base = Buffer.byteLength(JSON.stringify({ items, pages, nights, runs, modules, design, findings }, (k, v) => (k.startsWith('_') ? undefined : v)))
+const base = Buffer.byteLength(JSON.stringify({ items, pages, nights, runs, modules, design, findings, found }, (k, v) => (k.startsWith('_') ? undefined : v)))
   + Buffer.byteLength(read(join(HERE, 'catalog', 'viewer.html')) ?? '');
 const budget = Math.max(0, Math.min(IMG_BUDGET, PAGE_MAX - base));
 if (budget < IMG_BUDGET) notes.push(`image budget cut to ${Math.round(budget / 1024)} KiB by the size of the data`);
@@ -572,7 +606,10 @@ const data = {
   product, target: target || null,
   issue_url: target ? `https://${host}/${target.split('/').slice(-2).join('/')}/issues/{n}` : null,
   builds, collections, items, pages, uncovered_nav: uncoveredNav, nights, runs,
-  modules, design, findings, activity, areas, interactive: modules?.global?.dashboard_interactive?.value === 'enabled', images,
+  modules, design, findings, activity, areas, found,
+  // The labels a new issue gets: found_label always, fix_label (the software architect's) on request.
+  issue_labels: { found: cfg('found_label') || 'qa:found', fix: cfg('fix_label') || null },
+  interactive: modules?.global?.dashboard_interactive?.value === 'enabled', images,
 };
 const hash = createHash('sha256').update(JSON.stringify(data)).digest('hex').slice(0, 12);
 data.generated_utc = new Date().toISOString().replace(/\.\d+Z$/, 'Z');

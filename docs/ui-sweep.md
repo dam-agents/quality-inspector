@@ -4,7 +4,8 @@ A module of the modules run ([modules.md](modules.md)), switch `ui_sweep`. It wa
 page of the candidate's UI map at each of `ui_sweep_viewports` (default desktop, tablet,
 phone), only navigating — it never clicks, types or submits — and keeps what it finds in one
 register, `work/design/findings.json`, which the dashboard's **Design** view shows
-([catalog.md](catalog.md)). A finding is never a verdict, a comment or an issue.
+([catalog.md](catalog.md)). A finding is never a verdict or a comment, and becomes an issue only
+on the operator's "create issue for D-`<k>`" ([skills/create-issue](../skills/create-issue/SKILL.md)).
 
 ## 1. Sweep — `scripts/ui-sweep.mjs` (no model)
 
@@ -73,6 +74,17 @@ updates `work/design/findings.json` and renders a crop with the finding marked
 - **Noticed in passing** ([explorations.md](explorations.md)) joins as source `noticed` on
   every merge (`merge --noticed-only` without a sweep, before every catalog build); never
   resolved automatically.
-- **Dismissed** — the operator's "dismiss D-`<k>`": `modules.sh dismiss D-<k>` adds a row to
-  `work/design/DISMISSED.md` (direct session only, [modules.md](modules.md) → Control);
-  removing the row reopens it.
+- **Dismissed** — the operator's "dismiss D-`<k>`" (optionally `as <reason>`): `modules.sh dismiss D-<k> [<reason>]` adds a row to
+  `work/design/DISMISSED.md` (`| id | dismissed_utc | reason |`; a two-column file of an earlier version reads the same;
+  direct session only, [modules.md](modules.md) → Control); "reopen D-`<k>`" (`modules.sh reopen`) removes the row.
+
+## 4. Triage — the operator's, from the dashboard's Design view
+
+Each finding can carry the operator's **category** (`categorize D-<k> <category>` →
+`work/design/CATEGORIES.md`, `| id | category | updated_utc |`; any lower-case slug — `layout`,
+`a11y`, `branding` — so the design team can sort the register their way), a **dismissal** with
+its reason (`false-positive`: the check is wrong here; `wont-fix`: a defect that stays;
+`duplicate`; `by-design`), and a **found issue** on GitHub ("create issue for D-`<k>`[, D-`<j>`…]",
+several findings in one issue — [skills/create-issue](../skills/create-issue/SKILL.md); work/FOUND.md
+remembers it). The dashboard shows all three, filters by category, and offers each as a command
+([catalog.md](catalog.md)). None of them changes what a sweep finds; a merge keeps them.

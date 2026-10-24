@@ -17,14 +17,20 @@ The operator may share the page beyond themselves, so it carries only what conce
   per build (issue runs, nights, scenarios; the newest 30 — a night that does not name a
   regression-tier item is `unchanged`, or `drift` while its file is drifted), heals (date,
   build, basis), flaky confirmations, durations, the AC still and the evidence artifact's
-  reference.
+  reference, and the GitHub issue opened for its problem (work/FOUND.md: number, address,
+  labels, date — one issue may stand for several problems).
 - **Around them:** the newest UI map's pages with their coverage and shot, the operator's
   collections, and **every run** (the newest 400): each night of `work/REGRESSION.log` — its
   counts, the criteria that were not `unchanged`, the change context's issues (number, title), UI
   diff text and signal counts — or its environment failure; each issue and scenario run with its
-  verdicts; each with its build and report reference (a link when `artifact.id` holds one; else
-  "Open the report" — the command `open the report <id>`, since a private artifact has no
-  address a page can link to).
+  verdicts; each run by hand (`work/reruns/`, [on-demand.md](on-demand.md) → "run #N") with its raw
+  results; each with its build and report reference (a link when the report has one —
+  `artifact.url`, its share link, e.g. under `report_visibility: public`
+  ([reporting.md](reporting.md) → Delivery step 1), or an `https://` `artifact.id` — opened in a
+  new tab; else a "private" mark that says where to find it, Artifacts in the app: a private
+  artifact has no address a page can open, and the page never asks the agent to open a report).
+  The security run's report never links. Whoever sees the
+  page can pass a public link on: the link is that report's whole access control.
 - **Product map:** per page of the newest map, every named control the map saw on screen (its
   `boxes`, [change-awareness.md](change-awareness.md) → The three sources) with the items that
   name it in a quoted string — on that page only, or in a test that opens the page; a control
@@ -43,7 +49,7 @@ The operator may share the page beyond themselves, so it carries only what conce
   row's last update; never the request's words. Under them, every profile scenario still to adopt, as in Activity.
 - **Control center:** every module's state, settings, schedule and last run (`modules.sh
   status`), the focus queue and the areas; the design findings register with each finding's crop
-  ([ui-sweep.md](ui-sweep.md)); the newest validation results and stress checks; of the newest
+  ([ui-sweep.md](ui-sweep.md)) with the operator's category and dismissal reason; the newest validation results and stress checks; of the newest
   security run only its counts by severity and its report's reference.
 - **Never:** a scenario's request text, requester or thread; a verdict's notes or a triage
   explanation; `work/LESSONS.md`; the operator conversation; a security finding or anything else
@@ -69,6 +75,27 @@ The operator may share the page beyond themselves, so it carries only what conce
   A member is `#N`, `#N AC-k`, `S-k` or `S-k AC-j`; an unknown one is kept and matches nothing.
 - **Pins:** each viewer's own, kept in their browser.
 
+**Explained on the page**, in ASD-STE100 ([reporting.md](reporting.md) → **Artifact text is ASD-STE100**).
+- **One name and one icon per thing**, the same everywhere — 🎫 issue, 💬 scenario, 🎯 acceptance
+  criterion, 🔦 exploration, 🧪 test case (one criterion or exploration with its test), 📝 test file,
+  🏃 test run, 📦 build, 🎬 report, 🐞 bug issue, 🖥️ page, 🔘 control, 🎨 design finding, ⌨️ validation
+  finding, 🏋️ stress check, 🗂️ collection, 🧩 testing module. A short reference (`#42 AC-1`) always
+  carries its icon, and its tooltip gives the whole name ("Test case — acceptance criterion AC-1 of
+  issue #42 …").
+- **One kind of control, one look.** Blue with → goes to another view of the page, with ▯ opens a
+  panel, with ⌖ a page of the product map; teal with ↗ opens another site in a new tab (GitHub, a
+  report's link); violet with the agent's mark is a command for the agent (solid: "Send to the
+  agent"; dashed: only prepares one); grey changes only this page in this browser (filters, sorting,
+  pins, selections). Each one's tooltip says first what it does and where it goes, then its meaning.
+- **Where you are:** the header always names the view and the panel open on it, beside **Back**;
+  each view opens with its icon, its name and one line of what it is for (the line hideable, per
+  browser); a panel names its kind (test case, test run, issue, scenario).
+- Overview has a "How this page works" guide (the kinds of control, then issue, test case, test
+  run, verdict, tier, report, commands, reporting a bug); every verdict badge, tier, severity,
+  design check, validation input, run type, column, filter, quick filter, label of a panel and
+  figure carries its meaning as a tooltip — the page's own, on hover, keyboard focus or a tap of an
+  ⓘ; the Legend lists the kinds of control, every name and icon, verdict, tier and run type.
+
 Views: Overview, Modules (each module's switches and settings), Findings (validation, stress,
 security counts, edge-case observations), Design (the design findings: crops, filters, "copy as
 Markdown" for the design team), Runs, Product map (the page shots with every control clickable, coloured by
@@ -83,19 +110,31 @@ issue's or a scenario's criteria and explorations, every run that judged them, i
 this build"), a page a test opens to that page on the Product map, an area, a session, a surface,
 a label or a collection to the catalog filtered by it, a history cell or entry to its run, a
 design finding's page to the map, and from a map page to its design findings. Every report — the
-artifact with the video, the screenshots and the steps — is reachable wherever its run or its
-origin appears: the catalog's Report column, cards, Overview, the map's test lists, the runs in an
+artifact with the video, the screenshots and the steps — shows wherever its run or its
+origin appears (a link in a new tab, or the "private" mark): the catalog's Report column, cards, Overview, the map's test lists, the runs in an
 item's and an origin's panel, the Runs view and the run panel. Every move to another place (a view,
 a panel, a map page, a build, "as of") is a history step the browser's back and forward walk; a filter, a sort,
-a search or a picked control of the map refines the place instead. The page's own **← Back** (under the title and in every panel) returns to the place before,
+a search or a picked control of the map refines the place instead. The page's own **Back** (in the "You are here" bar under the tabs and in every panel) returns to the place before,
 named — in memory where the frame may not touch the browser history. A panel has previous and
 next (the item in the list it was opened from, the run before or after, the neighbouring origin)
 and breadcrumbs up to its origin; Close returns to the place under it. **As of a
 build** shows every view with the verdicts as they stood when that build last ran (files, tiers
 and steps stay today's); older catalogs are the artifact's earlier revisions. An action appears
 as a command for the direct session (`promote #42`, `module stress set stress_checks=weekly`) —
-only one of the closed set of [on-demand.md](on-demand.md) (`open the report <id>` included) and [modules.md](modules.md) →
-**Control**, built from constants and ids, never from page data. It can be copied; on an
+only one of the closed set of [on-demand.md](on-demand.md), [modules.md](modules.md) →
+**Control** and [skills/create-issue](../skills/create-issue/SKILL.md), built from constants, ids and a
+name or category the person types (checked against its pattern), never from other page data.
+
+**Managing from the page.** A test's panel has "What you can do": run it now (`run #42 AC-1`, or
+every test of its issue), retest the whole issue (`test #42`), promote or demote it, put it in or
+take it out of a collection, and report it as a GitHub issue (`create issue for #42 AC-1`, plus
+`… for the architect` when `fix_label` is set). A design finding's card has "Manage":
+categorize it, dismiss it with a reason or reopen it, report it. **Several problems as one
+issue:** every test (catalog table and cards; the failing ones in Needs attention), design finding,
+validation finding and failed stress check has a ☐; the ticked ones gather in a bar at the bottom
+of every view with one command, `create issue for <ref>, <ref>…` (at most 20), and its
+architect variant. The selection is the viewer's own, kept in their browser. A problem an issue
+was opened for shows that issue's link everywhere it appears, and the flag "issue created". It can be copied; on an
 interactive page opened beside the agent's chat its button sends it as the operator's message.
 The one exception is **Ask for a test** on the Product map: a scenario request built from the
 page's pattern, the control's kind and name, and the person's own words, in the one shape of

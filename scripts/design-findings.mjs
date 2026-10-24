@@ -18,7 +18,7 @@
 // without an error, `a11y:*` only where axe-core ran on that page (pages[].axe), `layout-shift`
 // only where CLS was measured. A review resolves the review findings of the pages it covered
 // (the review plan's and the ones it names). One seen again reopens. `dismissed` comes only from
-// work/design/DISMISSED.md (| id | dismissed_utc |, the operator's), re-applied on every merge.
+// work/design/DISMISSED.md (| id | dismissed_utc | reason |, the operator's), re-applied on every merge.
 // Noticed items (work/issues/*/verdicts-<ac_hash>-<candidate>.json and
 // work/scenarios/*/verdicts-<spec_hash>-<build>.json → noticed[]) join as source `noticed` — only
 // where, saw and shot are read — and are never resolved by a sweep. `first_seen`, `last_seen` and

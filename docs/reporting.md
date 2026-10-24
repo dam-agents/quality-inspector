@@ -63,6 +63,14 @@ which the renderer shows verbatim above the criteria ([scenarios.md](scenarios.m
 `acs` or `verdict` ([explorations.md](explorations.md) → **Reporting**, **Noticed in passing**). Never: credentials,
 internal state, the operator conversation.
 
+**Artifact text is ASD-STE100** (Simplified Technical English). Every sentence a reader sees in an
+artifact — a report, the dashboard, an evidence page, a found issue's body — and every text you
+write for one (a verdict's `note`, `notes`, an edit of a found issue): one statement or instruction
+per sentence, at most 20 words for an instruction and 25 for a description, active voice, simple
+tenses, one word for one meaning from the common technical words (`examine`, not "look into";
+`repair`, not "fix up"), no idioms, phrasal verbs or `-ing` nouns. Identifiers, commands, quoted
+product text and the frozen criteria stay verbatim.
+
 ## The report — `work/issues/<n>/report-<ac_hash>-<candidate>/`
 
 `node "$HOME/scripts/render-report.mjs" <verdicts.json> <dir>` writes:
@@ -104,6 +112,20 @@ re-run. Never retry within the same run.
    ([slack.md](slack.md) → **The answer in the thread**); share it with the issue's readers
    only through the comment's link. Open the published
    page once and confirm a video plays before recording the delivery.
+   - **`report_visibility: public`** (default `private`): every report but the security run's
+     ([security.md](security.md) → Rules) is published `public` — `create_artifact` with
+     `visibility: public`, or `set_artifact_sharing` on one that is private (a restricted one
+     stays as the operator set it). The link is then the whole access control: anyone who holds
+     it sees the videos and screenshots of the nested product, and an issue's artifact is one
+     per issue, so its later revisions too. It is for the dashboard: the catalog links it and
+     opens the report in one click ([catalog.md](catalog.md)). Switching back to `private`
+     changes no report already public — the operator makes those private in the app. Only the
+     operator sets the key (CLAUDE.md → Runtime configuration).
+   - **`artifact.url`**, beside `artifact.id`: after every create or revision, the response's
+     `shareUrl` when it is an `https://` link (one line), else the file removed — whatever
+     opened the link (this key, the operator's sharing, a Slack thread). The catalog reads it;
+     nothing else does, and a link goes elsewhere only by its own rule (step 2,
+     [slack.md](slack.md) → **The answer in the thread**). Never for the security run's report.
 2. **Issue comment** (`issue_comments: enabled`):
    - **Own markers only.** A marker — this one, `-data`, `-spec` — counts only in a comment
      whose `user` is the agent's own login (`github.sh whoami` — `github_login` when set —
@@ -113,8 +135,9 @@ re-run. Never retry within the same run.
      post; record as delivered. A failed listing is "could not look" → do not post, log,
      leave `report_pending`.
    - Post `comment.md` with `github.sh comment <n> <file>` (with `EVIDENCE_LINK` replaced by the artifact's share link —
-     never a `public` one while `slack_report_visibility: public`, which may have opened it for a
-     Slack thread ([slack.md](slack.md) → **The answer in the thread**) — or, with none, by
+     never a `public` one while `slack_report_visibility: public` or `report_visibility: public`,
+     which may have opened it for a Slack thread ([slack.md](slack.md) → **The answer in the
+     thread**) or the dashboard (step 1) — or, with none, by
      "evidence kept by the agent") with that marker and one
      machine copy next to it:
      `<!-- <marker_prefix>-data {"issue":42,"ac":"…","build":"…","verdicts":{"AC-1":"verified"}} -->`.

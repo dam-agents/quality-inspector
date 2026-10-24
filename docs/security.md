@@ -82,7 +82,8 @@ candidate has no `ran candidate=` line in `work/SECURITY.log`. Worklist: `candid
    `explanation`; e2e ones add `"tag": "sec-<k>"`); `counts` by severity plus `skipped`.
 8. `node "$HOME/scripts/render-report.mjs" work/security/<c>/verdicts.json work/security/<c>/report`.
 9. Deliver per [reporting.md](reporting.md) → **Delivery** step 1 only, the reference in
-   `work/security/<c>/artifact.id`; `artifact_reports: disabled` → it stays in `work/`.
+   `work/security/<c>/artifact.id`, always private (`report_visibility` aside, no
+   `artifact.url`); `artifact_reports: disabled` → it stays in `work/`.
 10. Append `<ISO> ran candidate=<c> critical=<n> high=<n> medium=<n> low=<n> info=<n> skipped=<n>`
     to `work/SECURITY.log`; log `security_run` ([logging.md](logging.md)).
 11. `env.sh unlock security`. Chat summary: every critical and high finding first (id,

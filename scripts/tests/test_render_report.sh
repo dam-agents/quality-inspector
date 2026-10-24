@@ -43,7 +43,7 @@ case "$h" in *ASSERTION_FAILED*) ;; *) echo "  baseline error missing"; FAILED=1
 grep -q '| AC-1 | renamed | passed | failed | verified |' "$SANDBOX/out/comment.md" || { echo "  comment row missing"; FAILED=1; }
 grep -q 'criteria ac=abc · 1 of 2 criteria tested$' "$SANDBOX/out/comment.md" || { echo "  comment: tested count missing (a not-testable AC is not tested)"; FAILED=1; }
 case "$h" in *'1 of 2 criteria tested'*) ;; *) echo "  page: tested count missing"; FAILED=1;; esac
-case "$h" in *'feature is absent there'*) ;; *) echo "  baseline blocked reason not rendered"; FAILED=1;; esac
+case "$h" in *'the function is not there'*) ;; *) echo "  baseline blocked reason not rendered"; FAILED=1;; esac
 # Backward compatibility: no "explorations" field → no section, no comment line, no new output keys.
 assert "no exploration keys without explorations" 'has("explorations") | not' "$out"
 case "$h" in *'Beyond the criteria'*) echo "  explorations section rendered without explorations"; FAILED=1;; esac

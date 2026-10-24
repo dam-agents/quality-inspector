@@ -50,6 +50,7 @@ github_rules() { # <host> [<owner>/<repo> of this definition]
   done <<EOF
 GET
 GET /issues*
+POST /issues
 POST /issues/*/comments
 DELETE /issues/*/labels/*
 GET /contents/$PROFILE_SOURCE_DIR/*
