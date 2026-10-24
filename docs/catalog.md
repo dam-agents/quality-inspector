@@ -26,9 +26,10 @@ The operator may share the page beyond themselves, so it carries only what conce
   verdicts; each run by hand (`work/reruns/`, [on-demand.md](on-demand.md) → "run #N") with its raw
   results; each with its build and report reference (a link when the report has one —
   `artifact.url`, its share link, e.g. under `report_visibility: public`
-  ([reporting.md](reporting.md) → Delivery step 1), or an `https://` `artifact.id` — opened in one
-  click; else "Open the report" — the command `open the report <id>`, since a private artifact
-  has no address a page can link to). The security run's report never links. Whoever sees the
+  ([reporting.md](reporting.md) → Delivery step 1), or an `https://` `artifact.id` — opened in a
+  new tab; else a "private" mark that says where to find it, Artifacts in the app: a private
+  artifact has no address a page can open, and the page never asks the agent to open a report).
+  The security run's report never links. Whoever sees the
   page can pass a public link on: the link is that report's whole access control.
 - **Product map:** per page of the newest map, every named control the map saw on screen (its
   `boxes`, [change-awareness.md](change-awareness.md) → The three sources) with the items that
@@ -71,12 +72,26 @@ The operator may share the page beyond themselves, so it carries only what conce
   A member is `#N`, `#N AC-k`, `S-k` or `S-k AC-j`; an unknown one is kept and matches nothing.
 - **Pins:** each viewer's own, kept in their browser.
 
-**Explained on the page**, in ASD-STE100 ([reporting.md](reporting.md) → **Artifact text is ASD-STE100**). Each view opens with one line of what it is for (hideable, per
-browser); Overview has a "How this page works" guide of the page's words (criterion,
-exploration, verdict, tier, run, design finding, action, reporting a bug); every verdict badge,
-tier, severity, design check, validation input, run type, column, filter, quick filter and
-figure carries its meaning as a tooltip, and an ⓘ beside a heading explains it on hover, focus
-or tap; the Legend lists every verdict, tier and run type with its meaning.
+**Explained on the page**, in ASD-STE100 ([reporting.md](reporting.md) → **Artifact text is ASD-STE100**).
+- **One name and one icon per thing**, the same everywhere — 🎫 issue, 💬 scenario, 🎯 acceptance
+  criterion, 🔦 exploration, 🧪 test case (one criterion or exploration with its test), 📝 test file,
+  🏃 test run, 📦 build, 🎬 report, 🐞 bug issue, 🖥️ page, 🔘 control, 🎨 design finding, ⌨️ validation
+  finding, 🏋️ stress check, 🗂️ collection, 🧩 testing module. A short reference (`#42 AC-1`) always
+  carries its icon, and its tooltip gives the whole name ("Test case — acceptance criterion AC-1 of
+  issue #42 …").
+- **One kind of control, one look.** Blue with → goes to another view of the page, with ▯ opens a
+  panel, with ⌖ a page of the product map; teal with ↗ opens another site in a new tab (GitHub, a
+  report's link); violet with the agent's mark is a command for the agent (solid: "Send to the
+  agent"; dashed: only prepares one); grey changes only this page in this browser (filters, sorting,
+  pins, selections). Each one's tooltip says first what it does and where it goes, then its meaning.
+- **Where you are:** the header always names the view and the panel open on it, beside **Back**;
+  each view opens with its icon, its name and one line of what it is for (the line hideable, per
+  browser); a panel names its kind (test case, test run, issue, scenario).
+- Overview has a "How this page works" guide (the kinds of control, then issue, test case, test
+  run, verdict, tier, report, commands, reporting a bug); every verdict badge, tier, severity,
+  design check, validation input, run type, column, filter, quick filter, label of a panel and
+  figure carries its meaning as a tooltip — the page's own, on hover, keyboard focus or a tap of an
+  ⓘ; the Legend lists the kinds of control, every name and icon, verdict, tier and run type.
 
 Views: Overview, Modules (each module's switches and settings), Findings (validation, stress,
 security counts, edge-case observations), Design (the design findings: crops, filters, "copy as
@@ -92,18 +107,18 @@ issue's or a scenario's criteria and explorations, every run that judged them, i
 this build"), a page a test opens to that page on the Product map, an area, a session, a surface,
 a label or a collection to the catalog filtered by it, a history cell or entry to its run, a
 design finding's page to the map, and from a map page to its design findings. Every report — the
-artifact with the video, the screenshots and the steps — is reachable wherever its run or its
-origin appears: the catalog's Report column, cards, Overview, the map's test lists, the runs in an
+artifact with the video, the screenshots and the steps — shows wherever its run or its
+origin appears (a link in a new tab, or the "private" mark): the catalog's Report column, cards, Overview, the map's test lists, the runs in an
 item's and an origin's panel, the Runs view and the run panel. Every move to another place (a view,
 a panel, a map page, a build, "as of") is a history step the browser's back and forward walk; a filter, a sort,
-a search or a picked control of the map refines the place instead. The page's own **← Back** (under the title and in every panel) returns to the place before,
+a search or a picked control of the map refines the place instead. The page's own **Back** (in the "You are here" bar under the tabs and in every panel) returns to the place before,
 named — in memory where the frame may not touch the browser history. A panel has previous and
 next (the item in the list it was opened from, the run before or after, the neighbouring origin)
 and breadcrumbs up to its origin; Close returns to the place under it. **As of a
 build** shows every view with the verdicts as they stood when that build last ran (files, tiers
 and steps stay today's); older catalogs are the artifact's earlier revisions. An action appears
 as a command for the direct session (`promote #42`, `module stress set stress_checks=weekly`) —
-only one of the closed set of [on-demand.md](on-demand.md) (`open the report <id>` included), [modules.md](modules.md) →
+only one of the closed set of [on-demand.md](on-demand.md), [modules.md](modules.md) →
 **Control** and [skills/create-issue](../skills/create-issue/SKILL.md), built from constants, ids and a
 name or category the person types (checked against its pattern), never from other page data.
 

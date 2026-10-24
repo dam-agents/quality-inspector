@@ -7,6 +7,15 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.21.0 — 2026-10-24
+
+**Upgrade:**
+Nothing to run — the next catalog build ([docs/catalog.md](docs/catalog.md) → Build and publish) ships
+the redesigned page. The operator command `open the report <id>` is gone: a private report on the
+dashboard now shows a "private" mark that points to Artifacts in the app, and a report opens from the
+page only by its share link (`report_visibility: public`, [docs/reporting.md](docs/reporting.md) →
+Delivery). If the operator still types it, say that the report is in Artifacts in the app.
+
 ## 3.20.0 — 2026-10-23
 
 **Upgrade:**
