@@ -340,6 +340,51 @@ pre.diff{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--card);bord
 #tray .chip button{background:none;border:0;cursor:pointer;color:var(--dim);padding:0 0 0 2px}
 body.has-tray main{padding-bottom:230px}
 
+/* Test builder: the steps as blocks or as text at the left, each step on the product's screens at the right. */
+.blayout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:16px;align-items:start}
+.bsteps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.bstep{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--muted);border-radius:var(--r);padding:8px 10px;box-shadow:var(--shadow);transition:box-shadow .12s}
+.bstep.k-given{border-left-color:var(--dim)}.bstep.k-open{border-left-color:var(--link)}.bstep.k-do{border-left-color:var(--agent)}.bstep.k-check{border-left-color:var(--ok)}
+.bstep.cur{outline:2px solid var(--link);outline-offset:1px}
+.bstep.drag{opacity:.45}.bstep.over{box-shadow:0 -4px 0 var(--link)}
+.bstep .grip{cursor:grab;color:var(--dim);background:none;border:0;padding:2px 4px;font-size:16px;line-height:1;border-radius:6px}
+.bstep .grip:hover{background:var(--card);color:var(--fg)}
+.bstep .num{width:22px;height:22px;border-radius:50%;background:var(--card);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--dim)}
+.bstep .bbody{display:flex;gap:6px;align-items:center;min-width:0}
+.bstep select{flex:none;padding:5px 6px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:12.5px}
+.bstep input{flex:1;min-width:0;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.bstep .tools{display:flex;gap:2px}
+.bstep .tools button{background:none;border:0;border-radius:6px;padding:3px 6px;cursor:pointer;color:var(--dim)}
+.bstep .tools button:hover{background:var(--card);color:var(--fg)}
+.bstep .tools button:disabled{opacity:.3;cursor:default;background:none}
+.badd{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0}
+.badd select{padding:4px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface);max-width:100%}
+.btext{width:100%;min-height:280px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.7;resize:vertical}
+.bname{width:100%;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);margin-bottom:10px}
+.seg{display:inline-flex;background:var(--card);border-radius:999px;padding:3px;gap:2px}
+.seg button{background:none;border:0;border-radius:999px;padding:3px 12px;cursor:pointer;color:var(--dim)}
+.seg button[aria-pressed=true]{background:var(--surface);color:var(--fg);font-weight:600;box-shadow:var(--shadow)}
+.bcap{display:flex;gap:8px;align-items:flex-start;margin:0 0 8px;font-size:14px;min-height:44px}
+.bcap .num{flex:none;width:26px;height:26px;border-radius:50%;background:var(--grad);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.bcap b{display:block}
+.bstage{position:relative}
+.bstage .hs.step{border:3px solid var(--agent);background:color-mix(in srgb,var(--agent) 20%,transparent);z-index:4;animation:qi-ring 1.6s infinite}
+.bstage .hs.mute{border:1px solid color-mix(in srgb,var(--dim) 40%,transparent);background:transparent;pointer-events:none}
+.bstage .hs.rec{border:2px dashed var(--agent);background:color-mix(in srgb,var(--agent) 6%,transparent);cursor:copy}
+.bstage .hs.rec:hover{background:color-mix(in srgb,var(--agent) 22%,transparent)}
+@keyframes qi-ring{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--agent) 55%,transparent)}70%{box-shadow:0 0 0 12px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.bcheck{position:absolute;left:10px;right:10px;bottom:10px;z-index:5;background:var(--okbg);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 50%,transparent);border-radius:10px;padding:6px 10px;font-weight:600;box-shadow:var(--shadow2);overflow-wrap:anywhere}
+.bph{aspect-ratio:16/10;flex-direction:column;gap:6px;padding:20px;text-align:center;font-size:13.5px}
+.bph .em{font-size:34px}
+.bplay{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0 4px}
+.film{display:flex;gap:6px;overflow-x:auto;padding:6px 2px 8px;scrollbar-width:thin}
+.film button{flex:none;display:flex;flex-direction:column;gap:3px;align-items:flex-start;width:118px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 8px;cursor:pointer;text-align:left;font-size:11.5px;color:var(--dim)}
+.film button[aria-current=true]{border-color:var(--link);background:var(--sel);color:var(--fg)}
+.film button b{font-size:12px;color:var(--fg)}
+.film button span{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:1100px){.blayout{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:520px){.bstep{grid-template-columns:auto minmax(0,1fr) auto}.bstep .num{display:none}.bstep .bbody{flex-wrap:wrap}.bstep input{flex-basis:100%}}
+
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media (max-width:520px){.set{grid-template-columns:minmax(0,1fr)}.set dd{margin-bottom:6px}.vhead .vico{width:36px;height:36px;font-size:20px}}
 @media (max-width:1200px){.maplayout{grid-template-columns:200px minmax(0,1fr)}.maplayout .mapdetail{grid-column:1/-1}}
@@ -625,6 +670,7 @@ const VIEW_HELP = {
   coverage: 'The pages that the tests open. Green: a nightly test opens the page. Amber: only a test that ran one time opens it. Red: no test opens it.',
   history: 'Each test case (row) on each build (column). The colour shows the result. Use it to find when a test started to fail. Click a cell to open that test run.',
   lifecycle: 'How a test case moves from an issue to the nightly regression, and the test cases that you can promote.',
+  builder: 'Make a test from steps, as blocks or as text. The preview shows each step on the screens of the product map. Then ask the agent for the test, or ask the agent to do the steps in the Browser Panel.',
 };
 const QUICK_HELP = {
   'Nightly regression': 'The test cases that run each night.', 'Needs attention': 'Test cases that failed, have a regression, are flaky, need review or changed after promotion. Start here.',
@@ -673,7 +719,7 @@ window.addEventListener('scroll', hideTip, true);
 // ------------------------------------------------------------------- state
 // [id, name, icon, group]: the tabs, grouped by subject, each with its icon on every link to it.
 const VIEWS = [['overview', 'Overview', '🏠', 'Status'], ['runs', 'Runs', '🏃', 'Status'],
-  ['catalog', 'Catalog', '📚', 'Tests'], ['gallery', 'Gallery', '🖼️', 'Tests'], ['history', 'History', '🕰️', 'Tests'], ['lifecycle', 'Lifecycle', '🌱', 'Tests'],
+  ['catalog', 'Catalog', '📚', 'Tests'], ['gallery', 'Gallery', '🖼️', 'Tests'], ['history', 'History', '🕰️', 'Tests'], ['lifecycle', 'Lifecycle', '🌱', 'Tests'], ['builder', 'Test builder', '🛠️', 'Tests'],
   ['map', 'Product map', '🗺️', 'Product'], ['coverage', 'Coverage', '🧭', 'Product'], ['design', 'Design', '🎨', 'Product'],
   ['findings', 'Findings', '🔎', 'Modules'], ['modules', 'Modules', '🧩', 'Modules']];
 const viewOf = (k) => VIEWS.find(([x]) => x === k) || VIEWS[0];
@@ -868,7 +914,10 @@ const bridge = () => { try { return window.platform && typeof window.platform.se
 // A scenario request carries the person's own words (docs/scenarios.md → A request from the
 // dashboard): a fixed opening, then printable text with line breaks, bounded.
 const SCEN_RE = /^test this scenario: On the page \/[A-Za-z0-9_./:-]{0,120}(?:, the [a-z ]{2,20} "[^"\n]{1,80}")?: [^\u0000-\u0009\u000b-\u001f\u007f]{10,2000}$/;
-const allowed = (t) => CMD_RE.test(t) || SCEN_RE.test(t);
+// The Test builder's other command: the agent does the steps in the Browser Panel, for the operator only
+// (docs/on-demand.md → "walk these steps live"), in the same bounded shape.
+const WALK_RE = /^walk these steps live: On the page \/[A-Za-z0-9_./:-]{0,120}: [^\u0000-\u0009\u000b-\u001f\u007f]{10,2000}$/;
+const allowed = (t) => CMD_RE.test(t) || SCEN_RE.test(t) || WALK_RE.test(t);
 // A command for the agent, violet, with the agent's mark: "Send to the agent" (only on an interactive
 // page beside the agent's chat) and "Copy". The page itself changes nothing.
 const CMD_TIP = 'The page does not do this action. The agent does it when it gets this command in its chat. The agent can ask you first.';
@@ -1282,7 +1331,8 @@ function guide() {
     [`${ENT.verdict[1]} Verdict`, 'The result of a test case. Verified: the test fails on the last release and passes on the new build. This shows that the change works. Failed or Regression: possibly a bug. The Legend shows all verdicts.'],
     [`${ENT.tier[1]} Tier`, '🆕 Exploratory: the test ran one time. ⭐ Promotable: the test is verified. 🌙 Regression: the test runs each night. Quarantined and retired tests do not run at night.'],
     [`${ENT.report[1]} Report`, 'The evidence of a test run: video, screenshots and steps. A report with a link opens in a new tab. A private report shows 🔒: find it in Artifacts in the app.'],
-    ['🤖 Commands for the agent', 'The violet controls give a command to the agent, for example "run #42 AC-1". Next to the chat of the agent, "Send to the agent" sends it. Else copy it into the chat. The page itself does not change anything. A dashed violet button only prepares the command.'],
+    ['🛠️ Test builder', 'Write the steps of a new test as blocks or as text, or start from a test case or a page of the map. The preview shows each step on the screens of the product. Then ask for the test, or ask the agent to do the steps in the Browser Panel.'],
+    ['🤖 Commands for the agent','The violet controls give a command to the agent, for example "run #42 AC-1". Next to the chat of the agent, "Send to the agent" sends it. Else copy it into the chat. The page itself does not change anything. A dashed violet button only prepares the command.'],
     [`${ENT.bug[1]} Report a bug`, 'Select failed test cases and findings (☐). Then use the violet bar at the bottom: one bug issue for all of them. Or use "Report it as a bug issue" in the panel of a test case. The agent shows you the draft and creates the issue only when you agree.' + (FIX_LABEL ? ` The command with "for the architect" adds the label "${FIX_LABEL}". The software architect then repairs the problem.` : '')],
   ];
   return h('details', { class: 'panel guide', open: open ? true : null, ontoggle: (e) => { try { localStorage.setItem(GUIDE_KEY, e.currentTarget.open ? 'open' : 'closed'); } catch { /* ignore */ } } },
@@ -1626,7 +1676,9 @@ function itemDrawer(i) {
       dt('Duration'), h('dd', {}, sparkline(i.duration_ms) || '–'),
       dt('Collections'), h('dd', {}, colls(i).length ? joinNodes(colls(i).map((c) => facetLink('collection', c, `${ENT.collection[1]} ${c}`))) : '–')),
     i.steps.length ? h('section', { class: 'sec' }, h('h3', {}, '👣 Steps of the test', tip('What the test does, in sequence, from its file.')), h('ol', { class: 'steps' }, i.steps.map((st) => h('li', { 'data-k': { open: '↗', act: '▶', assert: '?', expect: '=', shot: '◉' }[st.kind] || '•', class: st.kind },
-      h('span', { class: 'meta', title: STEP_HELP[st.kind] || null }, `${str(st.kind)} `), st.kind === 'open' && patOf(str(st.text).replace(/\?.*$/, '')) ? pageLink(str(st.text).replace(/\?.*$/, ''), str(st.text)) : stepText(st.text))))) : null,
+      h('span', { class: 'meta', title: STEP_HELP[st.kind] || null }, `${str(st.kind)} `), st.kind === 'open' && patOf(str(st.text).replace(/\?.*$/, '')) ? pageLink(str(st.text).replace(/\?.*$/, ''), str(st.text)) : stepText(st.text)))),
+      h('button', { class: 'btn k-go', type: 'button', 'data-kind': 'go', 'data-dest': `${viewOf('builder')[2]} ${viewOf('builder')[1]}, with a new draft`,
+        title: 'Copies these steps into a new draft of the Test builder. There you can change them, see them on the screens and ask for a new test. This test case does not change.', onclick: () => { bFromItem(i); go({ v: 'builder' }); } }, `${viewOf('builder')[2]} Change these steps in the Test builder`, ico('arrow'))) : null,
     h('section', { class: 'sec' }, h('h3', {}, `${ENT.run[1]} Test runs (${i.history.length})${S.at ? ` up to ${S.at}` : ''}`, tip('Each test run that gave this test case a result, newest first. Click a line to open the panel of that test run.')), i.history.length
       ? [h('div', { style: 'margin-bottom:6px' }, cells(i.history, 30)), runTable(i.history.slice().reverse().map((e) => [runFor(i, e), e]), (r, e) => e.value)]
       : h('p', { class: 'muted-t' }, 'Not run yet.')),
@@ -1837,7 +1889,10 @@ function viewMap() {
         design.some((d) => str(d.pattern) === p.pattern) ? h('p', {}, goLink({ v: 'design', ds: { pg: p.pattern, st: '' } },
           `${ENT.design[1]} Design findings on this page (${design.filter((d) => str(d.pattern) === p.pattern && d.status === 'open').length} open)`, null, 'linkish')) : null,
         h('p', { class: 'meta' }, p.hotspots.length ? 'Click a control with an outline on the screenshot to see its test cases, or to ask for a test of it. A control with ↗ goes to its page: a navigation item, a tab, a link or the first row of a list.' : '')]);
-  detail.append(askForm(p, x));
+  detail.append(askForm(p, x), h('div', { class: 'ask' }, h('b', {}, '🛠️ Or put the steps together yourself'),
+    h('span', { class: 'meta' }, x ? 'The Test builder starts with this page and a click on this control. Add the other steps and the result there.' : 'The Test builder starts with this page. Add the steps and the result there, and see them on the screens.'),
+    h('div', {}, h('button', { class: 'btn k-go', type: 'button', 'data-kind': 'go', 'data-dest': `${viewOf('builder')[2]} ${viewOf('builder')[1]}, with a new draft`,
+      title: 'Starts a new draft in the Test builder. The draft before it stays available with "Restore".', onclick: () => { bFromPage(p, x); go({ v: 'builder', pg: null, hs: null }); } }, `${viewOf('builder')[2]} Build a test from here`, ico('arrow')))));
   v.append(h('div', { class: 'maplayout' }, list, h('div', { style: 'min-width:0' }, sel, head, stage), detail));
 }
 
@@ -1861,6 +1916,275 @@ function askForm(p, x) {
       if (words.length < 10 || !SCEN_RE.test(req)) { msg.textContent = 'Write a minimum of one sentence: the steps and the result that you expect (maximum 2000 characters).'; msg.className = 'badge warn'; return; }
       asked.set(key, req); render();
     }), msg), out);
+}
+
+// ----------------------------------------------------------------- builder
+// The Test builder: a person puts steps in a sequence — as blocks or as text — and sees each one on
+// the screens of the product map. The page tests nothing itself. Its commands ask the agent for a test
+// (the scenario request of "Ask for a test") or, for the operator, to do the steps live in the Browser
+// Panel (docs/on-demand.md → "walk these steps live"). The draft is this browser's own.
+const BSTEP = {
+  given: ['Given', '🏁', 'The state at the start, for example "a project with two tasks". The agent makes this state before the other steps.'],
+  open: ['Open', '🧭', 'Opens a page of the product. Write its path, for example /projects.'],
+  do: ['Do', '👆', 'One action of a user, for example: Click the button "Save".'],
+  check: ['Check', '✅', 'The result that you expect after the steps before it. The test fails when it is not true.'],
+};
+const B_MAX = 30;
+const BUILD_KEY = `qi-catalog:${str(D.target)}:builder`;
+const B = { name: '', steps: [], mode: 'blocks', cur: 0, rec: false, cmd: null, prev: null, loaded: false };
+let bTimer = null; let bDragFrom = null;
+const bClean = (t) => str(t).replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 300);
+const bDefault = () => [{ k: 'open', t: pageOf('/') || !pagesData.length ? '/' : pagesData[0].pattern }, { k: 'do', t: '' }, { k: 'check', t: '' }];
+function bLoad() {
+  let d = null; if (storageOK) try { d = JSON.parse(localStorage.getItem(BUILD_KEY) || 'null'); } catch { d = null; }
+  B.name = bClean(d && d.name).slice(0, 80);
+  B.steps = arr(d && d.steps).filter((x) => x && own(BSTEP, x.k)).slice(0, B_MAX).map((x) => ({ k: x.k, t: bClean(x.t) }));
+  if (!B.steps.length) B.steps = bDefault();
+  B.mode = d && d.mode === 'text' ? 'text' : 'blocks'; B.loaded = true;
+}
+const bSave = () => { try { localStorage.setItem(BUILD_KEY, JSON.stringify({ name: B.name, steps: B.steps, mode: B.mode })); } catch { /* this browser only */ } };
+// A change of the steps: the prepared command is old now.
+const bChanged = () => { B.cmd = null; B.cur = Math.max(0, Math.min(B.cur, B.steps.length - 1)); bSave(); };
+// A new draft keeps the one before it, so "Restore" can bring it back.
+function bReplace(name, steps) {
+  if (!B.loaded) bLoad();
+  bStop(); B.prev = { name: B.name, steps: B.steps.map((x) => ({ ...x })) };
+  B.name = bClean(name).slice(0, 80); B.steps = steps.slice(0, B_MAX); B.cur = 0; B.rec = false; bChanged();
+}
+
+// The text form: one step a line, "Open: /projects", "Do: Click the button "Save"", "Check: …".
+const bLine = (st) => `${BSTEP[st.k][0]}: ${st.t}`;
+const bToText = () => [B.name ? `Name: ${B.name}` : null, ...B.steps.map(bLine)].filter(Boolean).join('\n');
+function bFromText(text) {
+  const steps = []; let name = '';
+  for (const raw of str(text).split('\n')) {
+    const l = raw.trim().replace(/^\d{1,3}[.)]\s*/, ''); if (!l) continue;
+    const m = /^(name|given|open|do|check)\s*:\s*(.*)$/i.exec(l);
+    const k = m ? m[1].toLowerCase() : 'do'; const t = bClean(m ? m[2] : l).trim();
+    if (k === 'name') name = t.slice(0, 80); else if (steps.length < B_MAX) steps.push({ k, t });
+  }
+  return { name, steps };
+}
+// From a test case: its Given, the pages it opens, its actions, its checks in words and its Then.
+function bFromItem(i) {
+  const steps = [];
+  if (str(i.given)) steps.push({ k: 'given', t: bClean(i.given) });
+  for (const st of i.steps) {
+    const k = { open: 'open', act: 'do', assert: 'check' }[st.kind];
+    if (k) steps.push({ k, t: bClean(st.text) });
+  }
+  if (str(i.then)) steps.push({ k: 'check', t: bClean(i.then) });
+  bReplace(`Like ${i.label}: ${str(i.name)}`, steps.length ? steps : bDefault());
+}
+// From a page of the map, optionally with one of its controls.
+function bFromPage(p, x) {
+  bReplace('', [{ k: 'open', t: p.pattern }, ...(x ? [{ k: 'do', t: bVerb(x) }] : []), { k: 'check', t: '' }]);
+  B.cur = x ? 1 : 0;
+}
+const bVerb = (x) => { const n = str(x.name).replace(/"/g, '').slice(0, 80);
+  return x.kind === 'inputs' ? `Type a value in the field "${n}"` : `Click the ${(KIND[x.kind] || 'control').toLowerCase()} "${n}"`; };
+
+// Where each step happens. An Open step goes to its page. A Do step that names a control of that page
+// (in quotes, or by its name) marks it, and when that control leads to a page, the next step is there.
+const bEsc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function bControl(p, t) {
+  if (!p || !t) return null;
+  const low = t.toLowerCase(); const quoted = [...t.matchAll(/"([^"]{1,80})"/g)].map((m) => m[1].toLowerCase());
+  let best = null;
+  p.hotspots.forEach((x, k) => {
+    const n = x.name.toLowerCase(); if (!n) return;
+    const score = quoted.includes(n) ? 1000 + n.length
+      : n.length >= 3 && new RegExp(`(^|[^\\p{L}\\p{N}])${bEsc(n)}($|[^\\p{L}\\p{N}])`, 'u').test(low) ? n.length : 0;
+    if (score && (!best || score > best[1])) best = [k, score];
+  });
+  return best ? best[0] : null;
+}
+function bFrames() {
+  let cur = null; let path = null;
+  return B.steps.map((st, k) => {
+    if (st.k === 'open') { path = st.t.trim().replace(/[?#].*$/, '') || null; cur = path ? patOf(path) : null; }
+    const p = cur ? pageOf(cur) : null;
+    const hs = st.k === 'do' ? bControl(p, st.t) : null;
+    const f = { st, k, pg: p, path, hs };
+    const to = hs != null ? p.hotspots[hs].to : null;
+    if (to && pageOf(to)) { cur = to; path = to; }
+    f.next = cur ? pageOf(cur) : null; // the page where the next step happens
+    return f;
+  });
+}
+
+// The words the agent gets: a name, then the steps numbered, one a line.
+const bFilled = () => B.steps.filter((st) => st.t.trim());
+const bWords = () => [B.name.trim() ? `Name: ${B.name.trim()}` : null, ...bFilled().map((st, k) => `${k + 1}. ${bLine({ k: st.k, t: st.t.trim() })}`)].filter(Boolean).join('\n');
+function bProblem() {
+  const steps = bFilled();
+  if (!steps.some((st) => st.k === 'open' || st.k === 'do')) return 'Add a minimum of one step that opens a page or does an action.';
+  if (!steps.some((st) => st.k === 'check')) return 'Add a minimum of one Check step: the result that you expect.';
+  if (steps.some((st) => st.k === 'open' && !st.t.trim().startsWith('/'))) return 'The path of an Open step must start with / (for example /projects).';
+  if (bWords().length > 2000) return 'The steps are too long. The maximum is 2000 characters.';
+  return null;
+}
+const bStart = () => { const o = bFrames().find((f) => f.st.k === 'open' && f.st.t.trim());
+  const pat = o ? (o.pg ? o.pg.pattern : o.path) : null; return pat && /^\/[A-Za-z0-9_./:-]{0,120}$/.test(pat) ? pat : '/'; };
+
+// Play: one step after the other, on the screens.
+const bStop = () => { if (bTimer) clearInterval(bTimer); bTimer = null; };
+function bPlay() {
+  if (bTimer) { bStop(); bRefresh(); return; }
+  if (B.cur >= B.steps.length - 1) B.cur = 0;
+  bTimer = setInterval(() => { if (S.v !== 'builder' || B.cur >= B.steps.length - 1) { bStop(); if (S.v === 'builder') bRefresh(); return; } B.cur += 1; bRefresh(); }, 1800);
+  bRefresh();
+}
+const bGo = (k) => { bStop(); B.cur = Math.max(0, Math.min(B.steps.length - 1, k)); bRefresh(); };
+// A click on a control of the screen, in "add steps with clicks": a Do step with that control — the
+// current step when it is an empty Do, else the next one when it is, else a new step after the current.
+function bPick(x) {
+  const cur = B.steps[B.cur]; const nx = B.steps[B.cur + 1];
+  if (cur && cur.k === 'do' && !cur.t.trim()) cur.t = bVerb(x);
+  else if (nx && nx.k === 'do' && !nx.t.trim()) { nx.t = bVerb(x); B.cur += 1; }
+  else if (B.steps.length < B_MAX) { B.steps.splice(B.cur + 1, 0, { k: 'do', t: bVerb(x) }); B.cur += 1; }
+  bChanged(); render();
+}
+
+// One step on its screen: the page shot (or its outline), its control marked, a Check written over it.
+// With "add steps with clicks", the page where the next step happens, every control a button.
+function bStage(f) {
+  if (!f) return h('div', { class: 'ph bph' }, h('span', { class: 'em' }, '🛠️'), 'Add a step at the left.');
+  const p = B.rec ? f.next : f.pg;
+  if (!p) {
+    return h('div', { class: 'ph bph' }, h('span', { class: 'em' }, BSTEP[f.st.k][1]),
+      f.st.k === 'given' ? [h('b', {}, 'The state at the start'), h('span', {}, f.st.t || 'Write the state at the start.')]
+        : f.path ? [h('b', {}, `${ENT.page[1]} ${f.path}`), h('span', {}, 'This page is not on the UI map. The agent finds it in the product.')]
+          : [h('b', {}, 'No page yet'), h('span', {}, 'Add an Open step before this step. The preview then shows the page of the product.')]);
+  }
+  const src = img(p.shot); const vp = arr(p.viewport).map(Number);
+  const ratio = vp.length === 2 && vp[0] > 0 && vp[1] > 0 ? vp[0] / vp[1] : 1.6;
+  const stage = h('div', { class: `stage${src ? '' : ' wf'}`, style: `aspect-ratio:${ratio}` }, src ? h('img', { src, alt: `Screenshot of ${str(p.title) || p.pattern}` }) : null);
+  const order = p.hotspots.map((x, k) => k).sort((a, b) => p.hotspots[b].box[2] * p.hotspots[b].box[3] - p.hotspots[a].box[2] * p.hotspots[a].box[3]);
+  for (const k of order) {
+    const x = p.hotspots[k]; const on = !B.rec && k === f.hs;
+    if (!B.rec && !on && src) continue;
+    const [bx, by, bw, bh] = x.box.map((n) => Math.max(0, Math.min(1, n)) * 100);
+    const style = `left:${bx}%;top:${by}%;width:${bw}%;height:${bh}%`;
+    const what = `${ENT.control[1]} ${KIND[x.kind] || 'Control'} "${x.name}"`;
+    const label = src ? null : h('span', {}, x.name);
+    stage.append(B.rec
+      ? h('button', { class: `hs rec${on ? ' step' : ''}`, type: 'button', style, 'data-kind': 'local', 'data-dest': 'a new step at the left', title: `${what}. Adds the step: ${bVerb(x)}.`, 'aria-label': `Add the step: ${bVerb(x)}`, onclick: () => bPick(x) }, label)
+      : h('div', { class: `hs ${on ? 'step' : 'mute'}`, style, title: on ? `${what}: this step uses it.` : null }, label));
+  }
+  if (!B.rec && f.st.k === 'check' && f.st.t.trim()) stage.append(h('div', { class: 'bcheck', role: 'note' }, `${BSTEP.check[1]} ${f.st.t}`));
+  return stage;
+}
+// The parts that change while a person types: the preview and the commands. A full render() only for
+// a change of the blocks themselves (add, remove, move), so that the cursor stays in its field.
+let bPreviewEl = null; let bCmdEl = null;
+function bRefresh() {
+  if (!bPreviewEl || !bPreviewEl.isConnected) return;
+  hideTip();
+  const fr = bFrames(); const f = fr[B.cur] || null;
+  for (const el of document.querySelectorAll('.bstep')) el.classList.toggle('cur', +el.dataset.k === B.cur);
+  bPreviewEl.textContent = '';
+  const p = f && f.pg; const hs = f && f.hs != null && p ? p.hotspots[f.hs] : null;
+  bPreviewEl.append(...[ // DOM append writes a null as text
+    h('div', { class: 'bcap', 'aria-live': 'polite' }, f ? h('span', { class: 'num' }, String(B.cur + 1)) : null,
+      f ? h('div', { style: 'min-width:0;overflow-wrap:anywhere' }, h('b', {}, `${BSTEP[f.st.k][1]} ${BSTEP[f.st.k][0]}: ${f.st.t.trim() || '…'}`),
+        h('span', { class: 'meta' }, p ? [pageLink(p.pattern, str(p.title) || p.pattern), hs ? ` · ${ENT.control[1]} ${KIND[hs.kind] || 'Control'} "${hs.name}"${hs.to ? ` → ${hs.to}` : ''}` : f.st.k === 'do' && f.st.t.trim() ? ' · no control of the map has this name: the agent finds it' : '']
+          : f.path ? `${f.path} (not on the UI map)` : '')) : null),
+    B.rec && f ? h('p', { class: 'note', style: 'margin:0 0 8px' }, `🖱️ Click a control on ${f.next ? `the page ${str(f.next.title) || f.next.pattern}` : 'the page'}. It becomes the step after step ${B.cur + 1}. A control with a link shows its page for the next click.`) : null,
+    h('div', { class: 'bstage' }, bStage(f)),
+    h('div', { class: 'bplay' },
+      h('button', { class: 'btn', type: 'button', 'data-kind': 'local', title: 'Shows the step before.', disabled: B.cur <= 0 ? true : null, onclick: () => bGo(B.cur - 1) }, '◀ Back one step'),
+      h('button', { class: `btn${bTimer ? ' on' : ''}`, style: 'font-weight:600', type: 'button', 'data-kind': 'local', title: bTimer ? 'Stops the preview.' : 'Shows the steps one after the other, on the screens of the product map.', onclick: bPlay }, bTimer ? '⏸ Stop' : '▶ Play the steps'),
+      h('button', { class: 'btn', type: 'button', 'data-kind': 'local', title: 'Shows the next step.', disabled: B.cur >= B.steps.length - 1 ? true : null, onclick: () => bGo(B.cur + 1) }, 'Next step ▶'),
+      h('span', { style: 'flex:1' }),
+      h('button', { class: `btn${B.rec ? ' on' : ''}`, type: 'button', 'data-kind': 'local', 'aria-pressed': B.rec ? 'true' : 'false',
+        title: 'When this is on, the screen shows all the controls of the page. Click a control to add a step that clicks it, after the current step. A control that goes to a different page shows that page in the next step.',
+        onclick: () => { B.rec = !B.rec; bStop(); bRefresh(); } }, `🖱️ Add steps with clicks: ${B.rec ? 'on' : 'off'}`)),
+    h('div', { class: 'film', role: 'group', 'aria-label': 'The steps' }, fr.map((x) => h('button', { type: 'button', 'aria-current': x.k === B.cur ? 'true' : null, 'data-kind': 'local', title: `Shows step ${x.k + 1}.`, onclick: () => bGo(x.k) },
+      h('b', {}, `${x.k + 1} ${BSTEP[x.st.k][1]} ${BSTEP[x.st.k][0]}`), h('span', {}, x.st.t.trim() || '…'), h('span', {}, x.pg ? `${ENT.page[1]} ${str(x.pg.title) || x.pg.pattern}` : x.path || '–'))))].filter(Boolean));
+  bCmdEl.textContent = '';
+  const problem = bProblem();
+  const prep = (kind) => { const cmd = `${kind === 'walk' ? 'walk these steps live' : 'test this scenario'}: On the page ${bStart()}: ${bWords()}`;
+    B.cmd = allowed(cmd) ? [kind, cmd] : null; bRefresh(); };
+  bCmdEl.append(...[h('h3', {}, '🤖 Give the steps to the agent'),
+    problem ? h('p', { class: 'badge warn', style: 'white-space:normal' }, problem) : null,
+    h('div', { class: 'actions' },
+      h('div', { class: 'action' }, h('b', {}, `${ENT.scenario[1]} Ask for this test`), h('p', {}, 'The agent changes your steps into frozen acceptance criteria. It writes a test, runs it on the newest build and makes a report. The result shows on this page. Anyone who can see this page can send this request.'),
+        h('div', { class: 'row' }, problem ? null : prepBtn('Prepare the request', () => prep('ask')))),
+      h('div', { class: 'action' }, h('b', {}, '👀 Do the steps live in the Browser Panel'), h('p', {}, 'The agent opens the product in the Browser Panel and does each step, so that you can see it. It says what it saw for each Check. This is not a test: there is no verdict, no report and no saved test. Only the operator can start it, and only when the product runs in the machine of the agent.'),
+        h('div', { class: 'row' }, problem ? null : prepBtn('Prepare the command', () => prep('walk'))))),
+    B.cmd ? h('div', { class: 'pending', role: 'status', style: 'margin-top:10px' }, h('span', {}, B.cmd[0] === 'walk'
+      ? (bridge() ? 'Send it. The agent answers in its chat with the Browser Panel button and a result for each step.' : 'Copy it into the chat of the agent. The agent answers there with the Browser Panel button and a result for each step.')
+      : (bridge() ? 'Send it. The agent tests it on the newest build. This page then shows the result.' : 'Copy it into the chat of the agent. The result shows on this page after the test run.')), copyBox(B.cmd[1])) : null].filter(Boolean));
+}
+function bBlocks() {
+  const pats = h('datalist', { id: 'qi-bpages' }, pagesData.map((p) => h('option', { value: p.pattern }, str(p.title) || p.pattern)));
+  const move = (from, to) => { if (to < 0 || to >= B.steps.length || from === to) return; const [st] = B.steps.splice(from, 1); B.steps.splice(to, 0, st); B.cur = to; bChanged(); render(); };
+  const list = h('ol', { class: 'bsteps', 'aria-label': 'The steps of the test' }, B.steps.map((st, k) => {
+    const inp = h('input', { type: 'text', value: st.t, maxlength: 300, list: st.k === 'open' ? 'qi-bpages' : null, 'aria-label': `Step ${k + 1}: ${BSTEP[st.k][0]}`,
+      placeholder: { given: 'for example: a project with two tasks', open: '/projects', do: 'for example: Click the button "Save"', check: 'for example: The list shows the new name' }[st.k],
+      onfocus: () => { if (B.cur !== k) { B.cur = k; bStop(); bRefresh(); } }, oninput: (e) => { st.t = bClean(e.target.value); B.cur = k; bChanged(); bRefresh(); } });
+    const kind = h('select', { 'aria-label': `Kind of step ${k + 1}`, 'data-kind': 'local', title: BSTEP[st.k][2], onchange: (e) => { if (own(BSTEP, e.target.value)) { st.k = e.target.value; B.cur = k; bChanged(); render(); } } },
+      Object.entries(BSTEP).map(([v, [n, e]]) => h('option', { value: v, selected: v === st.k ? true : null }, `${e} ${n}`)));
+    const li = h('li', { class: `bstep k-${st.k}${k === B.cur ? ' cur' : ''}`, 'data-k': k,
+      ondragstart: (e) => { bDragFrom = k; li.classList.add('drag'); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(k)); } catch { /* ignore */ } },
+      ondragend: () => { li.draggable = false; li.classList.remove('drag'); bDragFrom = null; },
+      ondragover: (e) => { if (bDragFrom == null) return; e.preventDefault(); li.classList.add('over'); },
+      ondragleave: () => li.classList.remove('over'),
+      ondrop: (e) => { e.preventDefault(); li.classList.remove('over'); if (bDragFrom != null) move(bDragFrom, k); } },
+    h('button', { class: 'grip', type: 'button', 'data-kind': 'local', title: 'Drag this step to a different position. Or use ↑ and ↓.', 'aria-label': `Move step ${k + 1}`,
+      onmousedown: () => { li.draggable = true; }, onmouseup: () => { li.draggable = false; } }, '⠿'),
+    h('span', { class: 'num', 'aria-hidden': 'true' }, String(k + 1)),
+    h('div', { class: 'bbody' }, kind, inp),
+    h('div', { class: 'tools' },
+      h('button', { type: 'button', 'data-kind': 'local', title: 'Moves the step up.', 'aria-label': `Move step ${k + 1} up`, disabled: k === 0 ? true : null, onclick: () => move(k, k - 1) }, '↑'),
+      h('button', { type: 'button', 'data-kind': 'local', title: 'Moves the step down.', 'aria-label': `Move step ${k + 1} down`, disabled: k === B.steps.length - 1 ? true : null, onclick: () => move(k, k + 1) }, '↓'),
+      h('button', { type: 'button', 'data-kind': 'local', title: 'Removes the step.', 'aria-label': `Remove step ${k + 1}`, onclick: () => { B.steps.splice(k, 1); if (!B.steps.length) B.steps = [{ k: 'do', t: '' }]; bChanged(); render(); } }, '✕')));
+    return li;
+  }));
+  const add = (k) => { if (B.steps.length >= B_MAX) return; B.steps.splice(B.cur + 1, 0, { k, t: '' }); B.cur += 1; bChanged(); render();
+    const el = $(`.bstep[data-k="${B.cur}"] input`); if (el) el.focus(); };
+  return [pats, list, h('div', { class: 'badd' }, h('span', { class: 'meta' }, B.steps.length >= B_MAX ? `The maximum is ${B_MAX} steps.` : 'Add a step after the current one:'),
+    B.steps.length < B_MAX ? Object.entries(BSTEP).map(([k, [n, e, help]]) => h('button', { class: 'chip', type: 'button', 'data-kind': 'local', title: help, onclick: () => add(k) }, `+ ${e} ${n}`)) : null)];
+}
+function bText() {
+  const ta = h('textarea', { class: 'btext', 'aria-label': 'The steps as text, one step on each line', spellcheck: 'false',
+    oninput: debounce((e) => { const r = bFromText(e.target.value); B.name = r.name; B.steps = r.steps.length ? r.steps : [{ k: 'do', t: '' }]; bChanged(); bRefresh(); }, 250) });
+  ta.value = bToText();
+  return [h('p', { class: 'meta', style: 'margin:0 0 6px' }, 'One step on each line. Start a line with ', ['Given:', 'Open:', 'Do:', 'Check:'].map((w, k) => [k ? ', ' : '', h('code', {}, w)]),
+    ' or ', h('code', {}, 'Name:'), '. A line without a word at the start is a Do step. A name of a control in quotes ("Save") marks it on the screen.'), ta];
+}
+function viewBuilder() {
+  if (!B.loaded) bLoad();
+  const v = $('#view');
+  const withSteps = ALL.filter((i) => i.steps.length);
+  const from = h('select', { 'aria-label': 'Start from a test case', 'data-kind': 'local', title: 'Copies the steps of a test case into the builder: its Given, the pages that it opens, its actions and its Then. The draft before it stays available with "Restore".',
+    onchange: (e) => { const i = byKey.get(e.target.value); if (i) { bFromItem(i); render(); } } },
+  h('option', { value: '' }, `${ENT.testcase[1]} Start from a test case…`), withSteps.slice().sort((a, b) => a.label.localeCompare(b.label, 'en', { numeric: true })).slice(0, 400)
+    .map((i) => h('option', { value: i.key }, `${itemTag(i)} — ${str(i.name).slice(0, 70)}`)));
+  const copy = h('button', { class: 'btn', type: 'button', 'data-kind': 'local', 'data-dest': 'your clipboard', title: 'Copies the steps as text.', onclick: async () => {
+    try { await navigator.clipboard.writeText(bToText()); copy.textContent = 'Copied ✓'; setTimeout(() => { copy.textContent = 'Copy as text'; }, 1500); } catch { B.mode = 'text'; bSave(); render(); }
+  } }, 'Copy as text');
+  const left = h('section', { class: 'panel' },
+    h('div', { style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px' },
+      h('h3', { style: 'margin:0' }, '👣 Steps', tip('Write each step in sequence. 🏁 Given: the state at the start. 🧭 Open: a page. 👆 Do: an action of a user. ✅ Check: the result that you expect. Only this browser keeps the draft.')),
+      h('span', { style: 'flex:1' }),
+      h('span', { class: 'seg', role: 'group', 'aria-label': 'How to write the steps' },
+        [['blocks', '🧱 Blocks'], ['text', '✏️ Text']].map(([m, l]) => h('button', { type: 'button', 'aria-pressed': B.mode === m ? 'true' : 'false', 'data-kind': 'local',
+          title: m === 'blocks' ? 'Each step is a block. Drag the blocks to change the sequence.' : 'All the steps as text, one step on each line. The blocks and the text show the same steps.',
+          onclick: () => { B.mode = m; bSave(); render(); } }, l)))),
+    h('input', { class: 'bname', type: 'text', value: B.name, maxlength: 80, placeholder: 'Name of the test (optional), for example: Rename a project', 'aria-label': 'Name of the test',
+      oninput: (e) => { B.name = bClean(e.target.value).slice(0, 80); bChanged(); bRefresh(); } }),
+    B.mode === 'text' ? bText() : bBlocks(),
+    h('div', { class: 'badd' }, from, copy,
+      B.prev ? h('button', { class: 'btn', type: 'button', 'data-kind': 'local', title: 'Brings back the draft before the newest start.', onclick: () => { const p = B.prev; bReplace(p.name, p.steps); B.prev = null; render(); } }, ico('back'), 'Restore the draft before') : null,
+      h('button', { class: 'btn', type: 'button', 'data-kind': 'local', title: 'Starts a new, empty draft. "Restore" brings back the old one.', onclick: () => { bReplace('', bDefault()); render(); } }, 'New draft')));
+  bPreviewEl = h('div', {});
+  bCmdEl = h('section', { class: 'panel', style: 'margin-top:14px' });
+  const right = h('div', { style: 'min-width:0' }, h('section', { class: 'panel' }, h('h3', {}, '🎞️ Preview on the product map', tip('Each step on the screen of its page, from the newest UI map. A purple outline shows the control of a Do step. The real product can look different: the agent does the steps on the running product.')),
+    pagesData.length ? null : h('p', { class: 'meta' }, 'There is no UI map yet. The preview shows the steps without screens. The map comes with the first nightly regression.'), bPreviewEl), bCmdEl);
+  v.append(h('div', { class: 'blayout' }, left, right));
+  bRefresh();
 }
 
 // ----------------------------------------------------------------- modules
@@ -2106,7 +2430,7 @@ function render(keepSearchFocus) {
   v.append(h('div', { class: 'vhead' }, h('span', { class: 'vico', 'aria-hidden': 'true' }, vicon), h('div', {}, h('h2', {}, vname), !hid && VIEW_HELP[S.v] ? h('p', {}, VIEW_HELP[S.v]) : null),
     VIEW_HELP[S.v] ? h('button', { class: 'btn', type: 'button', 'data-kind': 'local', title: hid ? 'Shows the line of help of this view again.' : 'Hides the line of help in this view. Only this browser keeps this setting.',
       onclick: () => { if (hid) hiddenHelp.delete(S.v); else hiddenHelp.add(S.v); saveHidden(); render(); } }, hid ? 'ⓘ Help' : 'Hide help') : null));
-  ({ overview: viewOverview, modules: viewModules, findings: viewFindings, design: viewDesign, runs: viewRuns, map: viewMap, catalog: () => viewList(false), gallery: () => viewList(true), coverage: viewCoverage, history: viewHistory, lifecycle: viewLifecycle }[S.v] || viewOverview)();
+  ({ overview: viewOverview, modules: viewModules, findings: viewFindings, design: viewDesign, runs: viewRuns, map: viewMap, catalog: () => viewList(false), gallery: () => viewList(true), coverage: viewCoverage, history: viewHistory, lifecycle: viewLifecycle, builder: viewBuilder }[S.v] || viewOverview)();
   if (pos != null) { const q = $('input[type=search]'); if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch { /* ignore */ } } }
   renderTray();
 }
