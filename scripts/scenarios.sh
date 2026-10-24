@@ -12,6 +12,13 @@
 #                                                 (kept when it exists), logs `scenario_adopt`,
 #                                                 prints {"id","slug","spec_hash","source",
 #                                                 "previous_spec_hash"} — the previous from the row
+#   scenarios.sh queue                            the profile scenarios still to adopt, by name:
+#                                                 {"files":n,"cap":max_scenarios_per_run,
+#                                                  "queue":[{"id","slug","spec_hash","kind","title"}],
+#                                                  "retire":[ids]} in the order the nightly
+#                                                 regression takes them (lib/profile.sh →
+#                                                 profile_scenario_queue); `null` with
+#                                                 profile_scenarios: disabled. Read only.
 #   scenarios.sh admit                            {"runs_today":n,"cap":m,"admit":bool,
 #                                                  "env":{"busy":bool,"holder":…,"since":…}}
 #   scenarios.sh lint <request.md>                {"injection":{…},"injection_suspect":bool} —
@@ -180,11 +187,26 @@ cmd_adopt() {
     '{id:$id, slug:$s, spec_hash:$h, source:$src, previous_spec_hash:(if $p == "-" then null else $p end)}'
 }
 
+# The adoption queue the regression pre-flight splits into adopt[] and deferred[], with each
+# file's `# ` title, so the dashboard names what waits (docs/catalog.md → Activity).
+cmd_queue() {
+  local per q titles
+  [ "$(cfg profile_scenarios)" = disabled ] && { echo null; return; }
+  per="$(reg max_scenarios_per_run)"; case "$per" in (''|*[!0-9]*) per=3;; esac
+  q="$(profile_scenario_queue "$WORK/SCENARIOS.md" 2>/dev/null)" || exit 1
+  titles="$(profile_scenarios 2>/dev/null | while IFS=$'\t' read -r slug _ path; do
+      printf '%s\t%s\n' "$slug" "$(grep -m1 '^# ' "$path" | sed 's/^# *//; s/[[:space:]]*$//')"
+    done | jq -R 'split("\t") | {key: .[0], value: ((.[1] // "")[:120])}' | jq -sc from_entries)"
+  jq -c --argjson p "$per" --argjson t "$titles" \
+    '{files, cap: $p, queue: [.queue[] | . + {title: ($t[.slug] | if . == "" then null else . end)}], retire}' <<<"$q"
+}
+
 case "${1:-}" in
   new)   cmd_new "${2:-}" ;;
   adopt) cmd_adopt "${2:-}" ;;
+  queue) cmd_queue ;;
   admit) cmd_admit ;;
   lint)  cmd_lint "${2:-}" ;;
   set)   shift; cmd_set "$@" ;;
-  *) echo "usage: $0 new <slack|operator|discovery|dashboard> | adopt <slug> | admit | lint <file> | set <S-<k>|P-<slug>> [<column>=<value>…]" >&2; exit 2 ;;
+  *) echo "usage: $0 new <slack|operator|discovery|dashboard> | adopt <slug> | queue | admit | lint <file> | set <S-<k>|P-<slug>> [<column>=<value>…]" >&2; exit 2 ;;
 esac

@@ -210,6 +210,12 @@ The product team's `scenarios/<slug>.md` in the profile ([profile-contract.md](p
 the product's repository, adopted by the nightly regression run, and replayed every night.
 Id `P-<slug>`, test `tests/profile-<slug>.e2e.ts`, tag `profile-<slug>`.
 
+**What waits** — a night adopts at most `max_scenarios_per_run`; the rest are the worklist's
+`deferred[]`, named in the nightly summary. `bash "$HOME/scripts/scenarios.sh" queue` prints the
+whole queue at any time (read only), in the order the nights take it; "which profile scenarios
+wait?" in the direct session is answered from it. The dashboard shows it
+([catalog.md](catalog.md) → Activity).
+
 **Adopt** — a `profile_scenarios.adopt[]` entry of the regression worklist
 ([regression.md](regression.md) → step 3a), under its lock, the candidate up:
 
