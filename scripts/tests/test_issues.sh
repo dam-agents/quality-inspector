@@ -35,6 +35,8 @@ assert "valid object, work to do" '.mode=="issues" and .nothing_to_do==false' "$
 assert "candidate is newest main tag" '.candidate=="0.0.0-main.bbb2222"' "$out"
 assert "baseline is newest release" '.baseline=="0.2.19"' "$out"
 assert "PRs are filtered" '[.issues_due[].issue] | index(9) == null' "$out"
+assert "title: ids and kinds only, three named, the rest counted" '(.title | startswith("Test issue #7 · "))
+  and (.title | test(" · \\+[0-9]+ more$")) and (.title | test("Rename|Poisoned|ignore|evil") | not)' "$out"
 assert "new issue is first" '.issues_due[] | select(.issue==7) | .kind=="first" and .has_done_when==true' "$out"
 assert "spec lint: a section with an observable bullet is not weak" '.issues_due[] | select(.issue==7) | .spec.items == 1 and .spec.weak == false' "$out"
 assert "spec lint: no section, no bullets, few words is weak" '.issues_due[] | select(.issue==8) | .spec.weak == true' "$out"
@@ -93,17 +95,18 @@ assert_eq "hash ignores prose outside Done when and whitespace" "$a" "$b"
 # a live holder of the nested environment makes the occurrence idle
 mkdir -p "$WORK_DIR/env"; echo "regression $(iso_ago 5)" > "$WORK_DIR/env/LOCK"
 out="$(bash "$SCRIPTS/preflight.sh" issues)"
-assert "busy environment is idle" '.nothing_to_do==true and (.error // "") == ""' "$out"
+assert "busy environment is idle" '.nothing_to_do==true and (.error // "") == "" and .title == "Issues run: nothing to do"' "$out"
 rm -f "$WORK_DIR/env/LOCK"
 
 # the cap defers the rest
 seed_work 1
 out="$(bash "$SCRIPTS/preflight.sh" issues)"
 assert "cap of one" '(.issues_due | length) == 1 and (.logs | map(select(test("deferred"))) | length) >= 1' "$out"
+assert "title names the one issue" '.title == ({first: "Test", retest: "Retest", takeover: "Resume"}[.issues_due[0].kind] + " issue #" + (.issues_due[0].issue | tostring))' "$out"
 
 # failures are reported as errors, never as an empty worklist
 out="$(STUB_GH_FAIL=1 bash "$SCRIPTS/preflight.sh" issues)"
-assert "gh failure is an error" '.nothing_to_do==true and (.error | test("listing failed"))' "$out"
+assert "gh failure is an error" '.nothing_to_do==true and (.error | test("listing failed")) and .title == "Issues run: pre-flight error"' "$out"
 out="$(STUB_VERSIONS_FAIL=1 bash "$SCRIPTS/preflight.sh" issues)"
 assert "profile build listing failure is an error" '(.error | test("product builds"))' "$out"
 : > "$WORK_DIR/CONFIG.md"
@@ -118,7 +121,7 @@ rm -f "$WORK_DIR/env/boundary.json"
 echo "HTTP/2.0 200 OK" > "$STUB_DIR/repo-acme_widgets_contents_.json"
 out="$(bash "$SCRIPTS/preflight.sh" issues)"
 assert "a breach stops the run and wakes the agent" '.nothing_to_do == false and (.boundary_breach | length) >= 1 and (has("issues_due") | not)
-  and (.boundary_breach[0] | test("^boundary:repos/acme/widgets/contents/ source surface reachable"))' "$out"
+  and (.boundary_breach[0] | test("^boundary:repos/acme/widgets/contents/ source surface reachable")) and .title == "Report black-box breach"' "$out"
 assert "the gate keeps its finding" '.fails | length >= 1' "$(cat "$WORK_DIR/env/boundary.json")"
 out="$(bash "$SCRIPTS/preflight.sh" regression)"
 assert "the same breach declines quietly" '.nothing_to_do == true and (.boundary_breach | length) >= 1' "$out"

@@ -18,6 +18,7 @@ h="$(bash "$SCRIPTS/check-asserts.sh" --hash "$WORK_DIR/suite/tests/issue-7.e2e.
 echo "| tests/issue-7.e2e.ts | 7 | regression | $h | 2026-10-01T00:00:00Z |" >> "$WORK_DIR/SUITE.md"
 out="$(bash "$SCRIPTS/preflight.sh" regression)"
 assert "new candidate -> due" '.nothing_to_do==false and .candidate=="0.0.0-main.bbb2222" and .tests==["tests/issue-7.e2e.ts"] and .assert_drift==[]' "$out"
+assert "title: the build and the test count" '.title == "Run regression on 0.0.0-main.bbb2222 (1 test)"' "$out"
 
 echo "2026-10-01T03:00:00Z ran candidate=0.0.0-main.bbb2222 passed=1 failed=0" >> "$WORK_DIR/REGRESSION.log"
 out="$(bash "$SCRIPTS/preflight.sh" regression)"

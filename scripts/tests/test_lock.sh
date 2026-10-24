@@ -107,7 +107,7 @@ echo "issues $(iso_ago 5) sess-a" > "$L"
 d="$(date -u +%Y-%m-%d)"
 for i in 1 2; do printf '{"ts":"%sT01:00:0%sZ","event":"slack_test","msg":"issue=%s"}\n' "$d" "$i" "$i" >> "$WORK_DIR/logs/events-$d.jsonl"; done
 out="$(STUB_RUNNING=sess-a bash "$SCRIPTS/preflight.sh" slack)"
-assert "slack: busy environment, one test left" '.mode == "slack" and .environment.busy == true and .environment.holder == "issues" and .tests_today == 2 and .quota_left == 1 and .channel == null' "$out"
+assert "slack: busy environment, one test left" '.mode == "slack" and .environment.busy == true and .environment.holder == "issues" and .tests_today == 2 and .quota_left == 1 and .channel == null and .title == null' "$out"
 printf -- '- slack_channel: C0123ABCD\n- slack_tests_per_day: 2\n' >> "$WORK_DIR/CONFIG.md"
 out="$(STUB_RUNNING=sess-x bash "$SCRIPTS/preflight.sh" slack)"
 assert "slack: a dead holder is not busy; quota spent" '.environment.busy == false and .environment.state == "dead" and .quota_left == 0 and .channel == "C0123ABCD"' "$out"
