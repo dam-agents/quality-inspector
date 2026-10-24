@@ -7,6 +7,19 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.25.0 — 2026-10-24
+
+**Upgrade:**
+1. A report is now published as one file: `scripts/report-media.mjs` makes `publish.html` from the
+   rendered report — public: each media file its own public artifact, linked by its address;
+   private: the media inline ([docs/reporting.md](docs/reporting.md) → Delivery step 1). Reports
+   published before show no video (their `media/` links answer 404). To repair one, publish its
+   report directory again by the new step 1 as a new revision (`update_artifact`) when the operator
+   asks; nothing else to run.
+2. A verdicts file now carries `started_utc` (and `cost_usd` when the platform states the cost;
+   [docs/reporting.md](docs/reporting.md) → Verdicts file): write them from the next run on. Older
+   runs show their length from the logs, or none. The next catalog build ships the page.
+
 ## 3.24.0 — 2026-10-24
 
 **Upgrade:**

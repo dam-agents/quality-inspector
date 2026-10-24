@@ -67,9 +67,10 @@ architect picks up to fix the issue. Without `fix_label` say so and offer the is
    (you have none), internal ids of the product's data, a credential or token, `work/env/`,
    a verdict's notes, a triage explanation, `work/LESSONS.md`, the operator conversation,
    anything of `work/security/`. Several refs keep one section each.
-3. **Evidence page.** Publish `evidence/index.html` with `evidence/media/` beside it as an
-   artifact, exactly as [docs/reporting.md](../../docs/reporting.md) → Delivery step 1 (a
-   folder, uploads through upload URLs, the relative paths kept, private), ledgered (surface
+3. **Evidence page.** Make it one file — `node "$HOME/scripts/report-media.mjs" publish
+   work/found/<slug>/evidence private` (the media go into the page) — and publish
+   `evidence/publish.html` as an artifact, exactly as [docs/reporting.md](../../docs/reporting.md)
+   → Delivery step 1 for a private report (an upload URL, private), ledgered (surface
    `artifact`, `issue=-`, key `found-evidence@<slug>`). Replace every `EVIDENCE_LINK` in
    `body.md` with the artifact's share link, never a `public` one; with
    `artifact_reports: disabled`, or no image and no video, with "the evidence is kept by

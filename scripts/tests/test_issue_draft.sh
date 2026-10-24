@@ -68,6 +68,12 @@ done
 case "$body$(cat "$dir/evidence/index.html")" in (*NOTE-SECRET*) echo "  a verdict's note reached the draft"; FAILED=1;; esac
 [ -f "$dir/evidence/media/42-ac-1-1.png" ] && [ -f "$dir/evidence/media/42-ac-1-video.webm" ] || { echo "  the still and the video are beside the evidence page"; FAILED=1; }
 grep -q 'src="media/42-ac-1-1.png"' "$dir/evidence/index.html" || { echo "  the evidence page shows the still"; FAILED=1; }
+# Published as one private file (skills/create-issue step 3): the still and the video inline, the still
+# once — its link to the full image goes with media/.
+pub="$(node "$SCRIPTS/report-media.mjs" publish "$dir/evidence" private)"
+assert "the evidence page becomes one file" '.inlined == 2 and .left_out == []' "$pub"
+grep -q '"media/' "$dir/evidence/publish.html" && { echo "  the published evidence page links media/"; FAILED=1; }
+[ "$(grep -o 'data:image/png;base64,' "$dir/evidence/publish.html" | wc -l | tr -d ' ')" = 1 ] || { echo "  the still is not inline exactly once"; FAILED=1; }
 
 out="$(node "$D" '#42 AC-1, D-1, VAL-1, STRESS-API-2, D-404' --fix)"
 dir="$(jq -r .dir <<<"$out")"

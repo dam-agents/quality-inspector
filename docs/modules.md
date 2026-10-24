@@ -46,10 +46,10 @@ and does not count a glob of `*` alone (`*`, `*.sh`), so ordinary scheduled comm
 a glob, or a name built at run time, can still reach `modules.sh`; the script then refuses. After any change: one line to the operator with
 the old and new value, then rebuild and publish the catalog.
 
-**From the dashboard.** Each control on the page shows the command it stands for. On an
-interactive dashboard opened beside the agent's chat, its button sends exactly that command
-as the operator's chat message (`platform.sendPrompt`) — the direct session, handled as if
-typed. Elsewhere the page offers the command to copy. A prompt whose transcript line opens
+**From the dashboard.** Each control opens a box at the bottom that shows the command it stands
+for. On an interactive dashboard opened beside the agent's chat, the box's "Send to the agent"
+sends exactly that command as the operator's chat message (`platform.sendPrompt`) — the direct
+session, handled as if typed. Elsewhere the box offers the command to copy. A prompt whose transcript line opens
 `<viewer> sent this from a button on the interactive artifact "…"` comes from a person the
 operator shared the page with: a channel turn, never direct (`lib/channel.sh`). Only a
 `test this scenario: …` request is taken ([scenarios.md](scenarios.md) → A request from the

@@ -154,6 +154,13 @@ const artRef = (dir, { link = true } = {}) => {
   return a ? (HTTPS.test(a) ? a : `platform://artifacts/${a}`) : null;
 };
 
+// How long a run took and what it cost (docs/catalog.md → every run). From the run's own file:
+// `minutes`, else `started_utc` to its time; `cost_usd` only when the file has it — never estimated.
+const epoch = (u) => { const t = Date.parse(u); return Number.isFinite(t) ? t / 1000 : null; };
+const span = (from, to) => { const a = epoch(from); const b = epoch(to); return a != null && b != null && b >= a && b - a < 86400 ? Math.round(b - a) : null; };
+const secsOf = (v, utc) => (typeof v.minutes === 'number' && v.minutes > 0 && v.minutes < 1440 ? Math.round(v.minutes * 60) : span(v.started_utc, utc));
+const costOf = (v) => (typeof v.cost_usd === 'number' && Number.isFinite(v.cost_usd) && v.cost_usd >= 0 ? Math.round(v.cost_usd * 100) / 100 : null);
+
 const WORST = ['regression', 'failed', 'needs-review', 'flaky', 'inconclusive', 'partial', 'blocked', 'not-testable', 'passed', 'verified'];
 const rank = (v) => (WORST.includes(v) ? WORST.indexOf(v) : WORST.length);
 function readVerdicts(dir, okey, run, ref) {
@@ -165,7 +172,7 @@ function readVerdicts(dir, okey, run, ref) {
     if (v.title) titles.set(okey, v.title);
     // A scenario's file has no top verdict: its worst criterion stands for the run.
     const worst = (v.acs ?? []).map((e) => e?.verdict).filter(Boolean).sort((a, b) => rank(a) - rank(b))[0] ?? null;
-    runs.push({ type: run, ref, build, baseline: v.baseline ?? null, utc, verdict: v.verdict ?? worst, report: artRef(dir),
+    runs.push({ type: run, ref, build, baseline: v.baseline ?? null, utc, verdict: v.verdict ?? worst, report: artRef(dir), secs: secsOf(v, utc), cost_usd: costOf(v),
       entries: [...(v.acs ?? []), ...(v.explorations ?? [])].filter((e) => e?.id && e.verdict).map((e) => ({ key: `${okey}/${e.id}`, value: e.verdict })) });
     for (const ac of v.acs ?? []) {
       const key = `${okey}/${ac.id}`;
@@ -194,7 +201,7 @@ for (const stem of ls(join(work, 'reruns')).filter((x) => /^(issue-\d+|scenario-
       .map(([id, r]) => ({ key: `${stem}/${id}`, value: r.status }));
     for (const e of entries) addHist(e.key, { build: v.build ?? null, run: 'rerun', value: e.value, utc });
     const worst = entries.map((e) => e.value).sort((a, b) => rank(a) - rank(b))[0] ?? null;
-    runs.push({ type: 'rerun', ref: stemRef(stem), build: v.build ?? null, utc, verdict: worst, report: null,
+    runs.push({ type: 'rerun', ref: stemRef(stem), build: v.build ?? null, utc, verdict: worst, report: null, secs: secsOf(v, utc), cost_usd: costOf(v),
       label: /^[A-Za-z0-9._-]{1,120}$/.test(String(v.label)) ? v.label : null, entries });
   }
 }
@@ -217,11 +224,15 @@ for (const c of ls(join(work, 'regression'))) {
   nightOutcomes.set(c, per);
 }
 const TOP = ['regression', 'needs-review', 'healed', 'relearned'];
+const due = new Map(); // candidate -> the pre-flight's `due` time: the night's start
 for (const line of (read(join(work, 'REGRESSION.log')) ?? '').split('\n')) {
+  const d = line.match(/^(\S+) due candidate=(\S+)/);
+  if (d) { due.set(d[2], d[1]); continue; }
   const env = line.match(/^(\S+) ERROR: environment candidate=(\S+)/);
-  if (env) { runs.push({ type: 'regression', ref: null, build: env[2], utc: env[1], verdict: 'environment', report: null, entries: [] }); continue; }
+  if (env) { runs.push({ type: 'regression', ref: null, build: env[2], utc: env[1], verdict: 'environment', report: null, secs: span(due.get(env[2]), env[1]), cost_usd: null, entries: [] }); due.delete(env[2]); continue; }
   const m = line.match(/^(\S+) ran candidate=(\S+)(.*)$/);
   if (!m) continue;
+  const started = due.get(m[2]); due.delete(m[2]);
   const counts = {};
   for (const [, k, v] of m[3].matchAll(/(\w[\w-]*)=(\d+)/g)) counts[k.replace(/_/g, '-')] = +v;
   nights.push({ build: m[2], utc: m[1], counts });
@@ -231,12 +242,33 @@ for (const line of (read(join(work, 'REGRESSION.log')) ?? '').split('\n')) {
   const ctx = v?.context ?? {};
   const signals = Object.fromEntries(Object.entries(ctx.signals ?? {}).map(([k, x]) => [k, Array.isArray(x) ? x.length : +x || 0]));
   runs.push({ type: 'regression', ref: null, build: m[2], utc: m[1], counts,
+    secs: v ? secsOf(v, m[1]) ?? span(started, m[1]) : span(started, m[1]), cost_usd: v ? costOf(v) : null,
     verdict: v?.verdict ?? TOP.find((k) => counts[k] > 0) ?? 'unchanged',
     previous: ctx.previous ?? nights.at(-2)?.build ?? null, window: ctx.window ?? null,
     issues: (ctx.issues ?? []).filter((x) => x?.number != null).slice(0, 60).map((x) => ({ number: x.number, title: x.title ?? null })),
     ui_diff: typeof ctx.ui_diff === 'string' ? ctx.ui_diff.slice(0, 4000) : null, signals,
     report: artRef(join(work, 'regression', m[2])),
     entries: [...(nightOutcomes.get(m[2]) ?? new Map())].map(([key, value]) => ({ key, value })) });
+}
+// A run whose file says nothing of its length: the events log (docs/logging.md, 14 days) — an issue
+// run's `issue_done minutes=` nearest its verdicts, a scenario run's `scenario_run` before them.
+const evs = ls(join(work, 'logs')).filter((f) => /^events-\d{4}-\d{2}-\d{2}\.jsonl$/.test(f))
+  .flatMap((f) => (read(join(work, 'logs', f)) ?? '').split('\n'))
+  .filter((l) => /"event":"(?:issue_done|scenario_run)"/.test(l))
+  .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+  .filter((e) => e && typeof e.msg === 'string' && epoch(e.ts) != null);
+const near = (list, t) => list.sort((a, b) => Math.abs(epoch(a.ts) - t) - Math.abs(epoch(b.ts) - t))[0];
+for (const r of runs) {
+  if (r.secs != null || epoch(r.utc) == null) continue;
+  const t = epoch(r.utc);
+  if (r.type === 'issue') {
+    const done = near(evs.filter((e) => e.event === 'issue_done' && new RegExp(`(^| )issue=${r.ref.slice(1)}( |$)`).test(e.msg) && Math.abs(epoch(e.ts) - t) < 3 * 3600), t);
+    const min = done ? +(done.msg.match(/(?:^| )minutes=(\d+)/)?.[1] ?? NaN) : NaN;
+    if (min > 0 && min < 1440) r.secs = min * 60;
+  } else if (r.type === 'scenario') {
+    const start = near(evs.filter((e) => e.event === 'scenario_run' && new RegExp(`(^| )id=${r.ref}( |$)`).test(e.msg) && epoch(e.ts) <= t), t);
+    if (start) r.secs = span(start.ts, r.utc);
+  }
 }
 runs.sort((a, b) => String(b.utc).localeCompare(String(a.utc)));
 runs.splice(RUNS_MAX);

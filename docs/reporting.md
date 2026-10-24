@@ -48,7 +48,7 @@ Your judgment, the renderer's only input besides the runs:
 {"issue": 42, "title": "…", "ac_hash": "3f9a0c12b7de", "criteria_source": "done-when",
  "candidate": "0.0.0-main.5203", "baseline": "0.2.19",
  "candidate_run": "issue-42-candidate", "baseline_run": "issue-42-baseline",
- "verdict": "partial", "generated_utc": "2026-10-12T19:20:00Z", "display_name": "<display_name>",
+ "verdict": "partial", "started_utc": "2026-10-12T18:41:07Z", "generated_utc": "2026-10-12T19:20:00Z", "display_name": "<display_name>",
  "acs": [{"id": "AC-1", "name": "…", "given": "…", "when": "…", "then": "…", "surface": "ui",
           "testable": true, "verdict": "verified", "baseline_blocked_reason": null,
           "note": "optional, one sentence"}],
@@ -59,7 +59,9 @@ A scenario's file (`"mode": "scenario"`) adds `request_file`: the path under `wo
 words as received (`scenarios/S-7/request.md`, `scenarios/P-<slug>/source-<spec_hash>.md`),
 which the renderer shows verbatim above the criteria ([scenarios.md](scenarios.md) → State).
 `given` / `when` / `then` are copied from the criteria file verbatim; `baseline_run` is
-`null` when no baseline ran. Explorations and `noticed` add their own keys, never touching
+`null` when no baseline ran. `started_utc` is the run's start (the `issue_start`'s time; the
+dashboard shows the run's length from it); `cost_usd` only when the platform states the run's
+cost — never an estimate, else leave it out. Explorations and `noticed` add their own keys, never touching
 `acs` or `verdict` ([explorations.md](explorations.md) → **Reporting**, **Noticed in passing**). Never: credentials,
 internal state, the operator conversation.
 
@@ -75,13 +77,14 @@ product text and the frozen criteria stay verbatim.
 
 `node "$HOME/scripts/render-report.mjs" <verdicts.json> <dir>` writes:
 
-- `index.html` — one self-contained page: the issue verdict, "N of M criteria tested" (an
+- `index.html` — the page: the issue verdict, "N of M criteria tested" (an
   AC judged `verified`, `failed` or `inconclusive`; `comment.md` carries it too), a summary table, and per AC
   the frozen criterion, then candidate and baseline side by side, each with the **video
   of the whole test**, the screenshots captioned by their step (the `AC-<k>` still first),
   the step list with durations and replay-cache use, the assertion error, and the trace
   (Playwright `trace.zip`, or the trace page from `e2e` 0.19 on).
-- `media/` — the copied videos, screenshots and traces it links to.
+- `media/` — the copied videos, screenshots and traces it links to by relative paths, which
+  only `report-media.mjs` turns into the published file `publish.html` (**Delivery** step 1).
 - `comment.md` — the short issue comment, with the literal `EVIDENCE_LINK` to replace.
 - `proof.json` (not regression or security) — the screenshots in `media/` that back the
   verdicts, per criterion and deciding side, for the one picture of a Slack answer
@@ -102,10 +105,21 @@ Order per effect is **send-then-record**: its `intent` ledger line, the send, it
 logged, and the next run's `reports_due` retries only the delivery — the tests are not
 re-run. Never retry within the same run.
 
-1. **Artifact** (`artifact_reports: enabled`): publish the report directory with the
-   platform's artifact tools — `index.html` as the artifact, `media/` beside it
-   (`create_artifact_folder`, files through `create_artifact_upload_url`), keeping the
-   relative paths so the page's links resolve. `work/issues/<n>/artifact.id` holds the
+1. **Artifact** (`artifact_reports: enabled`): an artifact is **one file** — a viewer never
+   gets `media/`, so a relative `media/<name>` link answers 404. First make the page one file
+   with `node "$HOME/scripts/report-media.mjs"` (its header has the contract), then publish
+   `<dir>/publish.html` — never a page with `media/` links — through `create_artifact_upload_url`:
+   - **A public report** (below, or a Slack thread's): `report-media.mjs list <dir>`; each
+     file with `url: null` becomes an artifact of its own — upload it, `create_artifact` with
+     `visibility: public` and its `file_name`, then `report-media.mjs set <dir> <path>
+     <shareUrl> <version>` from the response. Then `report-media.mjs publish <dir> public`
+     (exit 1 names a file still without an address). The addresses are kept by content, so a
+     revision uploads only new files. One ledger pair covers the media of one report.
+   - **A private report**: `report-media.mjs publish <dir> private` puts the screenshots and
+     videos into the page as data, within the platform's page limit; `left_out` names what
+     did not fit (the page says so) — tell it in the chat when it is a video.
+
+   `work/issues/<n>/artifact.id` holds the
    reference — when it exists, publish a new revision (`update_artifact`) instead of a new
    artifact, and write the file immediately after a create. Visibility stays private —
    a report answered in a Slack thread under `slack_report_visibility: public` aside

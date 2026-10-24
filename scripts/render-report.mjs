@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // render-report.mjs — turn one issue's verdicts and its e2e runs into a self-contained
-// evidence page: index.html plus media/ (videos, screenshots, traces), and comment.md.
+// evidence page: index.html plus media/ (videos, screenshots, traces), and comment.md. The page
+// links media/ relatively; report-media.mjs makes the one file that is published.
 // Deterministic and read-only toward everything but <out-dir>. Contract: docs/reporting.md.
 //
 //   node render-report.mjs <verdicts.json> <out-dir>

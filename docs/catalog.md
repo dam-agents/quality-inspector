@@ -24,7 +24,10 @@ The operator may share the page beyond themselves, so it carries only what conce
   counts, the criteria that were not `unchanged`, the change context's issues (number, title), UI
   diff text and signal counts — or its environment failure; each issue and scenario run with its
   verdicts; each run by hand (`work/reruns/`, [on-demand.md](on-demand.md) → "run #N") with its raw
-  results; each with its build and report reference (a link when the report has one —
+  results; each with its length — the run file's `minutes`, else its `started_utc` to its time;
+  else a night from its `due` line, an issue run from its `issue_done minutes=`, a scenario run
+  from its `scenario_run` ([logging.md](logging.md)) — and its `cost_usd` only when the file
+  states it (never estimated); each with its build and report reference (a link when the report has one —
   `artifact.url`, its share link, e.g. under `report_visibility: public`
   ([reporting.md](reporting.md) → Delivery step 1), or an `https://` `artifact.id` — opened in a
   new tab; else a "private" mark that says where to find it, Artifacts in the app: a private
@@ -84,8 +87,10 @@ The operator may share the page beyond themselves, so it carries only what conce
   issue #42 …").
 - **One kind of control, one look.** Blue with → goes to another view of the page, with ▯ opens a
   panel, with ⌖ a page of the product map; teal with ↗ opens another site in a new tab (GitHub, a
-  report's link); violet with the agent's mark is a command for the agent (solid: "Send to the
-  agent"; dashed: only prepares one); grey changes only this page in this browser (filters, sorting,
+  report's link); violet with the agent's mark is a message for the agent — it never sends: it opens the box at
+  the bottom, which names what the agent then does, shows the exact message, and sends it only on
+  its own "Send to the agent" (beside the agent's chat; else "Copy"), Esc or Cancel closes it with
+  nothing sent (dashed: takes your input first); grey changes only this page in this browser (filters, sorting,
   pins, selections). Each one's tooltip says first what it does and where it goes, then its meaning.
 - **Where you are:** the header always names the view and the panel open on it, beside **Back**;
   each view opens with its icon, its name and one line of what it is for (the line hideable, per
@@ -96,13 +101,15 @@ The operator may share the page beyond themselves, so it carries only what conce
   figure carries its meaning as a tooltip — the page's own, on hover, keyboard focus or a tap of an
   ⓘ; the Legend lists the kinds of control, every name and icon, verdict, tier and run type.
 
-Views: Overview, Modules (each module's switches and settings), Findings (validation, stress,
+Views: Overview, Modules (each module's switches and settings, and what a job tests: the
+Nightly regression lists its test cases by issue and scenario), Findings (validation, stress,
 security counts, edge-case observations), Design (the design findings: crops, filters, "copy as
 Markdown" for the design team), Runs, Product map (the page shots with every control clickable, coloured by
 its tests' worst verdict, dashed where no test names it; a drawn outline where a shot did not fit; a
 navigation item, tab, link or list row that leads to a mapped page opens that page, like a
 click-through wireframe, with a "back" to the page before), Catalog, Gallery, Coverage,
-History (item × build), Lifecycle and Test builder (below), plus a detail panel per item, per run and per origin (an
+History (item × build), Lifecycle and Test builder (below), plus a detail panel per item, per run (a night's
+lists every test case it had, with its result, its length and cost) and per origin (an
 issue's or a scenario's criteria and explorations, every run that judged them, its report).
 
 **Links and navigation.** Every reference is a link to its place: an issue or a scenario
@@ -134,8 +141,8 @@ issue:** every test (catalog table and cards; the failing ones in Needs attentio
 validation finding and failed stress check has a ☐; the ticked ones gather in a bar at the bottom
 of every view with one command, `create issue for <ref>, <ref>…` (at most 20), and its
 architect variant. The selection is the viewer's own, kept in their browser. A problem an issue
-was opened for shows that issue's link everywhere it appears, and the flag "issue created". It can be copied; on an
-interactive page opened beside the agent's chat its button sends it as the operator's message.
+was opened for shows that issue's link everywhere it appears, and the flag "issue created". It opens in the box at the
+bottom like every command: copied, or sent there as the operator's message beside the agent's chat.
 The one exception is **Ask for a test** on the Product map and in the Test builder: a scenario
 request built from the page's pattern, the control's kind and name, and the person's own words
 (or steps), in the one shape of [scenarios.md](scenarios.md) → **A request from the dashboard**. A
@@ -196,7 +203,8 @@ The steps:
    `error` and publish nothing; `secrets.mjs scan-all work/env/credentials.env work/suite/tests
    work/issues work/scenarios` (in `$HOME/scripts/lib/`) names the file to fix.
 2. Publish `work/catalog/index.html` as [reporting.md](reporting.md) → Delivery step 1 — artifact
-   only, through an upload URL (it exceeds the inline limit); the reference lives in
+   only, through an upload URL (it exceeds the inline limit). It has no `media/` links (its images
+   are in the page), so it is already one file: it skips `report-media.mjs`; the reference lives in
    `work/catalog/artifact.id`, a revision when it exists — refused as not found, a new artifact
    whose reference replaces it. With `dashboard_interactive: enabled` it is created with
    `interactive: true` (the platform's Interactive artifacts; never public); that is fixed at

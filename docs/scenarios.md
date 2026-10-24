@@ -80,7 +80,7 @@ several intents → handle each, then send **one** reply:
 ## A request from the dashboard
 
 The dashboard's Product map lets a person ask for a test of a page or one of its controls,
-in their own words ([catalog.md](catalog.md)); its button sends
+in their own words ([catalog.md](catalog.md)); its box at the bottom sends
 `test this scenario: On the page <pattern>, the <control kind> "<name>": <their words>`. The
 dashboard's Test builder sends the same shape without the control, its words a person's numbered
 steps (`Name: …`, then `1. Open: /projects`, `2. Do: Click the button "Save"`, `3. Check: …`, one a
