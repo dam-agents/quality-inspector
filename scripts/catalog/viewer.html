@@ -150,7 +150,7 @@ button.kpi:hover .kgo{opacity:1}
 .ringtxt b{font-size:12px}.ringtxt span{font-size:10px;color:var(--dim)}
 .ring .track{stroke:var(--mutedbg)}.ring{background:none}.ring.r-ok .arc{stroke:var(--ok)}.ring.r-warn .arc{stroke:var(--warn)}.ring.r-bad .arc{stroke:var(--bad)}
 .qbar{display:flex;height:12px;border-radius:6px;overflow:hidden;gap:2px;margin:6px 0 4px}
-.qbar i,.qdot{background:var(--muted)}.q-new{background:var(--link)!important}.q-re{background:var(--warn)!important}.q-sc{background:var(--agent)!important}.q-rp{background:var(--ok)!important}
+.qbar i,.qdot{background:var(--muted)}.q-new{background:var(--link)!important}.q-re{background:var(--warn)!important}.q-sc{background:var(--agent)!important}.q-rp{background:var(--ok)!important}.q-ps{background:var(--ext)!important}
 .qdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
 .qh{font-size:13px;margin:10px 0 2px}
 .sched{list-style:none;margin:6px 0;padding:0}.sched li{display:flex;align-items:baseline;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
@@ -1205,6 +1205,17 @@ function ring(frac, cls) {
     s('circle', { cx: 38, cy: 38, r, fill: 'none', 'stroke-width': 8, class: 'track' }),
     s('circle', { cx: 38, cy: 38, r, fill: 'none', 'stroke-width': 8, class: 'arc', 'stroke-dasharray': `${(c * f).toFixed(1)} ${c.toFixed(1)}`, transform: 'rotate(-90 38 38)', 'stroke-linecap': 'round' }));
 }
+// The profile scenarios still to adopt (catalog.mjs: findings.profile_queue), or null.
+const PQ_WHEN = { next: 'next night', later: 'a later night', 'new-build': 'retry on a new build' };
+const PQ_KIND = { new: 'new', changed: 'text changed', retry: 'retry' };
+function profileQueue() {
+  const q = F.profile_queue && typeof F.profile_queue === 'object' ? F.profile_queue : null;
+  return q ? { cap: Number.isInteger(q.cap) ? q.cap : 3, list: arr(q.list).filter((x) => x && /^P-[a-z0-9-]+$/.test(str(x.id))) } : null;
+}
+function pqTable(pq, tableOf) {
+  return tableOf(['Scenario', 'Title', 'Kind', 'When'], pq.list.map((x) => [refLink(str(x.id)), str(x.title) || h('span', { class: 'muted-t' }, 'no title'),
+    PQ_KIND[x.kind] || str(x.kind), h('span', { class: `badge ${x.when === 'next' ? 'ok' : 'muted'}` }, PQ_WHEN[x.when] || str(x.when))]));
+}
 function activityNow() {
   const lock = A.lock && A.lock.owner ? A.lock : null;
   const active = arr(A.issues).filter((x) => x && x.status === 'in_progress');
@@ -1239,12 +1250,14 @@ function activityQueue() {
   const pending = arr(A.issues).filter((x) => x && x.status === 'report_pending');
   const rq = arr(F.requests).filter((x) => x && x.status === 'queued');
   const rp = arr(F.requests).filter((x) => x && x.status === 'report_pending');
+  const pq = profileQueue();
   const issueA = (n) => issueRef(n);
   const groups = [
     [`${ENT.issue[1]} New issues`, 'q-new', waiting.filter((x) => x.kind === 'new').map((x) => [issueA(x.issue), ' ', str(x.title)])],
     [`${ENT.issue[1]} Retests`, 'q-re', waiting.filter((x) => x.kind === 'retest').map((x) => [issueA(x.issue), ' ', str(x.title)])],
     [`${ENT.scenario[1]} Requested scenarios`, 'q-sc', rq.map((x) => [h('b', {}, refLink(str(x.id))), ' ', str(x.title) || h('span', { class: 'meta' }, `from ${str(x.source)} · ${rel(x.utc)}`)])],
     [`${ENT.report[1]} Reports on their way`, 'q-rp', [...pending.map((x) => [issueA(x.issue), ' ', str(x.title), ' ', badge(x.verdict)]), ...rp.map((x) => [h('b', {}, refLink(str(x.id))), ' ', str(x.title), ' ', badge(x.verdict)])]],
+    [`${ENT.scenario[1]} Profile scenarios to adopt`, 'q-ps', (pq ? pq.list : []).map((x) => [h('b', {}, refLink(str(x.id))), ' ', str(x.title), ' ', h('span', { class: 'meta' }, `· ${PQ_KIND[x.kind] || str(x.kind)} · ${PQ_WHEN[x.when] || str(x.when)}`)])],
   ];
   const total = groups.reduce((n, g) => n + g[2].length, 0);
   const card = h('section', { class: 'panel' }, h('h2', {}, `📥 Queue (${total})`, tip('The issues and scenarios that wait for a test run, and the reports that the agent did not deliver yet.')));
@@ -1255,7 +1268,8 @@ function activityQueue() {
     groups.filter((g) => g[2].length).map((g) => h('i', { class: g[1], style: `flex:${g[2].length}`, title: `${g[0]}: ${g[2].length}` }))));
   for (const [label, cls, list] of groups) if (list.length) card.append(...[h('h3', { class: 'qh' }, h('i', { class: `qdot ${cls}` }), `${label} (${list.length})`),
     h('ul', { class: 'att' }, list.slice(0, 6).map((x) => h('li', {}, x))), list.length > 6 ? h('p', { class: 'meta' }, `and ${list.length - 6} more`) : null].filter(Boolean));
-  card.append(h('p', { class: 'meta' }, 'The issues run tests them in this sequence, one at a time.'));
+  card.append(h('p', { class: 'meta' }, 'The issues run tests them in this sequence, one at a time.',
+    pq && pq.list.length ? ` The nightly regression adopts the profile scenarios: ${pq.cap} each night.` : ''));
   return card;
 }
 function activitySchedule() {
@@ -2317,6 +2331,10 @@ function viewFindings() {
     !rq.length ? h('p', { class: 'muted-t' }, 'No request waits. You can ask for a test on the Product map (🗺️).') : tableOf(['Scenario', 'From', 'State', 'Title', 'Updated'],
       rq.map((x) => [refLink(str(x.id)), str(x.source), h('span', { class: `badge ${(RQ[x.status] || ['', 'none'])[1]}` }, (RQ[x.status] || [str(x.status)])[0]),
         str(x.title) || h('span', { class: 'muted-t' }, 'criteria not frozen yet'), x.utc ? rel(x.utc) : '']))));
+  const pq = profileQueue();
+  if (pq) v.append(sec2(`${ENT.scenario[1]} Profile scenarios to adopt`, pq.list.length ? `Scenarios of the product profile that the agent did not adopt yet. The nightly regression adopts ${pq.cap} each night, in this sequence.` : null,
+    !pq.list.length ? h('p', { class: 'muted-t' }, 'No profile scenario waits. The nightly regression adopted each file of the profile.')
+      : pq.cap === 0 ? [h('p', { class: 'meta', style: 'color:var(--warn)' }, 'max_scenarios_per_run is 0: no night adopts these scenarios.'), pqTable(pq, tableOf)] : pqTable(pq, tableOf)));
   const fo = arr(F.focus).filter((x) => x && typeof x === 'object');
   v.append(sec2('🎯 Feature focus', fo.length ? `${fo.length} newest focus run(s)` : null, !fo.length ? h('p', { class: 'muted-t' }, 'The agent did not test an area in depth yet. You can add an area to the queue in Modules.')
     : fo.map((x) => h('div', { style: 'margin-top:8px' }, h('h3', {}, x.area && items.some((i) => str(i.area) === str(x.area)) ? facetLink('area', str(x.area)) : str(x.area) || str(x.run), x.build ? [' · ', buildLink(x.build)] : '', x.utc ? ` · ${fmtDate(x.utc)}` : ''),

@@ -190,3 +190,30 @@ profile_scenarios() {
     printf '%s\t%s\t%s\n' "$slug" "$(text_hash "$(cat "$f")")" "$f"
   done | sort
 }
+
+# The adoption queue of the profile's scenarios against the `source=profile` rows of
+# <SCENARIOS.md> (docs/scenarios.md → Profile scenarios): one JSON object
+# {files, queue[], retire[]}. queue[] — {id, slug, spec_hash, kind}, in the order a night takes
+# them: `new` (no row, or a `retired` one), `changed` (another spec_hash), then `retry` (the same
+# text whose adoption ended failed, blocked or flaky). retire[] — a row whose file is gone.
+# The one computation behind the regression pre-flight's adopt[]/deferred[] and
+# `scenarios.sh queue`. Needs lib/state.sh; profile_scenarios' skip lines reach stderr.
+profile_scenario_queue() { # <SCENARIOS.md>
+  local files rows
+  files="$(profile_scenarios | jq -R 'split("\t") | {slug: .[0], spec_hash: .[1]}' | jq -sc .)"
+  rows="$(table_rows "$1" | while IFS= read -r r; do
+      [ "$(cell "$r" 2)" = profile ] || continue
+      printf '%s\t%s\t%s\t%s\n' "$(cell "$r" 1)" "$(cell "$r" 5)" "$(cell "$r" 8)" "$(cell "$r" 7)"
+    done | jq -R 'split("\t") | {id: .[0], spec_hash: .[1], status: .[2], verdict: .[3]}' | jq -sc .)"
+  jq -nc --argjson f "$files" --argjson r "$rows" '
+    ($r | map({key: .id, value: .}) | from_entries) as $by
+    | {files: ($f | length),
+       queue: ([$f[] | ("P-" + .slug) as $id | $by[$id] as $row
+         | if $row == null or $row.status == "retired" then {id: $id, slug, spec_hash, kind: "new"}
+           elif $row.spec_hash != .spec_hash then {id: $id, slug, spec_hash, kind: "changed"}
+           elif $row.status == "reported" and ($row.verdict | IN("failed", "blocked", "flaky"))
+             then {id: $id, slug, spec_hash, kind: "retry"}
+           else empty end] | sort_by(.kind == "retry")),
+       retire: (($f | map("P-" + .slug)) as $have
+         | [$r[] | select(.status != "retired" and ((.id | IN($have[])) | not)) | .id])}'
+}

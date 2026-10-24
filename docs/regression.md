@@ -39,11 +39,13 @@ The worklist carries `candidate`, `previous_candidate` (the build last regressio
 not run — say so, never treat it as clean), `profile_scenarios`, `channel`, and
 `confirm_regressions` / `bisect_max_steps` ([triage.md](triage.md) → Order of work, steps 5–6).
 
-- `profile_scenarios` — `{files, adopt[], retire[], deferred}`, or `null` with
+- `profile_scenarios` — `{files, adopt[], retire[], deferred[]}`, or `null` with
   `profile_scenarios: disabled`: the profile's `scenarios/` against the `source=profile`
   rows of `work/SCENARIOS.md`. `adopt[]` (`id`, `slug`, `spec_hash`, `kind` new|changed|retry
   — `retry`: the same text, its adoption failed, blocked or flaky, taken on a new build only)
-  holds at most `max_scenarios_per_run` entries, retries last; `deferred` wait for a later night.
+  holds at most `max_scenarios_per_run` entries, retries last. `deferred[]` (the same shape)
+  names the rest, in the order a later night takes them: the texts past the cap, then the
+  retries that wait for a new build. Not adopted tonight; listed by id in step 3a and step 9.
 - `replay` — `false` when the candidate was already regression-tested and only profile
   scenarios changed, or when no test is in the regression tier yet: adopt and retire them
   (step 3a), replay nothing else, skip steps 3 and 4–6. Steps 7–10 still run; step 8 records the
@@ -62,8 +64,9 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
 3a. **Profile scenarios** ([scenarios.md](scenarios.md) → **Profile scenarios**): each
    `retire[]` id, then each `adopt[]` entry — Adopt steps 1–6, the budgets counted per
    scenario. A newly registered test is in step 5's replay from the next night: its
-   adoption run is tonight's result. List what was adopted, rejected and retired in the
-   report's `notes`, with the adoption runs' verdicts as entries (`scenario`: `P-<slug>`).
+   adoption run is tonight's result. List what was adopted, rejected and retired, and each
+   `deferred[]` id with its `kind`, in the report's `notes`, with the adoption runs' verdicts
+   as entries (`scenario`: `P-<slug>`).
 4. Drifted tests (`assert_drift`) are **not run** — list them for the operator.
 5. Replay: `suite.sh run regression-<candidate> --evidence failures --tag issue-<a> --tag issue-<b> …`.
    `criterion()` judges a check whose control moved instead of failing it. Explorations
@@ -91,7 +94,8 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
    `previous_candidate` on `ran candidate=`.
 9. `env.sh unlock regression`. Summary in the chat UI: regressions first, each with its
    evidence link; then what needs review; then one line of what was absorbed; then the
-   profile scenarios adopted, rejected and retired. With `channel` set, the same summary
+   profile scenarios adopted, rejected and retired; then the `deferred[]` ids that wait, with
+   `max_scenarios_per_run` (none → no line). With `channel` set, the same summary
    as one `send_channel_message` to it — every night, also when all is `unchanged`, so a
    missing post is noticed; its links per [slack.md](slack.md) → **The answer in the thread**; a regression or a failed adoption opens with 🔴 and the test's
    owner (the scenario's file, or the issue). Ledgered as surface `slack`

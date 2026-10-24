@@ -183,42 +183,24 @@ scenarios_due() {
 # text, a `retired` one comes back as new; `retry` — the same text whose adoption ended
 # failed, blocked or flaky, taken only on a new build); retire[] — a row whose file is gone. At most
 # max_scenarios_per_run adoptions a night (authoring costs tokens), new and changed texts
-# before retries; the rest wait. Sets PS to
-# the worklist's `profile_scenarios` object, or `null` when profile_scenarios is disabled — not
-# printed, so its warnings reach LOGS (a command substitution would lose them).
-PS=null
+# before retries; the rest are deferred[], by name (lib/profile.sh → profile_scenario_queue).
+# Sets PS to the worklist's `profile_scenarios` object, or `null` when profile_scenarios is
+# disabled — not printed, so its warnings reach LOGS (a command substitution would lose them).
+PS=null PS_PER=3
 profile_scenarios_work() {
-  local on files rows adopt retire per n deferred
+  local on q per err l
   on="$(cfg profile_scenarios)"
   case "$on" in (''|enabled) ;; (disabled) PS=null; return;;
     (*) log "WARN: profile_scenarios '$on' is not enabled|disabled — treated as enabled";; esac
-  local err l
   mkdir -p "$WORK/.cache" && err="$(mktemp "$WORK/.cache/profile-scenarios.XXXXXX")" || err=/dev/null
-  files="$(profile_scenarios 2>"$err" | jq -R 'split("\t") | {slug: .[0], spec_hash: .[1]}' | jq -sc .)"
+  q="$(profile_scenario_queue "$WORK/SCENARIOS.md" 2>"$err")"
   while IFS= read -r l; do [ -n "$l" ] && log "WARN: $l"; done < "$err"
   [ "$err" = /dev/null ] || rm -f "$err"
-  rows="$(table_rows "$WORK/SCENARIOS.md" | while IFS= read -r r; do
-      [ "$(cell "$r" 2)" = profile ] || continue
-      printf '%s\t%s\t%s\t%s\n' "$(cell "$r" 1)" "$(cell "$r" 5)" "$(cell "$r" 8)" "$(cell "$r" 7)"
-    done | jq -R 'split("\t") | {id: .[0], spec_hash: .[1], status: .[2], verdict: .[3]}' | jq -sc .)"
+  # A failed queue adopts and retires nothing tonight, and says so.
+  [ -n "$q" ] || { log "WARN: profile scenario queue failed — no adoption tonight"; q='{"files":0,"queue":[],"retire":[]}'; }
   per="$(reg max_scenarios_per_run)"; case "$per" in (''|*[!0-9]*) per=3;; esac
-  adopt="$(jq -nc --argjson f "$files" --argjson r "$rows" '
-    ($r | map({key: .id, value: .}) | from_entries) as $by
-    | [$f[] | ("P-" + .slug) as $id | $by[$id] as $row
-       | if $row == null or $row.status == "retired" then {id: $id, slug, spec_hash, kind: "new"}
-         elif $row.spec_hash != .spec_hash then {id: $id, slug, spec_hash, kind: "changed"}
-         elif $row.status == "reported" and ($row.verdict | IN("failed", "blocked", "flaky"))
-           then {id: $id, slug, spec_hash, kind: "retry"}
-         else empty end] | sort_by(.kind == "retry")')"
-  retire="$(jq -nc --argjson f "$files" --argjson r "$rows" '
-    ($f | map("P-" + .slug)) as $have | [$r[] | select(.status != "retired" and ((.id | IN($have[])) | not)) | .id]')"
-  n="$(jq length <<<"$adopt")"; deferred=0
-  if [ "$n" -gt "$per" ]; then
-    deferred=$((n - per)); adopt="$(jq -c --argjson p "$per" '.[:$p]' <<<"$adopt")"
-    log "$deferred profile scenario(s) wait for a later night (max_scenarios_per_run: $per)"
-  fi
-  PS="$(jq -nc --argjson a "$adopt" --argjson r "$retire" --argjson d "$deferred" --argjson t "$(jq length <<<"$files")" \
-    '{files:$t, adopt:$a, retire:$r, deferred:$d}')"
+  PS_PER="$per"
+  PS="$(jq -c --argjson p "$per" '{files, adopt: .queue[:$p], retire, deferred: .queue[$p:]}' <<<"$q")"
 }
 
 mode_regression() {
@@ -244,11 +226,16 @@ mode_regression() {
     fi
     # Same build, new or changed scenario texts: adopt and run those only, replay nothing else.
     replay=false; log "candidate $candidate already regression-tested — $ps_work profile scenario change(s) due"
-    ps="$(jq -c '.adopt |= map(select(.kind != "retry"))' <<<"$ps")"
+    # A retry waits for a new build: it joins deferred[], after the texts the cap held back.
+    ps="$(jq -c '.deferred = [(.deferred[] | select(.kind != "retry")), (.adopt[], .deferred[] | select(.kind == "retry"))]
+      | .adopt |= map(select(.kind != "retry"))' <<<"$ps")"
   elif [ "$(printf '%s' "$tests" | jq length)" = 0 ]; then
     # A new build, but no regression-tier test yet: only profile scenarios are due. A replay
     # with no --tag would run every file in tests/.
     replay=false; log "candidate $candidate is new, no regression-tier test yet — profile scenarios only"
+  fi
+  if [ "$ps" != null ] && [ "$(jq '.deferred | length' <<<"$ps")" -gt 0 ]; then
+    log "$(jq -r --arg p "$PS_PER" '"\(.deferred | length) profile scenario(s) deferred (max_scenarios_per_run: \($p); a retry waits for a new build): \(.deferred | map(.id) | join(", "))"' <<<"$ps")"
   fi
   drift="$(bash "$SCRIPT_DIR/check-asserts.sh" --json 2>/dev/null | jq -c '.drift // []' 2>/dev/null)" || drift='null'
   [ -n "$drift" ] || drift='null'
