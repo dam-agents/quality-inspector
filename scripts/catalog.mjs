@@ -402,9 +402,23 @@ const requests = rows(join(work, 'SCENARIOS.md')).filter(([id, , , , , , , statu
     verdict: verdict && verdict !== '-' ? verdict : null, utc: utc || null,
     title: parseCriteria(read(join(work, 'scenarios', id, `criteria-${specHash}.md`)) ?? '')?.title ?? null }))
   .sort((a, b) => String(b.utc).localeCompare(String(a.utc))).slice(0, 50);
+// The profile scenarios still to adopt (docs/scenarios.md → Profile scenarios → What waits), in
+// the nightly regression's order: id, the file's title, kind and when — `next` within
+// max_scenarios_per_run, `later` past it, `new-build` for a retry. null: switched off or unknown.
+let profileQueue = null;
+try {
+  const q = JSON.parse(execFileSync('bash', [join(HERE, 'scenarios.sh'), 'queue'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
+  if (q && Array.isArray(q.queue)) {
+    const cap = Number.isInteger(q.cap) && q.cap >= 0 ? q.cap : 3;
+    profileQueue = { cap, list: q.queue.filter((x) => x && /^P-[a-z0-9][a-z0-9-]*$/.test(String(x.id))).slice(0, 100)
+      .map((x, i) => ({ id: x.id, title: typeof x.title === 'string' ? x.title : null, kind: ['new', 'changed', 'retry'].includes(x.kind) ? x.kind : null,
+        when: x.kind === 'retry' ? 'new-build' : i < cap ? 'next' : 'later' })) };
+  }
+} catch { notes.push('profile scenario queue unavailable (scenarios.sh queue failed)'); }
 const sweepFile = newestOf('design', 'sweep.json');
 const findings = {
   requests,
+  profile_queue: profileQueue,
   focus,
   design_build: sweepFile ? readJson(sweepFile)?.build ?? null : null,
   validation: val ? { build: val.build ?? null, run: val.run ?? null, utc: val.generated_utc ?? null,

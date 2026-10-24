@@ -3,7 +3,8 @@
 # environment failures, issue and scenario runs) with their reports; the product map's hotspots; test-related
 # content only (no request text, requester, notes, explanations, lessons); escaped data; a stable
 # hash and `changed` against the published one; collections; coverage pages; drift nights; the
-# image budget; the credential and token refusal; the verifier's CATALOG.md and test_catalog checks.
+# image budget; the credential and token refusal; the verifier's CATALOG.md and test_catalog checks;
+# the profile scenarios still to adopt.
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 seed_work
@@ -16,6 +17,10 @@ printf '| utc | test | ac | build | old_hash | new_hash | basis |\n| --- | --- |
 printf '| utc | test | ac | build | runs | passes |\n| --- | --- | --- | --- | --- | --- |\n| 2026-10-11T03:30:00Z | tests/issue-42.e2e.ts | AC-1 | c3 | 3 | 2 |\n' > "$W/FLAKY.md"
 printf '# Catalog collections\n\n| collection | members |\n| --- | --- |\n| Upload | #42, S-7 AC-1 |\n' > "$W/CATALOG.md"
 echo 'LESSON-SECRET: the registry is slow' > "$W/LESSONS.md"
+# The profile's scenarios: sign-in's text changed since its row (p1), upload has no row yet.
+mkdir -p "$QI_PROFILE_DIR/scenarios"
+printf '# Sign-in\n\n## AC-1 — Owner signs in\nThen the dashboard shows\n' > "$QI_PROFILE_DIR/scenarios/sign-in.md"
+printf '# Upload a <b>file</b>\n\n## AC-1 — Upload\nThen the file is listed\n' > "$QI_PROFILE_DIR/scenarios/upload.md"
 printf '2026-10-09T03:00:00Z ERROR: environment candidate=c2\n2026-10-10T03:00:00Z ran candidate=c2 unchanged=0 relearned=0 healed=1 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n2026-10-12T03:00:00Z ran candidate=c3 unchanged=1 relearned=0 healed=0 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n' > "$W/REGRESSION.log"
 mkdir -p "$W/issues/42" "$W/scenarios/S-7" "$W/scenarios/P-sign-in" "$W/regression/c2" "$W/suite/tests" "$W/security/c1"
 cat > "$W/issues/42/criteria-abc.md" <<'C'
@@ -192,6 +197,8 @@ assert "findings: validation and stress as they are, security only counted" '.fi
   and .findings.security == {"candidate":"c1","utc":null,"counts":{"critical":0,"high":2,"medium":1},"report":null}' "$data"
 assert "requests on their way: id, source, state — never the requester or thread" '.findings.requests == [{"id":"S-9","source":"dashboard","status":"queued","build":null,"verdict":null,"utc":"2026-10-22T08:00:00Z","title":null},
   {"id":"S-10","source":"slack","status":"rejected","build":null,"verdict":null,"utc":"2026-10-21T08:00:00Z","title":null}]' "$data"
+assert "profile scenarios to adopt: id, the file's title, kind and when, in the nightly order" '.findings.profile_queue == {"cap":3,"list":[
+  {"id":"P-sign-in","title":"Sign-in","kind":"changed","when":"next"},{"id":"P-upload","title":"Upload a <b>file</b>","kind":"new","when":"next"}]}' "$data"
 assert "a focus run, its checks without their notes" '.findings.focus == [{"run":"upload-c3","area":"Upload","build":"c3","utc":null,"checks":[{"id":"FX-1","heuristic":"negative-path","given":null,"when":null,"expected":"refused visibly","verdict":"observation","severity":"minor"}]}]' "$data"
 assert "areas for a focus" '.areas | index("projects") != null and index("files") != null' "$data"
 assert "coverage pages" '[.pages[] | {pattern, covered, nav}] | (map(select(.pattern == "/projects"))[0] == {"pattern":"/projects","covered":"regression","nav":"Projects"})

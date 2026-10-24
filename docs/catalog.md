@@ -32,12 +32,15 @@ The operator may share the page beyond themselves, so it carries only what conce
   the items that reach that page.
 - **Activity** (Overview, as of the page's build): the environment lock's holder and since (never
   its session), the `work/QA.md` rows `in_progress` or `report_pending`, the labelled open issues
-  with no row yet or carrying `retest_label` (unknown, not empty, when the listing failed), the queued scenario requests, the time budget
+  with no row yet or carrying `retest_label` (unknown, not empty, when the listing failed), the queued scenario requests,
+  the profile scenarios still to adopt (`scenarios.sh queue`: id, the file's `# ` title, kind, and
+  when — the next night within `max_scenarios_per_run`, a later night past it, a retry on a new
+  build; `null` with `profile_scenarios: disabled`), the time budget
   (`max_wallclock_min_per_issue`), each schedule's name, switch and cron from
   `work/schedules.json`, and the last 14 days of runs drawn from the runs above.
 - **Requests:** the scenarios still queued, running, awaiting delivery or rejected — id,
   source, state, the frozen title, the build and verdict once there are any, the time of the
-  row's last update; never the request's words.
+  row's last update; never the request's words. Under them, every profile scenario still to adopt, as in Activity.
 - **Control center:** every module's state, settings, schedule and last run (`modules.sh
   status`), the focus queue and the areas; the design findings register with each finding's crop
   ([ui-sweep.md](ui-sweep.md)); the newest validation results and stress checks; of the newest

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # The profile's scenarios/: scenarios.sh adopt (verbatim copy per spec_hash, P-<slug> rows) and
-# the regression pre-flight's profile_scenarios (new, changed, retired, the nightly cap).
+# the regression pre-flight's profile_scenarios (new, changed, retired, the nightly cap, deferred[]
+# by name), and scenarios.sh queue (the same order, with titles).
 . "$(dirname "$0")/lib.sh"
 seed_work
 sc="$QI_PROFILE_DIR/scenarios"; mkdir -p "$sc"
@@ -73,10 +74,18 @@ for i in 1 2 3 4; do printf '# S%s\n' "$i" > "$sc/extra-$i.md"; done
 echo '- max_scenarios_per_run: 2' >> "$WORK_DIR/CONFIG.md"
 echo '- regression_channel: C0123ABCD' >> "$WORK_DIR/CONFIG.md"
 out="$(bash "$SCRIPTS/preflight.sh" regression)"
-assert "at most max_scenarios_per_run adoptions, the rest deferred" '(.profile_scenarios.adopt | length) == 2 and .profile_scenarios.deferred == 4 and .channel == "C0123ABCD"' "$out"
+assert "at most max_scenarios_per_run adoptions, the rest deferred by name: texts first, then the retry" '(.profile_scenarios.adopt | map(.id)) == ["P-extra-1","P-extra-2"]
+  and (.profile_scenarios.deferred | map(.id + ":" + .kind)) == ["P-extra-3:new","P-extra-4:new","P-sign-in:new","P-create-agent:retry"]
+  and (.logs | map(select(test("4 profile scenario\\(s\\) deferred \\(max_scenarios_per_run: 2; .*\\): P-extra-3, P-extra-4, P-sign-in, P-create-agent$"))) | length) == 1
+  and .channel == "C0123ABCD"' "$out"
+q="$(bash "$SCRIPTS/scenarios.sh" queue)"
+assert "queue: the same order, with each file's title and the cap" '.cap == 2 and .files == 6
+  and (.queue | map(.id)) == ["P-extra-1","P-extra-2","P-extra-3","P-extra-4","P-sign-in","P-create-agent"]
+  and (.queue[0] | .title == "S1" and .kind == "new") and (.queue[4].title == "Sign-in again") and .retire == []' "$q"
 echo '- profile_scenarios: disabled' >> "$WORK_DIR/CONFIG.md"
 echo "2026-10-02T03:00:00Z ran candidate=0.0.0-main.bbb2222 unchanged=1" >> "$WORK_DIR/REGRESSION.log"
 out="$(bash "$SCRIPTS/preflight.sh" regression)"
 assert "disabled: no profile scenarios, same build -> idle" '.nothing_to_do == true' "$out"
 assert_eq "disabled: stdout is one JSON value" 1 "$(printf '%s' "$out" | jq -s length)"
+assert_eq "disabled: the queue is null" null "$(bash "$SCRIPTS/scenarios.sh" queue)"
 exit $FAILED

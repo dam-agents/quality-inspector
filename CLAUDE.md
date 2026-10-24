@@ -41,7 +41,7 @@ Worklist keys → procedure:
 - `issues_due[]` (`issue`, `ac_hash`, `kind` first|retest|ac_changed|takeover, `has_done_when`,
   `author_association`, `spec` lint incl. `injection_suspect`), plus `candidate` / `baseline` → [docs/issue-qa.md](docs/issue-qa.md).
 - `reports_due[]` (`issue`) — a finished report whose delivery failed → [docs/reporting.md](docs/reporting.md).
-- `regression` mode: `tests[]`, `assert_drift[]`, `candidate`, `previous_candidate`, `replay`, `profile_scenarios` (the profile's `scenarios/` to adopt or retire), `channel`, `confirm_regressions`, `bisect_max_steps` → [docs/regression.md](docs/regression.md).
+- `regression` mode: `tests[]`, `assert_drift[]`, `candidate`, `previous_candidate`, `replay`, `profile_scenarios` (the profile's `scenarios/` to adopt, retire or defer), `channel`, `confirm_regressions`, `bisect_max_steps` → [docs/regression.md](docs/regression.md).
 - `audit`: `checks[]`, `failures[]`, `stats` → [docs/audit.md](docs/audit.md); `benchmark`: `cases` → [docs/benchmark.md](docs/benchmark.md);
   `modules`: `modules_due[]`, `focus[]`, `candidate`, `baseline`, `previous`, `inventory`, `max_wallclock_min` → [docs/modules.md](docs/modules.md).
 - `security`: `candidate`, `inventory`, `roles[]`, `deployment_checks` → [docs/security.md](docs/security.md); findings go to a private artifact only, never a comment.
