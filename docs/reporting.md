@@ -108,7 +108,7 @@ re-run. Never retry within the same run.
 1. **Artifact** (`artifact_reports: enabled`): an artifact is **one file** — a viewer never
    gets `media/`, so a relative `media/<name>` link answers 404. First make the page one file
    with `node "$HOME/scripts/report-media.mjs"` (its header has the contract), then publish
-   `<dir>/publish.html` — never `index.html` — through `create_artifact_upload_url`:
+   `<dir>/publish.html` — never a page with `media/` links — through `create_artifact_upload_url`:
    - **A public report** (below, or a Slack thread's): `report-media.mjs list <dir>`; each
      file with `url: null` becomes an artifact of its own — upload it, `create_artifact` with
      `visibility: public` and its `file_name`, then `report-media.mjs set <dir> <path>

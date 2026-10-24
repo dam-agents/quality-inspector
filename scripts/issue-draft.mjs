@@ -12,8 +12,8 @@
 //
 // The draft: title.txt (one line), body.md (Markdown with the hidden marker
 // `<!-- <marker_prefix>-found refs="<ref>; <ref>" build=<b> -->` and the literal EVIDENCE_LINK where the
-// evidence page's link goes), draft.json ({refs, build, labels, problems}), and evidence/ — a
-// self-contained index.html with media/ beside it, to publish as an artifact. Several refs are one
+// evidence page's link goes), draft.json ({refs, build, labels, problems}), and evidence/ — an
+// index.html with media/ beside it; report-media.mjs makes the one file that is published. Several refs are one
 // issue: one section per problem, one "Done when" for all. A ref the work/ state does not know is
 // named in `missing` and left out (exit 2 when none is left); one already in work/FOUND.md is named
 // in `already`. What it copies is data the agent judged — an issue's criteria, a test's steps, the
