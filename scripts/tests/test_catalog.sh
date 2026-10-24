@@ -177,6 +177,10 @@ assert_eq "no command opens a report" 000 "$cmd"
 kinds="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
 process.stdout.write([/^function goLink\(/m, /^const extLink = /m, /class: .btn agent., type: .button., .data-kind.: .agent./, /^const prepBtn = /m, /^function showTip\(/m].map((re)=>re.test(s)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "the viewer: go links, new-tab links, agent commands, prepared commands, tooltips" 11111 "$kinds"
+# A link to another site opens by the page's script, also in a frame; with no new tab, a box shows the address.
+ext="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
+process.stdout.write([/^function openExt\(/m, /window\.open\(href, ._blank.\)/, /^\s*linkBox\(href\);/m, /document\.addEventListener\(.click., \(e\) => \{\n\s*if \(e\.defaultPrevented/].map((re)=>re.test(s)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "the viewer opens a link to another site by its script, else shows its address" 1111 "$ext"
 # Day / night (docs/catalog.md → Day / night): the system's dark tokens and the switch's dark tokens are the same set.
 dark="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
 const sys=(s.match(/@media \(prefers-color-scheme:dark\)\{:root:not\(\[data-theme=light\]\)\{([^}]*)\}\}/)||[])[1];

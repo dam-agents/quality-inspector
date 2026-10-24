@@ -87,7 +87,8 @@ The operator may share the page beyond themselves, so it carries only what conce
   issue #42 …").
 - **One kind of control, one look.** Blue with → goes to another view of the page, with ▯ opens a
   panel, with ⌖ a page of the product map; teal with ↗ opens another site in a new tab (GitHub, a
-  report's link); violet with the agent's mark is a message for the agent — it never sends: it opens the box at
+  report's link) — by the page's own script, as the page is often drawn in a frame where a plain link
+  stays and the other site refuses to load; when no tab opens, a teal box shows the address to copy; violet with the agent's mark is a message for the agent — it never sends: it opens the box at
   the bottom, which names what the agent then does, shows the exact message, and sends it only on
   its own "Send to the agent" (beside the agent's chat; else "Copy"), Esc or Cancel closes it with
   nothing sent (dashed: takes your input first); grey changes only this page in this browser (filters, sorting,
