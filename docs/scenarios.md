@@ -79,7 +79,7 @@ Classify each message; several intents → handle each, then send **one** reply:
 ## A request from the dashboard
 
 The dashboard's Product map lets a person ask for a test of a page or one of its controls,
-in their own words ([catalog.md](catalog.md)); its button sends
+in their own words ([catalog.md](catalog.md)); its box at the bottom sends
 `test this scenario: On the page <pattern>, the <control kind> "<name>": <their words>`.
 
 - **The operator's own press** is their chat message: source `operator`, answered here.

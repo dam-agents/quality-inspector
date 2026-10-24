@@ -16,7 +16,7 @@ printf '| utc | test | ac | build | old_hash | new_hash | basis |\n| --- | --- |
 printf '| utc | test | ac | build | runs | passes |\n| --- | --- | --- | --- | --- | --- |\n| 2026-10-11T03:30:00Z | tests/issue-42.e2e.ts | AC-1 | c3 | 3 | 2 |\n' > "$W/FLAKY.md"
 printf '# Catalog collections\n\n| collection | members |\n| --- | --- |\n| Upload | #42, S-7 AC-1 |\n' > "$W/CATALOG.md"
 echo 'LESSON-SECRET: the registry is slow' > "$W/LESSONS.md"
-printf '2026-10-09T03:00:00Z ERROR: environment candidate=c2\n2026-10-10T03:00:00Z ran candidate=c2 unchanged=0 relearned=0 healed=1 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n2026-10-12T03:00:00Z ran candidate=c3 unchanged=1 relearned=0 healed=0 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n' > "$W/REGRESSION.log"
+printf '2026-10-09T03:00:00Z ERROR: environment candidate=c2\n2026-10-10T03:00:00Z ran candidate=c2 unchanged=0 relearned=0 healed=1 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n2026-10-12T02:10:00Z due candidate=c3 tests=1\n2026-10-12T03:00:00Z ran candidate=c3 unchanged=1 relearned=0 healed=0 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n' > "$W/REGRESSION.log"
 mkdir -p "$W/issues/42" "$W/scenarios/S-7" "$W/scenarios/P-sign-in" "$W/regression/c2" "$W/suite/tests" "$W/security/c1"
 cat > "$W/issues/42/criteria-abc.md" <<'C'
 # #42 — Rename <b>projects</b>
@@ -61,7 +61,7 @@ cat > "$W/regression/c2/verdicts.json" <<'J'
 J
 printf '# S-7 — upload a <i>large</i> file\n\n## AC-1 — the upload finishes\nGiven a 50 MB file\nWhen the owner uploads it\nThen it is listed\nsurface: ui\ntestable: yes\n' > "$W/scenarios/S-7/criteria-s1.md"
 echo 'REQUEST-SECRET please test the upload, my boss asked' > "$W/scenarios/S-7/request.md"
-echo '{"scenario":"S-7","candidate":"c1","generated_utc":"2026-10-04T10:00:00Z","acs":[{"id":"AC-1","verdict":"passed"}],"notes":["NOTE-SECRET"]}' > "$W/scenarios/S-7/verdicts-s1-c1.json"
+echo '{"scenario":"S-7","candidate":"c1","started_utc":"2026-10-04T09:45:00Z","generated_utc":"2026-10-04T10:00:00Z","cost_usd":1.234,"acs":[{"id":"AC-1","verdict":"passed"}],"notes":["NOTE-SECRET"]}' > "$W/scenarios/S-7/verdicts-s1-c1.json"
 echo 'https://claude.ai/artifact/s7' > "$W/scenarios/S-7/artifact.id"
 echo '{"candidate":"c1","counts":{"critical":0,"high":2,"medium":1},"findings":[{"id":"SEC-SECRET","explanation":"SEC-SECRET recipe"}]}' > "$W/security/c1/verdicts.json"
 # A report's share link (docs/reporting.md → Delivery step 1): the night's links; the security run's never.
@@ -120,6 +120,8 @@ printf '| 57 | def | c4 | b1 | - | in_progress | 2026-10-22T19:50:00Z |\n| 67 | 
 echo '{"taken_utc":"2026-10-22T15:00:00Z","schedules":{"quality-inspector-issues-1h":{"enabled":true,"cron":"7 * * * *","task":"TASK-SECRET"},"quality-inspector-audit-weekly":{"enabled":null,"cron":"0 7 * * 5"},"other-agent-job":{"enabled":true,"cron":"0 1 * * *"}}}' > "$W/schedules.json"
 
 mkdir -p "$W/catalog/thumbs"; echo old > "$W/catalog/thumbs/issue-99-ac-1.jpg"
+printf '%s\n' '{"ts":"2026-10-02T14:05:00Z","run":"r","job":"issues","level":"info","event":"issue_done","msg":"issue=42 verdict=partial minutes=37 model_steps=120"}' \
+  '{"ts":"2026-10-02T14:06:00Z","run":"r","job":"issues","level":"info","event":"issue_done","msg":"issue=420 verdict=failed minutes=5 model_steps=9"}' > "$W/logs/events-2026-10-02.jsonl"
 out="$(node "$SCRIPTS/catalog.mjs")"; rc=$?
 assert_eq "catalog exits 0" 0 "$rc"
 assert "summary" '.items == 5 and .changed == true and (.hash | test("^[0-9a-f]{12}$")) and (.thumbnails | test("none due|unavailable")) and .notes == []' "$out"
@@ -136,6 +138,10 @@ assert_eq "the viewer's script parses" 0 "$?"
 nav="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
 process.stdout.write([/history\[push \? .pushState. : .replaceState.\]/, /addEventListener\(.popstate./, /^function back\(\)/m, /^function originDrawer\(/m, /onclick: back \}/].map((re)=>re.test(s)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "the viewer: history steps, popstate, back, the origin panel" 11111 "$nav"
+# Nothing goes to the agent but from the box at the bottom: one sendPrompt call, inside askAgent.
+send="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const calls=[...s.matchAll(/\.sendPrompt\(/g)].length;
+const box=(s.match(/^function askAgent\([\s\S]*?^}$/m)||[""])[0];process.stdout.write(`${calls}:${(box.match(/\.sendPrompt\(/g)||[]).length}`)' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "the viewer sends to the agent only from the box" "1:1" "$send"
 # A filter of a view refines the place: the run-type chips and a picked map control add no history step.
 refine="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
 process.stdout.write([/go\(\{ rt: /.test(s), /go\(\{ hs: /.test(s), /onclick: \(\) => pickRt\(k\)/.test(s), /pickHs\(S\.hs === k/.test(s)].map((x)=>x?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
@@ -178,6 +184,8 @@ assert "profile scenario item" '.items[] | select(.key == "profile-sign-in/AC-1"
 assert "nights and builds" '(.nights | length) == 2 and .nights[0].counts.healed == 1 and ([.builds[].id] | index("c3")) != null' "$data"
 assert "runs: newest first; nights, an environment failure, issue and scenario runs" '[.runs[] | .type + ":" + (.ref // "-") + ":" + .build + ":" + .verdict]
   == ["regression:-:c3:unchanged","regression:-:c2:healed","regression:-:c2:environment","scenario:S-7:c1:passed","issue:#42:c1:partial"]' "$data"
+assert "a run's length: a night from its due line, an issue run from issue_done, a scenario from its file with its cost" '[.runs[] | [.secs, .cost_usd]]
+  == [[3000,null],[null,null],[null,null],[900,1.23],[2220,null]]' "$data"
 assert "a night: its entries, change context and signal counts, its report" '.runs[1] | .entries == [{"key":"issue-42/AC-1","value":"healed"}] and .previous == "c1"
   and .issues == [{"number":40,"title":"Projects get tabs"}] and (.ui_diff | test("To-dos")) and .signals == {"console_errors_new":1,"slow_tests":0} and .report == "https://share.example/a/Night2Slug" and .counts.healed == 1' "$data"
 assert "an issue run: its verdicts and report; a scenario run: its link" '(.runs[4] | .entries == [{"key":"issue-42/AC-1","value":"verified"},{"key":"issue-42/AC-2","value":"not-testable"},{"key":"issue-42/EX-1","value":"observation"}]
