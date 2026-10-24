@@ -753,7 +753,7 @@ TITLE_JQ='
   def on: (.candidate | safe) as $c | if $c then " on " + $c else "" end;
   def count(n; one): (n | tostring) + " " + one + (if n == 1 then "" else "s" end);
   def some(xs): if xs == [] then "" else " (" + (xs | join(", ")) + ")" end;
-  def few: if length > 3 then .[:3] + ["+" + ((length - 3) | tostring) + " more"] else . end | join(" · ");
+  def few($none): if . == [] then $none elif length > 3 then .[:3] + ["+" + ((length - 3) | tostring) + " more"] | join(" · ") else join(" · ") end;
   def runname: {issues: "Issues run", regression: "Regression run", discovery: "Scenario discovery",
               audit: "Weekly audit", benchmark: "Benchmark run", security: "Security run",
               modules: "Modules run"}[.mode] // "Pre-flight";
@@ -763,13 +763,13 @@ TITLE_JQ='
     elif (.error // "") != "" then runname + ": pre-flight error"
     elif .mode == "slack" then null
     elif .nothing_to_do == true then runname + ": nothing to do"
-    elif .mode == "issues" then
+    elif .mode == "issues" then runname as $run |
       ([(.issues_due // [])[] | issue as $i
          | ({retest: "Retest ", ac_changed: "Retest ", takeover: "Resume "}[.kind] // "Test ") + $i
            + (if .kind == "ac_changed" then " (ACs changed)" else "" end)]
        + [(.reports_due // [])[] | "Deliver report for " + issue]
        + [(.scenarios_due // [])[] | (.id | safe) as $s | select($s)
-         | ({takeover: "Resume ", report: "Deliver report for "}[.kind] // "Test ") + "scenario " + $s]) | few
+         | ({takeover: "Resume ", report: "Deliver report for "}[.kind] // "Test ") + "scenario " + $s]) | few($run)
     elif .mode == "regression" then
       "Run regression" + on + some(
         (if .replay then [count(.tests | length; "test")] else [] end)
