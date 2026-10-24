@@ -153,6 +153,16 @@ const t=[`test this scenario: On the page /projects/:id, the button "Save": ${w}
   `test this scenario: On the page /x: ${w}\u0007`, `test this scenario: On the page /x: ${"a".repeat(2001)}`];
 process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "a scenario request: the composed shape only, bounded, no control characters" 1100000 "$scen"
+# The Test builder's steps go out as that scenario request, or as the operator's live walk in the same
+# bounded shape (docs/catalog.md → Test builder, docs/on-demand.md → "walk these steps live").
+walk="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const re=eval(s.match(/^const WALK_RE = (\/.*\/);$/m)[1]);
+const sc=eval(s.match(/^const SCEN_RE = (\/.*\/);$/m)[1]);
+const w="1. Open: /agents\n2. Do: Click the button \"Send\"\n3. Check: The chat shows the message";
+const t=[`walk these steps live: On the page /agents: ${w}`, `walk these steps live: On the page /agents, the button "Send": ${w}`, "walk these steps live: On the page /: short",
+  `walk these steps live: On the page /x: ${w}\u0007`, `walk these steps live: On the page https://x.example/: ${w}`, `walk these steps live: On the page /x: ${"a".repeat(2001)}`];
+process.stdout.write(t.map((x)=>re.test(x)?1:0).join("") + (sc.test(`test this scenario: On the page /agents: ${w}`)?1:0)
+  + [/allowed = \(t\) => CMD_RE\.test\(t\) \|\| SCEN_RE\.test\(t\) \|\| WALK_RE\.test\(t\);/, /\[.builder., .Test builder., /, /builder: viewBuilder \}/].map((r)=>r.test(s)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "the Test builder: its walk command bounded like a request, its steps a scenario request, the view drawn" 1000001111 "$walk"
 # A report opens only by its own link: the page never asks the agent to open one (docs/catalog.md → Content).
 cmd="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const re=eval(s.match(/^const CMD_RE = (\/.*\/);$/m)[1]);
 process.stdout.write([re.test("open the report abc123"), /open the report/.test(s), /sendPrompt\(c\)/.test(s)].map((x)=>x?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"

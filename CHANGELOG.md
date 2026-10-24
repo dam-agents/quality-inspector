@@ -15,6 +15,11 @@ list of the waiting scenarios (the same shape as `adopt[]`), not a count; the ni
 them, `scenarios.sh queue` prints the whole adoption queue, and the next catalog build
 ([docs/catalog.md](docs/catalog.md) → Build and publish) shows it under Activity and Requests.
 
+Nothing to run — the next catalog build ([docs/catalog.md](docs/catalog.md) → Build and publish) ships
+the Test builder view. It sends the existing scenario request shape, and one new operator command,
+`walk these steps live: …` ([docs/on-demand.md](docs/on-demand.md)); the live part needs `live_browser`
+([docs/test-authoring.md](docs/test-authoring.md) → Watching live), else the walk runs headless.
+
 ## 3.22.0 — 2026-10-24
 
 **Upgrade:**

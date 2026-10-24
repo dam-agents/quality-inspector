@@ -102,7 +102,7 @@ Markdown" for the design team), Runs, Product map (the page shots with every con
 its tests' worst verdict, dashed where no test names it; a drawn outline where a shot did not fit; a
 navigation item, tab, link or list row that leads to a mapped page opens that page, like a
 click-through wireframe, with a "back" to the page before), Catalog, Gallery, Coverage,
-History (item × build) and Lifecycle, plus a detail panel per item, per run and per origin (an
+History (item × build), Lifecycle and Test builder (below), plus a detail panel per item, per run and per origin (an
 issue's or a scenario's criteria and explorations, every run that judged them, its report).
 
 **Links and navigation.** Every reference is a link to its place: an issue or a scenario
@@ -136,10 +136,44 @@ of every view with one command, `create issue for <ref>, <ref>…` (at most 20),
 architect variant. The selection is the viewer's own, kept in their browser. A problem an issue
 was opened for shows that issue's link everywhere it appears, and the flag "issue created". It can be copied; on an
 interactive page opened beside the agent's chat its button sends it as the operator's message.
-The one exception is **Ask for a test** on the Product map: a scenario request built from the
-page's pattern, the control's kind and name, and the person's own words, in the one shape of
-[scenarios.md](scenarios.md) → **A request from the dashboard**. A shared viewer may send only
-this one; the agent takes their words as data.
+The one exception is **Ask for a test** on the Product map and in the Test builder: a scenario
+request built from the page's pattern, the control's kind and name, and the person's own words
+(or steps), in the one shape of [scenarios.md](scenarios.md) → **A request from the dashboard**. A
+shared viewer may send only this one; the agent takes their words as data. The Test builder's
+other command, `walk these steps live: …`, has the same bounded shape and is the operator's only
+([on-demand.md](on-demand.md)).
+
+## Test builder
+
+A view where a person writes a new test as steps and sees them before anyone runs them:
+
+- **Steps**, four kinds: 🏁 Given (the state at the start), 🧭 Open (a path), 👆 Do (one action of a
+  user, a control named in quotes: `Click the button "Save"`), ✅ Check (the result they expect).
+  **Blocks** — one card a step, a kind, a field; drag or ↑ ↓ to reorder — or **Text**, one step a
+  line (`Open: /projects`, `Do: …`, `Check: …`, `Given: …`, `Name: …`; a bare line is a Do). Both
+  show the same draft, at most 30 steps, kept in the viewer's browser only.
+- **Start** empty, from a test case (its panel's "Change these steps in the Test builder", or the
+  picker: its Given, the pages it opens, its `agent.act` and `agent.assert` words, its Then), or
+  from a page or a control of the Product map ("Build a test from here"). A new start keeps the
+  draft before it for "Restore", in memory.
+- **Preview on the product map:** each step on its page's shot of the newest UI map (its outline
+  where there is no shot). An Open step goes to the page its path matches; a Do step marks the
+  control it names — in quotes first, else by its name — and a control that leads to a mapped page
+  moves the next step there. Play shows the steps one after the other; a film strip opens any one.
+  **Add steps with clicks** shows the page where the next step happens with every control as a
+  button: a click writes that control's Do step after the current one (or into an empty Do), so a
+  person clicks a flow through like a wireframe. The preview is the map, not the product: a page
+  not on the map, or a control without a name there, shows as text.
+- **Give the steps to the agent**, once there is an Open or Do step and a Check, within 2000
+  characters — the steps numbered, one a line, after the start page (the first Open step's map
+  pattern, else `/`):
+  - **Ask for this test** — `test this scenario: On the page <pattern>: Name: …
+1. Open: …
+2. Do: …`:
+    the scenario request above, for anyone who sees the page.
+  - **Do the steps live in the Browser Panel** — `walk these steps live: On the page <pattern>: …`,
+    the operator's ([on-demand.md](on-demand.md)): the agent does the steps on the product that is
+    up, live in the Browser Panel, and says per step what it did and saw. No verdict, report or test.
 
 ## Build and publish
 
