@@ -744,16 +744,64 @@ boundary_gate() {
   return 1
 }
 
-case "$MODE" in (slack|benchmark|security|issues|regression|discovery|modules) boundary_gate || exit 0;; esac
+# ========================================================= SESSION TITLE ====
+# `title`: the name the run gives its session (docs/logging.md → Session titles), `<Verb>
+# <object>` from issue numbers, scenario and module ids, build versions and counts alone —
+# never from an issue's or a message's text. A Slack turn names its own (docs/slack.md).
+TITLE_JQ='
+  def safe: if type == "string" and test("^[A-Za-z0-9][A-Za-z0-9._+-]{0,39}$") then . else null end;
+  def on: (.candidate | safe) as $c | if $c then " on " + $c else "" end;
+  def count(n; one): (n | tostring) + " " + one + (if n == 1 then "" else "s" end);
+  def some(xs): if xs == [] then "" else " (" + (xs | join(", ")) + ")" end;
+  def few: if length > 3 then .[:3] + ["+" + ((length - 3) | tostring) + " more"] else . end | join(" · ");
+  def runname: {issues: "Issues run", regression: "Regression run", discovery: "Scenario discovery",
+              audit: "Weekly audit", benchmark: "Benchmark run", security: "Security run",
+              modules: "Modules run"}[.mode] // "Pre-flight";
+  def issue: .issue | numbers | "issue #" + tostring;
+  . + {title: ((
+    if (.boundary_breach // []) != [] then "Report black-box breach"
+    elif (.error // "") != "" then runname + ": pre-flight error"
+    elif .mode == "slack" then null
+    elif .nothing_to_do == true then runname + ": nothing to do"
+    elif .mode == "issues" then
+      ([(.issues_due // [])[] | issue as $i
+         | ({retest: "Retest ", ac_changed: "Retest ", takeover: "Resume "}[.kind] // "Test ") + $i
+           + (if .kind == "ac_changed" then " (ACs changed)" else "" end)]
+       + [(.reports_due // [])[] | "Deliver report for " + issue]
+       + [(.scenarios_due // [])[] | (.id | safe) as $s | select($s)
+         | ({takeover: "Resume ", report: "Deliver report for "}[.kind] // "Test ") + "scenario " + $s]) | few
+    elif .mode == "regression" then
+      "Run regression" + on + some(
+        (if .replay then [count(.tests | length; "test")] else [] end)
+        + ((.profile_scenarios // {}) | ((.adopt // []) + (.retire // [])) | length
+           | if . > 0 then [count(.; "profile scenario")] else [] end))
+    elif .mode == "discovery" then "Discover scenarios" + on + (if .discovery == "propose" then " (propose only)" else "" end)
+    elif .mode == "security" then "Run security checks" + on
+    elif .mode == "modules" then
+      "Run modules" + on + some([(.modules_due // [])[] | safe | select(.)]
+        + ((.focus // []) | length | if . > 0 then [count(.; "focus area")] else [] end))
+    elif .mode == "benchmark" then "Run benchmark" + some([.cases | numbers | count(.; "case")])
+    elif .mode == "audit" then "Run weekly audit"
+    else runname end) | if type == "string" then .[:200] else . end)}'
 
-case "$MODE" in
-  slack)      mode_slack ;;
-  benchmark)  mode_benchmark ;;
-  security)   mode_security ;;
-  modules)    mode_modules ;;
-  issues)     mode_issues ;;
-  regression) mode_regression ;;
-  discovery)  mode_discovery ;;
-  audit)      mode_audit ;;
-  *)          fail_out "unknown mode: $MODE" ;;
-esac
+main() {
+  case "$MODE" in (slack|benchmark|security|issues|regression|discovery|modules) boundary_gate || exit 0;; esac
+
+  case "$MODE" in
+    slack)      mode_slack ;;
+    benchmark)  mode_benchmark ;;
+    security)   mode_security ;;
+    modules)    mode_modules ;;
+    issues)     mode_issues ;;
+    regression) mode_regression ;;
+    discovery)  mode_discovery ;;
+    audit)      mode_audit ;;
+    *)          fail_out "unknown mode: $MODE" ;;
+  esac
+}
+
+OUT="$(main)"
+RC=$?
+TITLED="$(jq -c "$TITLE_JQ" <<<"$OUT" 2>/dev/null)" && [ -n "$TITLED" ] && OUT="$TITLED"
+printf '%s\n' "$OUT"
+exit "$RC"
