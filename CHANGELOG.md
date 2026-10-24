@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.23.0 — 2026-10-24
+## 3.24.0 — 2026-10-24
 
 **Upgrade:**
 1. A report is now published as one file: `scripts/report-media.mjs` makes `publish.html` from the
@@ -19,6 +19,14 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 2. A verdicts file now carries `started_utc` (and `cost_usd` when the platform states the cost;
    [docs/reporting.md](docs/reporting.md) → Verdicts file): write them from the next run on. Older
    runs show their length from the logs, or none. The next catalog build ships the page.
+
+## 3.23.0 — 2026-10-24
+
+**Upgrade:**
+Nothing to run — the next catalog build ([docs/catalog.md](docs/catalog.md) → Build and publish) ships
+the Test builder view. It sends the existing scenario request shape, and one new operator command,
+`walk these steps live: …` ([docs/on-demand.md](docs/on-demand.md)); the live part needs `live_browser`
+([docs/test-authoring.md](docs/test-authoring.md) → Watching live), else the walk runs headless.
 
 ## 3.22.0 — 2026-10-24
 
