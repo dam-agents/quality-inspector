@@ -181,6 +181,12 @@ assert_eq "the viewer: go links, new-tab links, agent commands, prepared command
 ext="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
 process.stdout.write([/^function openExt\(/m, /window\.open\(href, ._blank.\)/, /^\s*linkBox\(href\);/m, /document\.addEventListener\(.click., \(e\) => \{\n\s*if \(e\.defaultPrevented/].map((re)=>re.test(s)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "the viewer opens a link to another site by its script, else shows its address" 1111 "$ext"
+# Day / night (docs/catalog.md → Day / night): the system's dark tokens and the switch's dark tokens are the same set.
+dark="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
+const sys=(s.match(/@media \(prefers-color-scheme:dark\)\{:root:not\(\[data-theme=light\]\)\{([^}]*)\}\}/)||[])[1];
+const pick=(s.match(/:root\[data-theme=dark\]\{([^}]*)\}/)||[])[1];
+process.stdout.write(sys&&pick&&sys.includes("--bg:")&&sys===pick?"same":"differ")' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "the viewer: the dark colours of the system and of the switch are the same" same "$dark"
 assert "activity: lock without its session, rows on their way, waiting issues, own schedules only" '.activity.lock == {"owner":"issues","since":"2026-10-22T19:35:00Z"}
   and ([.activity.issues[] | {issue, status, build}] == [{"issue":57,"status":"in_progress","build":"c4"},{"issue":67,"status":"in_progress","build":"c4"}])
   and .activity.budget_min == 150

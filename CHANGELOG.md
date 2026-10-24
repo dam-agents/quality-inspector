@@ -7,11 +7,17 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.25.1 — 2026-10-24
+## 3.26.1 — 2026-10-24
 
 **Upgrade:**
 Nothing to run. A link to another site on the catalog (a report, GitHub) now opens in a new tab also
 when the page is drawn in a frame, or shows its address to copy. The next catalog build ships the page.
+
+## 3.26.0 — 2026-10-24
+
+**Upgrade:**
+Nothing — the next catalog build ([docs/catalog.md](docs/catalog.md) → Build and publish) ships the
+header with wrapped tabs, the day / night switch and a side panel that changes width by drag.
 
 ## 3.25.0 — 2026-10-24
 
