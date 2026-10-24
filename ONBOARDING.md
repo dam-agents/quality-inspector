@@ -18,7 +18,7 @@ if [ -f "$HOME/.quality-inspector-onboarded" ]; then
 fi
 ```
 
-Sentinel exists → **stop here**.
+Sentinel exists → **stop here**. Otherwise name the session ([docs/logging.md](docs/logging.md) → **Session titles**).
 
 ## Two ways in
 

@@ -3,7 +3,7 @@
 Read on every Slack turn. A Slack turn is framed by the platform's `<how-to-respond>` block;
 the policy hook reads that frame and treats the turn as non-direct
 ([persistence.md](persistence.md) → **Scheduled or direct session**). `read_thread` first —
-you remember nothing; the thread is the state.
+you remember nothing; the thread is the state. Then name the session ([logging.md](logging.md) → **Session titles**).
 
 ## Routing
 
