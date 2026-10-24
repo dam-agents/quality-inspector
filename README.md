@@ -155,7 +155,10 @@ the screen it checks — filterable, sortable and groupable by tier, origin, ver
 label or the operator's own collections, with a gallery, a coverage map of the UI, a
 build-by-test heatmap and the promotion funnel. It is also the way into every run — each night,
 issue run and scenario run with its outcome and report — and a product map: the UI map's page
-shots with each control clickable to the tests that use it, viewable as of any past build. Every
+shots with each control clickable to the tests that use it, viewable as of any past build. Its
+Test builder lets a person write a new test as steps — blocks or text, or clicked through on the
+map's shots — play them on those shots, then ask for the test or, as the operator, have the agent
+do the steps live in the Browser Panel. Every
 issue, build, page and report on it is a link, and the browser's back (or its own ← Back) returns
 step by step. It
 holds test-related content only, so the operator may share it ([docs/catalog.md](docs/catalog.md)).
