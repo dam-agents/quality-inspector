@@ -52,8 +52,12 @@ Step 3 of the regression run ([regression.md](regression.md)), after `impact.mjs
 ([change-awareness.md](change-awareness.md)), before the replay:
 
 ```bash
-node "$HOME/scripts/maintenance.mjs" predict --build <candidate> --impact /tmp/quality-inspector-impact.json
+node "$HOME/scripts/maintenance.mjs" predict --build <candidate> --impact <ctx>/impact.json
 ```
+
+`<ctx>/impact.json` is the file that step wrote, never another run's. Exit 1 (locked, no
+`work/SUITE.md`) or 2 (no impact file, or not its JSON): log it in the run's notes, open nothing,
+and go on with the replay.
 
 It opens the `obsolete`, `moved` and `renamed` rows, basis the diff's line; which test and which
 proposal is `scripts/lib/staleness.mjs` (its header). Only recurring tests, and a control only where a
@@ -61,7 +65,8 @@ frozen block names it: a navigation step outside the blocks is the replay cache'
 with an open triage row (`needs-review`, `superseded`, `quarantined`, `fighting`) is skipped.
 For each opened `heal`, prepare `M-<k>.diff` (the block's locator only, as a heal under
 [triage.md](triage.md) → Healing rules); when it would touch a matcher, an expected value or a Then
-sentence, open the row again with `--proposal review`. The night then decides each one: the
+sentence, open the row again with `--proposal review`; a later `predict` refreshes a row's build and
+basis and keeps its proposal. The night then decides each one: the
 triage's own row of the test resolves it (`replaced` in its output), and the sweep closes the
 prediction that did not come true.
 

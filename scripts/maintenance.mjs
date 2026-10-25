@@ -23,7 +23,8 @@
 // request's words or a credential; the catalog shows it.
 // `predict` opens the predicted kinds from impact.mjs output (lib/staleness.mjs says which), basis
 // the diff's line, and skips a test that already has an open triage row (needs-review, superseded,
-// quarantined, fighting) of it. Opening such a triage row resolves the open predicted rows of the
+// quarantined, fighting) of it; it refreshes an open row's build and basis, never its proposal (the
+// agent may have opened it again as `review`). Opening such a triage row resolves the open predicted rows of the
 // same test (`replaced`): the night's triage confirmed or upgraded the prediction.
 // `sweep` resolves the open rows whose cause is gone: a drift whose file no longer drifts
 // (check-asserts.sh --json), a quarantine or a superseded test whose tier changed, a test with no
@@ -137,7 +138,8 @@ switch (cmd) {
       const open = list.filter((p) => p.state === 'open');
       if (open.some((p) => TRIAGE.includes(p.kind) && related(p.test, c.test))) { skipped.push(c.test); continue; }
       const same = open.find((p) => p.test === c.test && p.kind === c.kind);
-      if (same) { Object.assign(same, { build, basis: c.basis, proposal: c.proposal }); updated.push(same.id); continue; }
+      // The proposal stays: the agent may have opened it again as `review` (docs/maintenance.md).
+      if (same) { Object.assign(same, { build, basis: c.basis }); updated.push(same.id); continue; }
       const id = nextId(list);
       list.push({ id, test: c.test, kind: c.kind, build, basis: c.basis, proposal: c.proposal, state: 'open', opened_utc: now(), closed_utc: '-' });
       opened.push(id);

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Predicted staleness (docs/maintenance.md → Predicted from the change context): ui-diff.mjs and
 # iface-diff output through impact.mjs (the hit's type and block, a block line before a line outside)
-# into maintenance.mjs predict — a gone page, a removed or renamed or moved control inside a block, a
-# removed endpoint; a hit only outside the blocks, a tier that does not recur and a file with no
-# SUITE.md row open nothing; a second predict updates; a triage row replaces a prediction and stops
-# the next one; sweep closes a predicted break that did not happen (--unchanged, --absorbed).
+# into maintenance.mjs predict — a gone page, a removed or renamed or moved control inside a block, one
+# control in two blocks, a removed endpoint; a hit only outside the blocks, a tier that does not recur
+# and a file with no SUITE.md row open nothing; a second predict updates build and basis but keeps a
+# proposal the agent changed; a triage row replaces a prediction and stops the next one; sweep closes
+# a predicted break that did not happen (--unchanged, --absorbed).
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 seed_work
@@ -56,7 +57,10 @@ printf "// AC-1 begin\nawait screen.getByRole('button', { name: 'Export report' 
 printf "// AC-1 begin\nawait screen.getByRole('button', { name: 'Save changes' }).click();\n// AC-1 end\n// AC-2 begin\nawait expect(screen.getByText('Usage')).toBeVisible();\n// AC-2 end\n// IN-1 begin\nawait screen.getByRole('button', { name: 'Create agent' }).click();\n// IN-1 end\n" > "$T/issue-8.e2e.ts"
 # #9: a removed endpoint, called outside its block.
 printf "const r = await api.get('/api/v1/reports');\n// AC-1 begin\nexpect(r.ok).toBe(true);\n// AC-1 end\n" > "$T/issue-9.e2e.ts"
-for n in 1 2 5 8 9; do printf '| tests/issue-%s.e2e.ts | %s | regression | none | 2026-10-03T08:12:40Z |\n' "$n" "$n" >> "$W/SUITE.md"; done
+# #10: one removed control in both of its blocks -> retire; #11: one renamed control in both blocks.
+printf "// AC-1 begin\nawait screen.getByRole('button', { name: 'Save changes' }).click();\n// AC-1 end\n// AC-2 begin\nawait expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();\n// AC-2 end\n" > "$T/issue-10.e2e.ts"
+sed 's/Save changes/Export report/' "$T/issue-10.e2e.ts" > "$T/issue-11.e2e.ts"
+for n in 1 2 5 8 9 10 11; do printf '| tests/issue-%s.e2e.ts | %s | regression | none | 2026-10-03T08:12:40Z |\n' "$n" "$n" >> "$W/SUITE.md"; done
 printf '| tests/issue-3.e2e.ts | 3 | promotable | none | - |\n| tests/issue-4.e2e.ts | 4 | exploratory | none | - |\n| tests/scenario-7.e2e.ts | S-7 | quarantined | none | 2026-10-03T08:12:40Z |\n' >> "$W/SUITE.md"
 
 I="$SANDBOX/impact.json"
@@ -64,9 +68,10 @@ node "$SCRIPTS/impact.mjs" "$SANDBOX/diff.json" --iface "$SANDBOX/iface.json" "$
 i="$(cat "$I")"
 assert "impact: a hit names its type and block, and the block line wins over an earlier line outside" \
   '.impacted[] | select(.test | endswith("issue-1.e2e.ts")) | .blocks == ["AC-1","AC-2"]
-   and (.hits | map(select(.type == "renamed-likely")) | .[0] | .block == "AC-1" and .line == 5 and .inAcBlock)
-   and (.hits | map(select(.type == "renamed")) | .[0] | .block == null and .inAcBlock == false)
+   and (.hits | map(select(.type == "renamed-likely")) | map([.block, .line, .inAcBlock]) == [[null, 2, false], ["AC-1", 5, true]])
+   and (.hits | map(select(.type == "renamed")) | map([.block, .line]) == [[null, 2]])
    and (.hits | map(select(.type == "moved")) | .[0].block == "AC-2")' "$i"
+assert "impact: one hit per block a control is named in" '.impacted[] | select(.test | endswith("issue-10.e2e.ts")) | .hits | map([.block, .line]) == [["AC-1", 2], ["AC-2", 5]]' "$i"
 assert "impact: an IN block is a block" '.impacted[] | select(.test | endswith("issue-8.e2e.ts")) | .blocks == ["AC-1","AC-2","IN-1"] and (.hits | map(select(.type == "moved")) | .[0].block == "IN-1")' "$i"
 assert "impact: an interface removal has its type" '.impacted[] | select(.test | endswith("issue-9.e2e.ts")) | .hits == [{"change":"endpoint GET /api/v1/reports removed","type":"endpoint-removed","line":1,"inAcBlock":false,"block":null}]' "$i"
 
@@ -74,18 +79,22 @@ before="$(cat "$W/MAINTENANCE.md" 2>/dev/null)"
 dry="$(M predict --build c2 --impact "$I" --dry-run)"
 assert "predict: the candidates, and nothing else" '[.candidates[] | .test + ":" + .kind + ":" + .proposal] | sort == ([
   "#1 AC-1:renamed:review", "#1 AC-2:moved:heal", "#2:obsolete:rewrite", "#3:obsolete:retire",
-  "#8 AC-1:obsolete:rewrite", "#8 IN-1:moved:heal", "#9:obsolete:rewrite", "S-7 AC-1:renamed:heal"] | sort)' "$dry"
+  "#8 AC-1:obsolete:rewrite", "#8 IN-1:moved:heal", "#9:obsolete:rewrite", "S-7 AC-1:renamed:heal",
+  "#10:obsolete:retire", "#11 AC-1:renamed:heal", "#11 AC-2:renamed:heal"] | sort)' "$dry"
 assert "predict: the basis is the diff line" '.candidates[] | select(.test == "#2") | .basis == "ui-map: page /legacy removed" and .file == "tests/issue-2.e2e.ts" and .line == 1' "$dry"
 assert "predict: an interface basis" '.candidates[] | select(.test == "#9") | .basis == "iface: endpoint GET /api/v1/reports removed"' "$dry"
 assert_eq "predict --dry-run writes nothing" "$before" "$(cat "$W/MAINTENANCE.md" 2>/dev/null)"
 
 out="$(M predict --build c2 --impact "$I")"
-assert "predict: eight rows opened" '(.opened | length) == 8 and .updated == [] and .skipped == []' "$out"
-assert "the rows: open, on the build" '[.proposals[] | select(.state == "open" and .build == "c2")] | length == 8' "$(M list)"
+assert "predict: eleven rows opened" '(.opened | length) == 11 and .updated == [] and .skipped == []' "$out"
+assert "the rows: open, on the build" '[.proposals[] | select(.state == "open" and .build == "c2")] | length == 11' "$(M list)"
 assert "check: the predicted kinds are well-formed" '.ok' "$(M check)"
-out="$(M predict --build c3 --impact "$I")"
-assert "predict again: the same rows, updated" '.opened == [] and (.updated | length) == 8' "$out"
 id() { M list --open | jq -r --arg t "$1" --arg k "$2" '.proposals[] | select(.test == $t and .kind == $k) | .id'; }
+# The agent finds the S-7 repair would touch a matcher and opens it again as review (docs/maintenance.md).
+M open 'S-7 AC-1' --kind renamed --build c2 --proposal review --basis-file "$(B 'ui-map: renamed')" >/dev/null
+out="$(M predict --build c3 --impact "$I")"
+assert "predict again: the same rows, updated" '.opened == [] and (.updated | length) == 11' "$out"
+assert "predict again: build and basis refreshed, the review proposal kept" '.proposals[] | select(.test == "S-7 AC-1") | .proposal == "review" and .build == "c3" and (.basis | test("Export reports"))' "$(M list --open)"
 
 # The night's triage confirms #1 AC-1 as needs-review: its prediction is replaced, the AC-2 one is not.
 r11="$(id '#1 AC-1' renamed)"; r12="$(id '#1 AC-2' moved)"

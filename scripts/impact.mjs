@@ -9,8 +9,9 @@
 //       -> {"impacted":[{test, blocks:["AC-1",…], hits:[{change, type, line, inAcBlock, block}]}], "clear":[…]}
 // `none` stands for a UI diff that was skipped (no map of the previous build). `type`: page-removed |
 // renamed | renamed-likely | moved | removed | command-removed | flag-removed | endpoint-removed |
-// field-removed. A hit's line is the first one inside a frozen block (`block`, AC-<k> or IN-<k>), else
-// the first one; maintenance.mjs predict reads it (docs/maintenance.md).
+// field-removed. One hit per change and per frozen block it is named in (`block`, AC-<k> or IN-<k>; the
+// block's first such line), and one for its first line outside the blocks (`block: null`);
+// maintenance.mjs predict reads them (docs/maintenance.md).
 
 import { existsSync, readFileSync } from 'node:fs';
 import { blockAt, blocksOf, controlRe, esc, matchable, pageRe } from './lib/match.mjs';
@@ -75,11 +76,9 @@ for (const file of files.filter((f) => existsSync(f))) {
   const hits = [];
   for (const c of changes) {
     if (c.requires && !c.requires.test(src)) continue;
-    const at = lines.flatMap((l, i) => (c.re.test(l) ? [i] : []));
-    const line = at.find((i) => blockAt(src, i)) ?? at[0];
-    if (line === undefined) continue;
-    const block = blockAt(src, line);
-    hits.push({ change: c.what, type: c.type, line: line + 1, inAcBlock: block !== null, block });
+    const first = new Map(); // block (or null) -> its first matching line
+    lines.forEach((l, i) => { if (c.re.test(l)) { const b = blockAt(src, i); if (!first.has(b)) first.set(b, i); } });
+    for (const [block, line] of first) hits.push({ change: c.what, type: c.type, line: line + 1, inAcBlock: block !== null, block });
   }
   (hits.length ? impacted : clear).push(hits.length ? { test: file, blocks: blocksOf(src), hits } : file);
 }
