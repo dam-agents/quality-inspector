@@ -76,7 +76,7 @@ if [ "$MODELS" = 1 ]; then
   exit $any
 fi
 
-SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-benchmark-monthly quality-inspector-security-weekly quality-inspector-audit-weekly quality-inspector-scenarios-weekly quality-inspector-modules-nightly"
+SCHEDULES="quality-inspector-issues-1h quality-inspector-regression-nightly quality-inspector-benchmark-monthly quality-inspector-security-weekly quality-inspector-audit-weekly quality-inspector-scenarios-weekly quality-inspector-modules-nightly quality-inspector-radar-3h"
 KNOWN_KEYS="profile target_repo display_name qa_label retest_label marker_prefix candidate_channel
 baseline_channel issue_comments artifact_reports include_comments max_issues_per_run lock_ttl_min
 e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback profile_source_path
@@ -369,7 +369,7 @@ if [ "$LIVE" = 1 ]; then
   st="$(bash "$SCRIPT_DIR/env.sh" status 2>/dev/null)"
   printf '%s' "$st" | jq -e '.running and (.ui_http | test("^[23]"))' >/dev/null 2>&1 \
     && ok product_env "$(printf '%s' "$st" | jq -r .build)" || warn product_env "not up: $st (docs/nested-env.md)"
-  for m in issues regression discovery modules; do
+  for m in issues regression discovery modules radar; do
     out="$(bash "$SCRIPT_DIR/preflight.sh" "$m" 2>/dev/null)"
     if printf '%s' "$out" | jq -e 'type == "object"' >/dev/null 2>&1; then
       err="$(printf '%s' "$out" | jq -r '.error // empty')"

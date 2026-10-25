@@ -114,8 +114,8 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
    `work/regression/<candidate>/artifact.id`; regression runs never comment).
    The run's top verdict is `regression` if any criterion is, else `needs-review` if any
    criterion or signal is, else `healed`, `relearned` or `unchanged`. Then
-   `maintenance.mjs sweep` with the night's `unchanged`, `relearned` and `healed` tests ([maintenance.md](maintenance.md)
-   → Closing by itself).
+   `maintenance.mjs sweep` with the night's `unchanged`, `relearned` and `healed` tests and `--built`
+   ([maintenance.md](maintenance.md) → Closing by itself).
 8. Append `<ISO> ran candidate=<c> unchanged=<n> relearned=<n> healed=<n> needs_review=<n> superseded=<n> flaky=<n> regression=<n> blocked=<n> drift=<n>`
    to `work/REGRESSION.log` — the pre-flight keys "already tested" and
    `previous_candidate` on `ran candidate=`.

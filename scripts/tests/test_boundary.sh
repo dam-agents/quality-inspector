@@ -88,6 +88,16 @@ deny GET https://api.github.com/repos/acme/widgets/tarball/main
 deny GET https://api.github.com/repos/acme/widgets/zipball/main?/issues
 deny GET https://api.github.com/repos/acme/widgets/pulls/3
 deny GET https://api.github.com/repos/acme/widgets/pulls/3/files?/issues
+deny GET https://api.github.com/repos/acme/widgets/pulls/3/commits
+deny GET https://api.github.com/repos/acme/widgets/pulls/3/reviews
+deny GET https://api.github.com/repos/acme/widgets/pulls/3/comments
+deny GET https://api.github.com/repos/acme/widgets/pulls/3?x=/issues
+deny GET https://api.github.com/repos/acme/widgets/pulls?state=all&x=/issues
+deny GET https://api.github.com/repos/acme/widgets/pulls/3/issues
+allow GET https://api.github.com/repos/acme/widgets/issues?state=all&sort=updated&direction=asc&per_page=100&since=2026-10-20T00:00:00Z&page=1
+deny GET https://github.com/acme/widgets/pull/3.diff
+deny GET https://github.com/acme/widgets/pull/3.patch
+deny GET https://github.com/acme/widgets/pull/3/files
 deny GET https://api.github.com/repos/acme/widgets/commits/HEAD
 deny GET https://api.github.com/repos/acme/widgets/compare/a...b
 deny GET https://api.github.com/repos/acme/widgets/readme
@@ -237,6 +247,7 @@ cat > "$BIN/gh" <<'S'
 args="$*"
 printf '%s\n' "$args" >> "$STUB_DIR/gh.calls"
 case "$args" in
+  *'select(has("pull_request"))'*) echo 12; exit 0 ;;
   *"--jq .[0].number"*) echo 7; exit 0 ;;
   *"contents/.quality-inspector?ref=HEAD --jq"*) printf 'dir\t.quality-inspector/p\t0\n'; exit 0 ;;
   *"contents/.quality-inspector/p?ref=HEAD --jq"*) [ -n "${STUB_LIST_FAIL:-}" ] && exit 1; printf 'file\t.quality-inspector/p/SKILL.md\t10\nfile\t.quality-inspector/p/link\t34\n'; exit 0 ;;
@@ -317,6 +328,12 @@ printf '%s\n' "$(STUB_OPEN="$PROFILE_OPEN" STUB_LIST_FAIL=1 probe)" \
   || { echo "  assertion failed: a failed listing warns instead of passing"; FAILED=1; }
 printf '%s\n' "$out" | grep -qF 'ok boundary:repos/acme/widgets/issues/7/timeline refused' \
   || { echo "  assertion failed: {issue} resolves to a real issue"; FAILED=1; }
+for want in 'ok boundary:repos/acme/widgets/pulls/12 refused' 'ok boundary:repos/acme/widgets/pulls/12/files refused' \
+            'ok boundary:repos/acme/widgets/pulls/12/commits refused' 'ok boundary:repos/acme/widgets/pulls/12/reviews refused' \
+            'ok boundary:repos/acme/widgets/pulls/12/comments refused' 'ok boundary:https://github.com/acme/widgets/pull/12.diff refused' \
+            'ok boundary:https://github.com/acme/widgets/pull/12.patch refused' 'ok boundary:https://github.com/acme/widgets/pull/12/files refused'; do
+  printf '%s\n' "$out" | grep -qxF "$want" || { echo "  assertion failed: {pr} resolves to a real pull request, its surface probed: $want"; FAILED=1; }
+done
 printf '%s\n' "$out" | grep -qF 'ok boundary:repos/acme/widgets/issues/7/TIMELINE refused' \
   || { echo "  assertion failed: the case-blind GitHub deny probed"; FAILED=1; }
 printf '%s\n' "$out" | grep -qF 'ok boundary:repositories/1/contents/ refused' \

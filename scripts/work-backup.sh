@@ -47,7 +47,7 @@ SKIP_PATHS='./catalog/index.html'
 KEEP_PATHS='./catalog/thumbs/*.jpg ./design/crops/*.jpg'
 # A snapshot that deletes one of these, or more than half of the backed-up files, comes from an
 # unhydrated work/ (restore first). Any other deletion is mirrored: the history keeps it.
-PROTECTED="CONFIG.md VERSION QA.md SUITE.md SCENARIOS.md HEALS.md FLAKY.md LESSONS.md FEATURES.md MAINTENANCE.md"
+PROTECTED="CONFIG.md VERSION QA.md SUITE.md SCENARIOS.md HEALS.md FLAKY.md LESSONS.md FEATURES.md MAINTENANCE.md PRSCAN.md"
 
 say() { echo "work-backup: $*"; }
 iso() { date -u +%Y-%m-%dT%H:%M:%SZ; }

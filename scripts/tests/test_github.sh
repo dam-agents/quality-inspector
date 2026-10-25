@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scripts/github.sh — the agent's only road to GitHub: the target's issues endpoints alone,
-# a pull request refused, writes only when comments are enabled.
+# a pull request refused but for its sanitized text (prs), writes only when comments are enabled.
 . "$(dirname "$0")/lib.sh"
 seed_work
 G="$SCRIPTS/github.sh"
@@ -14,6 +14,8 @@ assert_eq "whoami" "qa-bot" "$(bash "$G" whoami)"
 out="$(bash "$G" issue 7)"
 assert "an issue, trimmed to its text, labels and author" '.number == 7 and .user == "alice" and .labels == ["qa:ready"] and (has("pull_request") | not)' "$out"
 bash "$G" issue 9 >/dev/null 2>&1; assert_eq "a pull request is refused" 3 "$?"
+bash "$G" comments 9 >/dev/null 2>&1; assert_eq "a pull request's comments are refused" 3 "$?"
+assert "prs: the pull request's text alone, no link GitHub puts beside it" '. == [{"number":9,"title":"A PR","body":"x","labels":["qa:ready"],"state":"closed","draft":false,"updated_at":null,"merged_at":null}]' "$(bash "$G" prs)"
 bash "$G" issue 7x >/dev/null 2>&1; assert_eq "a non-number is a usage error" 2 "$?"
 assert "comments, trimmed" '.[0].user == "qa-bot" and (.[0].body | contains("issue=7"))' "$(bash "$G" comments 7 2026-09-01T00:00:00Z)"
 assert "list skips pull requests" 'map(.number) == [7]' "$(bash "$G" list)"
@@ -26,6 +28,9 @@ printf -- '- issue_comments: enabled\n- retest_label: qa:retest\n' >> "$WORK_DIR
 : > "$STUB_DIR/gh.calls"
 bash "$G" comment 7 "$SANDBOX/c.md" >/dev/null; assert_eq "comment posted" 0 "$?"
 bash "$G" unlabel 7 >/dev/null; assert_eq "retest label removed" 0 "$?"
+bash "$G" comment 9 "$SANDBOX/c.md" >/dev/null 2>&1; assert_eq "no comment on a pull request" 3 "$?"
+bash "$G" unlabel 9 >/dev/null 2>&1; assert_eq "no label removal on a pull request" 3 "$?"
+grep -E -- '-X (POST|DELETE) repos/acme/widgets/issues/9' "$STUB_DIR/gh.calls" && { echo "  assertion failed: a write reached a pull request"; FAILED=1; }
 grep -qF -- "-X POST repos/acme/widgets/issues/7/comments -F body=@$SANDBOX/c.md" "$STUB_DIR/gh.calls" \
   || { echo "  assertion failed: the comment goes to the target's issue"; FAILED=1; }
 grep -qF -- "-X DELETE repos/acme/widgets/issues/7/labels/qa%3Aretest" "$STUB_DIR/gh.calls" \

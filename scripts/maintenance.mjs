@@ -5,17 +5,18 @@
 // "rewrite M-3", "retire M-3", "keep M-3"); the agent opens them, and closes those whose cause is gone.
 //
 //   node maintenance.mjs open <test> --kind <kind> --build <build> --proposal <proposal> --basis-file <path>
-//     -> {"id", "opened": bool, "replaced": []}   one open row per (test, kind): a second open updates its build and basis
+//     -> {"id", "opened": bool, "replaced": [], "covered_by"?}   one open row per (test, kind): a second open updates its build and basis
 //   node maintenance.mjs predict --build <build> --impact <impact.json> [--dry-run]
-//     -> {"opened": [], "updated": [], "skipped": []}   (--dry-run: {"candidates": [{test, kind, proposal, basis, file, line}]})
+//     -> {"opened": [], "updated": [], "skipped": [], "replaced": []}   (--dry-run: {"candidates": [{test, kind, proposal, basis, file, line}]})
 //   node maintenance.mjs close <M-k> <state>   -> {"id", "state"}
 //   node maintenance.mjs list [--open]         -> {"proposals": [{id, test, kind, build, basis, proposal, state, opened_utc, closed_utc}]}
-//   node maintenance.mjs sweep [--unchanged <test>]… [--absorbed <test>]…   -> {"resolved": ["M-2", …], "notes": []}
+//   node maintenance.mjs sweep [--unchanged <test>]… [--absorbed <test>]… [--built <iso>]   -> {"resolved": ["M-2", …], "notes": []}
 //   node maintenance.mjs check                 -> {"ok", "problems": []}
 //
 // <test>: `#N`, `#N AC-k`, `#N IN-k`, `S-k[ AC-j]`, `P-<slug>[ AC-j]` (one argument or two). <kind>: needs-review |
-// superseded | drift | quarantined | fighting, or one predicted before the replay — obsolete | moved | renamed.
-// <proposal>: heal | rewrite | retire | re-promote | review.
+// superseded | drift | quarantined | fighting, one predicted before the replay — obsolete | moved | renamed —, or
+// `predicted`: a pull request's text names the test (the Change radar, docs/radar.md; proposal `review`, basis
+// `PR #<n>: <title>`). <proposal>: heal | rewrite | retire | re-promote | review.
 // <state>: accepted | rewritten | retired | kept | resolved. The basis — read from <path>, the call's own
 // `mktemp /tmp/quality-inspector-<kind>.XXXXXX` (<kind> = basis) written with a file tool, never by the
 // shell, since it may quote an issue; removed once read, before the lock is taken (lib/words.mjs) — is a short evidence pointer (a
@@ -24,11 +25,16 @@
 // `predict` opens the predicted kinds from impact.mjs output (lib/staleness.mjs says which), basis
 // the diff's line, and skips a test that already has an open triage row (needs-review, superseded,
 // quarantined, fighting) of it. Opening such a triage row resolves the open predicted rows of the
-// same test (`replaced`): the night's triage confirmed or upgraded the prediction.
+// same test (`replaced`): the night's triage confirmed or upgraded the prediction. The same holds one
+// step down: a triage row, or an obsolete, moved or renamed row (`open` or `predict`), resolves the open
+// `predicted` rows of the test, and `open --kind predicted` opens nothing for a test that has one of
+// those open (`covered_by`).
 // `sweep` resolves the open rows whose cause is gone: a drift whose file no longer drifts
 // (check-asserts.sh --json), a quarantine or a superseded test whose tier changed, a test with no
 // work/SUITE.md row, each --unchanged test (the night replayed it plain unchanged), and a predicted
-// row of each --absorbed test (relearned or healed: the triage absorbed the change). An unreadable
+// row of each --absorbed test (relearned or healed: the triage absorbed the change) — a `predicted` row only when
+// a pull request that holds it (work/PRSCAN.md) was merged at or before --built, the candidate's build time:
+// before that the build did not carry the change. An unreadable
 // work/SUITE.md stops it with no change (exit 1): an unhydrated work/ would else resolve every row.
 // Every write holds the queue's mutex (lib/mutex.mjs) from load to save.
 // Exit 2: usage or a malformed value; the file is then left as it was. Exit 1: locked, or no SUITE.md
@@ -39,6 +45,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withMutex, writeAtomic } from './lib/mutex.mjs';
+import { load as loadPrs } from './lib/prscan.mjs';
 import { predict } from './lib/staleness.mjs';
 import { takeWords } from './lib/words.mjs';
 
@@ -49,12 +56,15 @@ const HEADER = '| id | test | kind | build | basis | proposal | state | opened_u
 const TITLE = '# Test maintenance — proposals for recurring tests the product moved away from (docs/maintenance.md)';
 const TRIAGE = ['needs-review', 'superseded', 'quarantined', 'fighting'];
 const PREDICTED = ['obsolete', 'moved', 'renamed'];
-const KINDS = [...TRIAGE, 'drift', ...PREDICTED];
+// A pull request's text names the test (docs/radar.md): the weakest evidence, replaced by any other.
+const PR_KIND = 'predicted';
+const KINDS = [...TRIAGE, 'drift', ...PREDICTED, PR_KIND];
 const PROPOSALS = ['heal', 'rewrite', 'retire', 're-promote', 'review'];
 const CLOSED = ['accepted', 'rewritten', 'retired', 'kept', 'resolved'];
 const TEST_RE = /^(#(\d{1,7})(?: (?:AC|IN)-\d{1,3})?|S-(\d{1,6})(?: AC-\d{1,3})?|P-([a-z0-9][a-z0-9-]{0,40})(?: AC-\d{1,3})?)$/;
 const BUILD_RE = /^[A-Za-z0-9._+-]{1,80}$/;
 const UTC_RE = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/;
+const PR_BASIS_RE = /^PR #[1-9]\d{0,6}: \S/;
 
 class Usage extends Error {}
 const die = (msg) => { throw new Usage(msg); };
@@ -104,12 +114,16 @@ switch (cmd) {
     if (!PROPOSALS.includes(proposal)) die(`--proposal is one of ${PROPOSALS.join(', ')}`);
     if (!BUILD_RE.test(build ?? '')) die('--build <build> is required');
     if (!basis) die('--basis-file <path> is required: the evidence of the change');
+    if (kind === PR_KIND && (proposal !== 'review' || !PR_BASIS_RE.test(basis))) die('a predicted row is proposal review, basis "PR #<n>: <title>"');
     const list = load();
+    if (kind === PR_KIND) {
+      const cover = list.find((x) => x.state === 'open' && [...TRIAGE, ...PREDICTED].includes(x.kind) && related(x.test, test));
+      if (cover) { out({ id: null, opened: false, replaced: [], covered_by: cover.id }); break; }
+    }
     const replaced = [];
-    if (TRIAGE.includes(kind)) {
-      for (const p of list.filter((x) => x.state === 'open' && PREDICTED.includes(x.kind) && related(x.test, test))) {
-        Object.assign(p, { state: 'resolved', closed_utc: now() }); replaced.push(p.id);
-      }
+    const weaker = TRIAGE.includes(kind) ? [...PREDICTED, PR_KIND] : PREDICTED.includes(kind) ? [PR_KIND] : [];
+    for (const p of list.filter((x) => x.state === 'open' && weaker.includes(x.kind) && related(x.test, test))) {
+      Object.assign(p, { state: 'resolved', closed_utc: now() }); replaced.push(p.id);
     }
     const same = list.find((p) => p.state === 'open' && p.test === test && p.kind === kind);
     if (same) { Object.assign(same, { build, basis, proposal }); save(list); out({ id: same.id, opened: false, replaced }); break; }
@@ -132,18 +146,21 @@ switch (cmd) {
       .map((c) => ({ ...c, basis: sanitize(c.basis) }));
     if (args.includes('--dry-run')) { out({ candidates }); break; }
     const list = load();
-    const opened = []; const updated = []; const skipped = [];
+    const opened = []; const updated = []; const skipped = []; const replaced = [];
     for (const c of candidates) {
       const open = list.filter((p) => p.state === 'open');
       if (open.some((p) => TRIAGE.includes(p.kind) && related(p.test, c.test))) { skipped.push(c.test); continue; }
+      for (const p of open.filter((x) => x.kind === PR_KIND && related(x.test, c.test))) {
+        Object.assign(p, { state: 'resolved', closed_utc: now() }); replaced.push(p.id);
+      }
       const same = open.find((p) => p.test === c.test && p.kind === c.kind);
       if (same) { Object.assign(same, { build, basis: c.basis, proposal: c.proposal }); updated.push(same.id); continue; }
       const id = nextId(list);
       list.push({ id, test: c.test, kind: c.kind, build, basis: c.basis, proposal: c.proposal, state: 'open', opened_utc: now(), closed_utc: '-' });
       opened.push(id);
     }
-    if (opened.length || updated.length) save(list);
-    out({ opened, updated, skipped });
+    if (opened.length || updated.length || replaced.length) save(list);
+    out({ opened, updated, skipped, replaced });
     break;
   }
   case 'close': {
@@ -168,6 +185,8 @@ switch (cmd) {
       if (args[k] === '--unchanged') unchanged.add(testAt(k + 1));
       else if (args[k] === '--absorbed') absorbed.add(testAt(k + 1));
     }
+    const built = flag('--built');
+    if (built != null && !UTC_RE.test(built)) die('--built is the build time, <YYYY-MM-DDTHH:MM:SSZ>');
     const notes = [];
     let drift = null;
     try {
@@ -177,6 +196,12 @@ switch (cmd) {
     const tiers = suite();
     if (!tiers) throw new Error('work/SUITE.md cannot be read: nothing swept (restore work/ first)');
     const list = load();
+    // A predicted row's change is in the build once a pull request that holds it merged before the build.
+    let prs = [];
+    if (built && list.some((p) => p.state === 'open' && p.kind === PR_KIND)) {
+      try { prs = loadPrs(); } catch (e) { notes.push(`${e.message}: open predicted rows stay open`); }
+    }
+    const inBuild = (id) => !!built && prs.some((r) => r.proposals.includes(id) && r.state === 'merged' && r.merged_at <= built);
     const resolved = [];
     for (const p of list.filter((x) => x.state === 'open')) {
       const file = fileOf(p.test); const tier = tiers.get(file) ?? null;
@@ -185,7 +210,8 @@ switch (cmd) {
         || (p.kind === 'superseded' && tier !== 'retired')
         || (!tier)
         || (['needs-review', 'fighting', ...PREDICTED].includes(p.kind) && named(unchanged, p.test))
-        || (PREDICTED.includes(p.kind) && named(absorbed, p.test));
+        || (PREDICTED.includes(p.kind) && named(absorbed, p.test))
+        || (p.kind === PR_KIND && inBuild(p.id) && (named(unchanged, p.test) || named(absorbed, p.test)));
       if (gone) { Object.assign(p, { state: 'resolved', closed_utc: now() }); resolved.push(p.id); }
     }
     if (resolved.length) save(list);
@@ -204,6 +230,7 @@ switch (cmd) {
       if (!/^M-\d{1,6}$/.test(p.id) || seen.has(p.id)) problems.push(`"${p.id}": not an id, or twice`); seen.add(p.id);
       if (!TEST_RE.test(p.test)) problems.push(`${p.id}: "${p.test}" is not a test`);
       if (!KINDS.includes(p.kind)) problems.push(`${p.id}: kind "${p.kind}"`);
+      if (p.kind === PR_KIND && (p.proposal !== 'review' || !PR_BASIS_RE.test(p.basis))) problems.push(`${p.id}: a predicted row is proposal review, basis "PR #<n>: …"`);
       if (!PROPOSALS.includes(p.proposal)) problems.push(`${p.id}: proposal "${p.proposal}"`);
       if (![...CLOSED, 'open'].includes(p.state)) problems.push(`${p.id}: state "${p.state}"`);
       if (!BUILD_RE.test(p.build)) problems.push(`${p.id}: build "${p.build}"`);

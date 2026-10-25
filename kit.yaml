@@ -127,6 +127,16 @@ schedules:
       its worklist is already appended below. If its JSON says nothing_to_do, report its
       logs in one line and end the run. Otherwise follow CLAUDE.md → "Modules run": read
       docs/modules.md and run every due module against the worklist's candidate.
+  - name: quality-inspector-radar-3h
+    cron: "15 */3 * * *"
+    sessionMode: fresh
+    enabled: false
+    precheck: 'bash "$HOME/scripts/precheck.sh" radar'
+    task: >-
+      Change radar run. Run `bash "$HOME/scripts/preflight.sh" radar` first unless its
+      worklist is already appended below. If its JSON says nothing_to_do, report its
+      logs in one line and end the run. Otherwise follow CLAUDE.md → "Change radar run":
+      read docs/radar.md and work every prs_due entry.
 
 # The black-box boundary, the same for every target (docs/black-box.md → Egress rules): GitHub
 # is deny-by-default, and what opens opens for every repository alike — the issues endpoints,
