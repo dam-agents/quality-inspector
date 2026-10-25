@@ -120,11 +120,15 @@ re-run. Never retry within the same run.
      `create_artifact` with `visibility: public` and its `file_name`, then `report-media.mjs set
      <dir> <path> <shareUrl> <version>` from the response — right after each create. **The first
      media file of a run is checked before its `set`:** `HEAD` its `<shareUrl>/raw?v=<version>`
-     and pass the served type as `set … --served-type <type>`. On another type `set` exits 1 and
-     records nothing: the delivery fails, with no further upload and no published report, so the
-     retry finds no address and uploads again. The rejected artifact is public and stays: never
-     delete it yourself — its id is the `target` of the `failed` ledger line, and the chat UI names
-     it for the operator to delete. A refused or failed `HEAD` is a `warn` line and a `set` without
+     and pass the served type as `set … --served-type <type>`. On another type `set` exits 1,
+     records no address and records the refusal as a block: the delivery fails, with no further
+     upload and no published report. The rejected artifact is public and stays: never delete it
+     yourself — its id is the `target` of the `failed` ledger line, and the chat UI names it for the
+     operator to delete. While the block stands, `list` and `publish public` exit 1 with `blocked`,
+     so each retry stops before any upload — log it, name the block in the chat UI, leave
+     `report_pending`. Only on the operator's word in the direct session (the platform serves the
+     type again, the artifact is dealt with) run `report-media.mjs unblock <dir>`; the next delivery
+     uploads again. A refused or failed `HEAD` is a `warn` line and a `set` without
      `--served-type`. Then `report-media.mjs publish <dir> public` (exit 1 names a file still
      without an address). The addresses are kept by content
      and type, so a revision uploads only new files — and again each file recorded without its

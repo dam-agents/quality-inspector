@@ -16,16 +16,22 @@
 //        `Content-Type: <content_type>`: without it the platform stores the artifact as
 //        application/x-www-form-urlencoded and serves it as a download, which an <img> or a
 //        <video> of a strict viewer does not show.
+//        exit 1 {"blocked": {path, url, content_type, served_type, utc}, "media": []}: a served
+//        type was refused before — upload nothing until the operator's `unblock`
 //   node report-media.mjs set <report-dir> media/<name> <share-url> <version> [--served-type <type>]
 //     -> {"path", "url", "content_type"} — records one media artifact uploaded with that type.
 //        --served-type: the Content-Type a HEAD of the address answered (the run's first upload,
-//        docs/reporting.md); another type than the file's -> exit 1, nothing recorded,
-//        {"path", "url": null, "content_type", "served_type"}
+//        docs/reporting.md); another type than the file's -> exit 1, no address recorded, the
+//        refusal recorded as the block that `list` and `publish public` stop at,
+//        {"path", "url": null, "content_type", "served_type", "blocked": true}
+//   node report-media.mjs unblock <report-dir>
+//     -> {"unblocked": <the block> | null} — the operator's, once the rejected artifact is dealt with
 //   node report-media.mjs publish <report-dir> public|private
 //     -> {"file": "<report-dir>/publish.html", "content_type": "text/html; charset=utf-8", "bytes", "linked", "inlined", "left_out": [path]}
 //        exit 1 (public): a media file without its address — nothing is written, `missing` lists them
 //
-// The addresses are kept by content (sha256) in media-urls.json beside the report directory, so a
+// The addresses are kept by content (sha256) in media-urls.json beside the report directory (a
+// refused served type under its key `blocked`, never a sha256), so a
 // new revision of the same report uploads only what changed. An address recorded without its type
 // (before 3.32.1, uploaded untyped) counts as no address, so the next revision uploads it again.
 // Reads only <report-dir> and that file; writes only publish.html and media-urls.json. Exit 2:
@@ -36,7 +42,7 @@ import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
 const [cmd, dirArg, ...rest] = process.argv.slice(2);
-const usage = 'usage: report-media.mjs list <report-dir> | set <report-dir> media/<name> <share-url> <version> [--served-type <type>] | publish <report-dir> public|private';
+const usage = 'usage: report-media.mjs list <report-dir> | set <report-dir> media/<name> <share-url> <version> [--served-type <type>] | unblock <report-dir> | publish <report-dir> public|private';
 const die = (m, code = 2) => { console.error(m ? `report-media: ${m}` : usage); process.exit(code); };
 if (!cmd || !dirArg) die();
 const dir = resolve(dirArg);
@@ -74,8 +80,12 @@ const info = (path) => { const f = join(dir, path); return { path, bytes: statSy
 // The address of one file, only when it was recorded with the type this file is uploaded with.
 const addr = (map, i) => { const e = map[i.sha256]; return e && typeof e === 'object' && e.content_type === i.content_type && typeof e.url === 'string' ? e.url : null; };
 
+// A served type refused before stops every upload and public link of this report, so a retry
+// never makes one more public artifact of the same wrong type.
+const stopIfBlocked = (map) => { if (map.blocked) { console.log(JSON.stringify({ blocked: map.blocked, media: [] })); process.exit(1); } };
+
 if (cmd === 'list') {
-  const map = readMap();
+  const map = readMap(); stopIfBlocked(map);
   console.log(JSON.stringify({ media: refs.map((p) => { const i = info(p); return { ...i, url: addr(map, i) }; }) }));
 } else if (cmd === 'set') {
   const [path, share, version, flag, served, ...extra] = rest;
@@ -85,18 +95,24 @@ if (cmd === 'list') {
   if (extra.length || (flag !== undefined && (flag !== '--served-type' || !served))) die();
   const i = info(path);
   // A served type is compared without its parameters (`; charset=…`) and its letter case.
+  const map = readMap(); stopIfBlocked(map); const url = `${share}/raw?v=${version}`;
   if (served !== undefined && served.split(';')[0].trim().toLowerCase() !== i.content_type) {
-    console.log(JSON.stringify({ path, url: null, content_type: i.content_type, served_type: served }));
+    map.blocked = { path, url, content_type: i.content_type, served_type: served, utc: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+    writeFileSync(mapFile, `${JSON.stringify(map, null, 1)}\n`);
+    console.log(JSON.stringify({ path, url: null, content_type: i.content_type, served_type: served, blocked: true }));
     process.exit(1);
   }
-  const map = readMap(); const url = `${share}/raw?v=${version}`;
   map[i.sha256] = { url, content_type: i.content_type };
   writeFileSync(mapFile, `${JSON.stringify(map, null, 1)}\n`);
   console.log(JSON.stringify({ path, url, content_type: i.content_type }));
+} else if (cmd === 'unblock' && !rest.length) {
+  const map = readMap(); const was = map.blocked ?? null;
+  if (was) { delete map.blocked; writeFileSync(mapFile, `${JSON.stringify(map, null, 1)}\n`); }
+  console.log(JSON.stringify({ unblocked: was }));
 } else if (cmd === 'publish' && (rest[0] === 'public' || rest[0] === 'private')) {
   const out = join(dir, 'publish.html');
   if (rest[0] === 'public') {
-    const map = readMap(); const urls = new Map(refs.map((p) => [p, addr(map, info(p))]));
+    const map = readMap(); stopIfBlocked(map); const urls = new Map(refs.map((p) => [p, addr(map, info(p))]));
     const missing = refs.filter((p) => !urls.get(p));
     if (missing.length) { console.log(JSON.stringify({ file: null, missing })); process.exit(1); }
     const body = html.replace(REF, (_, a, raw, z) => `${a}${urls.get(unesc(raw))}${z}`);

@@ -46,8 +46,17 @@ node "$M" set "$D" "$first" 'https://share.example/a/Abc?x=1' 1 >/dev/null 2>&1;
 png="$(jq -r '[.media[] | select(.content_type == "image/png")][0].path' <<<"$list")"
 out="$(node "$M" set "$D" "$png" https://share.example/a/Bad 1 --served-type application/octet-stream)"; rc=$?
 assert_eq "set: a served type other than the file's fails" 1 "$rc"
-assert "… names both types and records nothing" '.url == null and .content_type == "image/png" and .served_type == "application/octet-stream"' "$out"
-[ -f "$SANDBOX/issues/42/media-urls.json" ] && { echo "  a rejected address was recorded"; FAILED=1; }
+assert "… names both types and records no address, only the block" '.url == null and .content_type == "image/png" and .served_type == "application/octet-stream" and .blocked == true' "$out"
+assert "the block is the only entry" 'keys == ["blocked"] and .blocked.url == "https://share.example/a/Bad/raw?v=1"' "$(cat "$SANDBOX/issues/42/media-urls.json")"
+# The stuck case: while the block stands, a retry uploads nothing and links nothing.
+out="$(node "$M" list "$D")"; rc=$?
+assert_eq "list: a block stops the retry before any upload" 1 "$rc"
+assert "… and names the block" '.media == [] and .blocked.served_type == "application/octet-stream"' "$out"
+node "$M" publish "$D" public >/dev/null; assert_eq "publish public: a block links nothing" 1 "$?"
+node "$M" set "$D" "$png" https://share.example/a/Ok 1 >/dev/null; assert_eq "set: a block records nothing" 1 "$?"
+assert "unblock names what it cleared" '.unblocked.path == "'"$png"'"' "$(node "$M" unblock "$D")"
+assert "list runs again after unblock" '(.media | length) == 6 and all(.media[]; .url == null)' "$(node "$M" list "$D")"
+assert "unblock without a block" '.unblocked == null' "$(node "$M" unblock "$D")"
 node "$M" set "$D" "$png" https://share.example/a/Abc 1 --served-type >/dev/null 2>&1; assert_eq "set: --served-type without a type is usage" 2 "$?"
 assert "set: the served type matches without its parameters" '.url == "https://share.example/a/Ok/raw?v=1"' "$(node "$M" set "$D" "$png" https://share.example/a/Ok 1 --served-type 'Image/PNG; charset=binary')"
 rm -f "$SANDBOX/issues/42/media-urls.json"
