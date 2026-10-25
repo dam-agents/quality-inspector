@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.30.1 — 2026-10-25
+## 3.31.1 — 2026-10-25
 
 **Upgrade:**
 Nothing to run — docs are re-read per run. Every artifact upload now sends its `Content-Type`
@@ -18,6 +18,17 @@ revision of a public report uploads its media again, typed. A report already pub
 is until then; to repair one now, ask in the direct session to republish its report: upload the media
 again, `report-media.mjs publish <dir> public`, `update_artifact` — the share link stays. The old
 mis-typed media artifacts are then unused; delete them in the app when you want to.
+
+## 3.31.0 — 2026-10-25
+
+**Upgrade:**
+Nothing to run — docs are re-read per run. New: from the next regression run on, step 3 opens
+maintenance proposals before the replay ([docs/maintenance.md](docs/maintenance.md) → **Predicted
+from the change context**): `obsolete`, `moved` and `renamed`, for a recurring test whose frozen block
+names a control the UI map shows renamed, moved or removed, or that needs a page or interface that is
+gone. The night's triage row of the test replaces such a proposal, and `maintenance.mjs sweep` closes
+it when the test passes (`--unchanged`) or the triage absorbs the change (`--absorbed`). `impact.mjs`
+now writes each hit's `type` and `block`. Existing rows of `work/MAINTENANCE.md` stay as they are.
 
 ## 3.30.0 — 2026-10-25
 

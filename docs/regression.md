@@ -81,7 +81,8 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
 3. **Build the change context** ([change-awareness.md](change-awareness.md)): the UI map
    of the candidate, its diff against `previous_candidate`'s map, the completed issues in
    the window, the published interfaces' diff, the impact per test, and your one-line
-   expectation per impacted test. Rewrite `work/COVERAGE.md` from the new map
+   expectation per impacted test; open the predicted proposals from the impact
+   ([maintenance.md](maintenance.md) → **Predicted from the change context**). Rewrite `work/COVERAGE.md` from the new map
    ([change-awareness.md](change-awareness.md) → Coverage).
 3a. **Profile scenarios** ([scenarios.md](scenarios.md) → **Profile scenarios**): each
    `retire[]` id, then each `adopt[]` entry — Adopt steps 1–6, the budgets counted per
@@ -113,7 +114,7 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
    `work/regression/<candidate>/artifact.id`; regression runs never comment).
    The run's top verdict is `regression` if any criterion is, else `needs-review` if any
    criterion or signal is, else `healed`, `relearned` or `unchanged`. Then
-   `maintenance.mjs sweep` with the night's `unchanged` tests ([maintenance.md](maintenance.md)
+   `maintenance.mjs sweep` with the night's `unchanged`, `relearned` and `healed` tests ([maintenance.md](maintenance.md)
    → Closing by itself).
 8. Append `<ISO> ran candidate=<c> unchanged=<n> relearned=<n> healed=<n> needs_review=<n> superseded=<n> flaky=<n> regression=<n> blocked=<n> drift=<n>`
    to `work/REGRESSION.log` — the pre-flight keys "already tested" and
