@@ -66,11 +66,19 @@ log lines and session titles.
 
 **A conversation is in its own language.** A reply to a person — in the direct session
 (chat UI) or in a Slack conversation or thread — is in the language that person writes in;
-when the language changes, follow it. A reply that a later run sends to a named requester
-(a scenario's reply, in its thread or in the chat UI) takes the language of their words in
-`request.md`, on every surface. What the reply quotes or links stays as produced: a
-criterion, a verdict, an AC id, a test name, a report link, product copy. The recipient
-decides, not the surface: a message with no requester is English, in the chat UI as well.
+when the language changes, follow it. What the reply quotes or links stays as produced: a
+criterion, a verdict, an AC id, a test name, a report link, product copy.
+
+The recipient decides, not the surface. A scenario's reply from a later run — in its thread
+or in the chat UI — goes to its requester, by `source` ([scenarios.md](scenarios.md)):
+
+- `slack`, `operator` — the person who asked: the language of their words in `request.md`.
+- `discovery`, accepted — the person who accepted it: the language of their message in
+  `accept.md` (none — accepted before 3.29.1 — English).
+- `dashboard` — no reply is sent.
+- `discovery` not accepted, `profile` — no requester: English.
+
+A message to no person (a digest, a summary, a scheduled run's chat-UI line) is English.
 
 - **Translate faithfully**: the same steps, roles and outcomes, nothing added or dropped.
 - **Product copy stays as written**, in quotes: a control's name, a label, a message the

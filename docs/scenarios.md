@@ -36,7 +36,8 @@ request — queued for the regression tier.
   `source` and `status`.
 - `bash "$HOME/scripts/scenarios.sh" new <source>` reserves `S-<k>` and
   `work/scenarios/S-<k>/`: `request.md` (the words as received, verbatim, with requester,
-  thread, received UTC and attachment names — or a proposal and its basis),
+  thread, received UTC and attachment names — or a proposal and its basis), `accept.md`
+  (an accepted proposal only: the accepting message, as received),
   `criteria-<spec_hash>.md` (frozen, never edited), `judge-spec-<spec_hash>.json`,
   `runs.json`, `verdicts-<spec_hash>-<build>.json`, `judge-verdict-<spec_hash>-<build>.json`,
   `report-<spec_hash>-<build>/`, `artifact.id`. `spec_hash` is `text_hash`
@@ -71,7 +72,7 @@ several intents → handle each, then send **one** reply:
 | `test` | "test that …", steps with an expected outcome | **The pipeline**, from step 1 |
 | `profile` | "test scenario <slug>", "run P-<slug>" | **Profile scenarios** → On demand |
 | `correct` | "no, it should …" about a scenario | Append it to that `request.md`; the pipeline without step 2's `new` |
-| `accept` | "try S-14 and S-16" under a digest | Each named `proposed` row takes this message's sender and thread; step 1, then the pipeline from step 5 |
+| `accept` | "try S-14 and S-16" under a digest | Each named `proposed` row takes this message's sender and thread, and its `accept.md` this message (verbatim, with sender, thread and received UTC; never part of `spec_hash`); step 1, then the pipeline from step 5 |
 | `save` | "save S-7", "keep testing this" | **Saving** |
 | `status` | "how did S-7 end?", "what is queued?" | Answer from `SCENARIOS.md`, each with the link of [slack.md](slack.md) → **The answer in the thread** |
 | `issue` | "test #42", "status #42" in `slack_channel` | [slack.md](slack.md); elsewhere it is `other` |
@@ -175,11 +176,9 @@ section is the reply's `attachment` (`evidence.png` already in the report direct
 retried delivery — is reused). Use the requester's mention (`<@U…>`), never a bare id; no
 credentials or internal state.
 
-**Language** ([acceptance-criteria.md](acceptance-criteria.md) → **Language**): the reply is
-in the requester's language on every surface, the chat UI of `thread: -` included — in their
-turn, the language they write in; from any other run, the language of their words in
-`request.md`. `comment.md`'s own sentences and the added line
-are translated; the criteria, the verdicts, the AC ids, the link, `save S-<k>` and product copy
+**Language**: the requester's, as [acceptance-criteria.md](acceptance-criteria.md) →
+**Language** names them by `source`. `comment.md`'s own sentences and the added line are
+translated; the criteria, the verdicts, the AC ids, the link, `save S-<k>` and product copy
 stay as produced.
 
 - In the requester's turn → `reply`.
