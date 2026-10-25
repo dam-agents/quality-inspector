@@ -45,8 +45,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/profile.sh" || { echo "cannot source lib/profile.sh" >&2; exit 1; }
 if ! . "$SCRIPT_DIR/log.sh" 2>/dev/null; then logev() { :; }; fi
 
-E2E_VERSION="$(cfg e2e_version)"; E2E_VERSION="${E2E_VERSION:-0.20.0}"
-E2E_WEB_VERSION="$(cfg e2e_web_version)"; E2E_WEB_VERSION="${E2E_WEB_VERSION:-0.14.0}"
+E2E_VERSION="$(cfg e2e_version)"; E2E_VERSION="${E2E_VERSION:-0.21.3}"
+E2E_WEB_VERSION="$(cfg e2e_web_version)"; E2E_WEB_VERSION="${E2E_WEB_VERSION:-0.15.3}"
 AXE_VERSION=4.10.2   # axe-core for the ui-sweep module's accessibility checks (docs/ui-sweep.md)
 E2E_MODEL="$(cfg e2e_model)"; E2E_MODEL="${E2E_MODEL:-claude-sonnet-5}"
 APP_URL="${APP_URL:-$(profile_field '.app.url')}"

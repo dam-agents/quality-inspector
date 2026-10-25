@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.27.0 — 2026-10-25
+## 3.28.0 — 2026-10-25
 
 **Upgrade:**
 Nothing to run — docs are re-read per run, and `work/FEATURES.md` and `work/MAINTENANCE.md` are
@@ -16,13 +16,32 @@ created on first use by `scripts/features.mjs` and `scripts/maintenance.mjs`. Ne
    goes into a feature, and "run feature …" (the direct session) or "test feature …" (Slack, within
    `slack_tests_per_day`) runs a feature's recurring tests. Tests promoted before have no feature:
    the operator may add them ("add #N to the feature <id>"), or ask the agent to propose features
-   for the regression tier in the direct session.
+   for the regression tier in the direct session ("propose features").
 2. **Test maintenance** ([docs/maintenance.md](docs/maintenance.md)): the triage's `needs-review`,
    `superseded`, drift, quarantine and third-heal results open proposals `M-<k>` the operator answers
    with "accept / rewrite / retire / keep M-<k>"; "accept the review of #N" still works. Earlier
    nights' open items are not migrated: the next night opens what still holds.
 3. The audit has two more checks, `features` and `maintenance`; the next catalog build shows the
    features, the open proposals and the feature runs.
+
+## 3.27.0 — 2026-10-25
+
+**Upgrade:**
+1. In `work/CONFIG.md`, a key still at the old default moves to the new one:
+   `e2e_version: 0.20.0` → `0.21.3`, `e2e_web_version: 0.14.0` → `0.15.3`. A value the
+   operator chose differently stays. Under 0.20 every test that restores the setup session failed
+   at its `app.screenshot()` with `POLICY_DENIED` and recorded a video without frames
+   ([docs/test-authoring.md](docs/test-authoring.md) → **Upgrading `e2e`**). Both releases were
+   two days old, an exception to the seven-day rule: no older release keeps screenshots and video
+   after the setup's secret fill.
+2. `bash "$HOME/scripts/suite.sh" init` — installs the new pins and re-checks that
+   `playwright-core` (now 1.64.1) matches the image's browser.
+3. Expect the next run of every test to record its steps again (the replay cache misses
+   once across an `e2e` minor bump); no action.
+4. Run the smoke test as in `ONBOARDING.md` Step 6 and `verify-onboarding.sh --live`.
+5. A verdict of the last runs that is `blocked` or `failed` only by that `POLICY_DENIED` is no
+   product result: tell the operator the issues, and test each again on their "test #N"
+   ([docs/on-demand.md](docs/on-demand.md)).
 
 ## 3.26.1 — 2026-10-24
 
