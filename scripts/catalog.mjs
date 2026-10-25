@@ -22,6 +22,9 @@
 // `findings` make it the control center (docs/modules.md): the modules' state, the design
 // findings with their crops, the newest validation and stress results — of the security run its
 // counts and report reference only.
+// `features` (work/FEATURES.md) and `maintenance` (the open rows of work/MAINTENANCE.md) are the
+// agent's groups of recurring tests and the proposals waiting for the operator (docs/features.md,
+// docs/maintenance.md); a feature run (work/reruns/feature-<id>/) is a run of type `feature`.
 
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -71,6 +74,12 @@ const heals = rows(join(work, 'HEALS.md')).map(([utc, test, ac, build, , , basis
 const flaky = rows(join(work, 'FLAKY.md')).map(([utc, test, ac, build, runs, passes]) => ({ utc, test, ac, build, runs: +runs || null, passes: +passes || 0 }));
 const collections = rows(join(work, 'CATALOG.md')).map(([name, members]) =>
   ({ name, members: String(members ?? '').split(',').map((s) => s.trim()).filter(Boolean) })).filter((c) => c.name);
+// The agent's features (docs/features.md) and the open test maintenance proposals (docs/maintenance.md).
+const cells = (s, sep) => String(s ?? '').split(sep).map((x) => x.trim()).filter((x) => x && x !== '-');
+const features = rows(join(work, 'FEATURES.md')).filter(([id]) => /^[a-z0-9][a-z0-9-]{0,39}$/.test(id ?? ''))
+  .map(([id, name, aliases, members]) => ({ id, name: name || id, aliases: cells(aliases, ';'), members: cells(members, ',') }));
+const maintenance = rows(join(work, 'MAINTENANCE.md')).filter((r) => /^M-\d{1,6}$/.test(r[0] ?? '') && r[6] === 'open')
+  .map(([id, test, kind, build, basis, proposal, , opened]) => ({ id, test, kind, build, basis, proposal, opened_utc: opened }));
 let drift = [];
 try {
   drift = JSON.parse(execFileSync('bash', [join(HERE, 'check-asserts.sh'), '--json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })).drift ?? [];
@@ -202,6 +211,22 @@ for (const stem of ls(join(work, 'reruns')).filter((x) => /^(issue-\d+|scenario-
     for (const e of entries) addHist(e.key, { build: v.build ?? null, run: 'rerun', value: e.value, utc });
     const worst = entries.map((e) => e.value).sort((a, b) => rank(a) - rank(b))[0] ?? null;
     runs.push({ type: 'rerun', ref: stemRef(stem), build: v.build ?? null, utc, verdict: worst, report: null, secs: secsOf(v, utc), cost_usd: costOf(v),
+      label: /^[A-Za-z0-9._-]{1,120}$/.test(String(v.label)) ? v.label : null, entries });
+  }
+}
+
+// Feature runs (scripts/features.mjs record, docs/features.md): the raw results of a feature's
+// criteria, keyed by item — a run by hand like the above, never a verdict.
+for (const dir of ls(join(work, 'reruns')).filter((x) => /^feature-[a-z0-9][a-z0-9-]{0,39}$/.test(x))) {
+  for (const f of ls(join(work, 'reruns', dir)).filter((x) => x.endsWith('.json'))) {
+    const v = readJson(join(work, 'reruns', dir, f));
+    if (!v || typeof v.results !== 'object') continue;
+    const utc = v.utc ?? new Date(mtime(join(work, 'reruns', dir, f))).toISOString().replace(/\.\d+Z$/, 'Z');
+    const entries = Object.entries(v.results).filter(([k, r]) => /^(issue-\d+|scenario-\d+|profile-[a-z0-9][a-z0-9-]*)\/AC-\d+$/.test(k) && ['passed', 'failed', 'blocked'].includes(r?.status))
+      .map(([k, r]) => ({ key: k, value: r.status }));
+    for (const e of entries) addHist(e.key, { build: v.build ?? null, run: 'feature', value: e.value, utc });
+    const worst = entries.map((e) => e.value).sort((a, b) => rank(a) - rank(b))[0] ?? null;
+    runs.push({ type: 'feature', ref: dir.slice(8), build: v.build ?? null, utc, verdict: worst, report: null, secs: secsOf(v, utc), cost_usd: costOf(v),
       label: /^[A-Za-z0-9._-]{1,120}$/.test(String(v.label)) ? v.label : null, entries });
   }
 }
@@ -600,7 +625,7 @@ for (const f of ls(thumbsDir).filter((x) => x.endsWith('.jpg'))) if (!wanted.has
 // other stills by tier, newest verdict first. A page without its shot still shows its controls.
 const images = {};
 let used = 0; let dropped = 0; let seq = 0;
-const base = Buffer.byteLength(JSON.stringify({ items, pages, nights, runs, modules, design, findings, found }, (k, v) => (k.startsWith('_') ? undefined : v)))
+const base = Buffer.byteLength(JSON.stringify({ items, pages, nights, runs, modules, design, findings, found, features, maintenance }, (k, v) => (k.startsWith('_') ? undefined : v)))
   + Buffer.byteLength(read(join(HERE, 'catalog', 'viewer.html')) ?? '');
 const budget = Math.max(0, Math.min(IMG_BUDGET, PAGE_MAX - base));
 if (budget < IMG_BUDGET) notes.push(`image budget cut to ${Math.round(budget / 1024)} KiB by the size of the data`);
@@ -637,7 +662,7 @@ const data = {
   agent: { display_name: cfg('display_name') || 'Quality Inspector', version: (read(join(HERE, '..', 'VERSION')) ?? '').trim() || null },
   product, target: target || null,
   issue_url: target ? `https://${host}/${target.split('/').slice(-2).join('/')}/issues/{n}` : null,
-  builds, collections, items, pages, uncovered_nav: uncoveredNav, nights, runs,
+  builds, collections, features, maintenance, items, pages, uncovered_nav: uncoveredNav, nights, runs,
   modules, design, findings, activity, areas, found,
   // The labels a new issue gets: found_label always, fix_label (the software architect's) on request.
   issue_labels: { found: cfg('found_label') || 'qa:found', fix: cfg('fix_label') || null },

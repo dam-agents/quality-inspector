@@ -24,7 +24,7 @@ The operator may share the page beyond themselves, so it carries only what conce
   counts, the criteria that were not `unchanged`, the change context's issues (number, title), UI
   diff text and signal counts — or its environment failure; each issue and scenario run with its
   verdicts; each run by hand (`work/reruns/`, [on-demand.md](on-demand.md) → "run #N") with its raw
-  results; each with its length — the run file's `minutes`, else its `started_utc` to its time;
+  results; each feature run (`work/reruns/feature-<id>/`) with its criteria's raw results; each with its length — the run file's `minutes`, else its `started_utc` to its time;
   else a night from its `due` line, an issue run from its `issue_done minutes=`, a scenario run
   from its `scenario_run` ([logging.md](logging.md)) — and its `cost_usd` only when the file
   states it (never estimated); each with its build and report reference (a link when the report has one —
@@ -76,6 +76,13 @@ The operator may share the page beyond themselves, so it carries only what conce
   ```
 
   A member is `#N`, `#N AC-k`, `S-k` or `S-k AC-j`; an unknown one is kept and matches nothing.
+- **Features**, the agent's ([features.md](features.md)), from `work/FEATURES.md`: a facet and a
+  grouping like the collections, and in a test's panel. The Overview lists them with their recurring
+  test count and a "Run this feature" action (`run feature <id>`).
+- **Maintenance**, from `work/MAINTENANCE.md` ([maintenance.md](maintenance.md)): the open proposals
+  on Overview (id, test, kind, basis, proposal) with the operator's four actions (`accept M-<k>`,
+  `rewrite M-<k>`, `retire M-<k>`, `keep M-<k>`), the test's own in its panel, and the flag
+  "maintenance". Closed proposals are not shown.
 - **Pins:** each viewer's own, kept in their browser.
 
 **Explained on the page**, in ASD-STE100 ([reporting.md](reporting.md) → **Artifact text is ASD-STE100**).

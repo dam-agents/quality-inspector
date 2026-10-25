@@ -192,8 +192,8 @@ may ask. The file qualifies when its latest verdict is `passed`, the judge agree
 AC, its candidate run passed `--strict` with no `judged` step, and
 `bash "$HOME/scripts/check-asserts.sh" --agent-asserts <file>` prints nothing. Then set its
 `work/SUITE.md` row to `promotable` with `assert_hash` from `check-asserts.sh --hash`, log
-`scenario_saved id=S-<k> by=<requester>`, and confirm in one line that the operator
-promotes it. Otherwise reply what is missing.
+`scenario_saved id=S-<k> by=<requester>`, put its criteria into a feature
+([features.md](features.md)), and confirm in one line that the operator promotes it. Otherwise reply what is missing.
 
 ## Waiting scenarios
 
@@ -238,7 +238,8 @@ wait?" in the direct session is answered from it. The dashboard shows it
    on the candidate only — no baseline: the scenario holds on `main`, nothing is under test.
 5. **Register.** Passed `--strict` with no `judged` step → `work/SUITE.md` row
    `tests/profile-<slug>.e2e.ts | P-<slug> | regression | <check-asserts --hash> | <now>`:
-   the merge in the product's repository was its promotion. Failed or judged → the row is
+   the merge in the product's repository was its promotion; put its criteria into a feature
+   ([features.md](features.md)). Failed or judged → the row is
    `exploratory` and the scenario's verdict `failed`, with its evidence — the report leads
    with it; the next new build retries it (`kind: retry`: steps 4–6 on the same frozen
    criteria), and so does a new text. A `changed` adoption first moves the

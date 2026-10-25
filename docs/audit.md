@@ -14,7 +14,9 @@ when `audit_report: disabled` (still append the log line).
    since the last push), `secrets_in_runs` (a credential
    value left in a raw run's text files; a `fail` names the paths, never the value),
    **coverage** of the newest UI map (`warn` while pages are uncovered, never `fail`;
-   [change-awareness.md](change-awareness.md) → Coverage), and `criteria_injection` (the
+   [change-awareness.md](change-awareness.md) → Coverage), `features` and `maintenance` (the
+   registry's and the queue's format; members that do not run; proposals open over 14 days —
+   [features.md](features.md), [maintenance.md](maintenance.md)), and `criteria_injection` (the
    week's criteria files of issues and scenarios holding URLs, code fences or HTML comments;
    the week's `issue_injection_suspect` and `scenario_injection_suspect` events) — a `warn`
    lists the issues and `S-<k>`: sample one and check its instruction sentences are
@@ -72,8 +74,8 @@ when `audit_report: disabled` (still append the log line).
    - Flakiness: rows added to `work/FLAKY.md` this week, tests `quarantined`, and whether
      one cause dominates (the same page, the nested product right after `up`).
    - Triage health: heals this week from `work/HEALS.md` (each one's basis is a UI-map
-     change or an issue — sample one), tests at three heals a month, `needs-review` items
-     the operator has not answered, `retired` tests, `promotable` rows waiting.
+     change or an issue — sample one), tests at three heals a month, open maintenance
+     proposals by kind, `retired` tests, `promotable` rows waiting.
    - Trends: verdict distribution (100 % one verdict is suspicious), `inconclusive`
      share (a non-discriminating suite), replay cache `handed_off + missed` share from
      `REGRESSION.log`, environment failures per week, observations per week by severity

@@ -48,14 +48,15 @@ connections:
 requireConnectionAddress: true
 
 # Optional. Bound, the channel carries two kinds of request (docs/slack.md, docs/scenarios.md);
-# onboarding records it as `slack_channel` when people there may order "test #N".
+# onboarding records it as `slack_channel` when people there may order "test #N" and "test feature …".
 channels:
   - type: slack
     note: >-
       Optional. Connect a channel where people ask for scenarios to be tested ("test that
       …"); anyone in it may ask, within max_scenarios_per_day. Recorded as slack_channel,
-      people in it may also order an issue test ("test #N", within slack_tests_per_day) and
-      get the verdict in their thread, with a picture of its evidence. With scenario_channel set, the weekly scenario
+      people in it may also order an issue test ("test #N") or a feature's recurring tests
+      ("test feature …"), within slack_tests_per_day, and get the result in their thread,
+      with a picture of its evidence. With scenario_channel set, the weekly scenario
       proposals land there too. Skip it to keep everything in chat.
 
 schedules:

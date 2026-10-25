@@ -386,6 +386,25 @@ mode_audit() {
   if [ -z "$drift" ]; then check assert_drift warn "not measured"
   elif [ "$drift" = '[]' ]; then check assert_drift ok "regression assertions match their promoted hashes"
   else check assert_drift fail "assertion blocks changed without promotion: $drift"; fi
+  # the features registry and the maintenance queue (docs/features.md, docs/maintenance.md): their
+  # format, members that will not run, and proposals the operator has left open over two weeks
+  local fx mx old
+  fx="$(node "$SCRIPT_DIR/features.mjs" check 2>/dev/null)"
+  if [ -z "$fx" ]; then check features warn "not measured (features.mjs check failed)"
+  elif [ "$(jq -r .ok <<<"$fx")" != true ]; then check features fail "work/FEATURES.md: $(jq -r '.problems | join("; ")' <<<"$fx")"
+  elif [ "$(jq '.warnings | map(select(test("not created") | not)) | length' <<<"$fx")" != 0 ]; then check features warn "$(jq -r '.warnings | join("; ")' <<<"$fx")"
+  else check features ok "registry well-formed"; fi
+  mx="$(node "$SCRIPT_DIR/maintenance.mjs" check 2>/dev/null)"
+  if [ -z "$mx" ]; then check maintenance warn "not measured (maintenance.mjs check failed)"
+  elif [ "$(jq -r .ok <<<"$mx")" != true ]; then check maintenance fail "work/MAINTENANCE.md: $(jq -r '.problems | join("; ")' <<<"$mx")"
+  else
+    # A listing that fails is "not measured", never an empty queue.
+    if ! old="$(node "$SCRIPT_DIR/maintenance.mjs" list --open 2>/dev/null | jq -er --arg w "$(epoch2iso $((NOW_EPOCH - 14*86400)))" \
+      '[.proposals[] | select(.opened_utc < $w) | .id] | join(", ")' 2>/dev/null)"; then
+      check maintenance warn "open proposals not measured (maintenance.mjs list failed)"
+    elif [ -z "$old" ]; then check maintenance ok "no proposal open over 14 days"
+    else check maintenance warn "open over 14 days, waiting for the operator: $old"; fi
+  fi
 
   # coverage of the newest UI map by regression-tier tests — informational, never a fail
   local map cov=null

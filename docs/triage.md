@@ -19,8 +19,8 @@ the step list and screenshots in `report.json`.
 | `unchanged` | passed, nothing judged, nothing re-learned | nothing |
 | `relearned` | passed; only steps outside AC blocks were re-learned | nothing — the next passing run re-records; note which steps moved |
 | `healed` | passed with `judged` checks, and the healing rules below hold | repair the check, log it |
-| `needs-review` | passed with `judged` checks, but a healing rule fails; or fails on the previous build too (step 5) | leave the file; the operator decides |
-| `superseded` | the criterion is false, and a completed issue in the window that `may_supersede` changes exactly this behaviour on purpose | retire the test (below) |
+| `needs-review` | passed with `judged` checks, but a healing rule fails; or fails on the previous build too (step 5) | leave the file; open a proposal for the operator ([maintenance.md](maintenance.md)) |
+| `superseded` | the criterion is false, and a completed issue in the window that `may_supersede` changes exactly this behaviour on purpose | retire the test (below) and open a proposal |
 | `regression` | the criterion is false (strict re-run fails and the judge agrees), and nothing in the context explains it | report it with both screens |
 | `flaky` | the confirmation re-run mixes passes and failures | log it in `work/FLAKY.md`; quarantine on the second flaky night (below) |
 | `blocked` | the test could not reach its AC block for a reason outside the product (environment, model, setup) | fix or report as environment |
@@ -86,7 +86,7 @@ Then update the file, set its `work/SUITE.md` `assert_hash` from
 ```
 
 A heal never touches a criteria file. Three heals of the same test inside a month →
-`needs-review` from then on: the test is fighting the product.
+`needs-review` from then on, and a `fighting` proposal: the test is fighting the product.
 
 ## Flaky tests and quarantine
 
@@ -98,8 +98,8 @@ Append one row per flaky criterion to `work/FLAKY.md`:
 ```
 
 A test with flaky rows from two different builds inside 14 days moves to tier
-`quarantined` in `work/SUITE.md`: it no longer replays, and the report names it under
-"needs review". A quarantined test comes back only by the operator ("promote #N") after
+`quarantined` in `work/SUITE.md`: it no longer replays, the report names it under
+"needs review", and it gets a `quarantined` proposal ([maintenance.md](maintenance.md)). A quarantined test comes back only by the operator ("promote #N") after
 its cause is fixed — usually a wait for state the test assumed, or nested-platform
 instability recorded in `work/LESSONS.md`. A flaky result is never a regression and
 never a pass.
