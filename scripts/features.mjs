@@ -5,11 +5,11 @@
 // is `regression` or `promotable`; any other member is listed as skipped, with the reason.
 //
 //   node features.mjs list                              -> {"features": [{id, name, aliases, members, updated_utc, runnable, skipped}]}
-//   node features.mjs resolve <words…>                  -> {"query", "match": "exact"|"ranked"|"none", "features": [{…, score, tags}]}
-//   node features.mjs add <feature> <member> [--name <text>]   -> {"feature", "added": bool}  (creates the feature)
+//   node features.mjs resolve --file <path>             -> {"query", "match": "exact"|"ranked"|"none", "features": [{…, score, tags}]}
+//   node features.mjs add <feature> <member> [--name-file <path>]   -> {"feature", "added": bool}  (creates the feature)
 //   node features.mjs remove <feature> <member>         -> {"feature", "removed": bool}
-//   node features.mjs alias <feature> <text>            -> {"feature", "aliases"}
-//   node features.mjs rename <feature> <text>           -> {"feature", "name"}
+//   node features.mjs alias <feature> --file <path>     -> {"feature", "aliases"}
+//   node features.mjs rename <feature> --file <path>    -> {"feature", "name"}
 //   node features.mjs merge <from> <into>               -> {"feature": <into>, "members"}  (<from> is gone)
 //   node features.mjs drop <feature>                    -> {"feature", "dropped": true}
 //   node features.mjs check                             -> {"ok", "problems": [], "warnings": []}
@@ -21,10 +21,15 @@
 // (`--tag issue-42 --tag scenario-7 …`): a member that names one criterion runs its whole file, and
 // `record` keeps the member criteria only. `record` reads work/suite/.e2e/runs/<label>/report.json and
 // writes work/reruns/feature-<id>/<label>.json — a run by hand: never a verdict, no tier change.
-// Exit 2: usage, an unknown feature, or a malformed member; the file is then left as it was.
+// Words — a query, a name, an alias — come only from a file (<path>, written with a file tool, never
+// by the shell): they are often a person's or an issue's text, and on a command line a quote in them
+// would end the argument. Every write of work/FEATURES.md holds its mutex (lib/mutex.mjs) from load to
+// save. Exit 2: usage, an unknown feature, a malformed member or text; the file is then left as it was.
+// Exit 1: the registry stays locked by another writer.
 
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { withMutex, writeAtomic } from './lib/mutex.mjs';
 
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 const runsRoot = process.env.QI_RUNS_ROOT ?? join(work, 'suite', '.e2e', 'runs');
@@ -36,7 +41,8 @@ const ID_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const MEMBER_RE = /^(#(\d{1,7})|S-(\d{1,6})|P-([a-z0-9][a-z0-9-]{0,40}))(?: (AC-\d{1,3}))?$/;
 const TEXT_RE = /^[^|\n\r\u0000-\u001f]{1,80}$/;
 
-const die = (msg) => { console.error(`features: ${msg}`); process.exit(2); };
+class Usage extends Error {}
+const die = (msg) => { throw new Usage(msg); };
 const out = (o) => console.log(JSON.stringify(o));
 const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
 const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
@@ -54,8 +60,7 @@ function load() {
 function save(features) {
   const body = features.slice().sort((a, b) => a.id.localeCompare(b.id)).map((f) =>
     `| ${f.id} | ${f.name} | ${f.aliases.join('; ') || '-'} | ${f.members.join(', ') || '-'} | ${f.updated_utc ?? '-'} |`);
-  writeFileSync(`${FILE}.tmp`, `${TITLE}\n\n${HEADER}\n| --- | --- | --- | --- | --- |\n${body.join('\n')}${body.length ? '\n' : ''}`);
-  renameSync(`${FILE}.tmp`, FILE);
+  writeAtomic(FILE, `${TITLE}\n\n${HEADER}\n| --- | --- | --- | --- | --- |\n${body.join('\n')}${body.length ? '\n' : ''}`);
 }
 
 // A member's test file and tier: `#42 AC-1` -> tests/issue-42.e2e.ts, the stem issue-42.
@@ -100,13 +105,23 @@ const idArg = (s) => { if (!ID_RE.test(s ?? '')) die(`"${s ?? ''}" is not a feat
 const memberAt = (k) => memberArg(/^AC-\d{1,3}$/.test(args[k + 1] ?? '') ? `${args[k]} ${args[k + 1]}` : args[k]);
 const memberArg = (s) => { const m = clean(s); if (!MEMBER_RE.test(m)) die(`"${m}" is not a member (#N, #N AC-k, S-k, S-k AC-j, P-<slug>, P-<slug> AC-j)`); return m; };
 const textArg = (s) => { const t = clean(s); if (!TEXT_RE.test(t)) die('a name or an alias is 1–80 printable characters without "|"'); return t; };
+// The words after <flag>, read from the file it names.
+const fileText = (flag) => {
+  const i = args.indexOf(flag);
+  if (i < 0 || !args[i + 1]) return null;
+  const t = read(args[i + 1]);
+  if (t == null) die(`${flag} ${args[i + 1]}: cannot read the file`);
+  return t;
+};
 const find = (features, id) => features.find((f) => f.id === id) ?? die(`no feature "${id}" in work/FEATURES.md`);
 
+function main() {
 switch (cmd) {
   case 'list': out({ features: load().map(resolved) }); break;
   case 'resolve': {
     need(1);
-    const q = clean(args.join(' '));
+    const q = clean(fileText('--file') ?? die('usage: features.mjs resolve --file <path>'));
+    if (!q || q.length > 200) die('the query is empty or longer than 200 characters');
     const scored = load().map((f) => ({ ...resolved(f), score: score(f, q) })).filter((f) => f.score >= 0.45).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
     const exact = scored.filter((f) => f.score === 1);
     out({ query: q, match: exact.length === 1 ? 'exact' : scored.length ? 'ranked' : 'none', features: exact.length === 1 ? exact : scored.slice(0, 5) });
@@ -115,8 +130,8 @@ switch (cmd) {
   case 'add': {
     need(2);
     const id = idArg(args[0]); const ref = memberAt(1);
-    const ni = args.indexOf('--name');
-    const name = ni >= 0 ? textArg(args.slice(ni + 1).join(' ')) : null;
+    const nt = fileText('--name-file');
+    const name = nt == null ? null : textArg(nt);
     const features = load();
     let f = features.find((x) => x.id === id);
     if (!f) features.push(f = { id, name: name ?? id, aliases: [], members: [], updated_utc: null });
@@ -136,7 +151,7 @@ switch (cmd) {
   }
   case 'alias': {
     need(2);
-    const features = load(); const f = find(features, idArg(args[0])); const a = textArg(args.slice(1).join(' '));
+    const features = load(); const f = find(features, idArg(args[0])); const a = textArg(fileText('--file') ?? die('usage: features.mjs alias <feature> --file <path>'));
     if (!f.aliases.some((x) => norm(x) === norm(a))) { f.aliases.push(a); f.updated_utc = now(); save(features); }
     out({ feature: f.id, aliases: f.aliases });
     break;
@@ -144,7 +159,7 @@ switch (cmd) {
   case 'rename': {
     need(2);
     const features = load(); const f = find(features, idArg(args[0]));
-    f.name = textArg(args.slice(1).join(' ')); f.updated_utc = now(); save(features);
+    f.name = textArg(fileText('--file') ?? die('usage: features.mjs rename <feature> --file <path>')); f.updated_utc = now(); save(features);
     out({ feature: f.id, name: f.name });
     break;
   }
@@ -214,10 +229,19 @@ switch (cmd) {
     const dir = join(work, 'reruns', `feature-${f.id}`);
     mkdirSync(dir, { recursive: true });
     const file = join(dir, `${label}.json`);
-    writeFileSync(`${file}.tmp`, `${JSON.stringify({ label, feature: f.id, name: f.name, build, utc: now(), results, skipped: f.skipped }, null, 2)}\n`);
-    renameSync(`${file}.tmp`, file);
+    writeAtomic(file, `${JSON.stringify({ label, feature: f.id, name: f.name, build, utc: now(), results, skipped: f.skipped }, null, 2)}\n`);
     out({ file, feature: f.id, build, results, skipped: f.skipped });
     break;
   }
   default: die('usage: features.mjs list|resolve|add|remove|alias|rename|merge|drop|check|record — see its header');
+}
+}
+
+// A command that writes the registry runs inside its mutex; a usage error releases it before exit 2.
+const WRITES = new Set(['add', 'remove', 'alias', 'rename', 'merge', 'drop']);
+try {
+  if (WRITES.has(cmd)) withMutex(`${FILE}.lock`, main); else main();
+} catch (e) {
+  console.error(`features: ${e.message}`);
+  process.exit(e instanceof Usage ? 2 : 1);
 }

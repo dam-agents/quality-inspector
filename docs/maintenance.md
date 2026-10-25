@@ -19,7 +19,8 @@ Written only through `node "$HOME/scripts/maintenance.mjs" …` (its header list
 one **open** row per (test, kind) — opening it again updates its build, basis and proposal. The
 `basis` is a short evidence pointer (a UI-map change, `#<n>` and its quoted sentence, a build),
 at most 160 characters — the catalog shows it, so never a triage explanation, a request's words
-or a credential. The details go to `work/maintenance/M-<k>.md`: what changed, the before and
+or a credential. It may quote an issue, so it never goes on a command line: write it with the file
+tool to `/tmp/quality-inspector-basis.txt`, pass `--basis-file`, and delete the file after the call. The details go to `work/maintenance/M-<k>.md`: what changed, the before and
 after screenshots (`work/inventory/<previous>/shots/`, the run's), and a `heal` or `rewrite`
 proposal's change as a diff of the test file in `work/maintenance/M-<k>.diff` — prepared, never
 applied before the operator's word.
@@ -35,7 +36,7 @@ applied before the operator's word.
 | `fighting` | the third heal of one test inside a month | `rewrite` |
 
 ```bash
-node "$HOME/scripts/maintenance.mjs" open "#42 AC-1" --kind needs-review --build <candidate> --proposal heal --basis 'ui-map: tab "API keys" → "Access tokens"'
+node "$HOME/scripts/maintenance.mjs" open "#42 AC-1" --kind needs-review --build <candidate> --proposal heal --basis-file /tmp/quality-inspector-basis.txt
 ```
 
 ## The operator decides

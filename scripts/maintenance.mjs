@@ -4,7 +4,7 @@
 // to do with the test. The operator decides each one in the direct session ("accept M-3",
 // "rewrite M-3", "retire M-3", "keep M-3"); the agent opens them, and closes those whose cause is gone.
 //
-//   node maintenance.mjs open <test> --kind <kind> --build <build> --proposal <proposal> --basis <text>
+//   node maintenance.mjs open <test> --kind <kind> --build <build> --proposal <proposal> --basis-file <path>
 //     -> {"id", "opened": bool}   one open row per (test, kind): a second open updates its build and basis
 //   node maintenance.mjs close <M-k> <state>   -> {"id", "state"}
 //   node maintenance.mjs list [--open]         -> {"proposals": [{id, test, kind, build, basis, proposal, state, opened_utc, closed_utc}]}
@@ -13,18 +13,22 @@
 //
 // <test>: `#N`, `#N AC-k`, `S-k[ AC-j]`, `P-<slug>[ AC-j]` (one argument or two). <kind>: needs-review |
 // superseded | drift | quarantined | fighting. <proposal>: heal | rewrite | retire | re-promote | review.
-// <state>: accepted | rewritten | retired | kept | resolved. <basis>: a short evidence pointer (a UI-map
-// change, an issue number and its quoted sentence, a build) — never a triage explanation, a request's
-// words or a credential; the catalog shows it.
+// <state>: accepted | rewritten | retired | kept | resolved. The basis — read from <path>, a file written
+// with a file tool, never by the shell, since it may quote an issue — is a short evidence pointer (a
+// UI-map change, an issue number and its quoted sentence, a build): never a triage explanation, a
+// request's words or a credential; the catalog shows it.
 // `sweep` resolves the open rows whose cause is gone: a drift whose file no longer drifts
 // (check-asserts.sh --json), a quarantine or a superseded test whose tier changed, a test with no
-// work/SUITE.md row, and each --unchanged test (the night replayed it plain unchanged).
-// Exit 2: usage or a malformed value; the file is then left as it was.
+// work/SUITE.md row, and each --unchanged test (the night replayed it plain unchanged). An unreadable
+// work/SUITE.md stops it with no change (exit 1): an unhydrated work/ would else resolve every row.
+// Every write holds the queue's mutex (lib/mutex.mjs) from load to save.
+// Exit 2: usage or a malformed value; the file is then left as it was. Exit 1: locked, or no SUITE.md.
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withMutex, writeAtomic } from './lib/mutex.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
@@ -38,7 +42,8 @@ const TEST_RE = /^(#(\d{1,7})|S-(\d{1,6})|P-([a-z0-9][a-z0-9-]{0,40}))(?: (AC-\d
 const BUILD_RE = /^[A-Za-z0-9._+-]{1,80}$/;
 const UTC_RE = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/;
 
-const die = (msg) => { console.error(`maintenance: ${msg}`); process.exit(2); };
+class Usage extends Error {}
+const die = (msg) => { throw new Usage(msg); };
 const out = (o) => console.log(JSON.stringify(o));
 const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
 const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
@@ -53,11 +58,10 @@ function load() {
 }
 function save(list) {
   const body = list.map((p) => `| ${COLS.map((k) => p[k] || '-').join(' | ')} |`);
-  writeFileSync(`${FILE}.tmp`, `${TITLE}\n\n${HEADER}\n| ${COLS.map(() => '---').join(' | ')} |\n${body.join('\n')}${body.length ? '\n' : ''}`);
-  renameSync(`${FILE}.tmp`, FILE);
+  writeAtomic(FILE, `${TITLE}\n\n${HEADER}\n| ${COLS.map(() => '---').join(' | ')} |\n${body.join('\n')}${body.length ? '\n' : ''}`);
 }
 const fileOf = (test) => { const m = TEST_RE.exec(test); return m ? `tests/${m[2] ? `issue-${m[2]}` : m[3] ? `scenario-${m[3]}` : `profile-${m[4]}`}.e2e.ts` : null; };
-const suite = () => new Map(rows(read(join(work, 'SUITE.md'))).map(([test, , tier]) => [test, tier]));
+const suite = () => { const t = read(join(work, 'SUITE.md')); return t == null ? null : new Map(rows(t).map(([test, , tier]) => [test, tier])); };
 
 const [cmd, ...args] = process.argv.slice(2);
 const flag = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };
@@ -68,16 +72,19 @@ const testAt = (k) => {
   return t;
 };
 
+function main() {
 switch (cmd) {
   case 'open': {
     const test = testAt(0);
     const kind = flag('--kind'); const build = flag('--build'); const proposal = flag('--proposal');
-    const bi = args.indexOf('--basis');
-    const basis = bi >= 0 ? args.slice(bi + 1).join(' ').replace(/[|\r\n\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160) : '';
+    const path = flag('--basis-file');
+    const raw = path ? read(path) : null;
+    if (path && raw == null) die(`--basis-file ${path}: cannot read the file`);
+    const basis = String(raw ?? '').replace(/[|\r\n\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
     if (!KINDS.includes(kind)) die(`--kind is one of ${KINDS.join(', ')}`);
     if (!PROPOSALS.includes(proposal)) die(`--proposal is one of ${PROPOSALS.join(', ')}`);
     if (!BUILD_RE.test(build ?? '')) die('--build <build> is required');
-    if (!basis) die('--basis <text> is required: the evidence of the change');
+    if (!basis) die('--basis-file <path> is required: the evidence of the change');
     const list = load();
     const same = list.find((p) => p.state === 'open' && p.test === test && p.kind === kind);
     if (same) { Object.assign(same, { build, basis, proposal }); save(list); out({ id: same.id, opened: false }); break; }
@@ -113,6 +120,7 @@ switch (cmd) {
         .map((d) => String(d.test ?? d)));
     } catch { notes.push('drift not measured (check-asserts.sh --json failed): open drift rows stay open'); }
     const tiers = suite();
+    if (!tiers) throw new Error('work/SUITE.md cannot be read: nothing swept (restore work/ first)');
     const list = load();
     const resolved = [];
     for (const p of list.filter((x) => x.state === 'open')) {
@@ -151,4 +159,13 @@ switch (cmd) {
     break;
   }
   default: die('usage: maintenance.mjs open|close|list|sweep|check — see its header');
+}
+}
+
+// A command that writes the queue runs inside its mutex; a usage error releases it before exit 2.
+try {
+  if (['open', 'close', 'sweep'].includes(cmd)) withMutex(`${FILE}.lock`, main); else main();
+} catch (e) {
+  console.error(`maintenance: ${e.message}`);
+  process.exit(e instanceof Usage ? 2 : 1);
 }

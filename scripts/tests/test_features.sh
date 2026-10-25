@@ -8,14 +8,17 @@ command -v node >/dev/null || { echo "  node missing"; exit 1; }
 seed_work
 W="$WORK_DIR"
 F() { node "$SCRIPTS/features.mjs" "$@"; }
+# Words reach the script only through a file (docs/features.md): T <words> writes it and prints its path.
+T() { printf '%s' "$*" > "$SANDBOX/words.txt"; echo "$SANDBOX/words.txt"; }
+R() { F resolve --file "$(T "$@")"; }
 printf '| tests/issue-42.e2e.ts | 42 | regression | a | 2026-10-03T08:12:40Z |\n| tests/issue-51.e2e.ts | 51 | promotable | b | - |\n| tests/scenario-7.e2e.ts | S-7 | exploratory | c | - |\n| tests/profile-chat.e2e.ts | P-chat | quarantined | d | 2026-10-05T03:00:00Z |\n' >> "$W/SUITE.md"
 
 out="$(F check)"; assert "check: no registry yet is fine" '.ok and (.warnings | length == 1)' "$out"
-out="$(F add model-switch '#42' AC-1 --name Model switching)"; assert "add: creates the feature" '.added' "$out"
+out="$(F add model-switch '#42' AC-1 --name-file "$(T Model switching)")"; assert "add: creates the feature" '.added' "$out"
 out="$(F add model-switch '#42 AC-1')"; assert "add: the same member twice is one" '.added == false' "$out"
 F add model-switch '#51' >/dev/null; F add model-switch S-7 >/dev/null; F add model-switch P-chat >/dev/null
-F alias model-switch 'Změna modelu' >/dev/null; F alias model-switch 'změna MODELU' >/dev/null
-F add slack-reply S-7 --name Reply in Slack >/dev/null
+F alias model-switch --file "$(T "Změna modelu")" >/dev/null; F alias model-switch --file "$(T "změna MODELU")" >/dev/null
+F add slack-reply S-7 --name-file "$(T "Reply in Slack")" >/dev/null
 assert_eq "the file: sorted rows, members and aliases" \
   '| model-switch | Model switching | Změna modelu | #42 AC-1, #51, S-7, P-chat |' "$(grep '^| model-switch' "$W/FEATURES.md" | sed 's/ | [0-9T:Z-]* |$/ |/')"
 grep -q '^| feature | name | aliases | members | updated_utc |$' "$W/FEATURES.md" || { echo "  header missing"; FAILED=1; }
@@ -23,18 +26,31 @@ grep -q '^| feature | name | aliases | members | updated_utc |$' "$W/FEATURES.md
 before="$(cat "$W/FEATURES.md")"
 F add 'Bad Id' '#42' 2>/dev/null; assert_eq "a bad id: exit 2" 2 "$?"
 F add model-switch '#42 EX-1' 2>/dev/null; assert_eq "an exploration is no member: exit 2" 2 "$?"
-F alias model-switch 'a | b' 2>/dev/null; assert_eq "a pipe in an alias: exit 2" 2 "$?"
+F alias model-switch --file "$(T "a | b")" 2>/dev/null; assert_eq "a pipe in an alias: exit 2" 2 "$?"
+F alias model-switch "it's" 2>/dev/null; assert_eq "words on the command line are refused: exit 2" 2 "$?"
+F alias model-switch --file "$SANDBOX/none.txt" 2>/dev/null; assert_eq "an unreadable words file: exit 2" 2 "$?"
 F remove nope '#42' 2>/dev/null; assert_eq "an unknown feature: exit 2" 2 "$?"
 assert_eq "refusals leave the file as it was" "$before" "$(cat "$W/FEATURES.md")"
+[ -e "$W/FEATURES.md.lock" ] && { echo "  a refused write left its lock"; FAILED=1; }
+ls "$W" | grep -q '\.tmp$' && { echo "  a write left a temp file"; FAILED=1; }
+# The mutex: a live lock holds a writer off (exit 1, nothing written); one over a minute old is a dead writer's.
+echo 1 > "$W/FEATURES.md.lock"
+F add model-switch '#77' 2>/dev/null; assert_eq "a held lock: exit 1" 1 "$?"
+assert_eq "a held lock: nothing written" "$before" "$(cat "$W/FEATURES.md")"
+touch -t 202601010000 "$W/FEATURES.md.lock"
+assert "a lock over a minute old is taken over" '.added' "$(F add model-switch '#77')"
+F remove model-switch '#77' >/dev/null
+[ -e "$W/FEATURES.md.lock" ] && { echo "  a write left its lock"; FAILED=1; }
 
-out="$(F resolve zmena modelu)"
+out="$(R zmena modelu)"
 assert "resolve: a whole alias, accents and case ignored, is exact" '.match == "exact" and (.features | length == 1) and .features[0].id == "model-switch"' "$out"
 assert "resolve: only regression and promotable members run" '.features[0].runnable == ["#42 AC-1","#51"]
   and ([.features[0].skipped[] | .ref + "=" + .reason] == ["S-7=tier exploratory","P-chat=tier quarantined"])' "$out"
 assert "resolve: the tags of the runnable files" '.features[0].tags == ["--tag","issue-42","--tag","issue-51"]' "$out"
-assert "resolve: a part of a name is ranked" '.match == "ranked" and .features[0].id == "model-switch" and .features[0].score < 1' "$(F resolve model)"
-assert "resolve: nothing alike is none" '.match == "none" and .features == []' "$(F resolve billing export)"
+assert "resolve: a part of a name is ranked" '.match == "ranked" and .features[0].id == "model-switch" and .features[0].score < 1' "$(R model)"
+assert "resolve: nothing alike is none" '.match == "none" and .features == []' "$(R billing export)"
 
+F resolve zmena modelu 2>/dev/null; assert_eq "resolve: words on the command line are refused" 2 "$?"
 out="$(F check)"; assert "check: well-formed, with warnings for members that do not run" '.ok and (.warnings | length == 3)' "$out"
 printf '| broken | row |\n' >> "$W/FEATURES.md"
 assert "check: a malformed row is a problem" '.ok == false' "$(F check)"

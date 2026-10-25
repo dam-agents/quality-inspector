@@ -46,8 +46,8 @@ library for evidence, the skill catalog for profiles, sub-agents for independent
   and a one-off deep test of a chosen area (docs/modules.md).
 - **Weekly audit** (off by default) — health, the black-box boundary probes, assertion
   drift, cache efficiency, and the week's speed and cost per issue (docs/audit.md).
-- **From Slack** (off by default) — a person in the bound channel asks "test #N" or for a
-  scenario and gets the verdict in the thread, with one picture of the screenshots behind it
+- **From Slack** (off by default) — a person in the bound channel asks "test #N", "test feature
+  …" or for a scenario and gets the result in the thread, with one picture of the screenshots behind it
   and a link to the report or the dashboard where one opens; the run shows on the dashboard.
   One test at a time, `slack_tests_per_day` a day (docs/slack.md).
   In the direct session the operator can watch exploration live in the Browser Panel
