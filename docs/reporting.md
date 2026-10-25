@@ -117,13 +117,16 @@ re-run. Never retry within the same run.
    image or video.
    - **A public report** (below, or a Slack thread's): `report-media.mjs list <dir>`; each
      file with `url: null` becomes an artifact of its own — upload it with its `content_type`,
-     `create_artifact` with `visibility: public` and its `file_name`. **The first media file of a
-     run is checked before its address is recorded:** `HEAD` its `<shareUrl>/raw?v=<version>`. A
-     `Content-Type` other than the one sent is a failed delivery: no `set` for it, no further
-     upload, no published report — so the retry finds no address and uploads again. A refused or
-     failed `HEAD` is a `warn` line, not a failure. Then (and for every later file at once)
-     `report-media.mjs set <dir> <path> <shareUrl> <version>` from the response. Then
-     `report-media.mjs publish <dir> public` (exit 1 names a file still without an address). The addresses are kept by content
+     `create_artifact` with `visibility: public` and its `file_name`, then `report-media.mjs set
+     <dir> <path> <shareUrl> <version>` from the response — right after each create. **The first
+     media file of a run is checked before its `set`:** `HEAD` its `<shareUrl>/raw?v=<version>`
+     and pass the served type as `set … --served-type <type>`. On another type `set` exits 1 and
+     records nothing: the delivery fails, with no further upload and no published report, so the
+     retry finds no address and uploads again. The rejected artifact is public and stays: never
+     delete it yourself — its id is the `target` of the `failed` ledger line, and the chat UI names
+     it for the operator to delete. A refused or failed `HEAD` is a `warn` line and a `set` without
+     `--served-type`. Then `report-media.mjs publish <dir> public` (exit 1 names a file still
+     without an address). The addresses are kept by content
      and type, so a revision uploads only new files — and again each file recorded without its
      type (before 3.32.1). One ledger pair covers the media of one report.
    - **A private report**: `report-media.mjs publish <dir> private` puts the screenshots and

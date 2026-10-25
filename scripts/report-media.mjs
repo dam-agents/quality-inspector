@@ -16,9 +16,11 @@
 //        `Content-Type: <content_type>`: without it the platform stores the artifact as
 //        application/x-www-form-urlencoded and serves it as a download, which an <img> or a
 //        <video> of a strict viewer does not show.
-//   node report-media.mjs set <report-dir> media/<name> <share-url> <version>
-//     -> {"path", "url", "content_type"} — records one media artifact uploaded with that type; for
-//        the run's first upload, only after a HEAD of its address served that type (docs/reporting.md)
+//   node report-media.mjs set <report-dir> media/<name> <share-url> <version> [--served-type <type>]
+//     -> {"path", "url", "content_type"} — records one media artifact uploaded with that type.
+//        --served-type: the Content-Type a HEAD of the address answered (the run's first upload,
+//        docs/reporting.md); another type than the file's -> exit 1, nothing recorded,
+//        {"path", "url": null, "content_type", "served_type"}
 //   node report-media.mjs publish <report-dir> public|private
 //     -> {"file": "<report-dir>/publish.html", "content_type": "text/html; charset=utf-8", "bytes", "linked", "inlined", "left_out": [path]}
 //        exit 1 (public): a media file without its address — nothing is written, `missing` lists them
@@ -34,7 +36,7 @@ import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
 const [cmd, dirArg, ...rest] = process.argv.slice(2);
-const usage = 'usage: report-media.mjs list <report-dir> | set <report-dir> media/<name> <share-url> <version> | publish <report-dir> public|private';
+const usage = 'usage: report-media.mjs list <report-dir> | set <report-dir> media/<name> <share-url> <version> [--served-type <type>] | publish <report-dir> public|private';
 const die = (m, code = 2) => { console.error(m ? `report-media: ${m}` : usage); process.exit(code); };
 if (!cmd || !dirArg) die();
 const dir = resolve(dirArg);
@@ -76,11 +78,18 @@ if (cmd === 'list') {
   const map = readMap();
   console.log(JSON.stringify({ media: refs.map((p) => { const i = info(p); return { ...i, url: addr(map, i) }; }) }));
 } else if (cmd === 'set') {
-  const [path, share, version] = rest;
+  const [path, share, version, flag, served, ...extra] = rest;
   if (!refs.includes(path)) die(`${path} is not a media file of this page`);
   if (!SHARE.test(share ?? '')) die('the share link must be https://<host>/a/<slug>');
   if (!/^[1-9]\d{0,6}$/.test(version ?? '')) die('the version must be a positive integer');
-  const map = readMap(); const url = `${share}/raw?v=${version}`; const i = info(path);
+  if (extra.length || (flag !== undefined && (flag !== '--served-type' || !served))) die();
+  const i = info(path);
+  // A served type is compared without its parameters (`; charset=…`) and its letter case.
+  if (served !== undefined && served.split(';')[0].trim().toLowerCase() !== i.content_type) {
+    console.log(JSON.stringify({ path, url: null, content_type: i.content_type, served_type: served }));
+    process.exit(1);
+  }
+  const map = readMap(); const url = `${share}/raw?v=${version}`;
   map[i.sha256] = { url, content_type: i.content_type };
   writeFileSync(mapFile, `${JSON.stringify(map, null, 1)}\n`);
   console.log(JSON.stringify({ path, url, content_type: i.content_type }));

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # report-media.mjs: a rendered report becomes one file. Public: each media file it names is listed,
 # with the content type its upload sends, its uploaded artifact's address is recorded by content and
-# type (an untyped one is uploaded again), and the page links the addresses — never
+# type (an untyped one is uploaded again; one whose served type differs is not recorded), and the
+# page links the addresses — never
 # a relative media/ link; a file without an address writes nothing. Private: screenshots, then the
 # candidate's video go into the page as data: URIs within the page budget; what does not fit is a
 # line that says so; a trace is never inlined. A reference outside media/ is refused.
@@ -41,6 +42,15 @@ node "$M" set "$D" media/nope.webm https://share.example/a/Abc 1 >/dev/null 2>&1
 first="$(jq -r '.media[0].path' <<<"$list")"
 node "$M" set "$D" "$first" http://share.example/a/Abc 1 >/dev/null 2>&1; assert_eq "set: not https is refused" 2 "$?"
 node "$M" set "$D" "$first" 'https://share.example/a/Abc?x=1' 1 >/dev/null 2>&1; assert_eq "set: a query is refused" 2 "$?"
+# The served-type gate: another type than the file's records nothing; the same type, parameters aside, records.
+png="$(jq -r '[.media[] | select(.content_type == "image/png")][0].path' <<<"$list")"
+out="$(node "$M" set "$D" "$png" https://share.example/a/Bad 1 --served-type application/octet-stream)"; rc=$?
+assert_eq "set: a served type other than the file's fails" 1 "$rc"
+assert "… names both types and records nothing" '.url == null and .content_type == "image/png" and .served_type == "application/octet-stream"' "$out"
+[ -f "$SANDBOX/issues/42/media-urls.json" ] && { echo "  a rejected address was recorded"; FAILED=1; }
+node "$M" set "$D" "$png" https://share.example/a/Abc 1 --served-type >/dev/null 2>&1; assert_eq "set: --served-type without a type is usage" 2 "$?"
+assert "set: the served type matches without its parameters" '.url == "https://share.example/a/Ok/raw?v=1"' "$(node "$M" set "$D" "$png" https://share.example/a/Ok 1 --served-type 'Image/PNG; charset=binary')"
+rm -f "$SANDBOX/issues/42/media-urls.json"
 k=0; for p in $(jq -r '.media[].path' <<<"$list"); do k=$((k + 1)); node "$M" set "$D" "$p" "https://share.example/a/S$k" 2 >/dev/null; done
 assert "the addresses are kept by content and type beside the report" '[.[]] | length == 6 and all(.url | test("^https://share.example/a/S[0-9]/raw\\?v=2$")) and all(.content_type | test("^(image/png|video/webm|application/zip)$"))' "$(cat "$SANDBOX/issues/42/media-urls.json")"
 out="$(node "$M" publish "$D" public)"
