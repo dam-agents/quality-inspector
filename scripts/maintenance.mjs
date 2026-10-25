@@ -124,7 +124,8 @@ switch (cmd) {
     if (!BUILD_RE.test(build ?? '')) die('--build <build> is required');
     if (!path) die('--impact <impact.json> is required: the output of impact.mjs');
     let impact;
-    try { impact = JSON.parse(readFileSync(path, 'utf8')); } catch { die(`${path}: not the JSON of impact.mjs`); }
+    try { impact = JSON.parse(readFileSync(path, 'utf8')); } catch { impact = null; }
+    if (!Array.isArray(impact?.impacted)) die(`${path}: not the JSON of impact.mjs`);
     const tiers = suite();
     if (!tiers) throw new Error('work/SUITE.md cannot be read: nothing predicted (restore work/ first)');
     const candidates = predict(impact, tiers).filter((c) => TEST_RE.test(c.test) && sanitize(c.basis))

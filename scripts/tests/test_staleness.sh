@@ -116,6 +116,9 @@ M predict --build c4 --impact "$I" 2>/dev/null; assert_eq "predict with no SUITE
 mv "$W/SUITE.md.away" "$W/SUITE.md"
 echo 'not json' > "$SANDBOX/bad.json"
 M predict --build c4 --impact "$SANDBOX/bad.json" 2>/dev/null; assert_eq "predict with a bad impact file: exit 2" 2 "$?"
+echo '{"impacted":{}}' > "$SANDBOX/bad.json"
+M predict --build c4 --impact "$SANDBOX/bad.json" 2>/dev/null; assert_eq "predict with JSON of another shape: exit 2" 2 "$?"
+M predict --build c4 --impact "$SANDBOX/none.json" 2>/dev/null; assert_eq "predict with no impact file: exit 2" 2 "$?"
 M predict --impact "$I" 2>/dev/null; assert_eq "predict without --build: exit 2" 2 "$?"
 assert_eq "refusals leave the file as it was" "$before" "$(cat "$W/MAINTENANCE.md")"
 [ -e "$W/MAINTENANCE.md.lock" ] && { echo "  a refused predict left its lock"; FAILED=1; }
