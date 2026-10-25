@@ -13,7 +13,8 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 Nothing to run — docs are re-read per run, and `scripts/lib/gherkin.mjs` needs no install. New:
 1. **Gherkin in** ([docs/acceptance-criteria.md](docs/acceptance-criteria.md) → Gherkin): an issue's
    ```` ```gherkin ```` block is criteria. The worklist's `spec.gherkin` names it. The injection lint
-   does not count a pure-Gherkin block as code (closed, no error, no doc string, no text the parser drops),
+   does not count a pure-Gherkin block as code (closed, no error, no doc string, every line reaches an AC
+   or has no words to drop),
    so an issue that was an injection suspect only for such a block is not one any more; any other
    block still counts. Earlier frozen criteria stay as they are (the `ac_hash` is unchanged).
    A Gherkin error is a new spec-feedback trigger.

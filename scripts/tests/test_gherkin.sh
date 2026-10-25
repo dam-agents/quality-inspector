@@ -130,10 +130,17 @@ for c in $'code|```gherkin\nimport os\nos.system("id")\n```' \
   $'tag with code in it|```gherkin\nFeature: x\n  @x$(id)\n  Scenario: s\n    When a\n    Then b\n```' \
   $'Rule name|```gherkin\nFeature: x\n  Rule: python3 -c exec(input())\n  Scenario: s\n    When a\n    Then b\n```' \
   $'Background name|```gherkin\nFeature: x\n  Background: python3 -c exec(input())\n    Given a\n  Scenario: s\n    When a\n    Then b\n```' \
+  $'Examples under a plain Scenario|```gherkin\nFeature: x\n  Scenario: s\n    When a\n    Then b\n    Examples:\n      | a |\n      | python3 -c exec(input()) |\n```' \
+  $'Examples with no data row|```gherkin\nFeature: x\n  Scenario: s\n    When a\n    Then b\n  Scenario Outline: o\n    When <a>\n    Then b\n    Examples:\n      | python3 -c exec(input()) |\n```' \
+  $'an unused Examples column|```gherkin\nFeature: x\n  Scenario Outline: o <a>\n    When <a>\n    Then b\n    Examples:\n      | a | b |\n      | 1 | python3 -c exec(input()) |\n```' \
+  $'a Background no scenario uses|```gherkin\nFeature: x\n  Scenario: s\n    When a\n    Then b\n  Background:\n    Given python3 -c exec(input())\n```' \
   $'Examples name|```gherkin\nFeature: x\n  Scenario Outline: s\n    When <a>\n    Then b\n    Examples: python3 -c exec(input())\n      | a |\n      | 1 |\n```'; do
   assert "spec lint: a gherkin block with ${c%%|*} counts as code" '.injection.code_fences == 1 and .injection_suspect == true' "$(lint "X" "${c#*|}")"
 done
 for c in $'first-line language|```gherkin\n# language: cs\nPožadavek: x\n  Scénář: s\n    Když a\n    Pak b\n```' \
+  $'an outline whose cells all reach an AC|```gherkin\nFeature: x\n  Scenario Outline: o <a>\n    When <a> with <b>\n    Then b\n    Examples:\n      | a | b |\n      | 1 | 2 |\n```' \
+  $'an outline named without placeholders|```gherkin\nFeature: x\n  Scenario Outline: o\n    When <a>\n    Then b\n    Examples:\n      | a |\n      | 1 |\n```' \
+  $'a step table|```gherkin\nFeature: x\n  Scenario: s\n    When they tag it\n      | tag |\n      | home |\n    Then b\n```' \
   $'tags and a keyword name|```gherkin\n@requires-member @wip\nFeature: x\n  Background:\n    Given a\n  Scenario: s\n    When a\n    Then b\n```'; do
   assert "spec lint: a pure gherkin block with ${c%%|*} is not code" '.injection.code_fences == 0 and .injection_suspect == false' "$(lint "X" "${c#*|}")"
 done

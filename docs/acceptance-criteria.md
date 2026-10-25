@@ -100,14 +100,13 @@ blocks; a profile scenario may be a `.feature` file ([profile-contract.md](profi
 
 - The worklist's `spec.gherkin` — `{blocks, acs, errors}`, or `null` without a block — says what
   is there. The injection lint does not count a block's fences as code only when the block is pure
-  Gherkin: closed, no error, at least one scenario, no doc string, and no text the mapping drops —
-  a comment (but a first-line `# language: <code>`), a description, a word on a tag line that is no
-  tag, a name on a Rule, Background or Examples line. Any other block counts as code, and every
+  Gherkin: closed, no error, at least one scenario, no doc string, and every non-blank line either
+  reaches an AC or has no words to drop (a first-line `# language: <code>`, a line of tags only, a
+  Rule, Background or Examples line with no name). Any other block counts as code, and every
   sentence is linted in all cases.
 - Write the spec to `"$(mktemp /tmp/quality-inspector-spec.XXXXXX)"` with the file tool, and run
   `node "$HOME/scripts/lib/gherkin.mjs" criteria <that file>`: the blocks as AC blocks, numbered as
-  one list — one AC per Then step, Background before every Given, one AC per Examples row, a
-  `@wip`/`@manual` scenario `testable: no` (the mapping: the script's header). Remove the file after.
+  one list (the mapping: the script's header). Remove the file after.
 - Freeze from that output by the rules above: translate a non-English text (`language:` line), split
   what still holds two outcomes, keep the product copy. The words outside the blocks are input too;
   a criterion stated there and not in a block is frozen as well.

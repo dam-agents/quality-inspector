@@ -106,9 +106,13 @@ export function parseFeature(text, offset = 0) {
   let examples = null;
   let doc = null; // an open doc string: {delim, lines, step}
   let inRule = false;
-  // Text the mapping drops: comments, descriptions, non-tag words on a tag line, the name of a Rule,
-  // Background or Examples. A pure-Gherkin block has none of it, and no doc string (isPureGherkin).
-  let docstrings = 0; let freeText = 0;
+  // A closed allowlist of lines (isPureGherkin): `used` — a line whose words reach an AC (marked
+  // below, when the AC is built); `plain` — a line with no words to drop: the first-line
+  // `# language: <code>`, a line of tags only, a Rule, Background or Examples line with no name.
+  // Every other non-blank line is dropped text: a comment, a description, a doc string, a name, a
+  // Background no scenario uses, an Examples table or cell no AC carries.
+  const used = new Set(); const plain = new Set();
+  let docstrings = 0;
   const TAG = /^@[A-Za-z0-9_.:-]+$/;
 
   for (let i = 0; i < lines.length; i++) {
@@ -120,20 +124,20 @@ export function parseFeature(text, offset = 0) {
       continue;
     }
     if (!t) continue;
-    if (t.startsWith('#')) { if (!(i === first && lm)) freeText++; continue; }
+    if (t.startsWith('#')) { if (i === first && lm) plain.add(i); continue; }
     if (t.startsWith('@')) {
       const words = t.split(/\s+/);
-      if (!words.every((x) => TAG.test(x))) freeText++;
+      if (words.every((x) => TAG.test(x))) plain.add(i);
       pendingTags.push(...words.filter((x) => x.startsWith('@')).map((x) => x.slice(1).toLowerCase())); continue;
     }
     let m;
     if ((m = RE.feature.exec(t))) {
       if (title !== null) err(i, 'a second Feature');
-      title = m[2].trim(); featureTags = pendingTags; pendingTags = []; cur = null; examples = null; continue;
+      title = m[2].trim(); used.add(i); featureTags = pendingTags; pendingTags = []; cur = null; examples = null; continue;
     }
-    if ((m = RE.rule.exec(t))) { if (m[2].trim()) freeText++; inRule = true; backgrounds.rule = []; pendingTags = []; cur = null; examples = null; continue; }
+    if ((m = RE.rule.exec(t))) { if (!m[2].trim()) plain.add(i); inRule = true; backgrounds.rule = []; pendingTags = []; cur = null; examples = null; continue; }
     if ((m = RE.background.exec(t))) {
-      if (m[2].trim()) freeText++;
+      if (!m[2].trim()) plain.add(i);
       cur = { type: 'background', steps: inRule ? backgrounds.rule : backgrounds.feature }; examples = null; pendingTags = []; continue;
     }
     if ((m = RE.outline.exec(t)) || (m = RE.scenario.exec(t))) {
@@ -144,14 +148,17 @@ export function parseFeature(text, offset = 0) {
     }
     if ((m = RE.examples.exec(t))) {
       if (!cur || cur.type !== 'scenario') { err(i, 'Examples outside a scenario'); continue; }
-      if (m[2].trim()) freeText++;
-      examples = { tags: pendingTags, header: null, rows: [], line: i }; pendingTags = []; cur.examples.push(examples); continue;
+      if (!m[2].trim()) plain.add(i);
+      examples = { tags: pendingTags, header: null, rows: [], rowLines: [], headerLine: null, line: i }; pendingTags = []; cur.examples.push(examples); continue;
     }
     if (t.startsWith('|')) {
-      if (examples) { if (!examples.header) examples.header = cells(t); else examples.rows.push(cells(t)); continue; }
+      if (examples) {
+        if (!examples.header) { examples.header = cells(t); examples.headerLine = i; } else { examples.rows.push(cells(t)); examples.rowLines.push(i); }
+        continue;
+      }
       const last = cur?.steps.at(-1);
       if (!last) { err(i, 'a table that belongs to no step'); continue; }
-      last.table = [...(last.table ?? []), cells(t)];
+      last.table = [...(last.table ?? []), cells(t)]; last.tableLines = [...(last.tableLines ?? []), i];
       continue;
     }
     if (t === '"""' || t === '```' || t === '~~~') {
@@ -176,7 +183,6 @@ export function parseFeature(text, offset = 0) {
       continue;
     }
     // Free text: a description right under a Feature, Rule, Scenario or Examples line, before any step.
-    freeText++;
     if (cur && cur.steps.length && !examples) err(i, `not a step: "${t.slice(0, 80)}"`);
   }
   if (doc) err(lines.length - 1, 'a doc string that is never closed');
@@ -220,7 +226,7 @@ export function parseFeature(text, offset = 0) {
         const exSkip = ex.tags.find((x) => NOT_TESTABLE_TAGS.includes(x));
         for (const r of ex.rows) {
           if (r.length !== ex.header.length) { err(ex.line, `a row of ${r.length} cells under a header of ${ex.header.length}`); continue; }
-          rows.push({ vals: Object.fromEntries(ex.header.map((h, k) => [h, r[k]])), skip: exSkip });
+          rows.push({ vals: Object.fromEntries(ex.header.map((h, k) => [h, r[k]])), skip: exSkip, cells: r, line: ex.rowLines[ex.rows.indexOf(r)] });
         }
       }
     } else rows.push({ vals: null, skip: null });
@@ -232,25 +238,36 @@ export function parseFeature(text, offset = 0) {
       const rowName = row.vals ? (/<[^<>]+>/.test(name) ? fill(name) : `${name} [${Object.values(row.vals).join(', ')}]`) : name;
       const g = given.map((s) => fill(stepText(s))).join(' and ');
       const w = when.map((s) => fill(stepText(s))).join(', then ');
-      then.forEach((s, k) => acs.push({
+      const made = then.map((s, k) => ({
         name: then.length > 1 ? `${rowName} (${k + 1}/${then.length})` : rowName,
         given: g || null, when: w, then: fill(stepText(s)),
         testable: (skip || row.skip) ? `no — tagged @${skip || row.skip}` : null,
       }));
+      acs.push(...made);
+      // An Examples row is used when every one of its cells reaches one of its ACs.
+      const out = made.map((a) => [a.name, a.given, a.when, a.then].join('\n')).join('\n');
+      if (row.cells && row.cells.every((c) => out.includes(c))) used.add(row.line);
+    }
+    used.add(sc.line);
+    for (const s of [...given, ...when, ...then]) { used.add(s.line); for (const l of s.tableLines ?? []) used.add(l); }
+    // An Examples header is used when every column is a placeholder of the scenario, named in words.
+    const named = new Set([name, ...[...given, ...when, ...then].map(stepText)].flatMap((x) => [...x.matchAll(/<([^<>]+)>/g)].map((mm) => mm[1])));
+    for (const ex of sc.outline ? sc.examples : []) {
+      if (ex.rows.length && ex.header?.every((h) => named.has(h) && /^[\p{L}\p{N}_ -]{1,40}$/u.test(h))) used.add(ex.headerLine);
     }
   }
   if (roles.size > 1) errors.push(`more than one second role (${[...roles].join(', ')}) — one per file`);
   return { language, title, requires: roles.size === 1 ? [...roles][0] : null, acs, errors, warnings, scenarios: scenarios.length,
-    docstrings, freeText };
+    docstrings, dropped: lines.filter((l, k) => l.trim() && !used.has(k) && !plain.has(k)).length };
 }
 
-// A block the injection lint need not count as code: closed, no error, at least one AC, and no text
-// the mapping drops (freeText above) and no doc string, where a payload could hide
-// (scan-issues.mjs → injectionLint).
+// A block the injection lint need not count as code: closed, no error, at least one AC, no doc
+// string, and every non-blank line on the allowlist of parseFeature (`dropped` = 0) — no text the
+// mapping drops, where a payload could hide (scan-issues.mjs → injectionLint).
 export function isPureGherkin(block) {
   if (!block.closed) return false;
   const p = parseFeature(block.text);
-  return !p.errors.length && p.acs.length > 0 && p.docstrings === 0 && p.freeText === 0;
+  return !p.errors.length && p.acs.length > 0 && p.docstrings === 0 && p.dropped === 0;
 }
 
 // Several texts (blocks of one Markdown file, or one .feature) as one list of ACs.
