@@ -48,13 +48,23 @@ printf 'not json' | node "$SCRIPTS/lib/pr-text.mjs" >/dev/null 2>&1; assert_eq "
 cp "$SANDBOX/listing.json" "$STUB_DIR/issues.json"
 : > "$STUB_DIR/gh.calls"
 out="$(bash "$SCRIPTS/github.sh" prs --since 2026-10-20T00:00:00Z)"
-assert "github.sh prs: the sanitized pull requests" 'map(.number) == [5,7,8] and (.[0].body | contains("http") | not)' "$out"
+assert "github.sh prs: the sanitized pull requests, not cut" '(.prs | map(.number)) == [5,7,8] and (.prs[0].body | contains("http") | not) and .truncated == false and .last_updated_at == "2026-10-25T10:00:00Z"' "$out"
 grep -qF -- "-X GET repos/acme/widgets/issues -f state=all -f sort=updated -f direction=asc -f per_page=100 -f since=2026-10-20T00:00:00Z -f page=1" "$STUB_DIR/gh.calls" \
   || { echo "  assertion failed: prs lists the target's issues endpoint, oldest update first, since the watermark"; FAILED=1; }
 grep -E 'pulls|/files|/commits|/reviews|\.diff|\.patch|/comments' "$STUB_DIR/gh.calls" && { echo "  assertion failed: prs requested a pull request surface"; FAILED=1; }
 bash "$SCRIPTS/github.sh" prs --since yesterday >/dev/null 2>&1; assert_eq "prs --since <not an ISO time>: exit 2" 2 "$?"
 bash "$SCRIPTS/github.sh" prs --since 2026-10-20T00:00:00Z extra >/dev/null 2>&1; assert_eq "prs with an extra argument: exit 2" 2 "$?"
 bash "$SCRIPTS/github.sh" prs --diff >/dev/null 2>&1; assert_eq "prs --diff: exit 2" 2 "$?"
+# A page over one argument's 128 KiB joins on stdin; a full last page is a cut listing (the stub
+# serves the same page each time).
+big() { node -e 'const b = "word ".repeat(400); console.log(JSON.stringify(Array.from({ length: +process.argv[1] }, (_, i) => ({ number: i + 1, title: `T${i}`, body: b,
+  state: "open", labels: [], updated_at: `2026-10-25T10:${String(i % 60).padStart(2, "0")}:00Z`, pull_request: i % 2 ? {} : undefined }))))' "$1" > "$STUB_DIR/issues.json"; }
+big 99
+[ "$(wc -c < "$STUB_DIR/issues.json")" -gt 131072 ] || { echo "  the big page is under 128 KiB"; FAILED=1; }
+assert "a page over 128 KiB: listed, not cut" '(.prs | length) == 49 and .truncated == false' "$(bash "$SCRIPTS/github.sh" prs)"
+big 100
+assert "a full last page: truncated, with its last item's update time" '.truncated == true and .last_updated_at == "2026-10-25T10:39:00Z"' "$(QI_PRS_PAGES=1 bash "$SCRIPTS/github.sh" prs)"
+cp "$SANDBOX/listing.json" "$STUB_DIR/issues.json"
 
 # ---------------------------------------------------------------- scan and matching
 printf '| tests/issue-42.e2e.ts | 42 | regression | h | 2026-10-03T08:12:40Z |\n| tests/issue-60.e2e.ts | 60 | regression | h | - |\n| tests/issue-43.e2e.ts | 43 | promotable | h | - |\n| tests/issue-44.e2e.ts | 44 | retired | h | - |\n| tests/scenario-7.e2e.ts | S-7 | quarantined | h | - |\n' >> "$W/SUITE.md"
@@ -67,7 +77,7 @@ printf "await app.open('/settings');\nawait screen.getByRole('tab', { name: 'Usa
 printf "await app.open('/reports');\nawait screen.getByRole('button', { name: 'Download' }).click();\n" > "$W/suite/tests/rerun-9.e2e.ts"
 pr() { jq -nc --argjson n "$1" --arg t "$2" --arg s "$3" --arg u "$4" --arg m "${5:-}" \
   '{number:$n, title:$t, body:"", labels:[], state:$s, draft:false, updated_at:$u, merged_at:(if $m == "" then null else $m end)}'; }
-prs() { jq -sc . > "$SANDBOX/prs.json"; }
+prs() { jq -sc '{prs: ., truncated: false, last_updated_at: null}' > "$SANDBOX/prs.json"; }
 { pr 101 "Rename the API keys tab" open 2026-10-25T01:00:00Z
   pr 102 "The download button on reports moves" open 2026-10-25T02:00:00Z
   pr 103 "Usage page" closed 2026-10-25T03:00:00Z
@@ -86,6 +96,10 @@ assert "a new entry carries its text and lint, never more" '.due[0] | has("title
 assert "since: 14 days back with no ledger" '.since | test("^20[0-9-]{8}T[0-9:]{8}Z$")' "$(R since)"
 assert "the cap: the first over it and every later one wait" '[.due[].pr] == [101] and .deferred == 4' "$(QI_RADAR_MAX=1 R scan "$SANDBOX/prs.json")"
 R scan "$SANDBOX/nothing.json" >/dev/null 2>&1; assert_eq "scan of no listing: exit 2" 2 "$?"
+jq -c '.prs' "$SANDBOX/prs.json" > "$SANDBOX/bare.json"
+R scan "$SANDBOX/bare.json" >/dev/null 2>&1; assert_eq "scan of a bare array (no truncated flag): exit 2" 2 "$?"
+jq -c '.truncated = true | .last_updated_at = "2026-10-25T05:00:00Z"' "$SANDBOX/prs.json" > "$SANDBOX/cut.json"
+assert "a cut listing with something due: no advance" '.truncated and .advance == null' "$(R scan "$SANDBOX/cut.json")"
 
 # ---------------------------------------------------------------- record and the lifecycle
 h() { jq -r --argjson n "$1" '.due[] | select(.pr == $n) | .text_hash' <<<"$out"; }
@@ -161,12 +175,19 @@ assert "radar: the pull requests due, with candidates; the digest's channel" \
 assert "radar: the session title names ids alone" '.title == "Scan PR #201 · Scan PR #202"' "$out"
 assert "radar: the body arrives sanitized" '.prs_due[0].body | contains("src/") | not' "$out"
 assert_eq "radar: no listing left in /tmp" "$n0" "$(left)"
-grep -qE '^[0-9T:Z-]+ since=[0-9T:Z-]+ due=2 new=2 deferred=0$' "$W/RADAR.log" || { echo "  assertion failed: the RADAR.log line: $(tail -1 "$W/RADAR.log")"; FAILED=1; }
+grep -qE '^[0-9T:Z-]+ since=[0-9T:Z-]+ due=2 new=2 deferred=0 truncated=false$' "$W/RADAR.log" || { echo "  assertion failed: the RADAR.log line: $(tail -1 "$W/RADAR.log")"; FAILED=1; }
 for n in 201 202; do R record "$n" --hash "$(jq -r --argjson n "$n" '.prs_due[] | select(.pr == $n) | .text_hash' <<<"$out")" --state open \
   --updated-at "$(jq -r --argjson n "$n" '.prs_due[] | select(.pr == $n) | .updated_at' <<<"$out")" >/dev/null; done
 out="$(bash "$SCRIPTS/preflight.sh" radar)"
 assert "radar: nothing changed, nothing to do" '.nothing_to_do == true and .title == "Change radar: nothing to do"' "$out"
 grep -q 'since=2026-10-25T02:00:00Z' "$STUB_DIR/gh.calls" || { echo "  assertion failed: the next listing starts at the ledger's newest update"; FAILED=1; }
+# A cut listing with nothing due moves the next listing past it.
+node -e 'const f = process.argv[1]; const items = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  require("fs").writeFileSync(f, JSON.stringify(items.concat(Array.from({ length: 97 }, (_, i) => ({ number: 300 + i, title: "x", body: "", labels: [], state: "open", updated_at: "2026-10-25T03:00:00Z" })))));' "$STUB_DIR/issues.json"
+out="$(QI_PRS_PAGES=1 bash "$SCRIPTS/preflight.sh" radar)"
+assert "radar: a cut listing with nothing due — nothing to do, the next run starts past it" '.nothing_to_do and (.logs | any(test("starts at 2026-10-25T03:00:00Z")))' "$out"
+assert "since: the cut mark" '.since == "2026-10-25T03:00:00Z"' "$(R since)"
+grep -q 'truncated=true$' "$W/RADAR.log" || { echo "  assertion failed: the RADAR.log line names the cut"; FAILED=1; }
 out="$(STUB_GH_FAIL=1 bash "$SCRIPTS/preflight.sh" radar)"
 assert "radar: a failed listing is an error, never a quiet run" '(.error | test("pull requests")) and .title == "Change radar: pre-flight error"' "$out"
 assert_eq "radar: no listing left after a failure" "$n0" "$(left)"

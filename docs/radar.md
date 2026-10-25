@@ -28,7 +28,7 @@ The worklist ([CLAUDE.md](../CLAUDE.md) → Worklist keys): `prs_due[]` — `pr`
 (`new` | `changed` | `merged` | `closed`), `state`, `draft`, `merged_at`, `updated_at`,
 `text_hash`, `labels`, `proposals` (the ones it holds); a `new` or `changed` entry also `title`,
 `body`, `injection_suspect` and `candidates[]` (`test`, `tier`, `score`, `reasons`). Also `inventory`
-(the UI map's build), `channel`, `deferred`. Per entry, oldest first:
+(the UI map's build), `channel`, `deferred`, `truncated`. Per entry, oldest first:
 
 1. **`new` / `changed`** — judge each candidate: does the text say the change alters what the test
    checks (a renamed or moved control, a changed flow, a removed feature)? A word in common is not
@@ -71,7 +71,10 @@ test — an exploration, a rerun, an unsaved scenario, a retired test — is nev
 
 Written only by `radar.mjs record`, under its mutex. The next listing starts at its newest
 `updated_at`; a pull request is due again only when its text hash, or its state, changed. At most
-10 `new` / `changed` a run: the rest waits, in order. The audit checks its format (`radar`).
+10 `new` / `changed` a run: the rest waits, in order. A listing cut at 1000 items (`truncated`) that
+leaves nothing due moves the start past it instead (`radar.mjs advance`, the cut mark
+`work/.cache/radar-since`): the radar never reads the same cut listing twice. The audit checks the
+ledger's format (`radar`).
 
 ## Lifecycle of a `predicted` proposal
 

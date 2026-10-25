@@ -7,9 +7,10 @@
 #   github.sh whoami                       -> the agent's login (github_login, else the token's)
 #   github.sh check                        -> exit 0 when the target's issues are readable
 #   github.sh list                         -> issues carrying qa_label, open and closed, as JSON
-#   github.sh prs [--since <iso>]          -> the pull requests the issues listing names, updated since
-#                                             <iso>, oldest first: their text alone, sanitized
-#                                             (lib/pr-text.mjs; the Change radar, docs/radar.md)
+#   github.sh prs [--since <iso>]          -> {"prs": [...], "truncated", "last_updated_at"}: the pull requests
+#                                             the issues listing names, updated since <iso>, oldest first —
+#                                             their text alone, sanitized (lib/pr-text.mjs; the Change radar,
+#                                             docs/radar.md); `truncated` past QI_PRS_PAGES (10) pages
 #   github.sh issue <n>                    -> the issue as JSON; a pull request is refused
 #   github.sh comments <n> [<since-iso>]   -> its comments as one JSON array (every page); a pull request is refused
 #   github.sh comment <n> <file>           -> posts the file as a comment, prints its URL; not on a pull request
@@ -51,6 +52,7 @@ need_target() {
   printf '%s' "$RP" | grep -qE '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$' || refuse "target_repo '$TARGET' is not [<host>/]<owner>/<repo>"
 }
 enabled() { [ "$(cfg "$1")" = enabled ]; }
+PRS_PAGES="${QI_PRS_PAGES:-10}"; case "$PRS_PAGES" in (''|*[!0-9]*|0) PRS_PAGES=10;; esac
 # Of a pull request, nothing but the text `prs` reads: no comments, no write (docs/radar.md).
 not_pr() {
   local o; o="$(api "repos/$RP/issues/$1")" || exit 1
@@ -130,15 +132,22 @@ case "$cmd" in
       (*) usage ;;
     esac
     f=(-f state=all -f sort=updated -f direction=asc -f per_page=100); [ -n "$since" ] && f+=(-f since="$since")
-    # The issues listing names pull requests too; no /pulls endpoint is ever requested.
-    all='[]'
-    for page in 1 2 3 4 5 6 7 8 9 10; do
+    # The issues listing names pull requests too; no /pulls endpoint is ever requested. Pages join
+    # on stdin, never as an argument (one argument holds 128 KiB). Past PRS_PAGES pages the listing
+    # is cut: `truncated`, and the update time of its last item, issue or pull request.
+    all=""; truncated=false
+    for page in $(seq 1 "$PRS_PAGES"); do
       c="$(api -X GET "repos/$RP/issues" "${f[@]}" -f page="$page")" || exit 1
       printf '%s' "$c" | jq -e 'type == "array"' >/dev/null 2>&1 || exit 1
-      all="$(jq -c --argjson c "$c" '. + $c' <<<"$all")"
+      all="$all$c"$'\n'
       [ "$(jq length <<<"$c")" -lt 100 ] && break
+      [ "$page" = "$PRS_PAGES" ] && truncated=true
     done
-    printf '%s' "$all" | node "$SCRIPT_DIR/lib/pr-text.mjs" || exit 1 ;;
+    all="$(printf '%s' "$all" | jq -cs 'add // []')" || exit 1
+    last="$(jq -r '[.[].updated_at | strings] | last // ""' <<<"$all")"
+    printf '%s' "$all" | node "$SCRIPT_DIR/lib/pr-text.mjs" \
+      | jq -c --argjson t "$truncated" --arg l "$last" '{prs: ., truncated: $t, last_updated_at: (if $l == "" then null else $l end)}' \
+      || exit 1 ;;
   (issue)
     need_target; num "${1:-}"
     out="$(api "repos/$RP/issues/$1")" || exit 1
@@ -150,14 +159,15 @@ case "$cmd" in
     need_target; num "${1:-}"; not_pr "$1"
     f=(-f per_page=100); [ -n "${2:-}" ] && f+=(-f since="$2")
     # Explicit pages: GitHub's next links name /repositories/<id>/…, which the egress denies.
-    all='[]'
+    # Pages join on stdin, never as an argument (one argument holds 128 KiB).
+    all=""
     for page in 1 2 3 4 5 6 7 8 9 10; do
       c="$(api -X GET "repos/$RP/issues/$1/comments" "${f[@]}" -f page="$page")" || exit 1
       printf '%s' "$c" | jq -e 'type == "array"' >/dev/null 2>&1 || exit 1
-      all="$(jq -c --argjson c "$c" '. + $c' <<<"$all")"
+      all="$all$c"$'\n'
       [ "$(jq length <<<"$c")" -lt 100 ] && break
     done
-    jq -c '[.[] | {id, user: .user.login, author_association, created_at, updated_at, body}]' <<<"$all" ;;
+    printf '%s' "$all" | jq -cs 'add // [] | [.[] | {id, user: .user.login, author_association, created_at, updated_at, body}]' ;;
   (comment)
     need_target; num "${1:-}"; [ -f "${2:-}" ] || usage
     enabled issue_comments || enabled spec_feedback || refuse "issue_comments and spec_feedback are disabled"

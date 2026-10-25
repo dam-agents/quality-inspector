@@ -11,7 +11,7 @@ Two layers under `work/`, both append-only, never loaded whole into context (`ta
 | `work/REGRESSION.log` | pre-flight and you | `<ISO> due candidate=<c> tests=<n>` / `<ISO> ran candidate=<c> passed=… failed=… drift=… replayed=… handed_off=… missed=…` |
 | `work/SECURITY.log` | pre-flight and you | `<ISO> due candidate=<c> inventory=<yes\|no>` / `<ISO> ran candidate=<c> critical=<n> high=<n> medium=<n> low=<n> info=<n> skipped=<n>` |
 | `work/DISCOVERY.log` | pre-flight and you | `<ISO> due candidate=<c> budget=<n>` / `<ISO> ran candidate=<c> proposed=<n> rejected=<n> passed=<n> failed=<n> regression=<n>` |
-| `work/RADAR.log` | pre-flight and you | `<ISO> since=<iso> due=<n> new=<n> changed=<n> merged=<n> closed=<n> deferred=<n>` (kinds with none left out) / `<ISO> ran prs=<n> predicted=<n> resolved=<n>` ([radar.md](radar.md)) |
+| `work/RADAR.log` | pre-flight and you | `<ISO> since=<iso> due=<n> new=<n> changed=<n> merged=<n> closed=<n> deferred=<n> truncated=<bool>` (kinds with none left out) / `<ISO> ran prs=<n> predicted=<n> resolved=<n>` ([radar.md](radar.md)) |
 | `work/MODULES.log` | pre-flight and `scripts/modules.sh ran` | `<ISO> due candidate=<c> modules=<ids> focus=<n>` / `<ISO> ran module=<id> candidate=<c> <counts>` ([modules.md](modules.md)) |
 | `work/AUDIT.log` | you | `<ISO> ok=<n> warn=<n> red=<n> sent=chat` |
 

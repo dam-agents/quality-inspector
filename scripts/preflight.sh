@@ -722,10 +722,17 @@ mode_radar() {
   scan="$(node "$SCRIPT_DIR/radar.mjs" scan "$RADAR_TMP" 2>/dev/null)" || fail_out "radar.mjs scan failed"
   rm -f "$RADAR_TMP"
   while IFS= read -r n; do log "$n"; done < <(jq -r '.logs[]' <<<"$scan")
-  runlog RADAR "since=$since due=$(jq '.due | length' <<<"$scan") $(jq -r '[.due | group_by(.kind)[] | "\(.[0].kind)=\(length)"] | join(" ")' <<<"$scan") deferred=$(jq .deferred <<<"$scan")"
-  jq -nc --arg since "$since" --arg ch "$(cfg regression_channel)" --argjson s "$scan" --argjson logs "$(logs_json)" \
-    '{mode:"radar", nothing_to_do:($s.due | length == 0), prs_due:$s.due, deferred:$s.deferred, since:$since,
-      inventory:$s.inventory, channel:(if $ch == "" then null else $ch end), logs:$logs}'
+  # A cut listing with nothing due: the next run starts past it (radar.mjs advance), never reads it again.
+  n="$(jq -r '.advance // empty' <<<"$scan")"
+  if [ -n "$n" ]; then
+    node "$SCRIPT_DIR/radar.mjs" advance "$n" >/dev/null 2>&1 && log "the next listing starts at $n" \
+      || fail_out "radar.mjs advance failed: the next run would read the same cut listing"
+  fi
+  runlog RADAR "since=$since due=$(jq '.due | length' <<<"$scan") $(jq -r '[.due | group_by(.kind)[] | "\(.[0].kind)=\(length)"] | join(" ")' <<<"$scan") deferred=$(jq .deferred <<<"$scan") truncated=$(jq .truncated <<<"$scan")"
+  # The worklist goes to jq on stdin: ten bodies of 2000 characters stay clear of one argument's limit.
+  jq -c --arg since "$since" --arg ch "$(cfg regression_channel)" --argjson logs "$(logs_json)" \
+    '{mode:"radar", nothing_to_do:(.due | length == 0), prs_due:.due, deferred:.deferred, truncated:.truncated, since:$since,
+      inventory:.inventory, channel:(if $ch == "" then null else $ch end), logs:$logs}' <<<"$scan"
 }
 
 # ============================================================= SLACK MODE ====
