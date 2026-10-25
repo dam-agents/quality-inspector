@@ -23,12 +23,12 @@ export const matchable = (s) => !!s && s.length >= 3;
 // The 0-based line of the first match, or -1.
 export const firstLine = (src, re) => src.split('\n').findIndex((l) => re.test(l));
 
-// Whether line `idx` sits inside an `// AC-<k> begin` … `end` block.
+// Whether line `idx` sits inside a frozen `// AC-<k> begin` … `end` block (an intent test's IN-<k> too).
 export function insideAc(src, idx) {
   const lines = src.split('\n');
   for (let i = idx; i >= 0; i--) {
-    if (/\/\/\s*AC-\d+\s+end/.test(lines[i]) && i !== idx) return false;
-    if (/\/\/\s*AC-\d+\s+begin/.test(lines[i])) return true;
+    if (/\/\/\s*(?:AC|IN)-\d+\s+end/.test(lines[i]) && i !== idx) return false;
+    if (/\/\/\s*(?:AC|IN)-\d+\s+begin/.test(lines[i])) return true;
   }
   return false;
 }

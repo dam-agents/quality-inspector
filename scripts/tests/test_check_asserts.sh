@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-asserts.sh: only AC blocks count, whitespace does not; EX blocks hash apart; agent.assert inside an AC block is named; --lint names blocks without unique() data and EX blocks an AC run selects.
+# check-asserts.sh: only AC and IN (intent) blocks count, whitespace does not; EX blocks hash apart; agent.assert inside an AC block is named; --lint names blocks without unique() data and EX blocks an AC run selects.
 . "$(dirname "$0")/lib.sh"
 f="$SANDBOX/t.e2e.ts"
 printf 'await agent.act("a");\n// AC-1 begin\nawait expect(x).toBeVisible();\n// AC-1 end\n' > "$f"
@@ -66,4 +66,16 @@ test('#42 EX-2: z', { tags: ["issue-42", 'ex-2', 'from-ac-1'] }, async () => {
 });
 T
 assert "lint names only the EX block whose test carries issue-<n>" '.ex_with_issue_tag == ["EX-2"]' "$(bash "$SCRIPTS/check-asserts.sh" --lint "$f")"
+
+# Intent tests (docs/intent.md): IN blocks are frozen like AC blocks — in the hash, the lint and the
+# agent.assert list — and a file without them keeps its hash.
+printf '// AC-1 begin\nawait expect(x).toBeVisible();\n// AC-1 end\n' > "$f"
+assert_eq "no IN block: the hash stays the AC hash" "$h1" "$(bash "$SCRIPTS/check-asserts.sh" --hash "$f")"
+printf '// AC-1 begin\nawait expect(x).toBeVisible();\n// AC-1 end\n// IN-1 begin\nawait expect(y).toHaveText("Fast");\nawait agent.assert("the answer names Fast");\n// IN-1 end\n' > "$f"
+i1="$(bash "$SCRIPTS/check-asserts.sh" --hash "$f")"
+[ "$i1" != "$h1" ] && [ "$i1" != none ] || { echo "  an IN block must count in the hash"; FAILED=1; }
+printf '// AC-1 begin\nawait expect(x).toBeVisible();\n// AC-1 end\n// IN-1 begin\nawait expect(y).toHaveText("Slow");\nawait agent.assert("the answer names Fast");\n// IN-1 end\n' > "$f"
+[ "$(bash "$SCRIPTS/check-asserts.sh" --hash "$f")" != "$i1" ] || { echo "  a changed IN check must change the hash (drift)"; FAILED=1; }
+assert_eq "agent.assert inside an IN block is named" IN-1 "$(bash "$SCRIPTS/check-asserts.sh" --agent-asserts "$f")"
+assert "lint lists an IN block without unique() data" '.no_unique_ref == ["AC-1","IN-1"]' "$(bash "$SCRIPTS/check-asserts.sh" --lint "$f")"
 exit $FAILED

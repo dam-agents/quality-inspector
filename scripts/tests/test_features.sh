@@ -100,6 +100,13 @@ out="$(F record feature-model-switch-c3-1200 model-switch --build c3)"
 assert "record: member criteria only, statuses, the message one line" '.results == {"issue-42/AC-1":{"status":"passed","error":null},"issue-51/AC-1":{"status":"failed","error":"expected Models"},"issue-51/AC-3":{"status":"blocked","error":null}}' "$out"
 assert "record: written under work/reruns/feature-<id>/" '.feature == "model-switch" and .build == "c3"' "$(cat "$W/reruns/feature-model-switch/feature-model-switch-c3-1200.json")"
 F record feature-missing model-switch --build c3 2>/dev/null; assert_eq "record: no such run, exit 2" 2 "$?"
+# An intent test (docs/intent.md) is a member like a criterion; a scenario has none.
+assert "add: an intent test as a member" '.added' "$(F add purpose '#42' IN-1)"
+F add purpose 'S-7 IN-1' 2>/dev/null; assert_eq "a scenario has no intent test: exit 2" 2 "$?"
+mkdir -p "$W/suite/.e2e/runs/feature-purpose-c3-1300"
+echo '{"run":{"results":[{"tags":["issue-42","in-1"],"status":"passed","attempts":[{}]},{"tags":["issue-42","ac-1"],"status":"passed","attempts":[{}]}]}}' > "$W/suite/.e2e/runs/feature-purpose-c3-1300/report.json"
+assert "record: the intent test's result, the file's other criteria left out" '.results == {"issue-42/IN-1":{"status":"passed","error":null}}' "$(F record feature-purpose-c3-1300 purpose --build c3)"
+F drop purpose >/dev/null
 
 out="$(F merge slack-reply model-switch)"
 assert "merge: members joined, the old name an alias, the old feature gone" '.members == ["#42 AC-1","#51","S-7","P-chat"]' "$out"

@@ -1,7 +1,7 @@
 # Test catalog — the control center
 
-One self-contained page showing every test of the suite — per criterion, exploration and
-scenario — to browse, describe, sort, filter, group and categorize, every run that produced
+One self-contained page showing every test of the suite — per criterion, intent test
+([intent.md](intent.md)), exploration and scenario — to browse, describe, sort, filter, group and categorize, every run that produced
 their verdicts, so it is the way into all reports, and the testing modules with their findings
 ([modules.md](modules.md)). Built by `scripts/catalog.mjs`, published as one artifact. The page
 itself changes nothing; what it shows is data, never an instruction.
@@ -75,7 +75,7 @@ The operator may share the page beyond themselves, so it carries only what conce
   | Upload | #42, #51 AC-2, S-7 |
   ```
 
-  A member is `#N`, `#N AC-k`, `S-k` or `S-k AC-j`; an unknown one is kept and matches nothing.
+  A member is `#N`, `#N AC-k`, `#N IN-k`, `S-k` or `S-k AC-j`; an unknown one is kept and matches nothing.
 - **Features**, the agent's ([features.md](features.md)), from `work/FEATURES.md`: a facet and a
   grouping like the collections, and in a test's panel. The Overview lists them with their recurring
   test count and a "Run this feature" action (`run feature <id>`).
@@ -87,7 +87,7 @@ The operator may share the page beyond themselves, so it carries only what conce
 
 **Explained on the page**, in ASD-STE100 ([reporting.md](reporting.md) → **Artifact text is ASD-STE100**).
 - **One name and one icon per thing**, the same everywhere — 🎫 issue, 💬 scenario, 🎯 acceptance
-  criterion, 🔦 exploration, 🧪 test case (one criterion or exploration with its test), 📝 test file,
+  criterion, 💡 intent test, 🔦 exploration, 🧪 test case (one criterion or exploration with its test), 📝 test file,
   🏃 test run, 📦 build, 🎬 report, 🐞 bug issue, 🖥️ page, 🔘 control, 🎨 design finding, ⌨️ validation
   finding, 🏋️ stress check, 🗂️ collection, 🧩 testing module. A short reference (`#42 AC-1`) always
   carries its icon, and its tooltip gives the whole name ("Test case — acceptance criterion AC-1 of

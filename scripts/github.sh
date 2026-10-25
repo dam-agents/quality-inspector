@@ -48,9 +48,9 @@ need_target() {
   printf '%s' "$RP" | grep -qE '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$' || refuse "target_repo '$TARGET' is not [<host>/]<owner>/<repo>"
 }
 enabled() { [ "$(cfg "$1")" = enabled ]; }
-# The refs a found issue may be about (skills/create-issue): a criterion or exploration of an issue,
+# The refs a found issue may be about (skills/create-issue): a criterion, intent test or exploration of an issue,
 # a criterion of a scenario or a profile scenario, a design finding, a validation case, a stress check.
-REF_RE='^(#[0-9]{1,7} (AC|EX)-[0-9]{1,3}|S-[0-9]{1,6} AC-[0-9]{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-[0-9]{1,3}|D-[0-9]{1,6}|VAL-[0-9]{1,6}|STRESS-[A-Z]{1,20}-[0-9]{1,3})$'
+REF_RE='^(#[0-9]{1,7} (AC|IN|EX)-[0-9]{1,3}|S-[0-9]{1,6} AC-[0-9]{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-[0-9]{1,3}|D-[0-9]{1,6}|VAL-[0-9]{1,6}|STRESS-[A-Z]{1,20}-[0-9]{1,3})$'
 
 LABEL_RE='^[A-Za-z0-9][A-Za-z0-9:._/ -]{0,49}$'
 create_issue() { # <draft-dir> [--fix] [--again]

@@ -12,8 +12,8 @@ A direct session's first request names it ([logging.md](logging.md) → **Sessio
   `scripts/lib/state.sh` → `text_hash "$(issue_spec_text …)"`, `kind: first` or
   `retest`), then follow [issue-qa.md](issue-qa.md). The QA label is not required for an
   operator request; say so in the report notes.
-- **"promote #N"** (optionally a file) — show the file's AC blocks and the criteria file
-  side by side, then on a yes write or update its `work/SUITE.md` row: tier `regression`,
+- **"promote #N"** (optionally a file) — show the file's AC and IN blocks beside the criteria
+  and intent files, then on a yes write or update its `work/SUITE.md` row: tier `regression`,
   `assert_hash` from `bash "$HOME/scripts/check-asserts.sh" --hash <file>`,
   `promoted_utc` now ([regression.md](regression.md) → Tiers), and put its criteria into a
   feature when they are in none ([features.md](features.md)). Re-promoting a drifted
@@ -29,7 +29,7 @@ A direct session's first request names it ([logging.md](logging.md) → **Sessio
   a test maintenance proposal ([maintenance.md](maintenance.md) → The operator decides);
   "accept the review of #N" / "reject …" name that test's open `needs-review` proposal.
 - **"run feature <words>"** — a feature's recurring tests now, by hand: [features.md](features.md)
-  → Asking for a feature. **"add #N[ AC-k] to the feature <id>"**, **"remove … from the feature
+  → Asking for a feature. **"add #N[ AC-k|IN-k] to the feature <id>"**, **"remove … from the feature
   <id>"**, **"alias feature <id> <text>"**, **"rename feature <id> <text>"**, **"merge feature <a>
   into <b>"**, **"drop feature <id>"**, **"show features"**, **"propose features"** — the registry
   ([features.md](features.md) → Who puts a test into a feature).
@@ -52,11 +52,11 @@ A direct session's first request names it ([logging.md](logging.md) → **Sessio
 - **"module <id> set|on|off|run now …"**, **"focus <area>"**, **"dismiss D-<k> [as <reason>]"**,
   **"reopen D-<k>"**, **"categorize D-<k> <category>"** — the testing modules and the design
   findings' triage ([modules.md](modules.md) → **Control**); the dashboard's buttons send the same words.
-- **"run #N"**, **"run #N AC-<k>"** (or `EX-<k>`), **"run S-<k>[ AC-<j>]"**, **"run P-<slug>[ AC-<j>]"** — a
+- **"run #N"**, **"run #N AC-<k>"** (or `IN-<k>`, `EX-<k>`), **"run S-<k>[ AC-<j>]"**, **"run P-<slug>[ AC-<j>]"** — a
   test run by hand, now, on the build that is up: `env.sh lock operator` (busy → say who holds
   it, end); `env.sh status` — no product up → `env.sh up <candidate>` and `wait` with the
   pre-flight's candidate; `bash "$HOME/scripts/suite.sh" run rerun-<test>-<candidate>-<HHMM> --evidence full
-  --tag <issue-N|scenario-K|profile-slug>[ --tag ac-<k>]` (an `EX-<k>`: `--tag issue-N-ex --tag ex-<k>`) as a
+  --tag <issue-N|scenario-K|profile-slug>[ --tag ac-<k>|in-<k>]` (an `EX-<k>`: `--tag issue-N-ex --tag ex-<k>`) as a
   background task, then `wait`; `node "$HOME/scripts/rerun.mjs" <label> <ref> --build <candidate>`;
   `env.sh unlock operator`. Answer with each criterion's result (`passed`, `failed` with its
   message, `blocked`) and the run's screenshots of a failure. It is never a verdict: no

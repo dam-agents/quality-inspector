@@ -61,7 +61,7 @@ which the renderer shows verbatim above the criteria ([scenarios.md](scenarios.m
 `given` / `when` / `then` are copied from the criteria file verbatim; `baseline_run` is
 `null` when no baseline ran. `started_utc` is the run's start (the `issue_start`'s time; the
 dashboard shows the run's length from it); `cost_usd` only when the platform states the run's
-cost — never an estimate, else leave it out. Explorations and `noticed` add their own keys, never touching
+cost — never an estimate, else leave it out. Intent tests (`intents`, `intent_verdict`, [intent.md](intent.md) → Verdict), explorations and `noticed` add their own keys, never touching
 `acs` or `verdict` ([explorations.md](explorations.md) → **Reporting**, **Noticed in passing**). Never: credentials,
 internal state, the operator conversation.
 
@@ -91,7 +91,7 @@ product text and the frozen criteria stay verbatim.
   (`scripts/evidence-sheet.mjs` → `evidence.png` beside it; [slack.md](slack.md) → **The
   answer in the thread**). Neither is published with the artifact.
 
-It reads only tests tagged `issue-<n>` (a scenario: `scenario-<k>`) and `ac-<k>` (explorations: `issue-<n>-ex` and
+It reads only tests tagged `issue-<n>` (a scenario: `scenario-<k>`) and `ac-<k>` (intent tests: `in-<k>`; explorations: `issue-<n>-ex` and
 `ex-<k>`), so the sign-in setup test is never in the evidence. Videos are not redacted by
 `e2e`; that is why no test but the setup one ever types a credential. Text artefacts are:
 `scripts/suite.sh` replaces every `work/env/credentials.env` secret with `***` in the run

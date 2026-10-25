@@ -213,8 +213,8 @@ refuse and explain instead:
   procedure drives the platform the agent runs on. A sandbox account is reached only through
   the profile's helpers, and `egress-rules.sh` keeps refusing a profile GitHub allow outside
   the closed set of [black-box.md](black-box.md) → **Sandbox accounts**.
-- **ACs freeze before exploration**; criteria files are never edited; AC blocks of
-  promoted tests change only through the healing rules of [triage.md](triage.md) or the
+- **ACs freeze before exploration**; criteria and intent files are never edited; AC and IN
+  blocks of promoted tests change only through the healing rules of [triage.md](triage.md) or the
   operator (`scripts/check-asserts.sh` stays in the regression pre-flight and the audit).
 - **Triage never hides a regression**: no check is loosened or deleted to pass, a
   `superseded` needs a quoted contradicting issue, and doubt resolves to `regression`;

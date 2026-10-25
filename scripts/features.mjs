@@ -14,9 +14,9 @@
 //   node features.mjs drop <feature>                    -> {"feature", "dropped": true}
 //   node features.mjs check                             -> {"ok", "problems": [], "warnings": []}
 //   node features.mjs record <label> <feature> --build <candidate>
-//     -> {"file", "feature", "build", "results": {"issue-42/AC-1": {"status", "error"}}}
+//     -> {"file", "feature", "build", "results": {"issue-42/AC-1": {"status", "error"}, "issue-42/IN-1": …}}
 //
-// <feature> is an id: [a-z0-9][a-z0-9-]{0,39}. A member is `#N`, `#N AC-k`, `S-k`, `S-k AC-j`,
+// <feature> is an id: [a-z0-9][a-z0-9-]{0,39}. A member is `#N`, `#N AC-k`, `#N IN-k`, `S-k`, `S-k AC-j`,
 // `P-<slug>` or `P-<slug> AC-j`. `tags` are the suite.sh arguments of the runnable members' files
 // (`--tag issue-42 --tag scenario-7 …`): a member that names one criterion runs its whole file, and
 // `record` keeps the member criteria only. `record` reads work/suite/.e2e/runs/<label>/report.json and
@@ -40,7 +40,8 @@ const HEADER = '| feature | name | aliases | members | updated_utc |';
 const TITLE = '# Features — recurring test cases grouped by what the product does (docs/features.md)';
 const RECURRING = new Set(['regression', 'promotable']);
 const ID_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
-const MEMBER_RE = /^(#(\d{1,7})|S-(\d{1,6})|P-([a-z0-9][a-z0-9-]{0,40}))(?: (AC-\d{1,3}))?$/;
+// An intent test (#N IN-k, docs/intent.md) is a member like a criterion.
+const MEMBER_RE = /^(#(\d{1,7})(?: ((?:AC|IN)-\d{1,3}))?|S-(\d{1,6})(?: (AC-\d{1,3}))?|P-([a-z0-9][a-z0-9-]{0,40})(?: (AC-\d{1,3}))?)$/;
 const TEXT_RE = /^[^|\n\r\u0000-\u001f]{1,80}$/;
 
 class Usage extends Error {}
@@ -70,9 +71,9 @@ const suite = new Map(rows(read(join(work, 'SUITE.md'))).map(([test, , tier]) =>
 function memberOf(ref) {
   const m = MEMBER_RE.exec(ref);
   if (!m) return null;
-  const stem = m[2] ? `issue-${m[2]}` : m[3] ? `scenario-${m[3]}` : `profile-${m[4]}`;
+  const stem = m[2] ? `issue-${m[2]}` : m[4] ? `scenario-${m[4]}` : `profile-${m[6]}`;
   const file = `tests/${stem}.e2e.ts`;
-  return { ref, stem, file, ac: m[5] ?? null, tier: suite.get(file) ?? null };
+  return { ref, stem, file, ac: m[3] ?? m[5] ?? m[7] ?? null, tier: suite.get(file) ?? null };
 }
 function resolved(f) {
   const runnable = []; const skipped = [];
@@ -104,8 +105,8 @@ const [cmd, ...args] = process.argv.slice(2);
 const need = (n) => { if (args.length < n) die(`usage: features.mjs ${cmd} — see the header of scripts/features.mjs`); };
 const idArg = (s) => { if (!ID_RE.test(s ?? '')) die(`"${s ?? ''}" is not a feature id ([a-z0-9][a-z0-9-]{0,39})`); return s; };
 // A member may come as one argument ("#42 AC-1") or two (#42 AC-1).
-const memberAt = (k) => memberArg(/^AC-\d{1,3}$/.test(args[k + 1] ?? '') ? `${args[k]} ${args[k + 1]}` : args[k]);
-const memberArg = (s) => { const m = clean(s); if (!MEMBER_RE.test(m)) die(`"${m}" is not a member (#N, #N AC-k, S-k, S-k AC-j, P-<slug>, P-<slug> AC-j)`); return m; };
+const memberAt = (k) => memberArg(/^(?:AC|IN)-\d{1,3}$/.test(args[k + 1] ?? '') ? `${args[k]} ${args[k + 1]}` : args[k]);
+const memberArg = (s) => { const m = clean(s); if (!MEMBER_RE.test(m)) die(`"${m}" is not a member (#N, #N AC-k, #N IN-k, S-k, S-k AC-j, P-<slug>, P-<slug> AC-j)`); return m; };
 const textArg = (s) => { const t = clean(s); if (!TEXT_RE.test(t)) die('a name or an alias is 1–80 printable characters without "|"'); return t; };
 // The words after <flag>: the call's own mktemp file, taken (read and removed, lib/words.mjs) first
 // thing, before the lock and before any other check can refuse the call and leave it behind.
@@ -219,9 +220,9 @@ switch (cmd) {
     const results = {};
     for (const r of report.run?.results ?? []) {
       const tags = r.tags ?? [];
-      const id = tags.map((t) => /^ac-(\d+)$/.exec(t)).find(Boolean);
+      const id = tags.map((t) => /^(ac|in)-(\d+)$/.exec(t)).find(Boolean);
       if (!id) continue; // explorations are not recurring tests
-      const ac = `AC-${id[1]}`;
+      const ac = `${id[1].toUpperCase()}-${id[2]}`;
       const m = wanted.find((w) => tags.includes(w.stem) && (!w.ac || w.ac === ac));
       if (!m) continue;
       const att = r.attempts?.at(-1) ?? {};

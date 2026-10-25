@@ -1,6 +1,7 @@
 # Triage — redesign or regression
 
-Every regression-tier criterion that did not simply pass gets exactly one category. The
+Every regression-tier criterion that did not simply pass — an `AC-<k>` or an intent test's
+`IN-<k>` ([intent.md](intent.md)), triaged alike — gets exactly one category. The
 goal is twofold: a reworked UI never fails the suite, and a broken product never hides
 behind "the UI changed". When the two pull apart, the bias is towards **regression**: a
 false alarm costs one look; a hidden regression costs users.

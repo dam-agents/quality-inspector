@@ -11,6 +11,8 @@
 // page for a whole regression run: no baseline column, the change context on top, and a
 // triage category per criterion (docs/triage.md). With "explorations" (docs/explorations.md)
 // it adds a "Beyond the criteria" section from the explorations_run, outside the verdict; with
+// "intents" (docs/intent.md) a "What the author wanted" section — candidate and baseline like a
+// criterion, the file's "intent_verdict", never the issue verdict; with
 // "noticed" (docs/explorations.md → Noticed in passing) a list of what was seen, never tested.
 // With "mode": "security" it is the security run's findings, severity-sorted, with the e2e
 // evidence of findings that carry a "tag"; it writes no comment.md — security findings never
@@ -239,6 +241,29 @@ ${exps.map((ex) => `
 </article>`).join('')}
 </section>`;
 
+// Intent tests: the purpose the issue states, red-green like a criterion, never part of the issue
+// verdict (docs/intent.md). A regression run carries them in "acs", as criteria of the night.
+const INTENT = { met: 'met', 'not-met': 'not met', unclear: 'unclear', none: 'none' };
+const intentVerdict = Object.hasOwn(INTENT, v.intent_verdict) ? v.intent_verdict : null;
+const intents = regression ? [] : (v.intents ?? []).map((x) => ({ ...x,
+  cand: x.testable === false ? null : evidence(runs.candidate, x), base: x.testable === false ? null : evidence(runs.baseline, x) }));
+const lettersOnly = v.verdict === 'verified' && intentVerdict === 'not-met';
+const inHtml = !intents.length && !intentVerdict ? '' : `
+<section id="what-the-author-wanted">
+<h2>What the author wanted — intent ${esc(INTENT[intentVerdict] ?? 'not judged')}</h2>
+<p class="dim"><b>Not part of the verdict.</b> One user journey from the purpose that the issue states, quoted as its goal. The agent tested it like a criterion, on the candidate and on the baseline.</p>
+${lettersOnly ? '<p><b>The criteria are true, but the goal is not met.</b> Examine the evidence below.</p>' : ''}
+${intents.length ? `<table><thead><tr><th>IN</th><th>Journey</th><th>Candidate</th><th>Baseline</th><th>Verdict</th></tr></thead><tbody>${intents.map((x) => `<tr><td><a href="#${esc(slug(key(x)))}">${esc(x.id)}</a></td><td>${esc(x.name)}</td><td>${stateBadge(x.cand?.state ?? 'not-run')}</td><td>${stateBadge(x.base?.state ?? 'not-run')}</td><td>${badge(x.verdict)}</td></tr>`).join('')}</tbody></table>` : '<p class="dim">The issue states no purpose beyond its criteria.</p>'}
+${intents.map((x) => `
+<article class="ac" id="${esc(slug(key(x)))}">
+  <header><h3>${esc(x.id)} — ${esc(x.name)}${(x.covers ?? []).length ? ` <span class="dim">covers ${esc([x.covers].flat().join(', '))}</span>` : ''}</h3>${badge(x.verdict)}</header>
+  <blockquote>${x.goal ? `<b>Goal</b> ${esc(x.goal)}<br>` : ''}${x.given ? `<b>Given</b> ${esc(x.given)}<br>` : ''}${x.when ? `<b>When</b> ${esc(x.when)}<br>` : ''}${x.then ? `<b>Then</b> ${esc(x.then)}` : ''}</blockquote>
+  ${x.note ? `<p class="note">${esc(x.note)}</p>` : ''}
+  ${x.baseline_blocked_reason ? `<p class="dim">${BLOCKED[x.baseline_blocked_reason] ?? `On the baseline, the test stopped before the check (${esc(x.baseline_blocked_reason)}).`}</p>` : ''}
+  ${x.testable === false ? '' : `<div class="sides">${sideHtml(`Candidate ${v.candidate ?? ''}`, x.cand)}${sideHtml(`Baseline ${v.baseline ?? ''}`, x.base)}</div>`}
+</article>`).join('')}
+</section>`;
+
 // Noticed in passing: seen while testing, outside the criteria; never tested, never a verdict.
 const noticed = v.noticed ?? [];
 let notN = 0;
@@ -320,6 +345,7 @@ ${(() => { const t = requestText(); return t == null ? '' : `<details class="req
 <p class="dim">The agent tested each criterion on the candidate build and on the baseline release. <b>Verified</b> means that the test fails on the baseline and passes on the candidate. You can examine the videos and screenshots to check the result.</p>
 <table><thead><tr><th>AC</th><th>Criterion</th><th>Candidate</th><th>Baseline</th><th>Verdict</th></tr></thead><tbody>${summaryRows}</tbody></table>`}
 ${acHtml}
+${inHtml}
 ${exHtml}
 ${noticedHtml}
 ${(v.notes ?? []).length ? `<h3>Notes</h3><ul>${v.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
@@ -341,6 +367,7 @@ const comment = scenario ? [
   '| --- | --- | --- | --- | --- |',
   ...acs.map((ac) => `| ${ac.id} | ${String(ac.name).replace(/\|/g, '\\|')} | ${ac.cand?.state ?? 'not run'} | ${ac.base?.state ?? 'not run'} | ${ac.verdict} |`),
   '',
+  ...(intentVerdict ? [`Intent (what the author wanted): ${INTENT[intentVerdict]}${intents.length ? ` — ${intents.map((x) => `${x.id} ${x.verdict}`).join(', ')}` : ''}${lettersOnly ? '. The criteria are true, but the goal is not met.' : ''}`, ''] : []),
   ...(exps.length ? [`${exps.length} explorations beyond the criteria: ${observations} observations (see evidence)`, ''] : []),
   ...(noticed.length ? [`${noticed.length} noticed in passing, not tested (see evidence)`, ''] : []),
   'Evidence (videos, screenshots, step traces): EVIDENCE_LINK',
@@ -372,6 +399,7 @@ if (!regression) {
   }, null, 2)}\n`);
 }
 console.log(JSON.stringify({ out: outDir, acs: acs.length, ...(regression ? {} : { proof: Math.min(proofRows.length, PROOF_MAX) }), videos: acs.flatMap((a) => [a.cand?.video, a.base?.video]).filter(Boolean).length, screenshots: acs.flatMap((a) => [...(a.cand?.shots ?? []), ...(a.base?.shots ?? [])]).length,
+  ...(intents.length || intentVerdict ? { intents: intents.length, intent_verdict: intentVerdict, intent_videos: intents.flatMap((x) => [x.cand?.video, x.base?.video]).filter(Boolean).length } : {}),
   ...(exps.length ? { explorations: exps.length, observations, exploration_videos: exps.filter((e) => e.cand?.video).length } : {}),
   ...(noticed.length ? { noticed: noticed.length } : {}) }));
 

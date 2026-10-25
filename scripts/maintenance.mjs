@@ -11,7 +11,7 @@
 //   node maintenance.mjs sweep [--unchanged <test>]…   -> {"resolved": ["M-2", …], "notes": []}
 //   node maintenance.mjs check                 -> {"ok", "problems": []}
 //
-// <test>: `#N`, `#N AC-k`, `S-k[ AC-j]`, `P-<slug>[ AC-j]` (one argument or two). <kind>: needs-review |
+// <test>: `#N`, `#N AC-k`, `#N IN-k`, `S-k[ AC-j]`, `P-<slug>[ AC-j]` (one argument or two). <kind>: needs-review |
 // superseded | drift | quarantined | fighting. <proposal>: heal | rewrite | retire | re-promote | review.
 // <state>: accepted | rewritten | retired | kept | resolved. The basis — read from <path>, the call's own
 // `mktemp /tmp/quality-inspector-<kind>.XXXXXX` (<kind> = basis) written with a file tool, never by the
@@ -40,7 +40,7 @@ const TITLE = '# Test maintenance — proposals for recurring tests the product 
 const KINDS = ['needs-review', 'superseded', 'drift', 'quarantined', 'fighting'];
 const PROPOSALS = ['heal', 'rewrite', 'retire', 're-promote', 'review'];
 const CLOSED = ['accepted', 'rewritten', 'retired', 'kept', 'resolved'];
-const TEST_RE = /^(#(\d{1,7})|S-(\d{1,6})|P-([a-z0-9][a-z0-9-]{0,40}))(?: (AC-\d{1,3}))?$/;
+const TEST_RE = /^(#(\d{1,7})(?: (?:AC|IN)-\d{1,3})?|S-(\d{1,6})(?: AC-\d{1,3})?|P-([a-z0-9][a-z0-9-]{0,40})(?: AC-\d{1,3})?)$/;
 const BUILD_RE = /^[A-Za-z0-9._+-]{1,80}$/;
 const UTC_RE = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/;
 
@@ -69,8 +69,8 @@ const [cmd, ...args] = process.argv.slice(2);
 const flag = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };
 // A test may come as one argument ("#42 AC-1") or two (#42 AC-1).
 const testAt = (k) => {
-  const t = (/^AC-\d{1,3}$/.test(args[k + 1] ?? '') ? `${args[k]} ${args[k + 1]}` : String(args[k] ?? '')).replace(/\s+/g, ' ').trim();
-  if (!TEST_RE.test(t)) die(`"${t}" is not a test (#N, #N AC-k, S-k[ AC-j], P-<slug>[ AC-j])`);
+  const t = (/^(?:AC|IN)-\d{1,3}$/.test(args[k + 1] ?? '') ? `${args[k]} ${args[k + 1]}` : String(args[k] ?? '')).replace(/\s+/g, ' ').trim();
+  if (!TEST_RE.test(t)) die(`"${t}" is not a test (#N, #N AC-k, #N IN-k, S-k[ AC-j], P-<slug>[ AC-j])`);
   return t;
 };
 
@@ -129,7 +129,7 @@ switch (cmd) {
         || (p.kind === 'quarantined' && tier !== 'quarantined')
         || (p.kind === 'superseded' && tier !== 'retired')
         || (!tier)
-        || (['needs-review', 'fighting'].includes(p.kind) && (unchanged.has(p.test) || [...unchanged].some((u) => !/ AC-/.test(u) && p.test.startsWith(`${u} `))));
+        || (['needs-review', 'fighting'].includes(p.kind) && (unchanged.has(p.test) || [...unchanged].some((u) => !/ (?:AC|IN)-/.test(u) && p.test.startsWith(`${u} `))));
       if (gone) { Object.assign(p, { state: 'resolved', closed_utc: now() }); resolved.push(p.id); }
     }
     if (resolved.length) save(list);

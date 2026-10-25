@@ -102,4 +102,28 @@ assert "rerun: kept under the test's stem" '.label == "rerun-issue-42-c3-1200" a
 out="$(node "$D" '#42 AC-1')"
 assert "a run by hand is the newest failure a draft cites" '.build == "c3"' "$out"
 grep -q 'manual run' "$(jq -r .dir <<<"$out")/body.md" || { echo "  the draft names the run by hand"; FAILED=1; }
+
+# An intent test (docs/intent.md): `#42 IN-1` is a problem like a criterion — its frozen lines from
+# intent-<ac_hash>.md, its verdict from "intents", its evidence by issue-42 + in-1; a run by hand records it.
+cat > "$W/issues/42/intent-abc.md" <<'C'
+# #42 — intent        frozen_utc: 2026-10-02T13:41:30Z        ac_hash: abc
+
+## IN-1 — the renamed project is found by its new name
+Goal "so that a team finds a project by the name it uses now"
+Given a project with one task
+When the owner renames it, then searches for the new name
+Then the search lists the renamed project
+covers: AC-1
+surface: ui
+testable: yes
+C
+jq '. + {intent_verdict: "not-met", intents: [{id: "IN-1", verdict: "failed"}]}' "$W/issues/42/verdicts-abc-c3.json" > "$W/v.tmp" && mv "$W/v.tmp" "$W/issues/42/verdicts-abc-c3.json"
+jq '.run.results += [{"tags":["issue-42","in-1"],"status":"failed","titlePath":["#42 IN-1"],"attempts":[{"error":{"code":"assert","message":"search lists nothing"},"steps":[],"artifacts":[]}]}]' \
+  "$R/issue-42-candidate/report.json" > "$W/r.tmp" && mv "$W/r.tmp" "$R/issue-42-candidate/report.json"
+out="$(node "$D" '#42 IN-1')"
+b="$(cat "$(jq -r .dir <<<"$out")/body.md")"
+case "$b" in *'intent test IN-1'*'the search lists the renamed project'*) ;; *) echo "  the draft names the intent test and its Then"; FAILED=1;; esac
+case "$b" in *'search lists nothing'*) ;; *) echo "  the draft cites the intent test's failure"; FAILED=1;; esac
+cp "$R/issue-42-candidate/report.json" "$R/rerun-issue-42-c3-1200/report.json"
+assert "rerun: an intent test by its id" '.results == {"IN-1":{"status":"failed","error":"search lists nothing"}}' "$(node "$SCRIPTS/rerun.mjs" rerun-issue-42-c3-1200 '#42 IN-1' --build c3)"
 exit $FAILED

@@ -54,7 +54,7 @@ node "$HOME/scripts/impact.mjs" /tmp/quality-inspector-diff.json --iface /tmp/qu
 
 (Source `work/env/credentials.env` for the map's sign-in.) `impact.mjs` names, per test,
 every changed page or control it opens or mentions — and every removed command, flag,
-endpoint or response field it names — and whether the hit is inside an AC block. With no
+endpoint or response field it names — and whether the hit is inside an AC or IN block (frozen, [intent.md](intent.md)). With no
 map of `<previous>` (first run, lost volume), the UI diff is skipped (pass `none` in its
 place) and the run says so — the triage then leans on the issues alone.
 

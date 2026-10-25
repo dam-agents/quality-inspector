@@ -27,7 +27,7 @@ the command in a scheduled or channel turn (rule `issue-create`).
 
 | Ref | The problem |
 | --- | --- |
-| `#42 AC-2`, `#42 EX-1` | a criterion's or an exploration's test of issue #42 — its newest bad result (failed, regression, needs-review, flaky, observation, blocked), else its newest |
+| `#42 AC-2`, `#42 IN-1`, `#42 EX-1` | a criterion's, an intent test's or an exploration's test of issue #42 — its newest bad result (failed, regression, needs-review, flaky, observation, blocked), else its newest |
 | `S-7 AC-1`, `P-<slug> AC-1` | a scenario's or a profile scenario's criterion |
 | `D-12` | a design finding ([docs/ui-sweep.md](../../docs/ui-sweep.md)) |
 | `VAL-3` | a validation case of the newest validation run ([docs/validation.md](../../docs/validation.md)) |

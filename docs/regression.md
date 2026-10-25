@@ -9,9 +9,9 @@
 ```
 
 - `exploratory` — written by an issues run; `promoted_utc` is `-`. Not replayed nightly.
-- `promotable` — written instead by an issues run when, in that run, every AC in the file
-  was `verified`, the file passed `--strict` on the candidate, no step inside an AC block
-  was `judged`, and `scripts/check-asserts.sh --agent-asserts <file>` prints nothing. Like
+- `promotable` — written instead by an issues run when, in that run, every AC and every
+  testable IN ([intent.md](intent.md)) in the file was `verified`, the file passed `--strict`
+  on the candidate, no step inside an AC or IN block was `judged`, and `scripts/check-asserts.sh --agent-asserts <file>` prints nothing. Like
   `exploratory` otherwise (not replayed, not drift-checked); the queue for "promote all
   pending". A saved scenario joins it ([scenarios.md](scenarios.md) → Saving). With `auto_promote: verified` the issues run promotes such a file itself
   (tier `regression`, `assert_hash`, `promoted_utc` now) — the risk: an AC freeze the
@@ -20,7 +20,7 @@
   [on-demand.md](on-demand.md)), by `auto_promote: verified`, or — a profile scenario — by
   its adoption ([scenarios.md](scenarios.md) → **Profile scenarios**): merged in the
   product's repository, it needs no operator.
-  `assert_hash` is the `scripts/check-asserts.sh --hash` value of its AC blocks; it changes
+  `assert_hash` is the `scripts/check-asserts.sh --hash` value of its AC and IN blocks; it changes
   only by a heal ([triage.md](triage.md), logged in `work/HEALS.md`) or by the operator.
 - `retired` — superseded by a completed issue ([triage.md](triage.md)), or a profile
   scenario's test whose file is gone or whose text changed ([scenarios.md](scenarios.md) →

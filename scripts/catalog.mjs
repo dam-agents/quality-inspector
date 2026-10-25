@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// catalog.mjs — the test catalog: every criterion, exploration and scenario test of
+// catalog.mjs — the test catalog: every criterion, intent test (docs/intent.md), exploration and scenario test of
 // work/suite as one self-contained, browsable HTML page (docs/catalog.md). Reads work/ and,
 // once, the target's labelled issues (GET, for labels and state); writes work/catalog/ only.
 //
@@ -95,12 +95,12 @@ function parseCriteria(text) {
   const acs = [];
   for (const sec of text.split(/^## /m).slice(1)) {
     const head = sec.split('\n')[0];
-    const id = (head.match(/^((?:AC|EX)-\d+)/) ?? [])[1];
+    const id = (head.match(/^((?:AC|IN|EX)-\d+)/) ?? [])[1];
     if (!id) continue;
     const line = (k) => ((sec.match(new RegExp(`^${k}[: ]\\s*(.*)$`, 'm')) ?? [])[1] ?? null);
     const testable = line('testable');
     acs.push({
-      id, name: (head.match(/ — (.*)$/) ?? [])[1] ?? null,
+      id, name: (head.match(/ — (.*)$/) ?? [])[1] ?? null, goal: line('Goal'),
       given: line('Given'), when: line('When'), then: line('Then') ?? line('Expected'),
       surface: line('surface'), testable: testable == null ? true : /^yes/.test(testable),
     });
@@ -123,7 +123,7 @@ function parseTestFile(src) {
   const tests = starts.map((s, i) => {
     const body = src.slice(s, starts[i + 1] ?? src.length);
     const title = unjs((body.match(new RegExp(String.raw`^\s*test\(\s*` + STR)) ?? [])[2] ?? '');
-    const id = (title.match(/\b((?:AC|EX)-\d+)\b/) ?? [])[1] ?? null;
+    const id = (title.match(/\b((?:AC|IN|EX)-\d+)\b/) ?? [])[1] ?? null;
     const session = (body.match(/session:\s*['"]([\w-]+)['"]/) ?? [])[1] ?? 'owner';
     const tags = [...((body.match(/tags:\s*\[([^\]]*)\]/) ?? [])[1] ?? '').matchAll(/['"]([^'"]+)['"]/g)].map((m) => m[1]);
     const steps = [];
@@ -182,8 +182,9 @@ function readVerdicts(dir, okey, run, ref) {
     // A scenario's file has no top verdict: its worst criterion stands for the run.
     const worst = (v.acs ?? []).map((e) => e?.verdict).filter(Boolean).sort((a, b) => rank(a) - rank(b))[0] ?? null;
     runs.push({ type: run, ref, build, baseline: v.baseline ?? null, utc, verdict: v.verdict ?? worst, report: artRef(dir), secs: secsOf(v, utc), cost_usd: costOf(v),
-      entries: [...(v.acs ?? []), ...(v.explorations ?? [])].filter((e) => e?.id && e.verdict).map((e) => ({ key: `${okey}/${e.id}`, value: e.verdict })) });
-    for (const ac of v.acs ?? []) {
+      entries: [...(v.acs ?? []), ...(v.intents ?? []), ...(v.explorations ?? [])].filter((e) => e?.id && e.verdict).map((e) => ({ key: `${okey}/${e.id}`, value: e.verdict })) });
+    // An intent test (docs/intent.md) runs in the same candidate run as the criteria.
+    for (const ac of [...(v.acs ?? []), ...(v.intents ?? [])]) {
       const key = `${okey}/${ac.id}`;
       addHist(key, { build, run, value: ac.verdict, utc });
       if (v.candidate_run) (stillRuns.get(key) ?? stillRuns.set(key, []).get(key)).push({ label: v.candidate_run, utc });
@@ -206,7 +207,7 @@ for (const stem of ls(join(work, 'reruns')).filter((x) => /^(issue-\d+|scenario-
     const v = readJson(join(work, 'reruns', stem, f));
     if (!v || typeof v.results !== 'object') continue;
     const utc = v.utc ?? new Date(mtime(join(work, 'reruns', stem, f))).toISOString().replace(/\.\d+Z$/, 'Z');
-    const entries = Object.entries(v.results).filter(([id, r]) => /^(AC|EX)-\d+$/.test(id) && ['passed', 'failed', 'blocked'].includes(r?.status))
+    const entries = Object.entries(v.results).filter(([id, r]) => /^(AC|IN|EX)-\d+$/.test(id) && ['passed', 'failed', 'blocked'].includes(r?.status))
       .map(([id, r]) => ({ key: `${stem}/${id}`, value: r.status }));
     for (const e of entries) addHist(e.key, { build: v.build ?? null, run: 'rerun', value: e.value, utc });
     const worst = entries.map((e) => e.value).sort((a, b) => rank(a) - rank(b))[0] ?? null;
@@ -222,7 +223,7 @@ for (const dir of ls(join(work, 'reruns')).filter((x) => /^feature-[a-z0-9][a-z0
     const v = readJson(join(work, 'reruns', dir, f));
     if (!v || typeof v.results !== 'object') continue;
     const utc = v.utc ?? new Date(mtime(join(work, 'reruns', dir, f))).toISOString().replace(/\.\d+Z$/, 'Z');
-    const entries = Object.entries(v.results).filter(([k, r]) => /^(issue-\d+|scenario-\d+|profile-[a-z0-9][a-z0-9-]*)\/AC-\d+$/.test(k) && ['passed', 'failed', 'blocked'].includes(r?.status))
+    const entries = Object.entries(v.results).filter(([k, r]) => /^(issue-\d+\/(?:AC|IN)|scenario-\d+\/AC|profile-[a-z0-9][a-z0-9-]*\/AC)-\d+$/.test(k) && ['passed', 'failed', 'blocked'].includes(r?.status))
       .map(([k, r]) => ({ key: k, value: r.status }));
     for (const e of entries) addHist(e.key, { build: v.build ?? null, run: 'feature', value: e.value, utc });
     const worst = entries.map((e) => e.value).sort((a, b) => rank(a) - rank(b))[0] ?? null;
@@ -340,16 +341,17 @@ for (const okey of [...origins].sort((a, b) => a.localeCompare(b, 'en', { numeri
     ? parseCriteria(read(join(work, 'issues', num, `criteria-${qa.get(num)?.acHash}.md`)))
     : parseCriteria(read(join(work, 'scenarios', ref, `criteria-${scen.get(ref)?.specHash}.md`)));
   const exps = isIssue ? parseCriteria(read(join(work, 'issues', num, `explorations-${qa.get(num)?.acHash}.md`))) : null;
+  const ins = isIssue ? parseCriteria(read(join(work, 'issues', num, `intent-${qa.get(num)?.acHash}.md`))) : null;
   const src = read(join(work, 'suite', file));
   const parsed = src ? parseTestFile(src) : { summary: null, area: null, tests: [] };
   const meta = isIssue ? issueMeta.get(num) : null;
   const origin = isIssue
     ? { kind: 'issue', ref, number: +num, title: meta?.title ?? titles.get(okey) ?? crit?.title ?? null, labels: meta?.labels ?? null, state: meta?.state ?? null }
     : { kind: 'scenario', ref, title: crit?.title ?? titles.get(okey) ?? null, source: scen.get(ref)?.source ?? null };
-  const ids = [...new Set([...(crit?.acs ?? []).map((a) => a.id), ...(exps?.acs ?? []).map((a) => a.id),
+  const ids = [...new Set([...(crit?.acs ?? []).map((a) => a.id), ...(ins?.acs ?? []).map((a) => a.id), ...(exps?.acs ?? []).map((a) => a.id),
     ...parsed.tests.map((t) => t.id).filter(Boolean)])];
   for (const id of ids) {
-    const c = [...(crit?.acs ?? []), ...(exps?.acs ?? [])].find((a) => a.id === id) ?? {};
+    const c = [...(crit?.acs ?? []), ...(ins?.acs ?? []), ...(exps?.acs ?? [])].find((a) => a.id === id) ?? {};
     const t = parsed.tests.find((x) => x.id === id);
     const key = `${okey}/${id}`;
     const ex = id.startsWith('EX');
@@ -368,8 +370,8 @@ for (const okey of [...origins].sort((a, b) => a.localeCompare(b, 'en', { numeri
     const perfKey = t ? Object.keys(perf).find((k) => k === t.title || k.endsWith(` › ${t.title}`)) : null;
     items.push({
       key, file: t ? file : null, origin, id,
-      kind: ex ? 'exploration' : 'criterion',
-      name: c.name ?? t?.title?.replace(/^.*?(?:AC|EX)-\d+:\s*/, '') ?? null,
+      kind: ex ? 'exploration' : id.startsWith('IN') ? 'intent' : 'criterion',
+      name: c.name ?? t?.title?.replace(/^.*?(?:AC|IN|EX)-\d+:\s*/, '') ?? null, goal: c.goal ?? null,
       given: c.given ?? null, when: c.when ?? null, then: c.then ?? null,
       surface: c.surface ?? null, testable: c.testable ?? true,
       tier: !t ? 'untracked' : ex ? 'exploratory' : (row?.tier ?? 'untracked'), // explorations are never promoted

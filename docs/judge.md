@@ -2,7 +2,9 @@
 
 A scenario has no issue author behind its criteria and no red-green behind its verdict,
 so a second reader checks both: is it a sound test ([scenarios.md](scenarios.md) →
-The pipeline, step 4), and does the evidence show what the verdict claims (step 10)?
+The pipeline, step 4), and does the evidence show what the verdict claims (step 10)? An
+issue's intent file has no author behind its goal either: the same reader checks it
+(**Intent** below, [intent.md](intent.md) → The judge).
 
 ## Briefing
 
@@ -76,3 +78,27 @@ Per AC:
 ```
 
 `call` is `-` for a pass. When the evidence does not show the claim, disagree.
+
+## Intent — is this the author's purpose?
+
+Inputs: `issue-<ac_hash>.json` (the issue as `github.sh issue` gave it), the criteria file and
+the intent file ([intent.md](intent.md)).
+
+Per IN:
+
+- **Quoted** — `Goal` is one sentence of the issue's title or body, verbatim.
+- **Grounded** — the `Then` follows from that sentence, not from how a product usually
+  behaves; nothing the issue does not ask for is added to the `When`.
+- **Beyond the letter** — the journey checks an outcome no criterion checks alone; an IN that
+  only repeats a criterion is not one.
+- **Observable, one outcome, testable here** — as for a criterion
+  ([acceptance-criteria.md](acceptance-criteria.md) → Rules).
+
+```json
+{"verdict": "accept", "reason": "one sentence",
+ "ins": [{"id": "IN-1", "ok": false, "problems": ["the goal sentence is not in the issue"],
+          "fix": "quote 'so that a user can …' from the body"}]}
+```
+
+`verdict`: `accept` (every IN ok, or the file says `none` and the issue states no purpose) ·
+`revise` (each problem has a concrete `fix`) · `reject` (no fix makes it the author's purpose).

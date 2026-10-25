@@ -58,6 +58,8 @@ assert "sweep: the quarantine undone" '.resolved == ["M-2"]' "$(M sweep)"
 assert "close: once" '.state == "kept"' "$(M close M-3 kept)"
 M close M-3 retired 2>/dev/null; assert_eq "close: a closed row again, exit 2" 2 "$?"
 assert "list --open: what is left" '[.proposals[].id] == ["M-1"]' "$(M list --open)"
+assert "an intent test is a test" '.opened' "$(M open '#42' IN-1 --kind needs-review --build c5 --proposal review --basis-file "$(B 'IN-1 judged on c5')")"
+M open 'S-7 IN-1' --kind drift --build c5 --proposal heal --basis-file "$(B x)" 2>/dev/null; assert_eq "a scenario has no intent test: exit 2" 2 "$?"
 assert "check: well-formed" '.ok' "$(M check)"
 ls "$SANDBOX" | grep -q '^quality-inspector-basis\.[A-Za-z0-9]' && { echo "  a basis file stayed after its call"; FAILED=1; }
 
