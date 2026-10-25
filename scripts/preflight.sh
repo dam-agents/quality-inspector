@@ -724,7 +724,7 @@ mode_radar() {
   while IFS= read -r n; do log "$n"; done < <(jq -r '.logs[]' <<<"$scan")
   # A cut listing with nothing due: the next run starts past it (radar.mjs advance, later than $since
   # only), never reads it again; one with no later time to start at is an error, never a quiet run.
-  jq -e '.stalled == true' <<<"$scan" >/dev/null && fail_out "the pull request listing is cut inside $since: more items updated in that second than github.sh prs pages — the radar cannot move past them"
+  jq -e '.stalled == true' <<<"$scan" >/dev/null && fail_out "the pull request listing is cut inside $since: more items updated in that second than github.sh prs pages — the radar cannot move past them; the operator's step: docs/radar.md → The ledger"
   n="$(jq -r '.advance // empty' <<<"$scan")"
   if [ -n "$n" ]; then
     node "$SCRIPT_DIR/radar.mjs" advance "$n" >/dev/null 2>&1 && log "the next listing starts at $n" \

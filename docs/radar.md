@@ -75,7 +75,9 @@ Written only by `radar.mjs record`, under its mutex. The next listing starts at 
 leaves nothing due moves the start past it instead (`radar.mjs advance`, the cut mark
 `work/.cache/radar-since`, only to a time later than the start): the radar never reads the same cut
 listing twice. One cut inside its start's own second has no later start that skips nothing: the
-pre-flight reports it as an error. The audit checks the
+pre-flight reports it as an error on every run until the operator, in the direct session, moves the
+start one second on — `node "$HOME/scripts/radar.mjs" advance <start + 1 s>` — and accepts that the
+pull requests updated in that second are not read. The audit checks the
 ledger's format (`radar`).
 
 ## Lifecycle of a `predicted` proposal

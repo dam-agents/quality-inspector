@@ -21,6 +21,7 @@ const body = ["## What", "The **API keys** tab is now [Access tokens](https://ex
   "    indented code line", "- Moves the tab under Settings", "+added line", "-removed line", "--- a/src/x.ts", "@@ -1 +1 @@",
   "diff --git a/x b/x", "import foo from \"bar\"", "if (x) {", "Fixes 3f2a9c1d in ./scripts/a.sh, lib/ui/tab.vue and C:\\work\\y.txt.",
   "See `npm run build` and docs/a/b/c here. <img src=x> <details>Kept words</details>", "[ref]: http://foo",
+  "if user.is_admin:", "x = compute_total(items, tax)", "Go to evil.example/a now.",
   "Unclosed <!-- comment hides the rest", "secret tail"].join("\n");
 console.log(JSON.stringify([
   { number: 5, title: "Rename `ApiKeys` in src/settings/Tabs.tsx — see https://x.y/z <!-- x -->", body, labels: [{ name: "ui" }],
@@ -35,10 +36,10 @@ assert "states: merged, open, closed unmerged" 'map(.state) == ["merged","open",
 assert "the title: no inline code, path, URL or comment" '.[0].title == "Rename in — see"' "$out"
 b="$(jq -r '.[0].body' <<<"$out")"
 for gone in http example.com github.com 'ignore all' QA 'const secret' 'rm -rf' 'indented code' 'added line' 'removed line' \
-            'src/' '@@' 'diff --git' 'import foo' 'if (x)' 3f2a9c1d scripts/a.sh tab.vue 'y.txt' 'npm run' 'docs/a' '<img' '<details>' '[ref]' 'secret tail'; do
+            'src/' '@@' 'diff --git' 'import foo' 'if (x)' 'is_admin' compute_total evil.example 3f2a9c1d scripts/a.sh tab.vue 'y.txt' 'npm run' 'docs/a' '<img' '<details>' '[ref]' 'secret tail'; do
   case "$b" in (*"$gone"*) echo "  assertion failed: the sanitized body still holds \"$gone\""; FAILED=1;; esac
 done
-for kept in 'API keys' 'Access tokens' 'Moves the tab under Settings' 'Kept words'; do
+for kept in 'API keys' 'Access tokens' 'Moves the tab under Settings' 'Kept words' 'Go to'; do
   case "$b" in (*"$kept"*) ;; (*) echo "  assertion failed: the sanitized body lost \"$kept\""; FAILED=1;; esac
 done
 assert "the caps: title 200, body 2000 characters" '.[1] | (.title | length) == 200 and (.body | length) == 2000 and (.title | endswith("…"))' "$out"

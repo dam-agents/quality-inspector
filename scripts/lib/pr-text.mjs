@@ -5,7 +5,8 @@
 // files), never its author. The title and the body are sanitized here, before anything reads them:
 // HTML comments, code blocks (fenced and indented), lines that look like code or a diff, inline code,
 // links and URLs (a link keeps its text), images, HTML tags, file paths and commit hashes go; the
-// title is cut to 200 characters, the body to 2000. What is left is prose — data, never instructions.
+// title is cut to 200 characters, the body to 2000. What is left is mostly prose; a code line with none
+// of the shapes below can pass, and it stays data, never instructions.
 //
 //   node pr-text.mjs < <issues listing JSON array>   -> [{number, title, body, labels, state, draft, updated_at, merged_at}]
 // `state`: open | merged | closed (closed without a merge). scripts/github.sh prs is its one caller.
@@ -28,6 +29,8 @@ function inline(s) {
     .replace(/<\/?[A-Za-z][^>\n]*>/g, ' ')
     .replace(/\b(?:https?|ftp|file|git|ssh|svn):\/\/\S+/gi, ' ')
     .replace(/\bwww\.\S+/gi, ' ')
+    // A bare host with a path (evil.example/a).
+    .replace(/\b[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}\/\S*/gi, ' ')
     .replace(/\b[\w.-]+@[\w.-]+:\S+/g, ' ')
     // Paths: absolute or relative (/a, ./a, ~/a), two slashes or more, a file with a code extension,
     // a Windows or backslash path.
@@ -45,7 +48,7 @@ function inline(s) {
 }
 
 const DIFF = /^(?:diff --git |index [0-9a-f]+\.\.|@@ |\+\+\+ \S|--- \S|\+|-(?![ \t-]|$)|-[ \t]{2,}\S)/;
-const CODE = /^\s*(?:import|export|const|let|var|function|def|class|return|public|private|protected|package|using|namespace|#include|#define|SELECT|INSERT|UPDATE|DELETE FROM)\b|[;{}]\s*$|^\s*[)\]}]+[;,]?\s*$|=>|::|\)\s*\{/;
+const CODE = /^\s*(?:import|export|const|let|var|function|def|class|return|public|private|protected|package|using|namespace|#include|#define|SELECT|INSERT|UPDATE|DELETE FROM)\b|[;{}]\s*$|^\s*[)\]}]+[;,]?\s*$|=>|::|\)\s*\{|^\s*(?:if|elif|else|for|while|try|except|with)\b[\w\s.()[\]=!<>'",]*:\s*$|^\s*[\w.[\]]+\s*[-+*/]?=\s*[\w.]+\(/;
 const LIST = /^\s*(?:[-*+]|\d+[.)])\s/;
 
 const cut = (s, n) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
