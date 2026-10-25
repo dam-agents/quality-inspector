@@ -235,6 +235,16 @@ for (const dir of ls(join(work, 'reruns')).filter((x) => /^feature-[a-z0-9][a-z0
 // Nightly runs: REGRESSION.log `ran candidate=` lines, and per run the criteria that were not
 // unchanged (work/regression/<candidate>/verdicts.json); every other regression-tier item of
 // that night counts as unchanged. A night whose environment failed is a run without results.
+// Why a night's environment failed (docs/regression.md step 2): work/regression/<c>/environment.json
+// when its `utc` is the ERROR line's — a later failure of the same build rewrites the file.
+const envFailure = (file, utc) => {
+  const f = readJson(file);
+  if (!f || f.utc !== utc) return null;
+  const txt = (x, n) => (typeof x === 'string' && x.trim() ? x.trim().slice(0, n) : null);
+  return { stage: /^(lock|reset|up|smoke|canary)$/.test(f.stage) ? f.stage : null, exit: Number.isInteger(f.exit) ? f.exit : null,
+    cause: txt(f.cause, 600), repair: txt(f.repair, 600), next: txt(f.next, 600),
+    evidence: (Array.isArray(f.evidence) ? f.evidence : []).filter((l) => typeof l === 'string').slice(-30).map((l) => l.slice(0, 300)) };
+};
 const nights = [];
 const nightOutcomes = new Map(); // build -> Map(item key -> value)
 const nightFile = new Map(); // build -> its verdicts.json
@@ -255,7 +265,11 @@ for (const line of (read(join(work, 'REGRESSION.log')) ?? '').split('\n')) {
   const d = line.match(/^(\S+) due candidate=(\S+)/);
   if (d) { due.set(d[2], d[1]); continue; }
   const env = line.match(/^(\S+) ERROR: environment candidate=(\S+)/);
-  if (env) { runs.push({ type: 'regression', ref: null, build: env[2], utc: env[1], verdict: 'environment', report: null, secs: span(due.get(env[2]), env[1]), cost_usd: null, entries: [] }); due.delete(env[2]); continue; }
+  if (env) {
+    runs.push({ type: 'regression', ref: null, build: env[2], utc: env[1], verdict: 'environment', report: null, secs: span(due.get(env[2]), env[1]), cost_usd: null, entries: [],
+      failure: envFailure(join(work, 'regression', env[2], 'environment.json'), env[1]) });
+    due.delete(env[2]); continue;
+  }
   const m = line.match(/^(\S+) ran candidate=(\S+)(.*)$/);
   if (!m) continue;
   const started = due.get(m[2]); due.delete(m[2]);
