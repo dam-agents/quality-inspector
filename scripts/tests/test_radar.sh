@@ -99,7 +99,10 @@ R scan "$SANDBOX/nothing.json" >/dev/null 2>&1; assert_eq "scan of no listing: e
 jq -c '.prs' "$SANDBOX/prs.json" > "$SANDBOX/bare.json"
 R scan "$SANDBOX/bare.json" >/dev/null 2>&1; assert_eq "scan of a bare array (no truncated flag): exit 2" 2 "$?"
 jq -c '.truncated = true | .last_updated_at = "2026-10-25T05:00:00Z"' "$SANDBOX/prs.json" > "$SANDBOX/cut.json"
-assert "a cut listing with something due: no advance" '.truncated and .advance == null' "$(R scan "$SANDBOX/cut.json")"
+assert "a cut listing with something due: no advance" '.truncated and .advance == null and .stalled == false' "$(R scan "$SANDBOX/cut.json")"
+jq -c '.prs = [] | .truncated = true | .last_updated_at = "2026-10-25T05:00:00Z"' "$SANDBOX/prs.json" > "$SANDBOX/cut0.json"
+assert "a cut listing with nothing due: advance past its start" '.advance == "2026-10-25T05:00:00Z" and .stalled == false' "$(R scan "$SANDBOX/cut0.json" --since 2026-10-25T04:00:00Z)"
+assert "a cut listing whose last item has the start's time: stalled, no advance" '.advance == null and .stalled' "$(R scan "$SANDBOX/cut0.json" --since 2026-10-25T05:00:00Z)"
 
 # ---------------------------------------------------------------- record and the lifecycle
 h() { jq -r --argjson n "$1" '.due[] | select(.pr == $n) | .text_hash' <<<"$out"; }
@@ -187,6 +190,11 @@ node -e 'const f = process.argv[1]; const items = JSON.parse(require("fs").readF
 out="$(QI_PRS_PAGES=1 bash "$SCRIPTS/preflight.sh" radar)"
 assert "radar: a cut listing with nothing due — nothing to do, the next run starts past it" '.nothing_to_do and (.logs | any(test("starts at 2026-10-25T03:00:00Z")))' "$out"
 assert "since: the cut mark" '.since == "2026-10-25T03:00:00Z"' "$(R since)"
+R advance 2026-10-25T03:00:00Z >/dev/null 2>&1; assert_eq "advance to a mark not later than the start: exit 2" 2 "$?"
+assert "since: the refused mark changed nothing" '.since == "2026-10-25T03:00:00Z"' "$(R since)"
+# The same cut listing again: every item at or before the start, no later mark — an error, never a quiet run.
+out="$(QI_PRS_PAGES=1 bash "$SCRIPTS/preflight.sh" radar)"
+assert "radar: a cut listing inside one second is an error" '.nothing_to_do and (.error | test("cut inside 2026-10-25T03:00:00Z")) and .title == "Change radar: pre-flight error"' "$out"
 grep -q 'truncated=true$' "$W/RADAR.log" || { echo "  assertion failed: the RADAR.log line names the cut"; FAILED=1; }
 out="$(STUB_GH_FAIL=1 bash "$SCRIPTS/preflight.sh" radar)"
 assert "radar: a failed listing is an error, never a quiet run" '(.error | test("pull requests")) and .title == "Change radar: pre-flight error"' "$out"

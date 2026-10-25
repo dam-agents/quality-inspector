@@ -73,7 +73,9 @@ Written only by `radar.mjs record`, under its mutex. The next listing starts at 
 `updated_at`; a pull request is due again only when its text hash, or its state, changed. At most
 10 `new` / `changed` a run: the rest waits, in order. A listing cut at 1000 items (`truncated`) that
 leaves nothing due moves the start past it instead (`radar.mjs advance`, the cut mark
-`work/.cache/radar-since`): the radar never reads the same cut listing twice. The audit checks the
+`work/.cache/radar-since`, only to a time later than the start): the radar never reads the same cut
+listing twice. One cut inside its start's own second has no later start that skips nothing: the
+pre-flight reports it as an error. The audit checks the
 ledger's format (`radar`).
 
 ## Lifecycle of a `predicted` proposal

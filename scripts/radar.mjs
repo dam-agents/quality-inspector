@@ -7,8 +7,9 @@
 //
 //   node radar.mjs since                    -> {"since": <iso>}   the newest updated_at of the ledger or the cut mark,
 //                                              else 14 days ago
-//   node radar.mjs scan <prs.json>          -> {"due": [...], "deferred", "truncated", "advance", "inventory", "logs": []}
-//   node radar.mjs advance <iso>            -> {"since": <iso>}   the cut mark, work/.cache/radar-since
+//   node radar.mjs scan <prs.json> [--since <iso>]   -> {"due": [...], "deferred", "truncated", "advance", "stalled", "inventory", "logs": []}
+//   node radar.mjs advance <iso>            -> {"since": <iso>}   the cut mark, work/.cache/radar-since; refused (exit 2)
+//                                              unless later than `since`
 //   node radar.mjs record <pr> --hash <h> --state <open|merged|closed> --updated-at <iso>
 //        [--merged-at <iso>] [--proposal M-k]… [--keep]
 //     -> {"pr", "state", "proposals", "resolved": []}
@@ -24,7 +25,10 @@
 //   the next run (`deferred`), so the ledger's newest updated_at never passes one not read.
 //   A cut listing (`truncated`, more items than `github.sh prs` pages) that leaves nothing due or
 //   deferred gives `advance`: its last item's update time, which the pre-flight keeps as the cut mark
-//   (`advance`), so the next listing starts past what this one read instead of reading it again.
+//   (`advance`), so the next listing starts past what this one read instead of reading it again. Only a
+//   mark later than --since (the listing's start) advances: a cut listing whose last item has the start's
+//   own time — more items than the pages hold, all updated in that second — is `stalled` instead, an
+//   error of the run, since no later start exists that skips none of them.
 // record: one ledger row per pull request, written under its mutex. The proposals are those the run
 //   opened or updated for it (open `predicted` rows only); --keep adds the row's earlier ones (a
 //   `merged` entry). A proposal the pull request no longer holds — every one when it is `closed` — is
@@ -108,8 +112,13 @@ function scan() {
   }
   const last = UTC_RE.test(listing.last_updated_at ?? '') ? listing.last_updated_at : null;
   if (listing.truncated) logs.push(`listing cut after ${prs.length} pull requests${last ? ` (last update ${last})` : ''}`);
-  const advance = listing.truncated && !due.length && !deferred ? last : null;
-  out({ due, deferred, truncated: listing.truncated, advance, inventory: ctx.inventory, logs });
+  const since = flag('--since');
+  if (since != null && !UTC_RE.test(since)) die('--since is the listing\'s start, <YYYY-MM-DDTHH:MM:SSZ>');
+  const cut = listing.truncated && !due.length && !deferred;
+  const advance = cut && last && (!since || last > since) ? last : null;
+  const stalled = cut && !advance;
+  if (stalled) logs.push(`listing cut and nothing due, but no update time later than ${since ?? 'its start'}: the next listing would be the same`);
+  out({ due, deferred, truncated: listing.truncated, advance, stalled, inventory: ctx.inventory, logs });
 }
 
 function record() {
@@ -169,17 +178,21 @@ function check() {
   return { ok: problems.length === 0, problems };
 }
 
+// The next listing's start: the newest of the ledger's updated_at and the cut mark, else 14 days ago.
+function sinceNow() {
+  const mark = (read(MARK) ?? '').trim();
+  const list = [...load().map((r) => r.updated_at), mark].filter((u) => UTC_RE.test(u)).sort();
+  return list.at(-1) ?? new Date(Date.now() - FIRST_DAYS * 86400000).toISOString().replace(/\.\d+Z$/, 'Z');
+}
+
 try {
   switch (cmd) {
-    case 'since': {
-      const mark = (read(MARK) ?? '').trim();
-      const list = [...load().map((r) => r.updated_at), mark].filter((u) => UTC_RE.test(u)).sort();
-      out({ since: list.at(-1) ?? new Date(Date.now() - FIRST_DAYS * 86400000).toISOString().replace(/\.\d+Z$/, 'Z') });
-      break;
-    }
+    case 'since': out({ since: sinceNow() }); break;
     case 'scan': scan(); break;
     case 'advance': {
       if (!UTC_RE.test(args[0] ?? '')) die('usage: radar.mjs advance <YYYY-MM-DDTHH:MM:SSZ>');
+      const from = sinceNow();
+      if (args[0] <= from) die(`${args[0]} is not later than the listing's start ${from}: the next run would read the same listing`);
       mkdirSync(dirname(MARK), { recursive: true });
       writeAtomic(MARK, `${args[0]}\n`);
       out({ since: args[0] });

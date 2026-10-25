@@ -719,10 +719,12 @@ mode_radar() {
   RADAR_TMP="$(mktemp /tmp/quality-inspector-radar.XXXXXX)" || fail_out "no temp file for the pull request listing"
   trap 'rm -f "${RADAR_TMP:-}"' EXIT
   bash "$SCRIPT_DIR/github.sh" prs --since "$since" > "$RADAR_TMP" 2>/dev/null || fail_out "cannot list the target's pull requests (github.sh prs)"
-  scan="$(node "$SCRIPT_DIR/radar.mjs" scan "$RADAR_TMP" 2>/dev/null)" || fail_out "radar.mjs scan failed"
+  scan="$(node "$SCRIPT_DIR/radar.mjs" scan "$RADAR_TMP" --since "$since" 2>/dev/null)" || fail_out "radar.mjs scan failed"
   rm -f "$RADAR_TMP"
   while IFS= read -r n; do log "$n"; done < <(jq -r '.logs[]' <<<"$scan")
-  # A cut listing with nothing due: the next run starts past it (radar.mjs advance), never reads it again.
+  # A cut listing with nothing due: the next run starts past it (radar.mjs advance, later than $since
+  # only), never reads it again; one with no later time to start at is an error, never a quiet run.
+  jq -e '.stalled == true' <<<"$scan" >/dev/null && fail_out "the pull request listing is cut inside $since: more items updated in that second than github.sh prs pages — the radar cannot move past them"
   n="$(jq -r '.advance // empty' <<<"$scan")"
   if [ -n "$n" ]; then
     node "$SCRIPT_DIR/radar.mjs" advance "$n" >/dev/null 2>&1 && log "the next listing starts at $n" \
