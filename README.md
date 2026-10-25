@@ -112,7 +112,8 @@ The agent must not be able to read the target's source, and it has **no GitHub a
 own** ([docs/black-box.md](docs/black-box.md)). The kit's egress makes it true for every
 target, with no operator step and whatever the connection's token may read (the gateway
 injects it; the VM holds a placeholder): GitHub is deny-by-default, and only the issues
-endpoints, the `.quality-inspector/` profile directory, a repository's metadata and the
+endpoints (which also list the pull requests: the Change radar keeps their sanitized title and
+description alone), the `.quality-inspector/` profile directory, a repository's metadata and the
 read-only fetch of this definition open — for every repository alike, each allow fenced by
 two longer denies against wildcard tricks. Every other code host is denied. What stays the
 operator's, listed by `bash scripts/egress-rules.sh` as host, method, path and why — never as
@@ -180,6 +181,9 @@ the only one that is a product defect, and the default when the evidence is uncl
 What the agent may not absorb alone becomes a **maintenance proposal** for the operator — what
 changed, the evidence, and accept, rewrite, retire or keep ([docs/maintenance.md](docs/maintenance.md));
 a page, control or interface gone or moved in the night's UI map opens one before the test even fails.
+A **Change radar** (every 3 hours, off by default) reads the target's pull requests — their title and
+description only, sanitized, through the issues listing; never a diff — and opens a `predicted`
+proposal for each recurring test a change names, before a build carries it ([docs/radar.md](docs/radar.md)).
 Recurring tests are also grouped by **feature** ("Model switching"), so anyone can ask for a
 feature by name — "run feature …" in the chat, "test feature …" in Slack — and have its tests run
 again ([docs/features.md](docs/features.md)).

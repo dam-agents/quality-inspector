@@ -7,10 +7,14 @@
 #   github.sh whoami                       -> the agent's login (github_login, else the token's)
 #   github.sh check                        -> exit 0 when the target's issues are readable
 #   github.sh list                         -> issues carrying qa_label, open and closed, as JSON
+#   github.sh prs [--since <iso>]          -> {"prs": [...], "truncated", "last_updated_at"}: the pull requests
+#                                             the issues listing names, updated since <iso>, oldest first —
+#                                             their text alone, sanitized (lib/pr-text.mjs; the Change radar,
+#                                             docs/radar.md); `truncated` past QI_PRS_PAGES (10) pages
 #   github.sh issue <n>                    -> the issue as JSON; a pull request is refused
-#   github.sh comments <n> [<since-iso>]   -> its comments as one JSON array (every page)
-#   github.sh comment <n> <file>           -> posts the file as a comment, prints its URL
-#   github.sh unlabel <n>                  -> removes retest_label from the issue
+#   github.sh comments <n> [<since-iso>]   -> its comments as one JSON array (every page); a pull request is refused
+#   github.sh comment <n> <file>           -> posts the file as a comment, prints its URL; not on a pull request
+#   github.sh unlabel <n>                  -> removes retest_label from the issue; not from a pull request
 #   github.sh create-issue <draft-dir> [--fix] [--again]
 #                                          -> opens one new issue from a draft of scripts/issue-draft.mjs
 #                                             (work/found/<slug>/: draft.json, title.txt, body.md) about
@@ -48,6 +52,13 @@ need_target() {
   printf '%s' "$RP" | grep -qE '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$' || refuse "target_repo '$TARGET' is not [<host>/]<owner>/<repo>"
 }
 enabled() { [ "$(cfg "$1")" = enabled ]; }
+PRS_PAGES="${QI_PRS_PAGES:-10}"; case "$PRS_PAGES" in (''|*[!0-9]*|0) PRS_PAGES=10;; esac
+# Of a pull request, nothing but the text `prs` reads: no comments, no write (docs/radar.md).
+not_pr() {
+  local o; o="$(api "repos/$RP/issues/$1")" || exit 1
+  printf '%s' "$o" | jq -e 'type == "object" and (has("pull_request") | not)' >/dev/null 2>&1 \
+    || refuse "#$1 is a pull request, not an issue"
+}
 # The refs a found issue may be about (skills/create-issue): a criterion, intent test or exploration of an issue,
 # a criterion of a scenario or a profile scenario, a design finding, a validation case, a stress check.
 REF_RE='^(#[0-9]{1,7} (AC|IN|EX)-[0-9]{1,3}|S-[0-9]{1,6} AC-[0-9]{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-[0-9]{1,3}|D-[0-9]{1,6}|VAL-[0-9]{1,6}|STRESS-[A-Z]{1,20}-[0-9]{1,3})$'
@@ -113,6 +124,30 @@ case "$cmd" in
     need_target; l="$(cfg qa_label)"
     out="$(api -X GET "repos/$RP/issues" -f labels="${l:-qa:ready}" -f state=all -f per_page=100)" || exit 1
     printf '%s' "$out" | jq -c '[.[] | select(has("pull_request") | not) | {number, title, state, labels: [.labels[]?.name]}]' ;;
+  (prs)
+    need_target; since=""
+    case "${1:-}" in
+      ('') ;;
+      (--since) since="${2:-}"; [[ "$since" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] && [ $# -eq 2 ] || usage ;;
+      (*) usage ;;
+    esac
+    f=(-f state=all -f sort=updated -f direction=asc -f per_page=100); [ -n "$since" ] && f+=(-f since="$since")
+    # The issues listing names pull requests too; no /pulls endpoint is ever requested. Pages join
+    # on stdin, never as an argument (one argument holds 128 KiB). Past PRS_PAGES pages the listing
+    # is cut: `truncated`, and the update time of its last item, issue or pull request.
+    all=""; truncated=false
+    for page in $(seq 1 "$PRS_PAGES"); do
+      c="$(api -X GET "repos/$RP/issues" "${f[@]}" -f page="$page")" || exit 1
+      printf '%s' "$c" | jq -e 'type == "array"' >/dev/null 2>&1 || exit 1
+      all="$all$c"$'\n'
+      [ "$(jq length <<<"$c")" -lt 100 ] && break
+      [ "$page" = "$PRS_PAGES" ] && truncated=true
+    done
+    all="$(printf '%s' "$all" | jq -cs 'add // []')" || exit 1
+    last="$(jq -r '[.[].updated_at | strings] | last // ""' <<<"$all")"
+    printf '%s' "$all" | node "$SCRIPT_DIR/lib/pr-text.mjs" \
+      | jq -c --argjson t "$truncated" --arg l "$last" '{prs: ., truncated: $t, last_updated_at: (if $l == "" then null else $l end)}' \
+      || exit 1 ;;
   (issue)
     need_target; num "${1:-}"
     out="$(api "repos/$RP/issues/$1")" || exit 1
@@ -121,24 +156,27 @@ case "$cmd" in
     printf '%s' "$out" | jq -c '{number, title, body, state, state_reason, author_association,
       user: .user.login, labels: [.labels[]?.name], created_at, updated_at, closed_at}' ;;
   (comments)
-    need_target; num "${1:-}"
+    need_target; num "${1:-}"; not_pr "$1"
     f=(-f per_page=100); [ -n "${2:-}" ] && f+=(-f since="$2")
     # Explicit pages: GitHub's next links name /repositories/<id>/…, which the egress denies.
-    all='[]'
+    # Pages join on stdin, never as an argument (one argument holds 128 KiB).
+    all=""
     for page in 1 2 3 4 5 6 7 8 9 10; do
       c="$(api -X GET "repos/$RP/issues/$1/comments" "${f[@]}" -f page="$page")" || exit 1
       printf '%s' "$c" | jq -e 'type == "array"' >/dev/null 2>&1 || exit 1
-      all="$(jq -c --argjson c "$c" '. + $c' <<<"$all")"
+      all="$all$c"$'\n'
       [ "$(jq length <<<"$c")" -lt 100 ] && break
     done
-    jq -c '[.[] | {id, user: .user.login, author_association, created_at, updated_at, body}]' <<<"$all" ;;
+    printf '%s' "$all" | jq -cs 'add // [] | [.[] | {id, user: .user.login, author_association, created_at, updated_at, body}]' ;;
   (comment)
     need_target; num "${1:-}"; [ -f "${2:-}" ] || usage
     enabled issue_comments || enabled spec_feedback || refuse "issue_comments and spec_feedback are disabled"
+    not_pr "$1"
     api -X POST "repos/$RP/issues/$1/comments" -F body=@"$2" --jq .html_url ;;
   (unlabel)
     need_target; num "${1:-}"
     enabled issue_comments || refuse "issue_comments is disabled"
+    not_pr "$1"
     l="$(cfg retest_label)"; l="$(jq -rn --arg l "${l:-qa:retest}" '$l | @uri')"
     api -X DELETE "repos/$RP/issues/$1/labels/$l" >/dev/null ;;
   (create-issue) create_issue "$@" ;;

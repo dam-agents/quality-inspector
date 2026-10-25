@@ -198,7 +198,8 @@ refuse and explain instead:
   be optional or best-effort — a missing external surface never fails the run.
 - **No GitHub, and the black-box boundary** ([black-box.md](black-box.md)): no change may
   let the agent reach GitHub but through `scripts/github.sh`, widen that script beyond the
-  target's issues endpoints, or let it read the target's source, git data, pulls, commits,
+  target's issues endpoints, or let it read the target's source, git data, pulls (but the sanitized
+  pull request text of `github.sh prs`, [radar.md](radar.md)), commits,
   issue timelines, archives, installed product package files or deployment templates — nor
   weaken the shared GitHub egress (`github_rules` in `scripts/lib/boundary.sh`, carried by
   `kit.yaml`), the boundary probes, or the black-box gate that stops every run while one

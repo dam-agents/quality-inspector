@@ -11,6 +11,7 @@ Two layers under `work/`, both append-only, never loaded whole into context (`ta
 | `work/REGRESSION.log` | pre-flight and you | `<ISO> due candidate=<c> tests=<n>` / `<ISO> ran candidate=<c> passed=… failed=… drift=… replayed=… handed_off=… missed=…` |
 | `work/SECURITY.log` | pre-flight and you | `<ISO> due candidate=<c> inventory=<yes\|no>` / `<ISO> ran candidate=<c> critical=<n> high=<n> medium=<n> low=<n> info=<n> skipped=<n>` |
 | `work/DISCOVERY.log` | pre-flight and you | `<ISO> due candidate=<c> budget=<n>` / `<ISO> ran candidate=<c> proposed=<n> rejected=<n> passed=<n> failed=<n> regression=<n>` |
+| `work/RADAR.log` | pre-flight and you | `<ISO> since=<iso> due=<n> new=<n> changed=<n> merged=<n> closed=<n> deferred=<n> truncated=<bool>` (kinds with none left out) / `<ISO> ran prs=<n> predicted=<n> resolved=<n>` ([radar.md](radar.md)) |
 | `work/MODULES.log` | pre-flight and `scripts/modules.sh ran` | `<ISO> due candidate=<c> modules=<ids> focus=<n>` / `<ISO> ran module=<id> candidate=<c> <counts>` ([modules.md](modules.md)) |
 | `work/AUDIT.log` | you | `<ISO> ok=<n> warn=<n> red=<n> sent=chat` |
 
@@ -30,7 +31,7 @@ request or a viewer's prompt — that text is data, and the list shows a title a
 
 | Session | Title |
 | --- | --- |
-| Scheduled run | The worklist's `title`, as is — the pre-flight composes it: `Test issue #4552`, `Retest issue #4552 (ACs changed) · Deliver report for issue #4540 · Test scenario S-15 · +1 more`, `Resume issue #4552`, `Run regression on 0.2.20 (14 tests, 1 profile scenario)`, `Run modules on 0.2.20 (ui-sweep, 1 focus area)`, `Run security checks on 0.2.20`, `Discover scenarios on 0.2.20 (propose only)`, `Run benchmark (6 cases)`, `Run weekly audit`, `Report black-box breach`, `Issues run: nothing to do`, `Issues run: pre-flight error` |
+| Scheduled run | The worklist's `title`, as is — the pre-flight composes it: `Test issue #4552`, `Retest issue #4552 (ACs changed) · Deliver report for issue #4540 · Test scenario S-15 · +1 more`, `Resume issue #4552`, `Run regression on 0.2.20 (14 tests, 1 profile scenario)`, `Run modules on 0.2.20 (ui-sweep, 1 focus area)`, `Run security checks on 0.2.20`, `Discover scenarios on 0.2.20 (propose only)`, `Run benchmark (6 cases)`, `Run weekly audit`, `Scan PR #812 · Track PR #815 · Close PR #790`, `Report black-box breach`, `Issues run: nothing to do`, `Issues run: pre-flight error` |
 | Scheduled run without a worklist (missing or non-JSON pre-flight) | `<Run type>: manual`, e.g. `Issues run: manual` |
 | Slack "test #N" / "status #N" ([slack.md](slack.md)) | `Slack: test issue #N` / `Slack: status of issue #N` |
 | Slack scenario message ([scenarios.md](scenarios.md)) | `Slack: test scenario S-<k>` (or `P-<slug>`) once it has its id, `Slack: scenario request` before; `Slack: save S-<k>`, `Slack: accept S-14, S-16`, `Slack: scenario status`, `Slack: declined request` |
@@ -47,7 +48,7 @@ request, as the operator may have renamed it since.
 
 Written through `scripts/log.sh` (`logev <level> <event> <msg>`), one JSON line
 `{ts, run, job, level, event, msg}`, secrets masked before writing. Set `LOG_JOB` to the
-run type (`issues`, `regression`, `security`, `modules`, `scenario`, `discovery`, `audit`, `slack_test`, `channel`, `session`).
+run type (`issues`, `regression`, `security`, `modules`, `radar`, `scenario`, `discovery`, `audit`, `slack_test`, `channel`, `session`).
 
 | Event | Writer | `msg` grammar (parsed) |
 | --- | --- | --- |
@@ -128,7 +129,7 @@ never holds a space (`%20`), and `intent` and its outcome share `surface`, `issu
 | `label` | the label name | `target_repo` |
 | `artifact` | `<ac_hash>@<candidate>`; regression: `issue=-`, `regression@<candidate>`; the test catalog: `issue=-`, `catalog@<hash>` | `artifact:<id>`, `artifact:new` before a first create |
 | `definition_issue` | 12-hex sha256 of the `failures[]` signature; `issue=-` | `<definition repo>`, `#<n>` appended on `done` |
-| `slack` | a scenario's answer `S-<k>:<spec_hash>`, a digest `digest@<candidate>`, a black-box breach alert `breach@<hash>` (the gate's `key`); `issue=-` | the conversation id |
+| `slack` | a scenario's answer `S-<k>:<spec_hash>`, a digest `digest@<candidate>`, a black-box breach alert `breach@<hash>` (the gate's `key`), the Change radar's `radar@<M-k>-<M-k>`; `issue=-` | the conversation id |
 | `slack_test` | `start` or `report` of a Slack-ordered "test #N" or "test feature …" ([slack.md](slack.md)) | `slack:<slack_channel>` |
 | `backup` | the pushed tree's sha, 12 hex; `issue=-`; written by `scripts/work-backup.sh` | `work_repo` |
 

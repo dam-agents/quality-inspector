@@ -12,7 +12,7 @@
 #   .nothing_to_do == true  -> the agent ends the run immediately.
 #   otherwise               -> the agent processes the arrays per CLAUDE.md + docs/.
 #
-# Modes: issues (default) | regression | discovery | audit | benchmark | security | modules | slack.
+# Modes: issues (default) | regression | discovery | audit | benchmark | security | modules | radar | slack.
 # Requires: bash, jq, gh, curl, sed/grep/awk, GNU date (Linux pod).
 
 set -u
@@ -405,6 +405,11 @@ mode_audit() {
     elif [ -z "$old" ]; then check maintenance ok "no proposal open over 14 days"
     else check maintenance warn "open over 14 days, waiting for the operator: $old"; fi
   fi
+  # the Change radar's ledger (docs/radar.md): its format, a closed pull request holding no proposal
+  local rx; rx="$(node "$SCRIPT_DIR/radar.mjs" check 2>/dev/null)"
+  if [ -z "$rx" ]; then check radar warn "not measured (radar.mjs check failed)"
+  elif [ "$(jq -r .ok <<<"$rx")" != true ]; then check radar fail "work/PRSCAN.md: $(jq -r '.problems | join("; ")' <<<"$rx")"
+  else check radar ok "ledger well-formed"; fi
 
   # coverage of the newest UI map by regression-tier tests — informational, never a fail
   local map cov=null
@@ -695,6 +700,43 @@ mode_modules() {
       inventory:(if $inv == "" then null else $inv end), max_wallclock_min:$budget, logs:$logs}'
 }
 
+# ============================================================= RADAR MODE ====
+# The Change radar (docs/radar.md): the target's pull requests updated since the ledger's newest
+# (work/PRSCAN.md, scripts/radar.mjs since), read through `github.sh prs` — their sanitized text
+# alone — and each one new, changed, merged or closed since its last scan, with the recurring tests
+# its text names. Never touches the nested environment. Its one local write is the listing's own
+# temp file, gone when the pre-flight ends.
+mode_radar() {
+  local since scan n
+  [ -n "$TARGET" ] || fail_out "target_repo is not configured (work/CONFIG.md or QI_TARGET_REPO)"
+  n="$(table_rows "$WORK/SUITE.md" 2>/dev/null | awk -F'|' '{ t=$4; gsub(/[ \t]/,"",t); if (t=="regression"||t=="promotable"||t=="quarantined") c++ } END { print c+0 }')"
+  if [ "${n:-0}" = 0 ]; then
+    log "no recurring test in work/SUITE.md — no pull request can affect one"; runlog RADAR "skip=no-tests"
+    jq -nc --argjson logs "$(logs_json)" '{mode:"radar", nothing_to_do:true, logs:$logs}'; return
+  fi
+  since="$(node "$SCRIPT_DIR/radar.mjs" since 2>/dev/null | jq -r '.since // empty' 2>/dev/null)"
+  [ -n "$since" ] || fail_out "radar.mjs since failed (work/PRSCAN.md)"
+  RADAR_TMP="$(mktemp /tmp/quality-inspector-radar.XXXXXX)" || fail_out "no temp file for the pull request listing"
+  trap 'rm -f "${RADAR_TMP:-}"' EXIT
+  bash "$SCRIPT_DIR/github.sh" prs --since "$since" > "$RADAR_TMP" 2>/dev/null || fail_out "cannot list the target's pull requests (github.sh prs)"
+  scan="$(node "$SCRIPT_DIR/radar.mjs" scan "$RADAR_TMP" --since "$since" 2>/dev/null)" || fail_out "radar.mjs scan failed"
+  rm -f "$RADAR_TMP"
+  while IFS= read -r n; do log "$n"; done < <(jq -r '.logs[]' <<<"$scan")
+  # A cut listing with nothing due: the next run starts past it (radar.mjs advance, later than $since
+  # only), never reads it again; one with no later time to start at is an error, never a quiet run.
+  jq -e '.stalled == true' <<<"$scan" >/dev/null && fail_out "the pull request listing is cut inside $since: more items updated in that second than github.sh prs pages — the radar cannot move past them; the operator's step: docs/radar.md → The ledger"
+  n="$(jq -r '.advance // empty' <<<"$scan")"
+  if [ -n "$n" ]; then
+    node "$SCRIPT_DIR/radar.mjs" advance "$n" >/dev/null 2>&1 && log "the next listing starts at $n" \
+      || fail_out "radar.mjs advance failed: the next run would read the same cut listing"
+  fi
+  runlog RADAR "since=$since due=$(jq '.due | length' <<<"$scan") $(jq -r '[.due | group_by(.kind)[] | "\(.[0].kind)=\(length)"] | join(" ")' <<<"$scan") deferred=$(jq .deferred <<<"$scan") truncated=$(jq .truncated <<<"$scan")"
+  # The worklist goes to jq on stdin: ten bodies of 2000 characters stay clear of one argument's limit.
+  jq -c --arg since "$since" --arg ch "$(cfg regression_channel)" --argjson logs "$(logs_json)" \
+    '{mode:"radar", nothing_to_do:(.due | length == 0), prs_due:.due, deferred:.deferred, truncated:.truncated, since:$since,
+      inventory:.inventory, channel:(if $ch == "" then null else $ch end), logs:$logs}' <<<"$scan"
+}
+
 # ============================================================= SLACK MODE ====
 # What a Slack turn needs before it answers (docs/slack.md): who holds the environment and
 # how many Slack tests already started today (UTC) against slack_tests_per_day. Never idle.
@@ -763,7 +805,7 @@ TITLE_JQ='
   def few($none): if . == [] then $none elif length > 3 then .[:3] + ["+" + ((length - 3) | tostring) + " more"] | join(" · ") else join(" · ") end;
   def runname: {issues: "Issues run", regression: "Regression run", discovery: "Scenario discovery",
               audit: "Weekly audit", benchmark: "Benchmark run", security: "Security run",
-              modules: "Modules run"}[.mode] // "Pre-flight";
+              modules: "Modules run", radar: "Change radar"}[.mode] // "Pre-flight";
   def issue: .issue | numbers | "issue #" + tostring;
   . + {title: ((
     if (.boundary_breach // []) != [] then "Report black-box breach"
@@ -787,18 +829,22 @@ TITLE_JQ='
     elif .mode == "modules" then
       "Run modules" + on + some([(.modules_due // [])[] | safe | select(.)]
         + ((.focus // []) | length | if . > 0 then [count(.; "focus area")] else [] end))
+    elif .mode == "radar" then
+      [(.prs_due // [])[] | (.pr | numbers | "PR #" + tostring) as $p
+        | ({closed: "Close ", merged: "Track "}[.kind] // "Scan ") + $p] | few("Change radar")
     elif .mode == "benchmark" then "Run benchmark" + some([.cases | numbers | count(.; "case")])
     elif .mode == "audit" then "Run weekly audit"
     else runname end) | if type == "string" then .[:200] else . end)}'
 
 main() {
-  case "$MODE" in (slack|benchmark|security|issues|regression|discovery|modules) boundary_gate || exit 0;; esac
+  case "$MODE" in (slack|benchmark|security|issues|regression|discovery|modules|radar) boundary_gate || exit 0;; esac
 
   case "$MODE" in
     slack)      mode_slack ;;
     benchmark)  mode_benchmark ;;
     security)   mode_security ;;
     modules)    mode_modules ;;
+    radar)      mode_radar ;;
     issues)     mode_issues ;;
     regression) mode_regression ;;
     discovery)  mode_discovery ;;

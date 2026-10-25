@@ -22,7 +22,7 @@ ev "$(iso_ago 70)" "surface=comment action=done issue=42 key=ac42@c1 target=acme
 
 out="$(reconcile)"
 assert "recorded -> ok" '.status == "ok" and (.detail | test("2 of 2"))' "$out"
-assert_eq "one comments GET per reported issue of the week" "2" "$(grep -c '/comments' "$STUB_DIR/gh.calls")"
+assert_eq "one comments GET per reported issue of the week" "2" "$(grep -c '/issues/[0-9]*/comments' "$STUB_DIR/gh.calls")"
 grep -q 'issues/44/comments\|issues/45/comments' "$STUB_DIR/gh.calls" && { echo "  listed an issue outside the scope"; FAILED=1; }
 
 jq -cn --arg ts "$(iso_ago 110)" '{ts:$ts, run:"u", job:"session", level:"info", event:"ledger_start", msg:"upgrade"}' >> "$EV"
@@ -41,6 +41,6 @@ for n in $(seq 100 124); do row "$n" reported "$(iso_ago $((n - 95)))"; done
 out="$(reconcile)"
 assert "dangling intent -> warn, in-flight and failed ones are not" \
   '.status == "warn" and (.detail | test("^unfinished write: label issue=42 key=qa:retest — 20 of 27 .*cap 20"))' "$out"
-assert_eq "capped at 20 issues" "20" "$(grep -c '/comments' "$STUB_DIR/gh.calls")"
+assert_eq "capped at 20 issues" "20" "$(grep -c '/issues/[0-9]*/comments' "$STUB_DIR/gh.calls")"
 grep -q 'issues/42/comments' "$STUB_DIR/gh.calls" && { echo "  the cap kept an older issue over newer ones"; FAILED=1; }
 exit $FAILED

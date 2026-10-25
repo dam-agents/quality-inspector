@@ -35,15 +35,17 @@ tag_utc() { profile_run build-time "$1" 2>/dev/null | grep -E '^[0-9]{4}-[0-9]{2
 from_utc="$(tag_utc "$FROM")" || { jq -nc --arg t "$FROM" '{error:("cannot read the push time of " + $t)}'; exit 0; }
 to_utc="$(tag_utc "$TO")" || { jq -nc --arg t "$TO" '{error:("cannot read the push time of " + $t)}'; exit 0; }
 
-all='[]'; truncated=false
+# Pages join on stdin, never as an argument (one argument holds 128 KiB).
+all=""; truncated=false
 for page in 1 2 3 4 5; do
   body="$(gh api ${HA[@]+"${HA[@]}"} -X GET "repos/$RP/issues" -f state=closed -f since="$from_utc" \
           -f per_page=100 -f page="$page" -f sort=updated -f direction=desc 2>/dev/null)" \
     || { jq -nc '{error:"closed-issue listing failed"}'; exit 0; }
-  all="$(jq -c --argjson b "$body" '. + $b' <<<"$all")"
+  all="$all$body"$'\n'
   [ "$(jq length <<<"$body")" -lt 100 ] && break
   [ "$page" = 5 ] && truncated=true
 done
+all="$(printf '%s' "$all" | jq -cs 'add // []')" || { jq -nc '{error:"closed-issue listing failed"}'; exit 0; }
 
 issues='[]'
 while IFS= read -r it; do
