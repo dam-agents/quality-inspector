@@ -22,7 +22,8 @@ The operator may share the page beyond themselves, so it carries only what conce
 - **Around them:** the newest UI map's pages with their coverage and shot, the operator's
   collections, and **every run** (the newest 400): each night of `work/REGRESSION.log` — its
   counts, the criteria that were not `unchanged`, the change context's issues (number, title), UI
-  diff text and signal counts — or its environment failure; each issue and scenario run with its
+  diff text and signal counts — or its environment failure (the step, cause, repair, next step and
+  evidence of `work/regression/<c>/environment.json`, [regression.md](regression.md) step 2); each issue and scenario run with its
   verdicts; each run by hand (`work/reruns/`, [on-demand.md](on-demand.md) → "run #N") with its raw
   results; each feature run (`work/reruns/feature-<id>/`) with its criteria's raw results; each with its length — the run file's `minutes`, else its `started_utc` to its time;
   else a night from its `due` line, an issue run from its `issue_done minutes=`, a scenario run

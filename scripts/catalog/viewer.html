@@ -649,6 +649,7 @@ const RUNTYPE_HELP = { regression: 'Each night, the promoted tests run on the ne
 const runs = arr(D.runs).filter((r) => r && typeof r === 'object' && r.utc && own(RUNTYPE, r.type)).map((r) => ({
   ...r, type: str(r.type), ref: r.ref == null ? '' : str(r.ref), build: str(r.build), utc: str(r.utc), entries: arr(r.entries).filter((e) => e && e.key).map((e) => ({ key: str(e.key), value: str(e.value) })),
   issues: arr(r.issues).filter((x) => x && x.number != null), counts: r.counts && typeof r.counts === 'object' ? r.counts : null, signals: r.signals && typeof r.signals === 'object' ? r.signals : null,
+  failure: r.failure && typeof r.failure === 'object' ? { ...r.failure, stage: str(r.failure.stage), cause: str(r.failure.cause), repair: str(r.failure.repair), next: str(r.failure.next), evidence: arr(r.failure.evidence).map(str) } : null,
   id: [r.type, r.ref, r.build, r.utc].map(str).join('~') }));
 const byRun = new Map(runs.map((r) => [r.id, r]));
 const nightOf = (build) => runs.find((r) => r.type === 'regression' && r.build === build && r.verdict !== 'environment') || runs.find((r) => r.type === 'regression' && r.build === build) || null;
@@ -1917,7 +1918,10 @@ const DUR_HELP = 'How long the test run took, from its start to its result. The 
 const COST_HELP = 'What the test run cost (model tokens), in US dollars. Only when the platform gave the cost to the agent. The page never estimates it.';
 const runName = (r) => (r.type === 'regression' ? `${RUNTYPE.regression} · ${r.build}` : r.type === 'feature' ? `${RUNTYPE.feature} ${ENT.feature[1]} ${featName(r.ref)} · ${r.build}` : `${RUNTYPE[r.type]} ${r.ref} · ${r.build}`);
 const COUNT_KEYS = ['regression', 'needs-review', 'flaky', 'healed', 'relearned', 'superseded', 'blocked', 'drift', 'unchanged'];
+// The step of a night that failed its environment (docs/regression.md step 2).
+const STAGE = { lock: 'The environment lock', reset: 'The reset of the product', up: 'The install of the build', smoke: 'The smoke test', canary: 'The injection canary' };
 function outcome(r) {
+  if (r.failure && STAGE[r.failure.stage]) return `${STAGE[r.failure.stage]} failed${r.failure.exit != null ? ` (exit ${+r.failure.exit})` : ''}`;
   if (r.counts) return COUNT_KEYS.filter((k) => +r.counts[k] > 0).map((k) => `${+r.counts[k]} ${vLabel(k).toLowerCase()}`).join(' · ') || 'nothing replayed';
   const c = {}; for (const e of r.entries) c[e.value] = (c[e.value] || 0) + 1;
   return Object.entries(c).map(([k, n]) => `${n} ${vLabel(k).toLowerCase()}`).join(' · ');
@@ -1990,7 +1994,15 @@ function runDrawer(r) {
       goLink({ at: r.build, v: 'catalog' }, '📚 Catalog as of this build', null, 'btn'),
       goLink({ at: r.build, v: 'map' }, '🗺️ Product map as of this build', null, 'btn'),
       goLink({ v: 'runs', rb: r.build, rt: 'all' }, `${ENT.run[1]} All test runs on this build`, null, 'btn')) : null,
-    r.verdict === 'environment' ? h('p', { class: 'muted-t' }, 'The product did not start on this build. No test ran, and no test has a result from this night.') : null,
+    r.verdict === 'environment' ? h('p', { class: 'muted-t' }, 'The test environment failed on this build. No test ran, and no test has a result from this night.') : null,
+    r.verdict === 'environment' ? h('section', { class: 'sec' }, h('h3', {}, '🧯 Why the environment failed', tip('What the agent found when the product did not start: the step that failed, the cause, the repair it tried, and what to do next. The evidence is the end of the install output, with the passwords removed.')),
+      r.failure ? [
+        h('dl', { class: 'dl' },
+          r.failure.cause ? [dt('Cause'), h('dd', {}, r.failure.cause)] : null,
+          r.failure.repair ? [dt('Repair'), h('dd', {}, r.failure.repair)] : null,
+          r.failure.next ? [dt('Next step'), h('dd', {}, r.failure.next)] : null),
+        r.failure.evidence.length ? h('pre', { class: 'diff' }, r.failure.evidence.join('\n')) : null]
+      : h('p', { class: 'muted-t' }, 'The agent did not record the cause of this failure. Look in the agent\u2019s log of that night (work/logs, the event env_failed).')) : null,
     night && tested.size ? h('section', { class: 'sec' }, h('h3', {}, `${ENT.testcase[1]} Test cases of this night (${tested.size})`, tip('All the test cases that the nightly regression had on this build, by issue or scenario, each with its result. Drift: a person changed the checks, so the test did not run.')),
       caseGroups([...tested.keys()].map((k) => byKey.get(k)), (i) => tested.get(i.key))) : null,
     h('section', { class: 'sec' }, h('h3', {}, night ? `${ENT.verdict[1]} Results that were not unchanged (${ents.length})` : `${ENT.verdict[1]} Verdicts (${ents.length})`),

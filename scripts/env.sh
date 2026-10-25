@@ -12,13 +12,17 @@
 #   env.sh wait <build> [<seconds>]  block until this session's background `up <build>` ends
 #                                (default 540 s, under the harness's 10-minute tool limit): exit 0
 #                                it succeeded, 3 it still runs (call again), 1 it failed, died, or
-#                                no such install was started
+#                                no such install was started — a failure prints the last lines of
+#                                its output, credential values masked
 #   env.sh watch                 the Browser Panel button for the product's UI when live_browser
 #                                attaches (lib/config.sh → live_link); prints nothing, exit 1, otherwise
 #   env.sh between <from> <to>   read-only: the profile's `bin/versions --between` — a JSON
 #                                array of builds between the two, oldest first; exit 2 when
 #                                the profile does not implement it (no array), 1 when it
 #                                cannot look (docs/triage.md → Order of work, step 6)
+#
+# `up` and `reset` keep their whole output in work/env/last-<cmd>.log (mode 600, never backed
+# up): the evidence of an environment failure (docs/nested-env.md → Failures).
 #
 # Every command is idempotent; a failed `up` is safe to re-run.
 
@@ -81,14 +85,28 @@ cmd_unlock() {
 
 delegate() { # <cmd> [args]
   mkdir -p "$ENVD" && chmod 700 "$ENVD"
-  local t0; t0="$(date -u +%s)"
-  profile_run env "$@"; local rc=$?
+  local t0 rc; t0="$(date -u +%s)"
+  [ "$1" = reset ] && ( umask 077; printf 'env.sh reset at %s\n' "$(now)" > "$ENVD/last-reset.log" )
+  case "$1" in
+    (up|reset) profile_run env "$@" 2>&1 | tee -a "$(outlog "$1")"; rc=${PIPESTATUS[0]} ;;
+    (*) profile_run env "$@"; rc=$? ;;
+  esac
   case "$rc" in
     (0) [ "$1" = up ] && logev info env_up "product at build ${2:-?} took_s=$(( $(date -u +%s) - t0 ))"
         [ "$1" = reset ] && logev info env_reset "product data wiped" ;;
-    (*) logev error env_failed "profile bin/env $1 exited $rc" ;;
+    (*) logev error env_failed "profile bin/env $1 exited $rc (output: work/env/last-$1.log)" ;;
   esac
   return "$rc"
+}
+# work/env/last-<cmd>.log — started anew by each `up` (cmd_up) and `reset` (delegate).
+outlog() { local f="$ENVD/last-$1.log"; [ -f "$f" ] || ( umask 077; : > "$f" ); printf '%s' "$f"; }
+# The last <n> lines of an output log, each credential value of work/env/credentials.env masked.
+outtail() { # <cmd> <n>
+  local f="$ENVD/last-$1.log" out
+  [ -s "$f" ] || { echo "  (no output kept)"; return 0; }
+  out="$(tail -n "$2" "$f" | node "$SCRIPT_DIR/lib/secrets.mjs" filter "$ENVD/credentials.env" 2>/dev/null)" \
+    || { echo "  (cannot mask the credential values — read work/env/last-$1.log, never quote it)"; return 0; }
+  printf '%s\n' "$out" | sed 's/^/  | /'
 }
 
 cmd_between() { # <from> <to>
@@ -108,7 +126,7 @@ disk_gate() {
   free="$(df -Pk "$HOME_DIR" 2>/dev/null | awk 'NR==2 && $4 ~ /^[0-9]+$/ {print int($4/1048576)}')"
   [ -n "$free" ] || { echo "env: free disk space not measurable — continuing" >&2; return 0; }
   [ "$free" -ge "$min" ] && return 0
-  echo "env: only ${free}Gi free on the home volume, min_free_disk_gi is $min — free space before an install (docs/nested-env.md → Failures)" >&2
+  echo "env: only ${free}Gi free on the home volume, min_free_disk_gi is $min — free space before an install (docs/nested-env.md → Failures)" | tee -a "$(outlog up)" >&2
   logev error env_failed "up refused: ${free}Gi free on the home volume, below min_free_disk_gi $min"
   exit 1
 }
@@ -117,8 +135,9 @@ disk_gate() {
 # `done <build> <ISO> <exit> <session>` — so a wait never reads an earlier run's result.
 cmd_up() {
   local rc
-  mkdir -p "$ENVD"
+  mkdir -p "$ENVD" && chmod 700 "$ENVD"
   printf 'running %s %s %s %s\n' "$1" "$(now)" "$$" "${ME:--}" > "$UPF"
+  ( umask 077; printf 'env.sh up %s at %s\n' "$1" "$(now)" > "$ENVD/last-up.log" )
   ( disk_gate && delegate up "$1" ); rc=$?
   printf 'done %s %s %s %s\n' "$1" "$(now)" "$rc" "${ME:--}" > "$UPF"
   return "$rc"
@@ -134,8 +153,9 @@ cmd_wait() { # <build> [<seconds>]
     fi
     case "$st" in
       (done) [ "$x" = 0 ] && { echo "env: $b is up ($ts)" >&2; return 0; }
-             echo "env: the install of $b failed (exit $x, $ts) — docs/nested-env.md → Failures" >&2; return 1;;
-      (running) kill -0 "$x" 2>/dev/null || { echo "env: the install of $b (started $ts) died without a result" >&2; return 1; };;
+             echo "env: the install of $b failed (exit $x, $ts) — docs/nested-env.md → Failures; its last lines (all: work/env/last-up.log):" >&2
+             outtail up 30 >&2; return 1;;
+      (running) kill -0 "$x" 2>/dev/null || { echo "env: the install of $b (started $ts) died without a result; its last lines (all: work/env/last-up.log):" >&2; outtail up 30 >&2; return 1; };;
       (*) echo "env: unreadable work/env/UP" >&2; return 1;;
     esac
     [ "$(date -u +%s)" -lt "$end" ] || { echo "env: $b still installing (since $ts) — run env.sh wait again" >&2; return 3; }
