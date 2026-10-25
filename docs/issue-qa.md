@@ -20,8 +20,10 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
   `not-testable` | `-` (while in progress). Meanings: [reporting.md](reporting.md).
 - Rewrite a row with an atomic `tmp + mv` of the whole file; never two rows per issue.
 - Per-issue files live in `work/issues/<n>/`: `criteria-<ac_hash>.md`, `intent-<ac_hash>.md`
-  and `explorations-<ac_hash>.md` (frozen, never edited), `issue-<ac_hash>.json` and
-  `intent-judge-<ac_hash>.json` (the intent judge's input and answer), `verdicts-<ac_hash>-<candidate>.json` (your judgment),
+  and `explorations-<ac_hash>.md` (frozen, never edited — the intent file once its judge's
+  steps freeze it, [intent.md](intent.md) → The judge), `issue-<ac_hash>.json`,
+  `intent-judge-<ac_hash>.json` and `intent-judge-<ac_hash>-2.json` (the intent judge's input
+  and its two answers), `verdicts-<ac_hash>-<candidate>.json` (your judgment),
   `report-<ac_hash>-<candidate>/` (the rendered evidence page), `artifact.id`.
 
 ## Procedure

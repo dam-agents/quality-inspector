@@ -56,7 +56,7 @@ criteria file and the intent file. The first answer goes to `intent-judge-<ac_ha
 the second to `intent-judge-<ac_hash>-2.json`. `accept` → the file is frozen. `revise` →
 apply its fixes to the file (a fix already applied stays as it is) and judge once more;
 a second `revise` or a `reject` → every IN of the file becomes
-`testable: no — judge: <reason>`, and the file is frozen so. A judge that does not answer
+`testable: no — judge: <reason>`, and only then is the file frozen. A judge that does not answer
 with its JSON is a `reject` with the reason "judge unavailable" ([judge.md](judge.md) →
 Briefing).
 
@@ -68,7 +68,8 @@ A takeover or retest finds the file in one of these states, each with one action
 | the intent file, no judge answer | the first reading |
 | the first answer `revise`, no second | apply its fixes, then the second reading |
 | the last answer `accept` | frozen: reuse it |
-| the last answer `reject`, or the second `revise` | frozen: make every IN not yet so `testable: no — judge: <reason>`, then reuse it |
+| the last answer `reject`, or the second `revise`, and every IN `testable: no — judge: …` | frozen: reuse it |
+| the last answer `reject`, or the second `revise`, and an IN not yet so | not yet frozen: make that IN `testable: no — judge: <reason>`, then the file is frozen |
 
 ## Tests
 
