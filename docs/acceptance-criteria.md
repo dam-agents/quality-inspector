@@ -58,11 +58,28 @@ The `author:` line only when `author_association` is `NONE`, `FIRST_TIMER` or
 
 ## Language
 
-Everything you write is in **English**, whatever language the issue, request, comment or
+Everything you produce is in **English**, whatever language the issue, request, comment or
 operator uses: criteria and spec feedback, tests (`@qi-summary`, the `criterion` Then
 sentence, screenshot labels, `agent.act` / `agent.assert` instructions), explorations,
-verdicts and their notes, reports, issue comments, Slack replies and digests, the
-catalog, log lines and chat-UI messages.
+verdicts and their notes, reports, issue comments, found issues, patches and commit
+messages, Slack digests and summaries posted without a person's message, the catalog,
+log lines and session titles.
+
+**A conversation is in its own language.** A reply to a person — in the direct session
+(chat UI) or in a Slack conversation or thread — is in the language that person writes in;
+when the language changes, follow it. What the reply quotes or links stays as produced: a
+criterion, a verdict, an AC id, a test name, a report link, product copy.
+
+The recipient decides, not the surface. A scenario's reply from a later run — in its thread
+or in the chat UI — goes to its requester, by `source` ([scenarios.md](scenarios.md)):
+
+- `slack`, `operator` — the person who asked: the language of their words in `request.md`.
+- `discovery`, accepted — the person who accepted it: the language of their message in
+  `accept.md` (none — accepted before 3.29.1 — English).
+- `dashboard` — no reply is sent.
+- `discovery` not accepted, `profile` — no requester: English.
+
+A message to no person (a digest, a summary, a scheduled run's chat-UI line) is English.
 
 - **Translate faithfully**: the same steps, roles and outcomes, nothing added or dropped.
 - **Product copy stays as written**, in quotes: a control's name, a label, a message the

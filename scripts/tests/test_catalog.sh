@@ -362,4 +362,12 @@ node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a build with an intent test" 
 data="$(page_data)"
 assert "an intent test is its own item, with its goal and its verdict" '(.items[] | select(.key == "issue-42/IN-1") | .kind == "intent" and .goal == "\"so that a team finds a project by the name it uses now\"" and .then == "the search lists the renamed project" and ([.history[] | select(.run == "issue")][-1].value == "verified"))
   and ([.items[] | select(.key == "issue-42/AC-1") | .kind] == ["criterion"])' "$data"
+# An intent test run by hand ("run #42 IN-1") and in a feature run joins its history; a scenario has no IN.
+mkdir -p "$W/reruns/issue-42"
+echo '{"label":"rerun-issue-42-c3-1400","ref":"#42 IN-1","build":"c3","utc":"2026-10-14T14:00:00Z","results":{"IN-1":{"status":"failed","error":null}}}' > "$W/reruns/issue-42/rerun-issue-42-c3-1400.json"
+echo '{"label":"feature-renaming-c3-1500","feature":"renaming","build":"c3","utc":"2026-10-14T15:00:00Z","results":{"issue-42/IN-1":{"status":"passed","error":null},"scenario-7/IN-1":{"status":"failed"}}}' > "$W/reruns/feature-renaming/feature-renaming-c3-1500.json"
+node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a build with intent test runs by hand" 0 "$?"
+data="$(page_data)"
+assert "an intent test run by hand and in a feature run: in its history; a scenario's IN key dropped" '(.items[] | select(.key == "issue-42/IN-1") | [.history[] | select(.run == "rerun" or .run == "feature") | .run + ":" + .value] == ["rerun:failed","feature:passed"])
+  and ([.runs[] | select(.type == "feature" and .utc == "2026-10-14T15:00:00Z")][0].entries == [{"key":"issue-42/IN-1","value":"passed"}])' "$data"
 exit $FAILED
