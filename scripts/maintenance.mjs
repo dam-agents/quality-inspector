@@ -5,7 +5,8 @@
 // "rewrite M-3", "retire M-3", "keep M-3"); the agent opens them, and closes those whose cause is gone.
 //
 //   node maintenance.mjs open <test> --kind <kind> --build <build> --proposal <proposal> --basis-file <path>
-//     -> {"id", "opened": bool, "replaced": []}   one open row per (test, kind): a second open updates its build and basis
+//     -> {"id", "opened": bool, "replaced": []}   one open row per (test, kind): a second open updates its build, basis and
+//     proposal (a predicted kind's basis stays: it is what predict matches the change on)
 //   node maintenance.mjs predict --build <build> --impact <impact.json> [--dry-run]
 //     -> {"opened": [], "updated": [], "replaced": [], "skipped": []}   (--dry-run: {"candidates": [{test, kind, proposal, basis, file, line}]})
 //   node maintenance.mjs close <M-k> <state>   -> {"id", "state"}
@@ -115,7 +116,8 @@ switch (cmd) {
       }
     }
     const same = list.find((p) => p.state === 'open' && p.test === test && p.kind === kind);
-    if (same) { Object.assign(same, { build, basis, proposal }); save(list); out({ id: same.id, opened: false, replaced }); break; }
+    // A predicted row keeps the diff's line that predict wrote: predict knows the change by it.
+    if (same) { Object.assign(same, { build, proposal }, PREDICTED.includes(kind) ? {} : { basis }); save(list); out({ id: same.id, opened: false, replaced }); break; }
     const id = nextId(list);
     list.push({ id, test, kind, build, basis, proposal, state: 'open', opened_utc: now(), closed_utc: '-' });
     save(list);

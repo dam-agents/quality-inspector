@@ -90,9 +90,11 @@ assert "predict: eleven rows opened" '(.opened | length) == 11 and .updated == [
 assert "the rows: open, on the build" '[.proposals[] | select(.state == "open" and .build == "c2")] | length == 11' "$(M list)"
 assert "check: the predicted kinds are well-formed" '.ok' "$(M check)"
 id() { M list --open | jq -r --arg t "$1" --arg k "$2" '.proposals[] | select(.test == $t and .kind == $k) | .id'; }
-# The agent finds the S-7 repair would touch a matcher and opens it again as review (docs/maintenance.md).
+# The agent finds the S-7 repair would touch a matcher and opens it again as review, with a basis in its
+# own words (docs/maintenance.md): the row keeps the predicted basis.
 b7="$(M list --open | jq -r '.proposals[] | select(.test == "S-7 AC-1") | .basis')"
-M open 'S-7 AC-1' --kind renamed --build c2 --proposal review --basis-file "$(B "$b7")" >/dev/null
+M open 'S-7 AC-1' --kind renamed --build c2 --proposal review --basis-file "$(B 'the repair would change the matcher')" >/dev/null
+assert "open again: a predicted row keeps its basis, takes the proposal" ".proposals[] | select(.test == \"S-7 AC-1\") | .proposal == \"review\" and .basis == $(jq -n --arg b "$b7" '$b')" "$(M list --open)"
 out="$(M predict --build c3 --impact "$I")"
 assert "predict again: the same rows, updated" '.opened == [] and (.updated | length) == 11 and .replaced == []' "$out"
 assert "predict again: the build refreshed, the review proposal kept" ".proposals[] | select(.test == \"S-7 AC-1\") | .proposal == \"review\" and .build == \"c3\" and .basis == $(jq -n --arg b "$b7" '$b')" "$(M list --open)"

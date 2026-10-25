@@ -17,7 +17,7 @@ Scope: the tests of `work/SUITE.md` tiers `regression`, `promotable`, `quarantin
 ```
 
 Written only through `node "$HOME/scripts/maintenance.mjs" …` (its header lists the commands):
-one **open** row per (test, kind) — opening it again updates its build, basis and proposal. The
+one **open** row per (test, kind) — opening it again updates its build, basis and proposal (a predicted kind keeps its basis, below). The
 `basis` is a short evidence pointer (a UI-map change, `#<n>` and its quoted sentence, a build),
 at most 160 characters — the catalog shows it, so never a triage explanation, a request's words
 or a credential. It may quote an issue, so it never goes on a command line: per call, `kind=basis; mktemp
@@ -65,7 +65,8 @@ frozen block names it: a navigation step outside the blocks is the replay cache'
 with an open triage row (`needs-review`, `superseded`, `quarantined`, `fighting`) is skipped.
 For each opened `heal`, prepare `M-<k>.diff` (the block's locator only, as a heal under
 [triage.md](triage.md) → Healing rules); when it would touch a matcher, an expected value or a Then
-sentence, open the row again with `--proposal review`. A later `predict` of the same change refreshes
+sentence, open the row again with `--proposal review` (the row keeps its basis, whatever the basis file
+says: `predict` knows the change by it). A later `predict` of the same change refreshes
 the row's build and keeps its proposal; another change of the same test and kind resolves the row
 (`replaced`) and opens a new one, with its own diff. The night then decides each one: the
 triage's own row of the test resolves it (`replaced` in its output), and the sweep closes the
