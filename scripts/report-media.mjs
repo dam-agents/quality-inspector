@@ -17,7 +17,8 @@
 //        application/x-www-form-urlencoded and serves it as a download, which an <img> or a
 //        <video> of a strict viewer does not show.
 //   node report-media.mjs set <report-dir> media/<name> <share-url> <version>
-//     -> {"path", "url", "content_type"} — records one media artifact uploaded with that type
+//     -> {"path", "url", "content_type"} — records one media artifact uploaded with that type; for
+//        the run's first upload, only after a HEAD of its address served that type (docs/reporting.md)
 //   node report-media.mjs publish <report-dir> public|private
 //     -> {"file": "<report-dir>/publish.html", "content_type": "text/html; charset=utf-8", "bytes", "linked", "inlined", "left_out": [path]}
 //        exit 1 (public): a media file without its address — nothing is written, `missing` lists them

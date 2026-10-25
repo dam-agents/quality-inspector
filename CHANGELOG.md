@@ -15,8 +15,9 @@ Nothing to run — docs are re-read per run. Every artifact upload now sends its
 `application/x-www-form-urlencoded` and served as downloads, so a strict viewer showed no image or
 video. Addresses in `media-urls.json` recorded before this version count as not uploaded, so the next
 revision of a public report uploads its media again, typed. A report already published stays as it
-is until then; to repair one now, ask in the direct session to republish its report: upload the media
-again, `report-media.mjs publish <dir> public`, `update_artifact` — the share link stays. The old
+is until then; to repair one now, ask in the direct session to deliver its report again by
+[docs/reporting.md](docs/reporting.md) → **Delivery** step 1 (the media are uploaded again, typed;
+`update_artifact` keeps the share link). The old
 mis-typed media artifacts are then unused; delete them in the app when you want to.
 
 ## 3.31.0 — 2026-10-25

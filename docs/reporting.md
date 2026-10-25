@@ -114,14 +114,16 @@ re-run. Never retry within the same run.
    An upload without it (curl's `PUT --data-binary` default) is stored as
    `application/x-www-form-urlencoded` and served as `application/octet-stream` with
    `Content-Disposition: attachment`: a click downloads the file, and a strict viewer shows no
-   image or video. After the first media upload of a run, `HEAD` its `<shareUrl>/raw?v=<version>`
-   once: a `Content-Type` other than the one sent is a failed delivery, never a published report
-   (a refused or failed `HEAD` is a `warn` line, not a failure).
+   image or video.
    - **A public report** (below, or a Slack thread's): `report-media.mjs list <dir>`; each
      file with `url: null` becomes an artifact of its own — upload it with its `content_type`,
-     `create_artifact` with `visibility: public` and its `file_name`, then `report-media.mjs set
-     <dir> <path> <shareUrl> <version>` from the response. Then `report-media.mjs publish <dir>
-     public` (exit 1 names a file still without an address). The addresses are kept by content
+     `create_artifact` with `visibility: public` and its `file_name`. **The first media file of a
+     run is checked before its address is recorded:** `HEAD` its `<shareUrl>/raw?v=<version>`. A
+     `Content-Type` other than the one sent is a failed delivery: no `set` for it, no further
+     upload, no published report — so the retry finds no address and uploads again. A refused or
+     failed `HEAD` is a `warn` line, not a failure. Then (and for every later file at once)
+     `report-media.mjs set <dir> <path> <shareUrl> <version>` from the response. Then
+     `report-media.mjs publish <dir> public` (exit 1 names a file still without an address). The addresses are kept by content
      and type, so a revision uploads only new files — and again each file recorded without its
      type (before 3.31.1). One ledger pair covers the media of one report.
    - **A private report**: `report-media.mjs publish <dir> private` puts the screenshots and
