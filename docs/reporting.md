@@ -108,13 +108,27 @@ re-run. Never retry within the same run.
 1. **Artifact** (`artifact_reports: enabled`): an artifact is **one file** — a viewer never
    gets `media/`, so a relative `media/<name>` link answers 404. First make the page one file
    with `node "$HOME/scripts/report-media.mjs"` (its header has the contract), then publish
-   `<dir>/publish.html` — never a page with `media/` links — through `create_artifact_upload_url`:
+   `<dir>/publish.html` — never a page with `media/` links — through `create_artifact_upload_url`.
+   **Every upload sends its `Content-Type` header**: a page `text/html; charset=utf-8`, a media
+   file the `content_type` that `report-media.mjs list` gives it (`image/png`, `video/webm`, …).
+   An upload without it (curl's `PUT --data-binary` default) is stored as
+   `application/x-www-form-urlencoded` and served as `application/octet-stream` with
+   `Content-Disposition: attachment`: a click downloads the file, and a strict viewer shows no
+   image or video.
    - **A public report** (below, or a Slack thread's): `report-media.mjs list <dir>`; each
-     file with `url: null` becomes an artifact of its own — upload it, `create_artifact` with
-     `visibility: public` and its `file_name`, then `report-media.mjs set <dir> <path>
-     <shareUrl> <version>` from the response. Then `report-media.mjs publish <dir> public`
-     (exit 1 names a file still without an address). The addresses are kept by content, so a
-     revision uploads only new files. One ledger pair covers the media of one report.
+     file with `url: null` becomes an artifact of its own — upload it with its `content_type`,
+     `create_artifact` with `visibility: public` and its `file_name`, then `report-media.mjs set
+     <dir> <path> <shareUrl> <version>` from the response — right after each create. **The first
+     media file of a run is checked before its `set`:** `HEAD` its `<shareUrl>/raw?v=<version>`
+     and pass the served type as `set … --served-type <type>`. On another type `set` exits 1 and
+     records nothing: the delivery fails, with no further upload and no published report, so the
+     retry finds no address and uploads again. The rejected artifact is public and stays: never
+     delete it yourself — its id is the `target` of the `failed` ledger line, and the chat UI names
+     it for the operator to delete. A refused or failed `HEAD` is a `warn` line and a `set` without
+     `--served-type`. Then `report-media.mjs publish <dir> public` (exit 1 names a file still
+     without an address). The addresses are kept by content
+     and type, so a revision uploads only new files — and again each file recorded without its
+     type (before 3.32.1). One ledger pair covers the media of one report.
    - **A private report**: `report-media.mjs publish <dir> private` puts the screenshots and
      videos into the page as data, within the platform's page limit; `left_out` names what
      did not fit (the page says so) — tell it in the chat when it is a video.
