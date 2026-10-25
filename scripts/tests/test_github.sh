@@ -68,6 +68,13 @@ sed -i.bak 's|refs="#7 AC-1; D-3"|refs="#7 AC-1"|' "$F/body.md" && rm -f "$F/bod
 bash "$G" create-issue "$F" --again >/dev/null 2>&1; assert_eq "a marker that does not name every problem is refused" 3 "$?"
 echo '{"refs":["#7 AC-1; rm"],"build":"c1"}' > "$F/draft.json"
 bash "$G" create-issue "$F" --again >/dev/null 2>&1; assert_eq "a malformed ref is refused" 3 "$?"
+# An intent test of an issue is a ref (docs/intent.md); a scenario has no intent test.
+echo '{"refs":["#7 IN-1"],"build":"c1"}' > "$F/draft.json"
+sed -i.bak 's|refs="#7 AC-1"|refs="#7 IN-1"|' "$F/body.md" && rm -f "$F/body.md.bak"
+assert "an issue's intent test is a ref" '.refs == ["#7 IN-1"]' "$(bash "$G" create-issue "$F")"
+echo '{"refs":["S-7 IN-1"],"build":"c1"}' > "$F/draft.json"
+sed -i.bak 's|refs="#7 IN-1"|refs="S-7 IN-1"|' "$F/body.md" && rm -f "$F/body.md.bak"
+bash "$G" create-issue "$F" --again >/dev/null 2>&1; assert_eq "a scenario's IN ref is refused" 3 "$?"
 
 # Every request names the target's issues, or the identity.
 grep -vE '(^| )repos/acme/widgets/issues([/?]| |$)|^api user|user --jq' "$STUB_DIR/gh.calls" \

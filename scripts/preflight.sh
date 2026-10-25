@@ -524,11 +524,12 @@ mode_audit() {
   fi
   find "$WORK/env/turns" -type f -mtime +14 -delete 2>/dev/null || true
 
-  # criteria_injection: the week's frozen criteria quoting links, code or hidden comments, and
+  # criteria_injection: the week's frozen criteria and intent files (docs/intent.md: they quote the
+  # issue too) quoting links, code or hidden comments, and
   # the issues and scenarios the agent logged as injection suspects (docs/acceptance-criteria.md);
   # a scenario's words come from anyone in a bound Slack conversation (docs/scenarios.md).
   local inj_files inj_events inj_scen inj_sev
-  quoting() { find "$1" -mindepth 2 -maxdepth 2 -name 'criteria-*.md' -mtime -7 2>/dev/null \
+  quoting() { find "$1" -mindepth 2 -maxdepth 2 \( -name 'criteria-*.md' -o -name 'intent-*.md' \) -mtime -7 2>/dev/null \
     | while read -r f; do grep -qE 'https?://|www\.|^[[:space:]]*(```|~~~)|<!--' "$f" && basename "$(dirname "$f")"; done; }
   suspects() { cat "$WORK"/logs/events-*.jsonl 2>/dev/null | jq -r --arg since "$week_ago" --arg e "$1" --arg re "$2" \
     'select(.event == $e and .ts >= $since) | .msg | capture($re).n' 2>/dev/null; }

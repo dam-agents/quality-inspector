@@ -519,8 +519,9 @@ const ENT = {
   issue: ['Issue', '🎫', 'A GitHub issue that has the QA label. The agent tests it: it writes acceptance criteria and a test for each criterion.'],
   scenario: ['Scenario', '💬', 'A test that a person requested (in Slack, in the chat or on this page), or a scenario of the product profile. It has its own acceptance criteria.'],
   criterion: ['Acceptance criterion', '🎯', 'One condition that the issue or the scenario must satisfy (Given, When, Then). Its id is AC-1, AC-2… Its test decides the verdict.'],
+  intent: ['Intent test', '💡', 'One user journey from the purpose that the issue states, quoted as its goal (IN-1, IN-2…). It is tested like a criterion. It does not change the verdict of the issue.'],
   exploration: ['Exploration', '🔦', 'An additional check outside the acceptance criteria (EX-1, EX-2…). It does not change the verdict of the issue.'],
-  testcase: ['Test case', '🧪', 'One line of the catalog: one acceptance criterion or exploration, and the automated browser test that checks it.'],
+  testcase: ['Test case', '🧪', 'One line of the catalog: one acceptance criterion, intent test or exploration, and the automated browser test that checks it.'],
   file: ['Test file', '📝', 'The file of the automated browser test.'],
   run: ['Test run', '🏃', 'One time that the agent ran tests on one build: an issue run, a nightly regression, a scenario run or a manual run.'],
   build: ['Build', '📦', 'One version of the product. The agent installs it in its own machine and tests it.'],
@@ -552,7 +553,7 @@ const ALL = arr(D.items).filter((x) => x && typeof x === 'object' && x.key).map(
   const it = {
     ...x, origin: o, full: hist, verdict0: x.verdict && typeof x.verdict === 'object' ? x.verdict : hist[hist.length - 1] || null, steps: arr(x.steps).filter((e) => e && typeof e === 'object'),
     healsAll: arr(x.heals), flakyAll: arr(x.flaky), pages: arr(x.pages).map(str), duration_ms: arr(x.duration_ms).filter(Number.isFinite),
-    tier: x.tier || 'untracked', kind: x.kind === 'exploration' ? 'exploration' : 'criterion', checks: x.checks && typeof x.checks === 'object' ? x.checks : null,
+    tier: x.tier || 'untracked', kind: ['exploration', 'intent'].includes(x.kind) ? x.kind : 'criterion', checks: x.checks && typeof x.checks === 'object' ? x.checks : null,
   };
   it.ref = str(o.ref) || str(x.key).split('/')[0];
   it.label = `${it.ref} ${str(x.id)}`.trim();
@@ -673,7 +674,7 @@ const FACETS = [
   { id: 'verdict', label: 'Latest verdict', get: (i) => [i.latest || 'none'], fmt: (v) => (v === 'none' ? 'No verdict yet' : vLabel(v)) },
   { id: 'origin', label: 'Issue or scenario', get: (i) => [i.origin.kind || 'issue'], fmt: entName },
   { id: 'ref', label: 'Which issue or scenario', get: (i) => [i.ref], order: (a, b) => str(a).localeCompare(str(b), 'en', { numeric: true }), fmt: (v) => `${ENT[refKind(v)][1]} ${v}${originTitle(v) ? ` ${originTitle(v).slice(0, 40)}` : ''}` },
-  { id: 'kind', label: 'Criterion or exploration', get: (i) => [i.kind], fmt: entName },
+  { id: 'kind', label: 'Criterion, intent or exploration', get: (i) => [i.kind], fmt: entName },
   { id: 'flag', label: 'Flags', get: (i) => [...i.flags, ...(pins.has(i.key) ? ['pinned'] : [])] },
   { id: 'collection', label: 'Collection', get: colls, fmt: (v) => `${ENT.collection[1]} ${v}` },
   { id: 'feature', label: 'Feature', get: feats, fmt: (v) => `${ENT.feature[1]} ${featName(v)}` },
@@ -691,7 +692,7 @@ const FACET_HELP = {
   verdict: 'The newest result of each test case. Put the pointer on a badge to see its meaning.',
   origin: 'Where the test case comes from: 🎫 an issue on GitHub, or 💬 a scenario that a person requested.',
   ref: 'The issue or the scenario of the test case.',
-  kind: '🎯 Acceptance criterion: a condition of the issue. It is part of the verdict. 🔦 Exploration: an additional check outside the criteria. It is not part of the verdict.',
+  kind: '🎯 Acceptance criterion: a condition of the issue. It is part of the verdict. 💡 Intent test: the purpose of the issue, tested like a criterion. It is not part of the verdict. 🔦 Exploration: an additional check outside the criteria. It is not part of the verdict.',
   flag: 'Special conditions: flaky, repaired after a UI change, changed after promotion, costly, has a screenshot, has a bug issue, has a maintenance proposal, pinned.',
   collection: 'Your own groups of test cases (work/CATALOG.md), for example "Upload".',
   feature: 'Groups of recurring test cases by what the product does (work/FEATURES.md). The agent keeps them.',
@@ -950,10 +951,10 @@ function stepText(t) {
 }
 // The commands the page may offer: the operator's words of docs/on-demand.md and docs/modules.md,
 // built from constants and ids only. Anything else is never shown, copied or sent.
-const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|run (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?|create issue for (?:#\d{1,7} (?:AC|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})(?:, (?:#\d{1,7} (?:AC|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})){0,19}(?: for the architect)?|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+(?: as (?:false-positive|wont-fix|duplicate|by-design))?|reopen D-\d+|categorize D-\d+ (?:[a-z0-9][a-z0-9-]{0,29}|-)|(?:add (?:#\d+|S-\d+)(?: AC-\d+)? to|remove (?:#\d+|S-\d+)(?: AC-\d+)? from) the collection [A-Za-z0-9][A-Za-z0-9 _.-]{0,39}|run feature [a-z0-9][a-z0-9-]{0,39}|(?:accept|rewrite|retire|keep) M-\d{1,6})$/;
+const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|run (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)|create issue for (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})(?:, (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})){0,19}(?: for the architect)?|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+(?: as (?:false-positive|wont-fix|duplicate|by-design))?|reopen D-\d+|categorize D-\d+ (?:[a-z0-9][a-z0-9-]{0,29}|-)|(?:add (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) to|remove (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) from) the collection [A-Za-z0-9][A-Za-z0-9 _.-]{0,39}|run feature [a-z0-9][a-z0-9-]{0,39}|(?:accept|rewrite|retire|keep) M-\d{1,6})$/;
 // A problem a found issue may be about (skills/create-issue): a criterion's or an exploration's failure,
 // a design finding, a validation case, a stress check.
-const PROB_RE = /^(?:#\d{1,7} (?:AC|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})$/;
+const PROB_RE = /^(?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})$/;
 // On an interactive artifact beside the agent's chat the platform injects `platform.sendPrompt`:
 // a click sends the command as the operator's own chat message. It gives no answer back.
 const bridge = () => { try { return window.platform && typeof window.platform.sendPrompt === 'function' ? window.platform : null; } catch { return null; } };
@@ -1144,7 +1145,7 @@ const foundLinks = (ref) => { const l = foundOf(ref);
 // The ref of a test case's problem: `#42 AC-2`, `#42 EX-1`, `S-7 AC-1`, `P-sign-in AC-1` (a scenario's exploration has none).
 const problemRef = (i) => { const r = i.origin.kind === 'scenario' ? `${i.ref} ${str(i.id)}` : `#${num(i.ref)} ${str(i.id)}`; return PROB_RE.test(r) ? r : null; };
 // A problem's kind, for its icon: a test case, a design finding, a validation finding, a stress check.
-const probIcon = (ref) => (/^D-/.test(ref) ? ENT.design[1] : /^VAL-/.test(ref) ? ENT.validation[1] : /^STRESS-/.test(ref) ? ENT.stress[1] : / EX-/.test(ref) ? ENT.exploration[1] : ENT.criterion[1]);
+const probIcon = (ref) => (/^D-/.test(ref) ? ENT.design[1] : /^VAL-/.test(ref) ? ENT.validation[1] : /^STRESS-/.test(ref) ? ENT.stress[1] : / EX-/.test(ref) ? ENT.exploration[1] : / IN-/.test(ref) ? ENT.intent[1] : ENT.criterion[1]);
 const PICK_KEY = `qi-catalog:${str(D.target)}:picked`;
 const PICK_MAX = 20;
 let picked = [];
@@ -1204,11 +1205,11 @@ function itemActions(i) {
   if (i.file) out.push(action(`${ENT.run[1]} Run this test now`, `The agent runs the test of ${i.label} one time on the current build. The result shows in the history as "Manual run". It does not change a verdict or a tier, and it does not post anything.`, `run ${r} ${str(i.id)}`));
   if (i.file) out.push(action(`${ENT.run[1]} Run all the tests of ${ENT[refKind(i.ref)][0].toLowerCase()} ${r}`, 'The same for all its acceptance criteria and explorations.', `run ${r}`));
   for (const f of feats(i)) out.push(action(`${ENT.feature[1]} Run the feature "${featName(f)}"`, 'The agent runs all the recurring tests of this feature one time on the current build. The result shows as "Feature run". It does not change a verdict or a tier.', `run feature ${f}`));
-  if (i.kind === 'criterion' && i.origin.kind !== 'scenario') out.push(action(`${ENT.issue[1]} Test the full issue again`, 'A full issue run: the agent tests each acceptance criterion on the new build and on the last release, and makes a new report with video and screenshots.', `test ${r}`));
-  if (i.kind === 'criterion' && ['promotable', 'exploratory', 'quarantined'].includes(i.tier)) out.push(action('🌙 Promote it into the nightly regression', 'After this, the test runs each night on the newest build. Before the agent does this, it shows you the test and its criteria.', `promote ${r}`));
-  if (i.kind === 'criterion' && i.tier === 'regression') out.push(action('Demote it', 'This removes the test from the nightly regression. The catalog keeps the test case and its history.', `demote ${r}`));
+  if (i.kind !== 'exploration' && i.origin.kind !== 'scenario') out.push(action(`${ENT.issue[1]} Test the full issue again`, 'A full issue run: the agent tests each acceptance criterion on the new build and on the last release, and makes a new report with video and screenshots.', `test ${r}`));
+  if (i.kind !== 'exploration' && ['promotable', 'exploratory', 'quarantined'].includes(i.tier)) out.push(action('🌙 Promote it into the nightly regression', 'After this, the test runs each night on the newest build. Before the agent does this, it shows you the test and its criteria.', `promote ${r}`));
+  if (i.kind !== 'exploration' && i.tier === 'regression') out.push(action('Demote it', 'This removes the test from the nightly regression. The catalog keeps the test case and its history.', `demote ${r}`));
   out.push(...issueActions(problemRef(i), bad));
-  const member = i.kind === 'criterion' ? `${r} ${str(i.id)}` : r;
+  const member = i.kind !== 'exploration' ? `${r} ${str(i.id)}` : r;
   const inp = h('input', { type: 'text', list: 'qi-colls', placeholder: 'collection name, for example Upload', 'aria-label': 'Collection name' });
   inp.addEventListener('input', () => inp.setCustomValidity(''));
   out.push(h('div', { class: 'action' }, h('b', {}, `${ENT.collection[1]} Put it in a collection`), h('p', {}, `${ENT.collection[2]} You can filter and group the catalog by collection.`),
@@ -1832,10 +1833,11 @@ function itemDrawer(i) {
       o.kind === 'scenario' ? (o.source ? ` · requested from ${str(o.source)}` : '') : (o.state ? ` · the issue is ${str(o.state)}` : '')),
     h('h2', {}, str(i.name) || str(i.then), ' ', star(i)),
     labelChips(o.labels),
-    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' }, tierB(i.tier), badge(i.latest), i.kind === 'exploration' ? h('span', { class: 'badge muted', title: ENT.exploration[2] }, 'outside every verdict') : null,
+    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' }, tierB(i.tier), badge(i.latest), i.kind === 'exploration' ? h('span', { class: 'badge muted', title: ENT.exploration[2] }, 'outside every verdict') : i.kind === 'intent' ? h('span', { class: 'badge muted', title: ENT.intent[2] }, 'outside the issue verdict') : null,
       i.drift ? h('span', { class: 'badge muted', title: VAL_HELP.drift }, 'drift — not run until re-promoted') : null, i.testable === false ? h('span', { class: 'badge muted', title: VAL_HELP['not-testable'] }, 'not testable') : null),
     i.summary ? h('p', {}, str(i.summary)) : null,
-    h('div', { class: 'gwt', title: i.kind === 'exploration' ? ENT.exploration[2] : 'The frozen acceptance criterion: the start state (Given), the action (When) and the result that the test checks (Then).' },
+    h('div', { class: 'gwt', title: i.kind === 'exploration' ? ENT.exploration[2] : i.kind === 'intent' ? `${ENT.intent[2]} The goal is the sentence of the issue, verbatim.` : 'The frozen acceptance criterion: the start state (Given), the action (When) and the result that the test checks (Then).' },
+      i.kind === 'intent' ? h('p', {}, h('b', {}, 'Goal'), str(i.goal) || '–') : null,
       h('p', {}, h('b', {}, 'Given'), str(i.given) || '–'), h('p', {}, h('b', {}, 'When'), str(i.when) || '–'), h('p', {}, h('b', {}, i.kind === 'exploration' ? 'Expect' : 'Then'), str(i.then) || '–')),
     src ? h('figure', { style: 'margin:10px 0' }, h('img', { src, alt: `The screen that ${i.id} checks`, style: 'width:100%;border-radius:10px;border:1px solid var(--line);background:#fff' }),
       h('figcaption', { class: 'meta', style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px' }, `📷 The screen right before the check of ${i.id}.`, i.evidence ? [' The video and all screenshots:', reportBtn(i.evidence)] : null)) : null,
@@ -1872,7 +1874,8 @@ function itemDrawer(i) {
 // An issue or a scenario: its criteria and explorations, every run that judged them, its report.
 function originDrawer(ref) {
   const o = origins.get(ref) || {};
-  const its = items.filter((x) => x.ref === ref).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'criterion' ? -1 : 1) || num(a.id) - num(b.id));
+  const KORD = { criterion: 0, intent: 1, exploration: 2 };
+  const its = items.filter((x) => x.ref === ref).sort((a, b) => (KORD[a.kind] ?? 3) - (KORD[b.kind] ?? 3) || num(a.id) - num(b.id));
   const all = ALL.filter((x) => x.ref === ref);
   const ev = (all.find((x) => x.evidence) || {}).evidence || null;
   const rs = originRuns(ref).filter((r) => runsAt.includes(r));

@@ -19,8 +19,11 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
 - `verdict`: `verified` | `failed` | `partial` | `inconclusive` | `blocked` |
   `not-testable` | `-` (while in progress). Meanings: [reporting.md](reporting.md).
 - Rewrite a row with an atomic `tmp + mv` of the whole file; never two rows per issue.
-- Per-issue files live in `work/issues/<n>/`: `criteria-<ac_hash>.md` and
-  `explorations-<ac_hash>.md` (frozen, never edited), `verdicts-<ac_hash>-<candidate>.json` (your judgment),
+- Per-issue files live in `work/issues/<n>/`: `criteria-<ac_hash>.md`, `intent-<ac_hash>.md`
+  and `explorations-<ac_hash>.md` (frozen, never edited — the intent file once its judge's
+  steps freeze it, [intent.md](intent.md) → The judge), `issue-<ac_hash>.json`,
+  `intent-judge-<ac_hash>.json` and `intent-judge-<ac_hash>-2.json` (the intent judge's input
+  and its two answers), `verdicts-<ac_hash>-<candidate>.json` (your judgment),
   `report-<ac_hash>-<candidate>/` (the rendered evidence page), `artifact.id`.
 
 ## Procedure
@@ -40,7 +43,8 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
 3. **Freeze the ACs** → [acceptance-criteria.md](acceptance-criteria.md). Output
    `work/issues/<n>/criteria-<ac_hash>.md`. Written **before** you look at the product;
    when it already exists (a takeover or a retest of the same text), reuse it unchanged.
-   Then, unless `explorations: disabled`, the explorations file, same discipline
+   Then the intent file, judged before it freezes ([intent.md](intent.md)), and, unless
+   `explorations: disabled`, the explorations file, same discipline
    ([explorations.md](explorations.md)). No testable AC → verdict `not-testable`, go to step 8.
 4. **Candidate environment.** `bash "$HOME/scripts/env.sh" wait <candidate>` — again while it exits 3
    ([nested-env.md](nested-env.md) → Shape) — then
@@ -50,10 +54,10 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    an environment problem never becomes a verdict.
 5. **Author** `work/suite/tests/issue-<n>.e2e.ts` per [test-authoring.md](test-authoring.md):
    one test per testable AC, AC blocks written from the criteria file, steps found by
-   exploring the candidate. Iterate until every test *reaches* its AC block on the
-   candidate. One test per EX too, tagged `issue-<n>-ex` ([explorations.md](explorations.md)
+   exploring the candidate; one per testable IN by the same rules ([intent.md](intent.md) →
+   Tests). Iterate until every test *reaches* its block on the candidate. One test per EX too, tagged `issue-<n>-ex` ([explorations.md](explorations.md)
    → **Tests**). Then `bash "$HOME/scripts/check-asserts.sh" --lint <file>`: give every AC in
-   `no_unique_ref` a discriminating check ([test-authoring.md](test-authoring.md)), and
+   `no_unique_ref` (AC or IN) a discriminating check ([test-authoring.md](test-authoring.md)), and
    retag every EX in `ex_with_issue_tag`. Something broken you see outside the ACs is one
    `noticed` item ([explorations.md](explorations.md) → **Noticed in passing**) — never
    chased. Refresh the row.
@@ -75,8 +79,9 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    [reporting.md](reporting.md) → Verdicts: a step the test could not perform is
    `blocked`, an assertion that ran and was false is `failed`; a baseline that stopped
    before the AC block is judged per [reporting.md](reporting.md) → **Baseline blocked**.
-   Judge each EX per [explorations.md](explorations.md) → **Run and judge** — never into an
-   AC verdict. Write
+   Judge each IN the same way, into `intents[]` and `intent_verdict`, never into the issue
+   verdict ([intent.md](intent.md) → Verdict). Judge each EX per [explorations.md](explorations.md)
+   → **Run and judge** — never into an AC verdict. Write
    `verdicts-<ac_hash>-<candidate>.json` ([reporting.md](reporting.md) → Verdicts file).
 8. **Report.** Render it — `node "$HOME/scripts/render-report.mjs" <verdicts.json>
    work/issues/<n>/report-<ac_hash>-<candidate>` — open its `index.html` and check
@@ -87,7 +92,13 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    `promotable` when the file qualifies, else `exploratory`, `assert_hash` from
    `bash "$HOME/scripts/check-asserts.sh" --hash <file>` ([regression.md](regression.md) →
    Tiers); `auto_promote: verified` writes a qualifying file as `regression` instead. A
-   retest of a promoted file never demotes it and never rewrites its hash. Name every
+   retest of a promoted file never demotes it and never rewrites its hash. When the
+   retest changed the file's AC or IN blocks — IN blocks added to a file promoted without
+   them included — the file drifts and the nightly run skips it: open its `drift` proposal
+   now (`maintenance.mjs open "#<n>" --kind drift --build <candidate> --proposal re-promote
+   --basis-file <f>`, [maintenance.md](maintenance.md)) and name it in the run's chat summary; the operator's
+   "accept M-<k>" alone re-promotes it with the new hash, also under `auto_promote: verified`
+   ([regression.md](regression.md) → Tiers: a heal or the operator). Name every
    `promotable` (or auto-promoted) file in the run's chat summary. Put each of its criteria
    into a feature ([features.md](features.md) → Who puts a test into a feature).
 10. **Release.** `env.sh unlock issues` (it refuses while a background install or suite run
@@ -110,7 +121,8 @@ work the same way ([nested-env.md](nested-env.md) → **Budgets**).
   `report_pending` or `queued`, never `in_progress` ([scenarios.md](scenarios.md)).
 - Every send of this run has its `intent` and `done`/`failed` ledger lines
   ([logging.md](logging.md) → **Ledger of external writes**).
-- `criteria-<ac_hash>.md` and `explorations-<ac_hash>.md` predate the first test file edit of this run.
+- `criteria-<ac_hash>.md`, `intent-<ac_hash>.md` (with its judge's answer) and `explorations-<ac_hash>.md` predate the first test file edit of this run.
+- No IN changed the issue verdict; an issue `verified` with intent `not-met` leads the chat summary.
 - No observation or `noticed` item changed an AC or issue verdict.
 - No AC is `verified` without a candidate pass and a baseline failure or
   `baseline_blocked_reason: absent`.

@@ -145,7 +145,9 @@ shows the frozen Given/When/Then, then the candidate build and the last release 
 side: a **video of the whole test run**, screenshots captioned by step — including the
 exact screen the criterion is checked on — the step list, the assertion error when one
 failed, and the trace. A reader can confirm a `verified` verdict by watching the feature
-fail on the release and work on the candidate. Media add a few MB per criterion.
+fail on the release and work on the candidate. When the issue states its purpose, the page also
+shows an **intent test**: one user journey that checks the goal, not only the letter of the
+criteria — reported beside the verdict, never in it ([docs/intent.md](docs/intent.md)). Media add a few MB per criterion.
 
 ## The test catalog
 

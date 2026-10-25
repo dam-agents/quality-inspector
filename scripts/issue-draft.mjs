@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // issue-draft.mjs — the draft of a found issue (skills/create-issue): one or more problems the
-// agent saw — a failed test of a criterion or an exploration, a design finding, a validation case,
+// agent saw — a failed test of a criterion, an intent test or an exploration, a design finding, a validation case,
 // a stress check — written up for the people who fix them: what is wrong, how it should work and
 // where that comes from (the original issue's criterion), how to reproduce it step by step, the
 // evidence (the screenshots, the video, the crop), and a "Done when" section an issue run can test
@@ -48,7 +48,7 @@ const mdq = (s) => String(s ?? '').replace(/([\\`*_[\]<>|])/g, '\\$1'); // produ
 // ------------------------------------------------------------------ arguments
 const args = process.argv.slice(2);
 const fix = args.includes('--fix');
-const REF_RE = /^(#\d{1,7} (?:AC|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})$/;
+const REF_RE = /^(#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})$/;
 const refs = [...new Set(args.filter((a) => a !== '--fix').join(' ').split(',').map((s) => s.trim().replace(/\s+/g, ' ')).filter(Boolean))];
 if (!refs.length || refs.length > MAX_REFS || refs.some((r) => !REF_RE.test(r))) {
   console.error(`usage: issue-draft.mjs <ref>[, <ref>…] [--fix] — 1 to ${MAX_REFS} refs: #42 AC-2, #42 EX-1, S-7 AC-1, P-<slug> AC-1, D-12, VAL-3, STRESS-API-2`);
@@ -70,7 +70,7 @@ function parseCriteria(text, id) {
   const title = (text.match(/^# (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*) — (.*?)(?:\s{2,}\S+:.*)?$/m) ?? [])[1] ?? null;
   for (const sec of text.split(/^## /m).slice(1)) {
     const head = sec.split('\n')[0];
-    if ((head.match(/^((?:AC|EX)-\d+)/) ?? [])[1] !== id) continue;
+    if ((head.match(/^((?:AC|IN|EX)-\d+)/) ?? [])[1] !== id) continue;
     const line = (k) => ((sec.match(new RegExp(`^${k}[: ]\\s*(.*)$`, 'm')) ?? [])[1] ?? null);
     return { title, name: (head.match(/ — (.*)$/) ?? [])[1] ?? null, given: line('Given'), when: line('When'),
       then: line('Then') ?? line('Expected'), surface: line('surface'), from: (head.match(/\(from (AC-\d+)/) ?? [])[1] ?? null };
@@ -133,7 +133,7 @@ const scenRows = new Map(rows(join(work, 'SCENARIOS.md')).map(([id, , , , h]) =>
 const found = rows(join(work, 'FOUND.md')).map(([ref, issue, url]) => ({ ref, issue, url }));
 
 function testProblem(ref) {
-  const [, owner, id] = ref.match(/^(\S+) ((?:AC|EX)-\d+)$/);
+  const [, owner, id] = ref.match(/^(\S+) ((?:AC|IN|EX)-\d+)$/);
   const isIssue = owner.startsWith('#');
   const num = owner.slice(1);
   const okey = isIssue ? `issue-${num}` : owner.startsWith('P-') ? `profile-${owner.slice(2)}` : `scenario-${owner.slice(2)}`;
@@ -142,14 +142,15 @@ function testProblem(ref) {
   const hash = isIssue ? qa.get(num) : scenRows.get(owner);
   const critFile = (pre) => (hash && existsSync(join(dir, `${pre}-${hash}.md`)) ? join(dir, `${pre}-${hash}.md`)
     : ls(dir).filter((f) => f.startsWith(`${pre}-`) && f.endsWith('.md')).map((f) => join(dir, f)).sort((a, b) => mtime(a) - mtime(b)).at(-1));
-  const crit = parseCriteria(read(critFile(ex ? 'explorations' : 'criteria')), id) ?? {};
+  // An intent test's frozen lines live in intent-<ac_hash>.md (docs/intent.md).
+  const crit = parseCriteria(read(critFile(ex ? 'explorations' : id.startsWith('IN') ? 'intent' : 'criteria')), id) ?? {};
   const originTitle = parseCriteria(read(critFile('criteria')), 'AC-1')?.title ?? crit.title ?? null;
 
   // Every result of this test: issue and scenario runs, nights, runs by hand — the newest bad one.
   const results = [];
   for (const f of ls(dir).filter((x) => /^verdicts-.*\.json$/.test(x))) {
     const v = readJson(join(dir, f)); if (!v) continue;
-    const e = [...(v.acs ?? []), ...(v.explorations ?? [])].find((x) => x?.id === id);
+    const e = [...(v.acs ?? []), ...(v.intents ?? []), ...(v.explorations ?? [])].find((x) => x?.id === id);
     if (e?.verdict) results.push({ value: e.verdict, build: v.candidate ?? v.build ?? null, baseline: v.baseline ?? null,
       utc: v.generated_utc ?? iso(mtime(join(dir, f))), label: ex ? v.explorations_run : v.candidate_run, run: isIssue ? 'issue run' : 'scenario run', title: v.title });
   }
@@ -190,7 +191,7 @@ function testProblem(ref) {
     title: one(crit.name ?? crit.then ?? `${ref} fails`, 120),
     what: [`On build \`${bad?.build ?? '?'}\` (${bad?.run ?? 'no run yet'}), ${ref}${crit.name ? ` — ${mdq(crit.name)}` : ''}: ${VERDICT[bad?.value] ?? bad?.value ?? 'no result yet'}.`,
       ev?.error ? `The message of the check: \`${ev.error.replace(/`/g, "'")}\`` : null, failedAt].filter(Boolean),
-    expected: { source: isIssue ? `#${num}${originTitle ? ` (${mdq(originTitle)})` : ''}, ${ex ? `exploration ${id}${crit.from ? ` of ${crit.from}` : ''}` : `acceptance criterion ${id}`}`
+    expected: { source: isIssue ? `#${num}${originTitle ? ` (${mdq(originTitle)})` : ''}, ${ex ? `exploration ${id}${crit.from ? ` of ${crit.from}` : ''}` : id.startsWith('IN') ? `intent test ${id} (the purpose the issue states)` : `acceptance criterion ${id}`}`
       : `the scenario ${owner}${originTitle ? ` (${mdq(originTitle)})` : ''}, criterion ${id}`,
       given: crit.given, when: crit.when, then: crit.then },
     done: crit.then ? { given: crit.given, when: crit.when, then: crit.then } : null,

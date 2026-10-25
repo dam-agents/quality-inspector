@@ -7,6 +7,18 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.30.0 — 2026-10-25
+
+**Upgrade:**
+Nothing to run — docs are re-read per run. New: intent tests ([docs/intent.md](docs/intent.md)).
+From the next issue run on, an issue that states its purpose gets up to two `IN-<k>` tests: frozen in
+`intent-<ac_hash>.md` with the issue's goal sentence quoted, checked by the judge, run red-green with
+the criteria, and reported as `intent_verdict` beside the issue verdict, which they never change.
+Issues tested before have no intent file: "test #N" gives them one. `check-asserts.sh --hash` now
+covers IN blocks too; a promoted file without IN blocks keeps its `assert_hash`, so no drift. A "test #N"
+that adds IN blocks to a promoted file changes its hash: the run opens a `drift` proposal at once, and the
+nightly run skips the file until the operator accepts it, also under `auto_promote: verified`.
+
 ## 3.29.1 — 2026-10-25
 
 **Upgrade:**

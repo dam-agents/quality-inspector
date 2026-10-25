@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # render-report.mjs: every tested AC gets its video and captioned screenshot, and the header counts how
 # many were tested; the setup test never appears;
-# explorations render apart from the verdict, and a verdicts file without them renders as before;
+# explorations and intent tests render apart from the verdict, and a verdicts file without them renders as before;
 # noticed-in-passing items are listed outside the verdict; a baseline blocked reason and a
 # regression's build interval are shown; a scenario's evidence is found by its own tag and
 # carries the judge's reading, and a verified scenario is refused; proof.json names the
@@ -94,6 +94,31 @@ case "$hx" in *'<h1>#42 — Rename &lt;b&gt;</h1><span class="badge ok">Verified
 [ "$(ls "$SANDBOX/outx/media" | wc -l | tr -d ' ')" = 6 ] || { echo "  expected the AC media plus EX-1's video and screenshot"; FAILED=1; }
 grep -qx '2 explorations beyond the criteria: 1 observations (see evidence)' "$SANDBOX/outx/comment.md" || { echo "  explorations comment line missing"; FAILED=1; }
 [ "$(grep -c 'EX-' "$SANDBOX/outx/comment.md")" = 0 ] || { echo "  the comment must not list explorations"; FAILED=1; }
+
+# Intent tests (docs/intent.md): red-green like a criterion, found by issue-<n> + in-<k> in the same
+# runs; their own section and comment line; never the issue verdict. Here IN-1 fails on the
+# candidate while every AC is verified: the letter holds, the goal does not.
+for side in cand base; do
+  jq '.run.results += [{"titlePath":["#42 IN-1: the next answer comes from Fast"],"tags":["issue-42","in-1"],"status":"failed","attempts":[{"durationMs":800,
+    "error":{"code":"ASSERTION_FAILED","message":"answer names Default"},"artifacts":[],"steps":[]}]}]' "$R/$side/report.json" > "$R/$side/r.tmp" && mv "$R/$side/r.tmp" "$R/$side/report.json"
+done
+jq '. + {intent_verdict: "not-met", intents: [{id:"IN-1", name:"the next answer comes from <Fast>", goal:"so that answers come faster", given:"a conversation", when:"pick Fast, then ask", then:"the answer names Fast", covers:["AC-1"], surface:"ui", testable:true, verdict:"failed", baseline_blocked_reason:null}]}' \
+  "$SANDBOX/v.json" > "$SANDBOX/vi.json"
+out="$(QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/vi.json" "$SANDBOX/outi")"
+assert "intents counted apart from the ACs" '.acs == 2 and .intents == 1 and .intent_verdict == "not-met"' "$out"
+hi="$(cat "$SANDBOX/outi/index.html")"
+case "$hi" in *'What the author wanted — intent not met'*'Not part of the verdict'*'The criteria are true, but the goal is not met'*) ;; *) echo "  intent section, its label or the letter-not-goal line missing"; FAILED=1;; esac
+case "$hi" in *'answer names Default'*) ;; *) echo "  IN evidence missing"; FAILED=1;; esac
+case "$hi" in *'from &lt;Fast&gt;'*'<b>Goal</b> so that answers come faster'*) ;; *) echo "  IN name not escaped or goal missing"; FAILED=1;; esac
+case "$hi" in *'<h1>#42 — Rename &lt;b&gt;</h1><span class="badge ok">Verified</span>'*) ;; *) echo "  an intent test changed the issue verdict"; FAILED=1;; esac
+grep -qx 'Intent (what the author wanted): not met — IN-1 failed. The criteria are true, but the goal is not met.' "$SANDBOX/outi/comment.md" || { echo "  intent comment line missing"; FAILED=1; }
+grep -q '| IN-1 |' "$SANDBOX/outi/comment.md" && { echo "  the AC table must not list intent tests"; FAILED=1; }
+assert "no intent keys without intents" 'has("intents") | not' "$(QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/v.json" "$SANDBOX/out-noin")"
+case "$(cat "$SANDBOX/out-noin/index.html")" in *'What the author wanted'*) echo "  intent section rendered without intents"; FAILED=1;; esac
+jq '. + {intent_verdict: "none", intents: []}' "$SANDBOX/v.json" > "$SANDBOX/vn.json"
+QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/vn.json" "$SANDBOX/outn" >/dev/null
+case "$(cat "$SANDBOX/outn/index.html")" in *'intent none'*'states no purpose beyond its criteria'*) ;; *) echo "  intent none not rendered"; FAILED=1;; esac
+grep -qx 'Intent (what the author wanted): none' "$SANDBOX/outn/comment.md" || { echo "  intent none comment line missing"; FAILED=1; }
 
 # Noticed in passing: listed with its screenshot, escaped, counted once in the comment, never in the verdict.
 printf 'png' > "$SANDBOX/noticed.png"

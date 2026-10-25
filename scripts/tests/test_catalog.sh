@@ -324,9 +324,10 @@ cmd="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const
 const t=["run #42", "run #42 AC-1", "run S-7 AC-1", "run P-sign-in", "create issue for #42 AC-1", "create issue for #42 AC-1, D-3, VAL-2, STRESS-API-2, S-7 AC-1 for the architect",
   "categorize D-3 layout", "categorize D-3 -", "dismiss D-3 as wont-fix", "reopen D-3", "add #42 AC-1 to the collection Upload", "remove S-7 from the collection My set",
   "run #42; rm -rf ~", "create issue for #42", "create issue for D-3 for everyone", "categorize D-3 Layout", "dismiss D-3 as boring", `create issue for ${Array(21).fill("D-1").join(", ")}`, "add #42 to the collection ../x",
-  "run feature renaming", "accept M-1", "keep M-12", "run feature Bad Id", "accept M-1; rm -rf ~"];
+  "run feature renaming", "accept M-1", "keep M-12", "run feature Bad Id", "accept M-1; rm -rf ~",
+  "run #42 IN-1", "create issue for #42 IN-1", "add #42 IN-1 to the collection Goals", "run S-7 IN-1", "create issue for S-7 IN-1"];
 process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
-assert_eq "the managing commands: their shapes only, at most 20 problems" 111111111111000000011100 "$cmd"
+assert_eq "the managing commands: their shapes only, at most 20 problems" 11111111111100000001110011100 "$cmd"
 
 # The agent's features, the open maintenance proposals and a feature run (docs/features.md,
 # docs/maintenance.md): a malformed feature id and a closed proposal stay out; a feature run joins the
@@ -341,4 +342,32 @@ assert "features: the well-formed rows" '.features == [{"id":"renaming","name":"
 assert "maintenance: the open proposals only" '[.maintenance[] | .id + ":" + .test + ":" + .kind + ":" + .proposal + ":" + .basis] == ["M-1:#42 AC-1:needs-review:heal:ui-map: tab moved"]' "$data"
 assert "a feature run: in the runs and the history" '([.runs[] | select(.type == "feature")] | length == 1 and .[0].ref == "renaming" and .[0].entries == [{"key":"issue-42/AC-1","value":"passed"}])
   and (.items[] | select(.key == "issue-42/AC-1") | [.history[] | select(.run == "feature")] | length == 1)' "$data"
+
+# An intent test (docs/intent.md): its own item kind, its goal from intent-<ac_hash>.md, its verdict from
+# "intents" in the history, never mixed into the criteria.
+cat > "$W/issues/42/intent-abc.md" <<'C'
+# #42 — intent        frozen_utc: 2026-10-02T13:41:30Z        ac_hash: abc
+
+## IN-1 — a renamed project is found by its new name
+Goal "so that a team finds a project by the name it uses now"
+Given a project with one task
+When the owner renames it, then searches for the new name
+Then the search lists the renamed project
+covers: AC-1
+surface: ui
+testable: yes
+C
+jq '. + {intent_verdict: "met", intents: [{id: "IN-1", verdict: "verified"}]}' "$W/issues/42/verdicts-abc-c1.json" > "$W/v.tmp" && mv "$W/v.tmp" "$W/issues/42/verdicts-abc-c1.json"
+node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a build with an intent test" 0 "$?"
+data="$(page_data)"
+assert "an intent test is its own item, with its goal and its verdict" '(.items[] | select(.key == "issue-42/IN-1") | .kind == "intent" and .goal == "\"so that a team finds a project by the name it uses now\"" and .then == "the search lists the renamed project" and ([.history[] | select(.run == "issue")][-1].value == "verified"))
+  and ([.items[] | select(.key == "issue-42/AC-1") | .kind] == ["criterion"])' "$data"
+# An intent test run by hand ("run #42 IN-1") and in a feature run joins its history; a scenario has no IN.
+mkdir -p "$W/reruns/issue-42"
+echo '{"label":"rerun-issue-42-c3-1400","ref":"#42 IN-1","build":"c3","utc":"2026-10-14T14:00:00Z","results":{"IN-1":{"status":"failed","error":null}}}' > "$W/reruns/issue-42/rerun-issue-42-c3-1400.json"
+echo '{"label":"feature-renaming-c3-1500","feature":"renaming","build":"c3","utc":"2026-10-14T15:00:00Z","results":{"issue-42/IN-1":{"status":"passed","error":null},"scenario-7/IN-1":{"status":"failed"}}}' > "$W/reruns/feature-renaming/feature-renaming-c3-1500.json"
+node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a build with intent test runs by hand" 0 "$?"
+data="$(page_data)"
+assert "an intent test run by hand and in a feature run: in its history; a scenario's IN key dropped" '(.items[] | select(.key == "issue-42/IN-1") | [.history[] | select(.run == "rerun" or .run == "feature") | .run + ":" + .value] == ["rerun:failed","feature:passed"])
+  and ([.runs[] | select(.type == "feature" and .utc == "2026-10-14T15:00:00Z")][0].entries == [{"key":"issue-42/IN-1","value":"passed"}])' "$data"
 exit $FAILED

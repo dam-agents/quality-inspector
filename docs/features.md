@@ -16,7 +16,8 @@ free grouping; features are the agent's, kept by the rules below.
 ```
 
 - `feature` — an id, `[a-z0-9][a-z0-9-]{0,39}`; `name` and each alias (`; `-separated) — 1–80
-  characters. A member is `#N`, `#N AC-k`, `S-k`, `S-k AC-j`, `P-<slug>` or `P-<slug> AC-j`.
+  characters. A member is `#N`, `#N AC-k`, `#N IN-k` (an intent test, [intent.md](intent.md)), `S-k`, `S-k AC-j`,
+  `P-<slug>` or `P-<slug> AC-j`.
 - Written only through `node "$HOME/scripts/features.mjs" …` (its header lists the commands and
   their JSON), never by hand: the script keeps the format the catalog and the audit read
   (`features.mjs check`, the audit's `features` check).
@@ -41,7 +42,7 @@ free grouping; features are the agent's, kept by the rules below.
   visible labels — a user's name for it, never a page path, a component or anything of the
   code. Add the issue title's words as an alias when they differ from the name. Name every
   feature written in the run's chat summary.
-- **The operator**, in the direct session ([on-demand.md](on-demand.md)): "add #N[ AC-k] to the
+- **The operator**, in the direct session ([on-demand.md](on-demand.md)): "add #N[ AC-k|IN-k] to the
   feature <id>", "remove … from the feature <id>", "alias feature <id> <text>", "rename feature
   <id> <text>", "merge feature <a> into <b>", "drop feature <id>", "show features", and "propose
   features" — every recurring test case in no feature, grouped by the rules above and shown as one

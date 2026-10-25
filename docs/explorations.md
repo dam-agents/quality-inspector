@@ -88,7 +88,7 @@ test('#42 EX-1: a viewer cannot rename the agent', { session: 'viewer', tags: ['
   `check-asserts.sh --lint <file>` lists in `ex_with_issue_tag` every EX block whose test
   carries `issue-<n>`; issue-qa step 5 retags each one before red-green.
 - `check-asserts.sh --ex-hash <file>` hashes the EX blocks alone (`none` without any);
-  `--hash` and `work/SUITE.md` cover AC blocks only, so EX blocks may evolve without drift.
+  `--hash` and `work/SUITE.md` cover AC and IN blocks only ([intent.md](intent.md)), so EX blocks may evolve without drift.
 
 ## Run and judge — candidate only
 

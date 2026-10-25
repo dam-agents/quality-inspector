@@ -39,7 +39,8 @@ test('#42 AC-1: a renamed project keeps its tasks', { session: 'owner', tags: ['
 - **Right before each AC block, `app.screenshot('AC-<k>: <what the Then line looks at>')`.**
   It is the still a reader checks the verdict against; the report captions it with that
   label. `agent.assert` adds its own screenshot. Never screenshot inside the setup test.
-- **Every AC block is one `criterion(id, then, ctx, check)` call**
+- **Every AC block — and an intent test's `IN-<k>` block, which follows every rule here for an
+  AC block ([intent.md](intent.md)) — is one `criterion(id, then, ctx, check)` call**
   (`work/suite/lib/criterion.ts`): `then` is the criterion's Then sentence verbatim, the
   callback holds the exact checks. When the UI moves under a check, the sentence is judged
   on screen instead and the run's triage repairs the check ([triage.md](triage.md)).
