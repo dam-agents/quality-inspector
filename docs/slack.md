@@ -46,6 +46,9 @@ declined in one reply — it is the operator's, in the direct session.
   again while it exits 3 ([nested-env.md](nested-env.md) → **Shape**).
 - **The report:** the issue verdict, the ACs that are not `verified` with their verdicts
   (none → "N of N verified"), and the link and the picture of **The answer in the thread**.
+  Both replies are in the language the person writes in; the verdicts, the AC ids, the
+  criteria and the link stay as produced ([acceptance-criteria.md](acceptance-criteria.md) →
+  **Language**).
   Never a credential, a log, the operator conversation or a security finding
   ([security.md](security.md)).
 - **Delivery** stays per [reporting.md](reporting.md): the artifact, then the issue
@@ -68,7 +71,7 @@ will run: log `slack_test feature=<id> user=<sender id>` (it counts against
 `slack_tests_per_day`) and run it, the lock's owner `slack`. **Two replies**, as for a test: once the lock is taken (the feature, its tests, the build), then each
 criterion's result, failures first, and the picture of a failure's screen (`evidence-sheet.mjs`
 cannot read a run by hand: attach the failing step's screenshot from the run, at most one) with
-the catalog link of **The answer in the thread**. No GitHub write, no `marked`, no registry
+the catalog link of **The answer in the thread**, in the language the person writes in, as for a test. No GitHub write, no `marked`, no registry
 change — an alias asked for here is the operator's.
 
 ## The answer in the thread

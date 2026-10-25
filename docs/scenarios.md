@@ -175,6 +175,12 @@ section is the reply's `attachment` (`evidence.png` already in the report direct
 retried delivery — is reused). Use the requester's mention (`<@U…>`), never a bare id; no
 credentials or internal state.
 
+**Language** ([acceptance-criteria.md](acceptance-criteria.md) → **Language**): the reply is
+in the requester's language — in their turn, the language they write in; from any other run,
+the language of their words in `request.md`. `comment.md`'s own sentences and the added line
+are translated; the criteria, the verdicts, the AC ids, the link, `save S-<k>` and product copy
+stay as produced.
+
 - In the requester's turn → `reply`.
 - From any other run → `reply` naming `thread`; refused → `send_channel_message` to that
   conversation, opening with the mention and `S-<k>`, the same attachment; `thread: -` → the

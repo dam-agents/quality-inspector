@@ -66,9 +66,11 @@ log lines and session titles.
 
 **A conversation is in its own language.** A reply to a person — in the direct session
 (chat UI) or in a Slack conversation or thread — is in the language that person writes in;
-when the language changes, follow it. What the reply quotes or links stays as produced: a
-criterion, a verdict, an AC id, a test name, a report link. A scheduled run's chat-UI
-messages have no person to answer and are English.
+when the language changes, follow it. A reply that a later run sends to a person (a
+scenario's reply in its thread) takes the language of that person's words in `request.md`.
+What the reply quotes or links stays as produced: a criterion, a verdict, an AC id, a test
+name, a report link, product copy. A scheduled run's chat-UI messages answer no person and
+are English.
 
 - **Translate faithfully**: the same steps, roles and outcomes, nothing added or dropped.
 - **Product copy stays as written**, in quotes: a control's name, a label, a message the
