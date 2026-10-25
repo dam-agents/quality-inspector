@@ -3,8 +3,8 @@
 # iface-diff output through impact.mjs (the hit's type and block, a block line before a line outside)
 # into maintenance.mjs predict — a gone page, a removed or renamed or moved control inside a block, one
 # control in two blocks, a removed endpoint; a hit only outside the blocks, a tier that does not recur
-# and a file with no SUITE.md row open nothing; a second predict updates build and basis but keeps a
-# proposal the agent changed; a triage row replaces a prediction and stops the next one; sweep closes
+# and a file with no SUITE.md row open nothing; a second predict of the same change refreshes the build
+# and keeps a proposal the agent changed, of another change replaces the row with a new one; a triage row replaces a prediction and stops the next one; sweep closes
 # a predicted break that did not happen (--unchanged, --absorbed).
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
@@ -91,17 +91,26 @@ assert "the rows: open, on the build" '[.proposals[] | select(.state == "open" a
 assert "check: the predicted kinds are well-formed" '.ok' "$(M check)"
 id() { M list --open | jq -r --arg t "$1" --arg k "$2" '.proposals[] | select(.test == $t and .kind == $k) | .id'; }
 # The agent finds the S-7 repair would touch a matcher and opens it again as review (docs/maintenance.md).
-M open 'S-7 AC-1' --kind renamed --build c2 --proposal review --basis-file "$(B 'ui-map: renamed')" >/dev/null
+b7="$(M list --open | jq -r '.proposals[] | select(.test == "S-7 AC-1") | .basis')"
+M open 'S-7 AC-1' --kind renamed --build c2 --proposal review --basis-file "$(B "$b7")" >/dev/null
 out="$(M predict --build c3 --impact "$I")"
-assert "predict again: the same rows, updated" '.opened == [] and (.updated | length) == 11' "$out"
-assert "predict again: build and basis refreshed, the review proposal kept" '.proposals[] | select(.test == "S-7 AC-1") | .proposal == "review" and .build == "c3" and (.basis | test("Export reports"))' "$(M list --open)"
+assert "predict again: the same rows, updated" '.opened == [] and (.updated | length) == 11 and .replaced == []' "$out"
+assert "predict again: the build refreshed, the review proposal kept" ".proposals[] | select(.test == \"S-7 AC-1\") | .proposal == \"review\" and .build == \"c3\" and .basis == $(jq -n --arg b "$b7" '$b')" "$(M list --open)"
+# Another change in the same block (a later build renames another control of #11 AC-1): the old row,
+# whose diff repairs the old change, is resolved, and a new row opens for the new change.
+r11a="$(M list --open | jq -r '.proposals[] | select(.test == "#11 AC-1" and .kind == "renamed") | .id')"
+jq '(.impacted[] | select(.test | endswith("issue-11.e2e.ts")) | .hits[] | select(.block == "AC-1") | .change) = "buttons \"Export\" renamed to \"Download\""' "$I" > "$SANDBOX/impact2.json"
+out="$(M predict --build c4 --impact "$SANDBOX/impact2.json")"
+assert "predict: another change replaces the row and opens a new one" ".replaced == [\"$r11a\"] and (.opened | length) == 1 and (.updated | length) == 10" "$out"
+assert "the new row: the new basis, the proposal of the prediction" '[.proposals[] | select(.test == "#11 AC-1" and .kind == "renamed")] | length == 1 and .[0].basis == "ui-map: buttons \"Export\" renamed to \"Download\"" and .[0].proposal == "heal" and .[0].build == "c4"' "$(M list --open)"
+assert "the old row: resolved" ".proposals[] | select(.id == \"$r11a\") | .state == \"resolved\"" "$(M list)"
 
 # The night's triage confirms #1 AC-1 as needs-review: its prediction is replaced, the AC-2 one is not.
 r11="$(id '#1 AC-1' renamed)"; r12="$(id '#1 AC-2' moved)"
 out="$(M open '#1 AC-1' --kind needs-review --build c3 --proposal heal --basis-file "$(B 'ui-map: tab "API keys" renamed')")"
 assert "a triage row replaces the prediction of its block only" ".opened and .replaced == [\"$r11\"]" "$out"
 assert "the replaced row is resolved" ".proposals[] | select(.id == \"$r11\") | .state == \"resolved\"" "$(M list)"
-out="$(M predict --build c3 --impact "$I")"
+out="$(M predict --build c4 --impact "$SANDBOX/impact2.json")"
 assert "predict: a block with an open triage row is skipped" '.skipped == ["#1 AC-1"] and .opened == []' "$out"
 # A triage row of the whole test replaces every prediction of it.
 r8a="$(id '#8 AC-1' obsolete)"; r8i="$(id '#8 IN-1' moved)"

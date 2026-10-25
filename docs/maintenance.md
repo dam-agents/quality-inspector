@@ -65,8 +65,9 @@ frozen block names it: a navigation step outside the blocks is the replay cache'
 with an open triage row (`needs-review`, `superseded`, `quarantined`, `fighting`) is skipped.
 For each opened `heal`, prepare `M-<k>.diff` (the block's locator only, as a heal under
 [triage.md](triage.md) → Healing rules); when it would touch a matcher, an expected value or a Then
-sentence, open the row again with `--proposal review`; a later `predict` refreshes a row's build and
-basis and keeps its proposal. The night then decides each one: the
+sentence, open the row again with `--proposal review`. A later `predict` of the same change refreshes
+the row's build and keeps its proposal; another change of the same test and kind resolves the row
+(`replaced`) and opens a new one, with its own diff. The night then decides each one: the
 triage's own row of the test resolves it (`replaced` in its output), and the sweep closes the
 prediction that did not come true.
 
