@@ -9,6 +9,8 @@ seed_work
 W="$WORK_DIR"
 F() { node "$SCRIPTS/features.mjs" "$@"; }
 # Words reach the script only through a file (docs/features.md): T <words> writes it and prints its path.
+# QI_WORDS_DIR stands for /tmp, the one folder words files may come from (lib/words.mjs).
+export QI_WORDS_DIR="$SANDBOX"
 T() { local f; f="$(mktemp "$SANDBOX/quality-inspector-words.XXXXXX")"; printf '%s' "$*" > "$f"; echo "$f"; }
 R() { F resolve --file "$(T "$@")"; }
 printf '| tests/issue-42.e2e.ts | 42 | regression | a | 2026-10-03T08:12:40Z |\n| tests/issue-51.e2e.ts | 51 | promotable | b | - |\n| tests/scenario-7.e2e.ts | S-7 | exploratory | c | - |\n| tests/profile-chat.e2e.ts | P-chat | quarantined | d | 2026-10-05T03:00:00Z |\n' >> "$W/SUITE.md"
@@ -37,6 +39,11 @@ printf 'Shared' > "$SANDBOX/quality-inspector-words.txt"
 F alias model-switch --file "$SANDBOX/quality-inspector-words.txt" 2>/dev/null; assert_eq "a fixed words path: exit 2" 2 "$?"
 [ -e "$SANDBOX/quality-inspector-words.txt" ] || { echo "  a refused words file was removed"; FAILED=1; }
 rm -f "$SANDBOX/quality-inspector-words.txt"
+# Only the words folder: a mktemp name elsewhere (where $TMPDIR may point) is refused and left alone.
+mkdir -p "$SANDBOX/elsewhere"; ef="$(mktemp "$SANDBOX/elsewhere/quality-inspector-words.XXXXXX")"; printf 'x' > "$ef"
+F alias model-switch --file "$ef" 2>/dev/null; assert_eq "a words file outside the words folder: exit 2" 2 "$?"
+[ -e "$ef" ] || { echo "  a refused words file outside the folder was removed"; FAILED=1; }
+rm -rf "$SANDBOX/elsewhere"
 wf="$(T Model picker)"; F alias model-switch --file "$wf" >/dev/null
 [ -e "$wf" ] && { echo "  a words file stayed after its call"; FAILED=1; }
 before="$(cat "$W/FEATURES.md")"
@@ -46,7 +53,8 @@ assert_eq "an unknown feature leaves the file as it was" "$before" "$(cat "$W/FE
 ls "$W" | grep -q '\.tmp$' && { echo "  a write left a temp file"; FAILED=1; }
 # The mutex: a live lock holds a writer off (exit 1, nothing written); one over a minute old is a dead writer's.
 echo 1 > "$W/FEATURES.md.lock"
-F add model-switch '#77' 2>/dev/null; assert_eq "a held lock: exit 1" 1 "$?"
+wf="$(T Held)"; F add model-switch '#77' --name-file "$wf" 2>/dev/null; assert_eq "a held lock: exit 1" 1 "$?"
+[ -e "$wf" ] && { echo "  a held lock left the call's words file"; FAILED=1; }
 assert_eq "a held lock: nothing written" "$before" "$(cat "$W/FEATURES.md")"
 touch -t 202601010000 "$W/FEATURES.md.lock"
 assert "a lock over a minute old is taken over" '.added' "$(F add model-switch '#77')"

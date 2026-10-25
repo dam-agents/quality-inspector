@@ -9,6 +9,7 @@ seed_work
 W="$WORK_DIR"
 M() { node "$SCRIPTS/maintenance.mjs" "$@"; }
 # The basis reaches the script only through a file (docs/maintenance.md): B <text> writes it, prints its path.
+export QI_WORDS_DIR="$SANDBOX"   # stands for /tmp (lib/words.mjs)
 B() { local f; f="$(mktemp "$SANDBOX/quality-inspector-basis.XXXXXX")"; printf '%s' "$*" > "$f"; echo "$f"; }
 printf '| tests/issue-42.e2e.ts | 42 | regression | none | 2026-10-03T08:12:40Z |\n| tests/issue-51.e2e.ts | 51 | quarantined | b | 2026-10-03T08:12:40Z |\n| tests/scenario-7.e2e.ts | S-7 | retired | c | - |\n| tests/issue-60.e2e.ts | 60 | regression | none | 2026-10-03T08:12:40Z |\n' >> "$W/SUITE.md"
 
@@ -38,6 +39,8 @@ assert_eq "refusals leave the file as it was" "$before" "$(cat "$W/MAINTENANCE.m
 [ -e "$W/MAINTENANCE.md.lock" ] && { echo "  a refused write left its lock"; FAILED=1; }
 echo 1 > "$W/MAINTENANCE.md.lock"
 M close M-1 kept 2>/dev/null; assert_eq "a held lock: exit 1" 1 "$?"
+bf="$(B 'held')"; M open '#42' --kind drift --build c4 --proposal heal --basis-file "$bf" 2>/dev/null; assert_eq "a held lock on open: exit 1" 1 "$?"
+[ -e "$bf" ] && { echo "  a held lock left the call's basis file"; FAILED=1; }
 assert_eq "a held lock: nothing written" "$before" "$(cat "$W/MAINTENANCE.md")"
 rm -f "$W/MAINTENANCE.md.lock"
 # An unhydrated work/ (no SUITE.md) never resolves the queue.

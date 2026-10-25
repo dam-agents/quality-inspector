@@ -14,8 +14,8 @@
 // <test>: `#N`, `#N AC-k`, `S-k[ AC-j]`, `P-<slug>[ AC-j]` (one argument or two). <kind>: needs-review |
 // superseded | drift | quarantined | fighting. <proposal>: heal | rewrite | retire | re-promote | review.
 // <state>: accepted | rewritten | retired | kept | resolved. The basis — read from <path>, the call's own
-// `mktemp -t quality-inspector-basis.XXXXXX` written with a file tool, never by the shell, since it
-// may quote an issue; removed once read (lib/words.mjs) — is a short evidence pointer (a
+// `mktemp /tmp/quality-inspector-<kind>.XXXXXX` (<kind> = basis) written with a file tool, never by the
+// shell, since it may quote an issue; removed once read, before the lock is taken (lib/words.mjs) — is a short evidence pointer (a
 // UI-map change, an issue number and its quoted sentence, a build): never a triage explanation, a
 // request's words or a credential; the catalog shows it.
 // `sweep` resolves the open rows whose cause is gone: a drift whose file no longer drifts
@@ -77,10 +77,7 @@ const testAt = (k) => {
 function main() {
 switch (cmd) {
   case 'open': {
-    // The basis file first: any later refusal must not leave the call's own file behind.
-    const path = flag('--basis-file');
-    let raw = null;
-    if (path) try { raw = takeWords(path, 'basis'); } catch (e) { die(e.message); }
+    const raw = basisRaw;
     const test = testAt(0);
     const kind = flag('--kind'); const build = flag('--build'); const proposal = flag('--proposal');
     const basis = String(raw ?? '').replace(/[|\r\n\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
@@ -166,7 +163,11 @@ switch (cmd) {
 }
 
 // A command that writes the queue runs inside its mutex; a usage error releases it before exit 2.
+// The basis file first, before the lock: no refusal and no held lock leaves the call's own file behind.
+let basisRaw = null;
 try {
+  const path = cmd === 'open' ? flag('--basis-file') : null;
+  if (path) try { basisRaw = takeWords(path, 'basis'); } catch (e) { die(e.message); }
   if (['open', 'close', 'sweep'].includes(cmd)) withMutex(`${FILE}.lock`, main); else main();
 } catch (e) {
   console.error(`maintenance: ${e.message}`);
