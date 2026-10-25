@@ -20,8 +20,9 @@ holding `profile.json` (how to run it, which builds exist, egress, boundary, set
 maintainers) and, only when no engine fits, `bin/` scripts. It usually lives in the
 product's own repository, so the product team versions it with the product.
 
-Paths below are relative to this skill's directory. Everything you write is in
-**English**, whatever language the conversation is in.
+Paths below are relative to this skill's directory. Every file you write is in
+**English**, whatever language the conversation is in; your replies in the conversation are
+in its language.
 
 ## Ground rules
 

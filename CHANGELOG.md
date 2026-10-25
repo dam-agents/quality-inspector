@@ -19,6 +19,11 @@ covers IN blocks too; a promoted file without IN blocks keeps its `assert_hash`,
 that adds IN blocks to a promoted file changes its hash: the run opens a `drift` proposal at once, and the
 nightly run skips the file until the operator accepts it, also under `auto_promote: verified`.
 
+## 3.29.1 — 2026-10-25
+
+**Upgrade:**
+Nothing — docs are re-read per run.
+
 ## 3.29.0 — 2026-10-25
 
 **Upgrade:**
