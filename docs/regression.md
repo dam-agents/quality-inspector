@@ -74,8 +74,9 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
       failed one: `🟠 Nightly regression <date> · build <candidate>: the environment failed —
       no test ran.` then `Step: <stage> (exit <n>)`, `Cause: <cause>`, `Repair: <repair>`,
       `Next: <next>`, up to 5 lines of `evidence` in a code block, and the catalog's link.
-      When the night before also ended in `ERROR: environment`, it opens with 🔴 and
-      `<n>. night in a row` (the run of such lines at the end of the log) instead.
+      `<n>` = the `ERROR: environment` lines of `work/REGRESSION.log` after its last
+      `ran candidate=` line, tonight's included (other lines, `due` among them, do not count):
+      from 2 it opens with 🔴 and `<n>. night in a row` instead.
    4. The catalog (step 10), then end.
 3. **Build the change context** ([change-awareness.md](change-awareness.md)): the UI map
    of the candidate, its diff against `previous_candidate`'s map, the completed issues in

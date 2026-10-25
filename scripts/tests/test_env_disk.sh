@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # env.sh up refuses below min_free_disk_gi (an env_failed event, exit 1) and goes ahead above it;
-# a failed up keeps its output in work/env/last-up.log, and `wait` prints its end, credentials masked.
+# a failed up keeps its output in work/env/last-up.log, and `wait` prints its end, credentials masked —
+# also for an install that died, and nothing of it when masking fails; a failed reset keeps its own log.
 . "$(dirname "$0")/lib.sh"
 seed_work
 mkdir -p "$SANDBOX/bin"
@@ -38,4 +39,30 @@ assert_eq "the event names the log" 1 "$(cat "$WORK_DIR"/logs/events-*.jsonl | j
 assert_eq "a refusal starts the log anew" 1 "$(up $((5 * 1048576)))"
 grep -q 'image pull refused' "$WORK_DIR/env/last-up.log" && { echo "  an earlier up's output kept"; FAILED=1; }
 grep -q 'only 5Gi free' "$WORK_DIR/env/last-up.log" || { echo "  the refusal is not in the log"; FAILED=1; }
+
+# A failing reset: its own log, started anew, and the event names it.
+cat > "$QI_PROFILE_DIR/bin/env" <<'S'
+#!/usr/bin/env bash
+[ "$1" = reset ] || exit 0
+echo "volume busy" >&2; exit 5
+S
+echo stale > "$WORK_DIR/env/last-reset.log"
+bash "$SCRIPTS/env.sh" reset >/dev/null 2>&1; assert_eq "a failing reset exits with the profile's code" 5 "$?"
+grep -q 'volume busy' "$WORK_DIR/env/last-reset.log" || { echo "  reset output not kept"; FAILED=1; }
+grep -q stale "$WORK_DIR/env/last-reset.log" && { echo "  an earlier reset's output kept"; FAILED=1; }
+assert_eq "the reset event names its log" 1 "$(cat "$WORK_DIR"/logs/events-*.jsonl | jq -sc '[.[] | select(.event == "env_failed" and (.msg | test("env reset exited 5 .*last-reset.log")))] | length')"
+
+# An install that died: wait prints its masked tail.
+sleep 0 & dead=$!; wait "$dead"
+printf 'running 1.0.0 2026-10-25T03:00:00Z %s %s\n' "$dead" "${CLAUDE_CODE_SESSION_ID:--}" > "$WORK_DIR/env/UP"
+printf 'env.sh up 1.0.0\nkilled while pulling, login owner-pass-1\n' > "$WORK_DIR/env/last-up.log"
+bash "$SCRIPTS/env.sh" wait 1.0.0 5 >/dev/null 2>"$SANDBOX/err"; assert_eq "a died install fails the wait" 1 "$?"
+grep -q 'died without a result' "$SANDBOX/err" && grep -q '| killed while pulling, login \*\*\*' "$SANDBOX/err" \
+  || { echo "  no masked tail for a died install: $(cat "$SANDBOX/err")"; FAILED=1; }
+
+# Masking fails (no working node): wait prints no line of the log.
+mkdir -p "$SANDBOX/nonode"; printf '#!/bin/sh\nexit 1\n' > "$SANDBOX/nonode/node"; chmod +x "$SANDBOX/nonode/node"
+PATH="$SANDBOX/nonode:$PATH" bash "$SCRIPTS/env.sh" wait 1.0.0 5 >/dev/null 2>"$SANDBOX/err"; assert_eq "wait still fails" 1 "$?"
+grep -q 'cannot mask the credential values' "$SANDBOX/err" || { echo "  no masking notice: $(cat "$SANDBOX/err")"; FAILED=1; }
+grep -q 'killed while pulling\|owner-pass-1' "$SANDBOX/err" && { echo "  unmasked output printed"; FAILED=1; }
 exit $FAILED
