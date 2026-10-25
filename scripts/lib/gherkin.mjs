@@ -83,14 +83,12 @@ export function parseFeature(text, offset = 0) {
   const errors = [];
   const warnings = [];
   const err = (n, msg) => errors.push(`line ${n + 1 + offset}: ${msg}`);
+  // The one comment that is not free text: `# language: <code>`, strict, on the first non-empty line.
+  const LANGUAGE = /^#\s*language\s*:\s*([A-Za-z-]+)\s*$/;
+  const first = lines.findIndex((l) => l.trim());
   let language = 'en';
-  for (const l of lines) {
-    const t = l.trim();
-    if (!t) continue;
-    const m = /^#\s*language\s*:\s*([A-Za-z-]+)\s*$/.exec(t);
-    if (m) language = m[1].toLowerCase();
-    break;
-  }
+  const lm = first >= 0 ? LANGUAGE.exec(lines[first].trim()) : null;
+  if (lm) language = lm[1].toLowerCase();
   if (!DIALECTS[language]) { errors.push(`language '${language}' is not supported (${Object.keys(DIALECTS).join(', ')})`); language = 'en'; }
   const D = DIALECTS[language];
   const RE = {
@@ -108,7 +106,10 @@ export function parseFeature(text, offset = 0) {
   let examples = null;
   let doc = null; // an open doc string: {delim, lines, step}
   let inRule = false;
-  let docstrings = 0; let freeText = 0; // comments and descriptions; a pure-Gherkin block has neither (isPureGherkin)
+  // Text the mapping drops: comments, descriptions, non-tag words on a tag line, the name of a Rule,
+  // Background or Examples. A pure-Gherkin block has none of it, and no doc string (isPureGherkin).
+  let docstrings = 0; let freeText = 0;
+  const TAG = /^@[A-Za-z0-9_.:-]+$/;
 
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
@@ -119,15 +120,20 @@ export function parseFeature(text, offset = 0) {
       continue;
     }
     if (!t) continue;
-    if (t.startsWith('#')) { if (!/^#\s*language\s*:/.test(t)) freeText++; continue; }
-    if (t.startsWith('@')) { pendingTags.push(...t.split(/\s+/).filter((x) => x.startsWith('@')).map((x) => x.slice(1).toLowerCase())); continue; }
+    if (t.startsWith('#')) { if (!(i === first && lm)) freeText++; continue; }
+    if (t.startsWith('@')) {
+      const words = t.split(/\s+/);
+      if (!words.every((x) => TAG.test(x))) freeText++;
+      pendingTags.push(...words.filter((x) => x.startsWith('@')).map((x) => x.slice(1).toLowerCase())); continue;
+    }
     let m;
     if ((m = RE.feature.exec(t))) {
       if (title !== null) err(i, 'a second Feature');
       title = m[2].trim(); featureTags = pendingTags; pendingTags = []; cur = null; examples = null; continue;
     }
-    if ((m = RE.rule.exec(t))) { inRule = true; backgrounds.rule = []; pendingTags = []; cur = null; examples = null; continue; }
+    if ((m = RE.rule.exec(t))) { if (m[2].trim()) freeText++; inRule = true; backgrounds.rule = []; pendingTags = []; cur = null; examples = null; continue; }
     if ((m = RE.background.exec(t))) {
+      if (m[2].trim()) freeText++;
       cur = { type: 'background', steps: inRule ? backgrounds.rule : backgrounds.feature }; examples = null; pendingTags = []; continue;
     }
     if ((m = RE.outline.exec(t)) || (m = RE.scenario.exec(t))) {
@@ -138,6 +144,7 @@ export function parseFeature(text, offset = 0) {
     }
     if ((m = RE.examples.exec(t))) {
       if (!cur || cur.type !== 'scenario') { err(i, 'Examples outside a scenario'); continue; }
+      if (m[2].trim()) freeText++;
       examples = { tags: pendingTags, header: null, rows: [], line: i }; pendingTags = []; cur.examples.push(examples); continue;
     }
     if (t.startsWith('|')) {
@@ -237,9 +244,9 @@ export function parseFeature(text, offset = 0) {
     docstrings, freeText };
 }
 
-// A block the injection lint need not count as code: closed, no error, at least one AC, and
-// nothing that is not a keyword line, a step, a tag or a table — no doc string, no comment (but
-// `# language:`) and no free description, where a payload could hide (scan-issues.mjs → injectionLint).
+// A block the injection lint need not count as code: closed, no error, at least one AC, and no text
+// the mapping drops (freeText above) and no doc string, where a payload could hide
+// (scan-issues.mjs → injectionLint).
 export function isPureGherkin(block) {
   if (!block.closed) return false;
   const p = parseFeature(block.text);

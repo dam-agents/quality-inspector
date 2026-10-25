@@ -100,8 +100,10 @@ blocks; a profile scenario may be a `.feature` file ([profile-contract.md](profi
 
 - The worklist's `spec.gherkin` — `{blocks, acs, errors}`, or `null` without a block — says what
   is there. The injection lint does not count a block's fences as code only when the block is pure
-  Gherkin: closed, no error, at least one scenario, no doc string and no free text. Any other
-  block counts as code, and every sentence is linted in all cases.
+  Gherkin: closed, no error, at least one scenario, no doc string, and no text the mapping drops —
+  a comment (but a first-line `# language: <code>`), a description, a word on a tag line that is no
+  tag, a name on a Rule, Background or Examples line. Any other block counts as code, and every
+  sentence is linted in all cases.
 - Write the spec to `"$(mktemp /tmp/quality-inspector-spec.XXXXXX)"` with the file tool, and run
   `node "$HOME/scripts/lib/gherkin.mjs" criteria <that file>`: the blocks as AC blocks, numbered as
   one list — one AC per Then step, Background before every Given, one AC per Examples row, a

