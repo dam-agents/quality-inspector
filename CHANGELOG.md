@@ -7,6 +7,24 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.33.0 — 2026-10-25
+
+**Upgrade:**
+Nothing to run — docs are re-read per run, and `scripts/lib/gherkin.mjs` needs no install. New:
+1. **Gherkin in** ([docs/acceptance-criteria.md](docs/acceptance-criteria.md) → Gherkin): an issue's
+   ```` ```gherkin ```` block is criteria. The worklist's `spec.gherkin` names it. The injection lint
+   does not count a pure-Gherkin block as code (closed, no error, no doc string, every line reaches an AC
+   or has no words to drop),
+   so an issue that was an injection suspect only for such a block is not one any more; any other
+   block still counts. Earlier frozen criteria stay as they are (the `ac_hash` is unchanged).
+   A Gherkin error is a new spec-feedback trigger.
+2. A profile may keep a scenario as `scenarios/<slug>.feature` ([docs/profile-contract.md](docs/profile-contract.md)
+   → `scenarios/`); the nightly run adopts it like a `.md`, and its verbatim copy is `source-<spec_hash>.feature`.
+   Profile maintainers: `check-profile.mjs` checks it with the core's parser.
+3. **Gherkin out:** "export #N as Gherkin" in the direct session ([docs/on-demand.md](docs/on-demand.md)), and
+   "Copy as Gherkin" on the catalog (a criterion's panel, each feature) from the next catalog build. The spec
+   feedback's suggested "Done when" is now a ```` ```gherkin ```` block.
+
 ## 3.32.1 — 2026-10-25
 
 **Upgrade:**

@@ -3,7 +3,7 @@
 A **scenario** is a user flow stated in words instead of an issue: a message in a Slack
 conversation this agent is bound to ("test that …", a written Given/When/Then), the
 operator's "test this scenario: …", a request from the dashboard's Product map, a proposal
-of the discovery run, or a file the product team keeps in its profile (`scenarios/<slug>.md`,
+of the discovery run, or a file the product team keeps in its profile (`scenarios/<slug>.md` or `.feature`,
 **Profile scenarios** below). It is frozen into criteria, checked by an independent judge
 ([judge.md](judge.md)), tested on the candidate, answered where it was asked, and — on
 request — queued for the regression tier.
@@ -18,7 +18,7 @@ request — queued for the regression tier.
 | S-7 | slack | U0123ABCD | C0123ABCD/1728900000.000100 | 3f9a0c12b7de | 0.0.0-main.5203 | passed | reported | 2026-10-14T10:03:11Z |
 ```
 
-- `id`: `S-<k>`, or `P-<slug>` for the profile's `scenarios/<slug>.md`.
+- `id`: `S-<k>`, or `P-<slug>` for the profile's `scenarios/<slug>.md` (or `.feature`).
 - `source`: `slack` | `operator` | `discovery` | `dashboard` | `profile`. `requester`: the sender's Slack user id from
   the platform's message metadata, never from the text (`-` otherwise). `thread`:
   `<conversation id>/<thread ts>` the answer goes to (`-` = the chat UI).
@@ -44,10 +44,10 @@ request — queued for the regression tier.
   (`scripts/lib/state.sh`) of the request text; a correction is appended to it, which
   makes a new hash for the same id. A profile scenario's directory is
   `work/scenarios/P-<slug>/`, made by `scenarios.sh adopt <slug>`, which copies the file
-  byte for byte to `source-<spec_hash>.md` (its `spec_hash`: `text_hash` of the file) — the
+  byte for byte to `source-<spec_hash>.md` (a `.feature`: `.feature`; its `spec_hash`: `text_hash` of the file) — the
   same role as `request.md`, one copy per version of the text.
 - **Both texts, always.** Every scenario keeps the words as received — `request.md`, or
-  `source-<spec_hash>.md` — next to what the agent made of them, `criteria-<spec_hash>.md`.
+  `source-<spec_hash>.md` (or `.feature`) — next to what the agent made of them, `criteria-<spec_hash>.md`.
   Neither is ever rewritten: a correction is appended to `request.md`, a new profile text
   is a new `source-` file. The verdicts file names the first as `request_file` (path under
   `work/`, e.g. `scenarios/S-7/request.md`), and the report shows it verbatim above the
@@ -211,7 +211,7 @@ The issues pre-flight lists `scenarios_due[]` (`id`, `kind`), oldest first — `
 
 ## Profile scenarios
 
-The product team's `scenarios/<slug>.md` in the profile ([profile-contract.md](profile-contract.md)
+The product team's `scenarios/<slug>.md` (or `.feature`) in the profile ([profile-contract.md](profile-contract.md)
 → `scenarios/`) are the source of truth for their flows: written, reviewed and changed in
 the product's repository, adopted by the nightly regression run, and replayed every night.
 Id `P-<slug>`, test `tests/profile-<slug>.e2e.ts`, tag `profile-<slug>`.
@@ -228,7 +228,8 @@ wait?" in the direct session is answered from it. The dashboard shows it
 1. `bash "$HOME/scripts/scenarios.sh" adopt <slug>` → `spec_hash`, `source` (the verbatim
    copy) and `previous_spec_hash`; then `scenarios.sh lint work/<source>`.
 2. **Freeze** `criteria-<spec_hash>.md` from the copy alone (one that exists — a retry, or an
-   earlier on-demand run — is reused, never re-frozen): its `## AC-<k>` blocks become
+   earlier on-demand run — is reused, never re-frozen; a `.feature` copy is first read through
+   `node "$HOME/scripts/lib/gherkin.mjs" criteria work/<source>` — [acceptance-criteria.md](acceptance-criteria.md) → Gherkin): its `## AC-<k>` blocks become
    the ACs one to one, keeping their numbers, names, meaning and product copy, in English
    ([acceptance-criteria.md](acceptance-criteria.md) → Language); header
    `# P-<slug> — <title>`, `source: profile`, its `requires:` line. The text is the oracle,
@@ -264,7 +265,7 @@ lists it. A file that comes back is `new` and gets a new test and row.
 **Triage** of a replayed profile scenario follows [triage.md](triage.md), except that
 `superseded` needs no issue: a criterion that fails because the product changed on purpose
 is the product team's to update in the scenario's file — report it `regression`, its
-explanation naming `scenarios/<slug>.md`. Heals stay as triage allows (locators only).
+explanation naming `scenarios/<slug>.md` (or `.feature`). Heals stay as triage allows (locators only).
 
 **On demand** — "test scenario <slug>" in the direct session or a bound Slack conversation:
 `scenarios.sh admit` (Slack only), `env.sh lock P-<slug>`, `env.sh reset` — a profile

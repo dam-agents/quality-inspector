@@ -135,7 +135,7 @@ its own issues run writes the replacement tests.
 A profile scenario (`profile-<slug>`) is never `superseded` by an issue: its file in the
 product's repository is the truth, and the product team updates it with the change. A
 criterion that no longer holds is `regression`, its explanation naming
-`scenarios/<slug>.md` ([scenarios.md](scenarios.md) → **Profile scenarios**).
+`scenarios/<slug>.md` or `.feature` ([scenarios.md](scenarios.md) → **Profile scenarios**).
 
 ## What never happens
 

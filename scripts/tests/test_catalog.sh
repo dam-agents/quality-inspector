@@ -189,6 +189,28 @@ const sys=(s.match(/@media \(prefers-color-scheme:dark\)\{:root:not\(\[data-them
 const pick=(s.match(/:root\[data-theme=dark\]\{([^}]*)\}/)||[])[1];
 process.stdout.write(sys&&pick&&sys.includes("--bg:")&&sys===pick?"same":"differ")' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "the viewer: the dark colours of the system and of the switch are the same" same "$dark"
+# Gherkin (docs/catalog.md → Gherkin): criteria only, in their frozen words, the ref named when a list spans origins.
+gk="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
+const fn=(s.match(/^function gherkinText\([\s\S]*?^}$/m)||[""])[0];
+const str=(v)=>(v==null?"":String(v)), num=(r)=>{const m=str(r).match(/\d+/);return m?+m[0]:0;};
+const gherkinText=eval(`(${fn})`);
+process.stdout.write(gherkinText("Upload", [
+ {kind:"criterion",ref:"S-7",id:"AC-1",name:"listed",given:"a file",when:"they upload\n it",then:"it is listed",testable:true},
+ {kind:"exploration",ref:"#42",id:"EX-1",name:"x",given:"g",when:"w",then:"t"},
+ {kind:"criterion",ref:"#42",id:"AC-2",name:"cache",given:null,when:"w",then:"t",testable:false}]))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "the viewer: Copy as Gherkin" "# Exported from the test catalog.
+# The frozen acceptance criteria, in words. No step definitions run them.
+Feature: Upload
+
+  @not-testable
+  Scenario: #42 AC-2 — cache
+    When w
+    Then t
+
+  Scenario: S-7 AC-1 — listed
+    Given a file
+    When they upload it
+    Then it is listed" "$gk"
 assert "activity: lock without its session, rows on their way, waiting issues, own schedules only" '.activity.lock == {"owner":"issues","since":"2026-10-22T19:35:00Z"}
   and ([.activity.issues[] | {issue, status, build}] == [{"issue":57,"status":"in_progress","build":"c4"},{"issue":67,"status":"in_progress","build":"c4"}])
   and .activity.budget_min == 150

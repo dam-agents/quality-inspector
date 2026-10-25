@@ -85,6 +85,10 @@ The operator may share the page beyond themselves, so it carries only what conce
   `rewrite M-<k>`, `retire M-<k>`, `keep M-<k>`), the test's own in its panel, and the flag
   "maintenance". Closed proposals are not shown.
 - **Pins:** each viewer's own, kept in their browser.
+- **Gherkin:** "Copy as Gherkin" in a criterion's panel (every criterion of its issue or scenario)
+  and on each feature of Overview copies them as one `Feature`, a `Scenario` per criterion in its
+  frozen words, `@not-testable` where it is; explorations stay out. The same shape as
+  `gherkin.mjs export` ([on-demand.md](on-demand.md)).
 
 **Explained on the page**, in ASD-STE100 ([reporting.md](reporting.md) → **Artifact text is ASD-STE100**).
 - **One name and one icon per thing**, the same everywhere — 🎫 issue, 💬 scenario, 🎯 acceptance
