@@ -177,7 +177,9 @@ next verified pass.
 ## Upgrading `e2e`
 
 `e2e_version` and `e2e_web_version` move together, by the operator, to releases at least
-seven days old. `@e2e-dev/web` pins its own `playwright-core`; when it no longer matches
+seven days old. The 3.27.0 defaults (`e2e` 0.21.3, `@e2e-dev/web` 0.15.3) are a recorded
+exception: they were two days old, and no older release keeps screenshots and video after the
+setup's secret fill (below). `@e2e-dev/web` pins its own `playwright-core`; when it no longer matches
 the image's Playwright, `suite.sh init` downloads the matching Chromium into the home
 ([black-box.md](black-box.md) → **Egress rules** lists the hosts). From `e2e` 0.19 the
 trace is a markdown page per test (`results/<test>/trace.md`) instead of a Playwright zip;
