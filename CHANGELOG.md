@@ -14,7 +14,9 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    `e2e_version: 0.20.0` → `0.21.3`, `e2e_web_version: 0.14.0` → `0.15.3`. A value the
    operator chose differently stays. Under 0.20 every test that restores the setup session failed
    at its `app.screenshot()` with `POLICY_DENIED` and recorded a video without frames
-   ([docs/test-authoring.md](docs/test-authoring.md) → **Upgrading `e2e`**).
+   ([docs/test-authoring.md](docs/test-authoring.md) → **Upgrading `e2e`**). Both releases were
+   two days old, an exception to the seven-day rule: no older release keeps screenshots and video
+   after the setup's secret fill.
 2. `bash "$HOME/scripts/suite.sh" init` — installs the new pins and re-checks that
    `playwright-core` (now 1.64.1) matches the image's browser.
 3. Expect the next run of every test to record its steps again (the replay cache misses
