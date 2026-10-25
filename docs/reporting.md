@@ -108,13 +108,22 @@ re-run. Never retry within the same run.
 1. **Artifact** (`artifact_reports: enabled`): an artifact is **one file** — a viewer never
    gets `media/`, so a relative `media/<name>` link answers 404. First make the page one file
    with `node "$HOME/scripts/report-media.mjs"` (its header has the contract), then publish
-   `<dir>/publish.html` — never a page with `media/` links — through `create_artifact_upload_url`:
+   `<dir>/publish.html` — never a page with `media/` links — through `create_artifact_upload_url`.
+   **Every upload sends its `Content-Type` header**: a page `text/html; charset=utf-8`, a media
+   file the `content_type` that `report-media.mjs list` gives it (`image/png`, `video/webm`, …).
+   An upload without it (curl's `PUT --data-binary` default) is stored as
+   `application/x-www-form-urlencoded` and served as `application/octet-stream` with
+   `Content-Disposition: attachment`: a click downloads the file, and a strict viewer shows no
+   image or video. After the first media upload of a run, `HEAD` its `<shareUrl>/raw?v=<version>`
+   once: a `Content-Type` other than the one sent is a failed delivery, never a published report
+   (a refused or failed `HEAD` is a `warn` line, not a failure).
    - **A public report** (below, or a Slack thread's): `report-media.mjs list <dir>`; each
-     file with `url: null` becomes an artifact of its own — upload it, `create_artifact` with
-     `visibility: public` and its `file_name`, then `report-media.mjs set <dir> <path>
-     <shareUrl> <version>` from the response. Then `report-media.mjs publish <dir> public`
-     (exit 1 names a file still without an address). The addresses are kept by content, so a
-     revision uploads only new files. One ledger pair covers the media of one report.
+     file with `url: null` becomes an artifact of its own — upload it with its `content_type`,
+     `create_artifact` with `visibility: public` and its `file_name`, then `report-media.mjs set
+     <dir> <path> <shareUrl> <version>` from the response. Then `report-media.mjs publish <dir>
+     public` (exit 1 names a file still without an address). The addresses are kept by content
+     and type, so a revision uploads only new files — and again each file recorded without its
+     type (before 3.30.1). One ledger pair covers the media of one report.
    - **A private report**: `report-media.mjs publish <dir> private` puts the screenshots and
      videos into the page as data, within the platform's page limit; `left_out` names what
      did not fit (the page says so) — tell it in the chat when it is a video.

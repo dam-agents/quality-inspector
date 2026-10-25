@@ -11,17 +11,22 @@
 //           fit is a line that says so; a trace.zip is never inlined.
 //
 //   node report-media.mjs list <report-dir>
-//     -> {"media": [{"path": "media/<name>", "bytes", "sha256", "url": <address> | null}]}
-//        the files the page names; `url: null` = not uploaded yet (public)
+//     -> {"media": [{"path": "media/<name>", "bytes", "sha256", "content_type", "url": <address> | null}]}
+//        the files the page names; `url: null` = not uploaded yet (public). Every upload sends
+//        `Content-Type: <content_type>`: without it the platform stores the artifact as
+//        application/x-www-form-urlencoded and serves it as a download, which an <img> or a
+//        <video> of a strict viewer does not show.
 //   node report-media.mjs set <report-dir> media/<name> <share-url> <version>
-//     -> {"path", "url"} — records one uploaded media artifact
+//     -> {"path", "url", "content_type"} — records one media artifact uploaded with that type
 //   node report-media.mjs publish <report-dir> public|private
-//     -> {"file": "<report-dir>/publish.html", "bytes", "linked", "inlined", "left_out": [path]}
+//     -> {"file": "<report-dir>/publish.html", "content_type": "text/html; charset=utf-8", "bytes", "linked", "inlined", "left_out": [path]}
 //        exit 1 (public): a media file without its address — nothing is written, `missing` lists them
 //
 // The addresses are kept by content (sha256) in media-urls.json beside the report directory, so a
-// new revision of the same report uploads only what changed. Reads only <report-dir> and that file;
-// writes only publish.html and media-urls.json. Exit 2: usage or a refused value.
+// new revision of the same report uploads only what changed. An address recorded without its type
+// (before 3.30.1, uploaded untyped) counts as no address, so the next revision uploads it again.
+// Reads only <report-dir> and that file; writes only publish.html and media-urls.json. Exit 2:
+// usage or a refused value.
 
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -35,8 +40,11 @@ const dir = resolve(dirArg);
 const page = join(dir, 'index.html');
 if (!existsSync(page)) die(`no ${page} — render the report first`, 1);
 const mapFile = join(dirname(dir), 'media-urls.json');
+const HTML_TYPE = 'text/html; charset=utf-8';
 const PAGE_MAX = Number(process.env.QI_REPORT_PAGE_MAX ?? 9 * 1024 * 1024);
 const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', webm: 'video/webm', mp4: 'video/mp4' };
+const TYPE = { ...MIME, zip: 'application/zip' };
+const typeOf = (p) => TYPE[p.split('.').pop().toLowerCase()] ?? 'application/octet-stream';
 const SHARE = /^https:\/\/[A-Za-z0-9.-]+(?::\d+)?\/a\/[A-Za-z0-9_-]{1,64}$/;
 
 const unesc = (s) => s.replace(/&(amp|lt|gt|quot|#39);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" })[e]);
@@ -59,29 +67,31 @@ for (const [, , raw] of html.matchAll(REF)) {
   if (!existsSync(join(dir, 'media', name))) die(`${path} is named by the page but missing`, 1);
   if (!refs.includes(path)) refs.push(path);
 }
-const info = (path) => { const f = join(dir, path); return { path, bytes: statSync(f).size, sha256: sha(f) }; };
+const info = (path) => { const f = join(dir, path); return { path, bytes: statSync(f).size, sha256: sha(f), content_type: typeOf(path) }; };
+// The address of one file, only when it was recorded with the type this file is uploaded with.
+const addr = (map, i) => { const e = map[i.sha256]; return e && typeof e === 'object' && e.content_type === i.content_type && typeof e.url === 'string' ? e.url : null; };
 
 if (cmd === 'list') {
   const map = readMap();
-  console.log(JSON.stringify({ media: refs.map((p) => { const i = info(p); return { ...i, url: map[i.sha256] ?? null }; }) }));
+  console.log(JSON.stringify({ media: refs.map((p) => { const i = info(p); return { ...i, url: addr(map, i) }; }) }));
 } else if (cmd === 'set') {
   const [path, share, version] = rest;
   if (!refs.includes(path)) die(`${path} is not a media file of this page`);
   if (!SHARE.test(share ?? '')) die('the share link must be https://<host>/a/<slug>');
   if (!/^[1-9]\d{0,6}$/.test(version ?? '')) die('the version must be a positive integer');
-  const map = readMap(); const url = `${share}/raw?v=${version}`;
-  map[info(path).sha256] = url;
+  const map = readMap(); const url = `${share}/raw?v=${version}`; const i = info(path);
+  map[i.sha256] = { url, content_type: i.content_type };
   writeFileSync(mapFile, `${JSON.stringify(map, null, 1)}\n`);
-  console.log(JSON.stringify({ path, url }));
+  console.log(JSON.stringify({ path, url, content_type: i.content_type }));
 } else if (cmd === 'publish' && (rest[0] === 'public' || rest[0] === 'private')) {
   const out = join(dir, 'publish.html');
   if (rest[0] === 'public') {
-    const map = readMap(); const urls = new Map(refs.map((p) => [p, map[info(p).sha256]]));
+    const map = readMap(); const urls = new Map(refs.map((p) => [p, addr(map, info(p))]));
     const missing = refs.filter((p) => !urls.get(p));
     if (missing.length) { console.log(JSON.stringify({ file: null, missing })); process.exit(1); }
     const body = html.replace(REF, (_, a, raw, z) => `${a}${urls.get(unesc(raw))}${z}`);
     writeFileSync(out, body);
-    console.log(JSON.stringify({ file: out, bytes: Buffer.byteLength(body), linked: refs.length, inlined: 0, left_out: [] }));
+    console.log(JSON.stringify({ file: out, content_type: HTML_TYPE, bytes: Buffer.byteLength(body), linked: refs.length, inlined: 0, left_out: [] }));
   } else {
     // Inline: the order of what matters most, then the page budget.
     const ext = (p) => p.split('.').pop().toLowerCase();
@@ -106,6 +116,6 @@ if (cmd === 'list') {
       .replace(/<a href="(media\/[^"]+)">([^<]*)<\/a>/g, (m, raw, text) => (gone(raw) ? `${text} (not in this private report)` : m))
       .replace(REF, (_, a, raw, z) => `${a}${data.get(unesc(raw)) ?? '#'}${z}`);
     writeFileSync(out, body);
-    console.log(JSON.stringify({ file: out, bytes: Buffer.byteLength(body), linked: 0, inlined: data.size, left_out: leftOut }));
+    console.log(JSON.stringify({ file: out, content_type: HTML_TYPE, bytes: Buffer.byteLength(body), linked: 0, inlined: data.size, left_out: leftOut }));
   }
 } else die();

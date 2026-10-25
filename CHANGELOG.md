@@ -7,6 +7,18 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.30.1 — 2026-10-25
+
+**Upgrade:**
+Nothing to run — docs are re-read per run. Every artifact upload now sends its `Content-Type`
+(`report-media.mjs list` gives each media file's); before, a public report's media were stored as
+`application/x-www-form-urlencoded` and served as downloads, so a strict viewer showed no image or
+video. Addresses in `media-urls.json` recorded before this version count as not uploaded, so the next
+revision of a public report uploads its media again, typed. A report already published stays as it
+is until then; to repair one now, ask in the direct session to republish its report: upload the media
+again, `report-media.mjs publish <dir> public`, `update_artifact` — the share link stays. The old
+mis-typed media artifacts are then unused; delete them in the app when you want to.
+
 ## 3.30.0 — 2026-10-25
 
 **Upgrade:**

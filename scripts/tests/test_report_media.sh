@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # report-media.mjs: a rendered report becomes one file. Public: each media file it names is listed,
-# its uploaded artifact's address is recorded by content, and the page links the addresses — never
+# with the content type its upload sends, its uploaded artifact's address is recorded by content and
+# type (an untyped one is uploaded again), and the page links the addresses — never
 # a relative media/ link; a file without an address writes nothing. Private: screenshots, then the
 # candidate's video go into the page as data: URIs within the page budget; what does not fit is a
 # line that says so; a trace is never inlined. A reference outside media/ is refused.
@@ -30,6 +31,7 @@ M="$SCRIPTS/report-media.mjs"
 
 list="$(node "$M" list "$D")"
 assert "list: every media file the page names, none uploaded yet" '(.media | length) == 6 and all(.media[]; .url == null and (.path | startswith("media/")) and (.sha256 | test("^[0-9a-f]{64}$")))' "$list"
+assert "list: each file carries the type it is uploaded with" '[.media[] | {e: (.path | split(".") | last), t: .content_type}] | unique == [{e:"png",t:"image/png"},{e:"webm",t:"video/webm"},{e:"zip",t:"application/zip"}]' "$list"
 out="$(node "$M" publish "$D" public)"; rc=$?
 assert_eq "public without addresses fails" 1 "$rc"
 assert "… and names what is missing, writing nothing" '.file == null and (.missing | length) == 6' "$out"
@@ -40,9 +42,9 @@ first="$(jq -r '.media[0].path' <<<"$list")"
 node "$M" set "$D" "$first" http://share.example/a/Abc 1 >/dev/null 2>&1; assert_eq "set: not https is refused" 2 "$?"
 node "$M" set "$D" "$first" 'https://share.example/a/Abc?x=1' 1 >/dev/null 2>&1; assert_eq "set: a query is refused" 2 "$?"
 k=0; for p in $(jq -r '.media[].path' <<<"$list"); do k=$((k + 1)); node "$M" set "$D" "$p" "https://share.example/a/S$k" 2 >/dev/null; done
-assert "the addresses are kept by content beside the report" '[.[]] | length == 6 and all(test("^https://share.example/a/S[0-9]/raw\\?v=2$"))' "$(cat "$SANDBOX/issues/42/media-urls.json")"
+assert "the addresses are kept by content and type beside the report" '[.[]] | length == 6 and all(.url | test("^https://share.example/a/S[0-9]/raw\\?v=2$")) and all(.content_type | test("^(image/png|video/webm|application/zip)$"))' "$(cat "$SANDBOX/issues/42/media-urls.json")"
 out="$(node "$M" publish "$D" public)"
-assert "public: every reference linked" '.linked == 6 and .inlined == 0 and .left_out == []' "$out"
+assert "public: every reference linked, the page typed as HTML" '.linked == 6 and .inlined == 0 and .left_out == [] and .content_type == "text/html; charset=utf-8"' "$out"
 grep -q '"media/' "$D/publish.html" && { echo "  public page still has a relative media/ link"; FAILED=1; }
 grep -q 'src="https://share.example/a/S[0-9]/raw?v=2"' "$D/publish.html" || { echo "  public page lacks an absolute media address"; FAILED=1; }
 cmp -s "$D/index.html" "$D/publish.html" && { echo "  index.html was changed in place"; FAILED=1; }
@@ -64,6 +66,14 @@ out="$(QI_REPORT_PAGE_MAX=$((size - 2000)) node "$M" publish "$D" private)"
 assert "a budget drops the baseline video first" '.inlined == 3 and (.left_out | index("media/42-ac-1-baseline-video-video.webm")) != null and (.left_out | index("media/42-ac-1-candidate-video-video.webm")) == null' "$out"
 case "$(cat "$D/publish.html")" in *'This private report has a size limit'*) ;; *) echo "  private page: no line for the dropped video"; FAILED=1;; esac
 
+# An address recorded without its type (uploaded untyped, before 3.30.1) is no address: upload again.
+cp "$SANDBOX/issues/42/media-urls.json" "$SANDBOX/urls.bak"
+jq 'with_entries(.value |= .url)' "$SANDBOX/urls.bak" > "$SANDBOX/issues/42/media-urls.json"
+assert "an untyped address is uploaded again" 'all(.media[]; .url == null)' "$(node "$M" list "$D")"
+node "$M" publish "$D" public >/dev/null 2>&1; assert_eq "… and never linked" 1 "$?"
+jq 'with_entries(.value.content_type = "application/x-www-form-urlencoded")' "$SANDBOX/urls.bak" > "$SANDBOX/issues/42/media-urls.json"
+assert "an address of another type is uploaded again" 'all(.media[]; .url == null)' "$(node "$M" list "$D")"
+mv "$SANDBOX/urls.bak" "$SANDBOX/issues/42/media-urls.json"
 # A damaged address file is an error, not an empty one.
 cp "$SANDBOX/issues/42/media-urls.json" "$SANDBOX/urls.bak"; echo '[1' > "$SANDBOX/issues/42/media-urls.json"
 node "$M" list "$D" >/dev/null 2>&1; assert_eq "a damaged media-urls.json fails" 1 "$?"

@@ -216,7 +216,8 @@ The steps:
    `error` and publish nothing; `secrets.mjs scan-all work/env/credentials.env work/suite/tests
    work/issues work/scenarios` (in `$HOME/scripts/lib/`) names the file to fix.
 2. Publish `work/catalog/index.html` as [reporting.md](reporting.md) → Delivery step 1 — artifact
-   only, through an upload URL (it exceeds the inline limit). It has no `media/` links (its images
+   only, through an upload URL (it exceeds the inline limit), sent with `Content-Type: text/html;
+   charset=utf-8`. It has no `media/` links (its images
    are in the page), so it is already one file: it skips `report-media.mjs`; the reference lives in
    `work/catalog/artifact.id`, a revision when it exists — refused as not found, a new artifact
    whose reference replaces it. With `dashboard_interactive: enabled` it is created with
