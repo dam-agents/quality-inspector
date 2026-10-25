@@ -17,7 +17,7 @@ when `audit_report: disabled` (still append the log line).
    [change-awareness.md](change-awareness.md) → Coverage), `features` and `maintenance` (the
    registry's and the queue's format; members that do not run; proposals open over 14 days —
    [features.md](features.md), [maintenance.md](maintenance.md)), and `criteria_injection` (the
-   week's criteria files of issues and scenarios holding URLs, code fences or HTML comments;
+   week's criteria files of issues and scenarios and intent files of issues holding URLs, code fences or HTML comments;
    the week's `issue_injection_suspect` and `scenario_injection_suspect` events) — a `warn`
    lists the issues and `S-<k>`: sample one and check its instruction sentences are
    `testable: no`. From the harness trace ([logging.md](logging.md) → **Harness trace**):
@@ -50,7 +50,7 @@ when `audit_report: disabled` (still append the log line).
      mistake* / *definition bug*. A reproduced environment cause → `work/LESSONS.md`. A
      definition bug → one deduplicated issue on the definition repository (search open
      issues first) — the audit's only external write, ledgered as `definition_issue`.
-   - Sample up to three reports of the week: criteria file predates the test file; no
+   - Sample up to three reports of the week: criteria and intent files predate the test file; no
      `verified` without a baseline failure or `baseline_blocked_reason: absent`; every
      tested AC has a candidate video and its `AC-<k>` screenshot; AC blocks contain checks
      only; no internal identifiers or credentials in the text, the screenshots or the

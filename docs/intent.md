@@ -89,7 +89,7 @@ Each IN is judged like an AC, by the same table and the same baseline rules
 
 | `intent_verdict` | When |
 | --- | --- |
-| `met` | every testable IN is `verified` |
+| `met` | at least one IN is testable, and every testable IN is `verified` |
 | `not-met` | any IN is `failed` |
 | `unclear` | otherwise (inconclusive, blocked, flaky, or no testable IN) |
 | `none` | the intent file says `none` |
@@ -104,8 +104,8 @@ wanted"; `comment.md` gets one line.
 - **Promotion**: a file is `promotable` only when every testable IN in it is `verified`
   too ([regression.md](regression.md) → Tiers). Its IN blocks count in `assert_hash`
   (`check-asserts.sh --hash` hashes AC and IN blocks), so they are frozen like the criteria.
-  IN blocks added to a file promoted before change its hash: the file drifts until it is
-  re-promoted ([issue-qa.md](issue-qa.md) step 9).
+  IN blocks added to a file promoted before change its hash: the file drifts until the
+  operator re-promotes it ([issue-qa.md](issue-qa.md) step 9).
 - **Nightly**: an IN replays with its file and is triaged as a criterion
   ([triage.md](triage.md)): where that doc says `AC-<k>`, read `IN-<k>` too, and where a
   command selects the tag `ac-<k>`, an IN selects `in-<k>` — never its AC's tag.
