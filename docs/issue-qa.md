@@ -88,7 +88,8 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    `bash "$HOME/scripts/check-asserts.sh" --hash <file>` ([regression.md](regression.md) →
    Tiers); `auto_promote: verified` writes a qualifying file as `regression` instead. A
    retest of a promoted file never demotes it and never rewrites its hash. Name every
-   `promotable` (or auto-promoted) file in the run's chat summary.
+   `promotable` (or auto-promoted) file in the run's chat summary. Put each of its criteria
+   into a feature ([features.md](features.md) → Who puts a test into a feature).
 10. **Release.** `env.sh unlock issues` (it refuses while a background install or suite run
     runs: `env.sh wait <candidate>` / `suite.sh wait <label>` first); log `issue_done issue=<n> verdict=<v> minutes=<m> model_steps=<k>`,
     `m` and `k` the `elapsed_min` and `model_steps` of `suite.sh budget <claim time>`. Then the
@@ -114,7 +115,7 @@ work the same way ([nested-env.md](nested-env.md) → **Budgets**).
 - No AC is `verified` without a candidate pass and a baseline failure or
   `baseline_blocked_reason: absent`.
 - Every `promotable` row written qualifies; no file was newly promoted unless
-  `auto_promote: verified`.
+  `auto_promote: verified`. Each of their criteria is in a feature (`features.mjs list`).
 - Each `spec.injection_suspect` issue: its listed sentences are `testable: no —
   instruction` and quoted in the chat summary ([acceptance-criteria.md](acceptance-criteria.md)).
 - Every tested AC in the rendered report has a candidate video and at least one screenshot.

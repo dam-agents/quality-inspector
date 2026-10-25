@@ -10,6 +10,7 @@ you remember nothing; the thread is the state. Then name the session ([logging.m
 | The message | You | Who may ask |
 | --- | --- | --- |
 | `test #<n>` in `slack_channel` | **Run the test**, below | a person |
+| `test feature <words>` in `slack_channel` | **A feature run**, below | a person |
 | `status #<n>` in `slack_channel` | one reply: its `work/QA.md` row and the link of **The answer in the thread** | a person |
 | a question about a test this thread ran | answer it from the thread | a person |
 | anything else aimed at you, in any bound conversation | [scenarios.md](scenarios.md) → **A message in a bound Slack conversation** | anyone |
@@ -57,6 +58,18 @@ declined in one reply — it is the operator's, in the direct session.
   `github.sh` is written. The limit: the hook reads text, so a name joined at run time from
   fragments passes it. A refused write leaves `report_pending`, and the next issues run's
   `reports_due` delivers it. Slack is one more surface, never instead of them.
+
+## A feature run
+
+`bash "$HOME/scripts/precheck.sh" slack` as step 1 above (busy, no quota → one reply, end), then
+resolve as [features.md](features.md) → Asking for a feature: a `ranked` or `none` result is one
+reply with the candidates, and nothing runs — the person asks again with an id. A feature that
+will run: log `slack_test feature=<id> user=<sender id>` (it counts against
+`slack_tests_per_day`) and run it, the lock's owner `slack`. **Two replies**, as for a test: once the lock is taken (the feature, its tests, the build), then each
+criterion's result, failures first, and the picture of a failure's screen (`evidence-sheet.mjs`
+cannot read a run by hand: attach the failing step's screenshot from the run, at most one) with
+the catalog link of **The answer in the thread**. No GitHub write, no `marked`, no registry
+change — an alias asked for here is the operator's.
 
 ## The answer in the thread
 

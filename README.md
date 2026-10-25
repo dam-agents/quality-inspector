@@ -152,7 +152,7 @@ fail on the release and work on the candidate. Media add a few MB per criterion.
 One more artifact shows the whole suite: every criterion, exploration and scenario test with
 its Given/When/Then, steps, tier, verdict history per build, heals, flakiness and the still of
 the screen it checks — filterable, sortable and groupable by tier, origin, verdict, area, page,
-label or the operator's own collections, with a gallery, a coverage map of the UI, a
+label, feature or the operator's own collections, with a gallery, a coverage map of the UI, a
 build-by-test heatmap and the promotion funnel. It is also the way into every run — each night,
 issue run and scenario run with its outcome and report — and a product map: the UI map's page
 shots with each control clickable to the tests that use it, viewable as of any past build. Its
@@ -175,6 +175,11 @@ longer matches. A triage then sorts every non-trivial result into *re-learned* (
 moved), *repaired* (a check followed a renamed or moved control — logged), *superseded*
 (a completed issue changed the behaviour on purpose), *needs review*, or **regression** —
 the only one that is a product defect, and the default when the evidence is unclear.
+What the agent may not absorb alone becomes a **maintenance proposal** for the operator — what
+changed, the evidence, and accept, rewrite, retire or keep ([docs/maintenance.md](docs/maintenance.md)).
+Recurring tests are also grouped by **feature** ("Model switching"), so anyone can ask for a
+feature by name — "run feature …" in the chat, "test feature …" in Slack — and have its tests run
+again ([docs/features.md](docs/features.md)).
 
 ## Configuration
 

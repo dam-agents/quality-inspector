@@ -319,7 +319,22 @@ case "$(cat "$W/catalog/index.html")" in (*RERUN-ERROR-SECRET*) echo "  a run by
 cmd="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const re=eval(s.match(/^const CMD_RE = (\/.*\/);$/m)[1]);
 const t=["run #42", "run #42 AC-1", "run S-7 AC-1", "run P-sign-in", "create issue for #42 AC-1", "create issue for #42 AC-1, D-3, VAL-2, STRESS-API-2, S-7 AC-1 for the architect",
   "categorize D-3 layout", "categorize D-3 -", "dismiss D-3 as wont-fix", "reopen D-3", "add #42 AC-1 to the collection Upload", "remove S-7 from the collection My set",
-  "run #42; rm -rf ~", "create issue for #42", "create issue for D-3 for everyone", "categorize D-3 Layout", "dismiss D-3 as boring", `create issue for ${Array(21).fill("D-1").join(", ")}`, "add #42 to the collection ../x"];
+  "run #42; rm -rf ~", "create issue for #42", "create issue for D-3 for everyone", "categorize D-3 Layout", "dismiss D-3 as boring", `create issue for ${Array(21).fill("D-1").join(", ")}`, "add #42 to the collection ../x",
+  "run feature renaming", "accept M-1", "keep M-12", "run feature Bad Id", "accept M-1; rm -rf ~"];
 process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
-assert_eq "the managing commands: their shapes only, at most 20 problems" 1111111111110000000 "$cmd"
+assert_eq "the managing commands: their shapes only, at most 20 problems" 111111111111000000011100 "$cmd"
+
+# The agent's features, the open maintenance proposals and a feature run (docs/features.md,
+# docs/maintenance.md): a malformed feature id and a closed proposal stay out; a feature run joins the
+# runs and the history with its criteria's raw results, a malformed key dropped.
+printf '# Features\n\n| feature | name | aliases | members | updated_utc |\n| --- | --- | --- | --- | --- |\n| renaming | Renaming projects | Přejmenování | #42 AC-1, S-7 | 2026-10-20T00:00:00Z |\n| Bad Id | x | - | #42 | - |\n' > "$W/FEATURES.md"
+printf '# Maintenance\n\n| id | test | kind | build | basis | proposal | state | opened_utc | closed_utc |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| M-1 | #42 AC-1 | needs-review | c3 | ui-map: tab moved | heal | open | 2026-10-20T00:00:00Z | - |\n| M-2 | S-7 | drift | c3 | x | re-promote | kept | 2026-10-20T00:00:00Z | 2026-10-21T00:00:00Z |\n' > "$W/MAINTENANCE.md"
+mkdir -p "$W/reruns/feature-renaming"
+echo '{"label":"feature-renaming-c3-1300","feature":"renaming","build":"c3","utc":"2026-10-14T13:00:00Z","results":{"issue-42/AC-1":{"status":"passed","error":null},"../x/AC-1":{"status":"failed"}}}' > "$W/reruns/feature-renaming/feature-renaming-c3-1300.json"
+node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a build with features, maintenance and a feature run" 0 "$?"
+data="$(page_data)"
+assert "features: the well-formed rows" '.features == [{"id":"renaming","name":"Renaming projects","aliases":["Přejmenování"],"members":["#42 AC-1","S-7"]}]' "$data"
+assert "maintenance: the open proposals only" '[.maintenance[] | .id + ":" + .test + ":" + .kind + ":" + .proposal + ":" + .basis] == ["M-1:#42 AC-1:needs-review:heal:ui-map: tab moved"]' "$data"
+assert "a feature run: in the runs and the history" '([.runs[] | select(.type == "feature")] | length == 1 and .[0].ref == "renaming" and .[0].entries == [{"key":"issue-42/AC-1","value":"passed"}])
+  and (.items[] | select(.key == "issue-42/AC-1") | [.history[] | select(.run == "feature")] | length == 1)' "$data"
 exit $FAILED

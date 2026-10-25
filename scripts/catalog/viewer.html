@@ -532,6 +532,8 @@ const ENT = {
   validation: ['Validation finding', '⌨️', 'A form that did not process incorrect or unusual input correctly (VAL-1…).'],
   stress: ['Stress check', '🏋️', 'A check of a page or an endpoint under load (STRESS-…).'],
   collection: ['Collection', '🗂️', 'Your own group of test cases (work/CATALOG.md).'],
+  feature: ['Feature', '🧭', 'A group of recurring test cases by what the product does, for example "Model switching" (work/FEATURES.md). The agent keeps it. You can run all its tests.'],
+  maintenance: ['Maintenance proposal', '🛠️', 'A proposal of the agent for a recurring test that the product moved away from (M-1, M-2…): what changed, the evidence, and what to do with the test. You decide.'],
   module: ['Testing module', '🧩', 'A type of testing that you can switch on and off: UI sweep, validation, stress and others.'],
   verdict: ['Verdict', '🏷️', 'The result of a test case on one build.'],
   tier: ['Tier', '🪜', 'The status of a test case: written once, verified, nightly, quarantined or retired.'],
@@ -592,6 +594,7 @@ function derive() {
     if (it.testable === false) it.flags.push('not testable');
     if (ATTN.has(it.latest) || it.drift) it.flags.push('needs attention');
     if (foundOf(problemRef(it)).length) it.flags.push('issue created');
+    if (maintOf(it).length) it.flags.push('maintenance');
     if (!upto || it.history.length) items.push(it);
   }
   presentSet = new Set(items.map((i) => i.key));
@@ -607,6 +610,25 @@ for (const c of collections) for (const m of c.members) {
   for (const i of ALL) if (i.ref === ref && (!id || str(i.id) === id)) (memberOf.get(i.key) || memberOf.set(i.key, []).get(i.key)).push(c.name);
 }
 const colls = (i) => [...new Set(memberOf.get(i.key) || [])];
+// Features (docs/features.md): the same member shapes, plus "P-<slug>" and "P-<slug> AC-1".
+const FEAT_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
+const features = arr(D.features).filter((f) => f && FEAT_ID.test(str(f.id))).map((f) => ({ id: str(f.id), name: str(f.name) || str(f.id), aliases: arr(f.aliases).map(str), members: arr(f.members).map(str) }));
+const featById = new Map(features.map((f) => [f.id, f]));
+const featOf = new Map();
+for (const f of features) for (const m of f.members) {
+  const [ref, id] = m.trim().split(/\s+/);
+  for (const i of ALL) if (i.ref === ref && (!id || str(i.id) === id)) (featOf.get(i.key) || featOf.set(i.key, []).get(i.key)).push(f.id);
+}
+const feats = (i) => [...new Set(featOf.get(i.key) || [])];
+const featName = (id) => (featById.has(id) ? featById.get(id).name : str(id));
+const featItems = (id) => ALL.filter((i) => feats(i).includes(id));
+// The open test maintenance proposals (docs/maintenance.md); a test is "#42", "#42 AC-1", "S-7 AC-1"…
+const MAINT_RE = /^M-\d{1,6}$/;
+const MAINT_KIND = { 'needs-review': 'The check failed or was judged, and the agent could not repair it by its rules.', superseded: 'A completed issue changed this behaviour on purpose. The agent retired the test.',
+  drift: 'A person changed the checks of the test after its promotion. It does not run until you decide.', quarantined: 'The test was flaky on two builds. It does not run until you decide.', fighting: 'The agent repaired the test three times in one month. The test fights the product.' };
+const MAINT_PROP = { heal: 'apply the repair that the agent prepared', rewrite: 'write the test again for the current product', retire: 'stop the test (it stays in the catalog)', 're-promote': 'promote the test again, as it is now', review: 'look at it: the agent has no repair' };
+const maintenance = arr(D.maintenance).filter((m) => m && MAINT_RE.test(str(m.id)) && own(MAINT_KIND, str(m.kind))).map((m) => ({ ...m, id: str(m.id), test: str(m.test), kind: str(m.kind), proposal: str(m.proposal), basis: str(m.basis), build: str(m.build) }));
+const maintOf = (i) => { const r = i.origin.kind === 'scenario' ? i.ref : `#${num(i.ref)}`; return maintenance.filter((m) => m.test === r || m.test === `${r} ${str(i.id)}`); };
 
 // Pins (this browser only).
 const PIN_KEY = `qi-catalog:${str(D.target)}:pins`;
@@ -620,9 +642,10 @@ const pagesData = arr(D.pages).filter((p) => p && p.pattern).map((p) => ({ ...p,
 const pageOf = (pat) => pagesData.find((p) => p.pattern === pat);
 
 // Runs: every night, issue run and scenario run — the way into each one's report.
-const RUNTYPE = { regression: 'Nightly regression', issue: 'Issue run', scenario: 'Scenario run', rerun: 'Manual run' };
+const RUNTYPE = { regression: 'Nightly regression', issue: 'Issue run', scenario: 'Scenario run', rerun: 'Manual run', feature: 'Feature run' };
 const RUNTYPE_HELP = { regression: 'Each night, the promoted tests run on the newest build.', issue: 'The agent tests an issue that has the QA label. It freezes the criteria, writes the tests, and runs them on the new build and on the last release.',
-  scenario: 'The agent tests a scenario that a person requested (in Slack, in the chat or on this page) on the newest build.', rerun: 'You started this test. It shows the result only. It is not a verdict and it has no report.' };
+  scenario: 'The agent tests a scenario that a person requested (in Slack, in the chat or on this page) on the newest build.', rerun: 'You started this test. It shows the result only. It is not a verdict and it has no report.',
+  feature: 'A person asked for all the recurring tests of one feature. It shows the results only. It is not a verdict and it has no report.' };
 const runs = arr(D.runs).filter((r) => r && typeof r === 'object' && r.utc && own(RUNTYPE, r.type)).map((r) => ({
   ...r, type: str(r.type), ref: r.ref == null ? '' : str(r.ref), build: str(r.build), utc: str(r.utc), entries: arr(r.entries).filter((e) => e && e.key).map((e) => ({ key: str(e.key), value: str(e.value) })),
   issues: arr(r.issues).filter((x) => x && x.number != null), counts: r.counts && typeof r.counts === 'object' ? r.counts : null, signals: r.signals && typeof r.signals === 'object' ? r.signals : null,
@@ -630,6 +653,7 @@ const runs = arr(D.runs).filter((r) => r && typeof r === 'object' && r.utc && ow
 const byRun = new Map(runs.map((r) => [r.id, r]));
 const nightOf = (build) => runs.find((r) => r.type === 'regression' && r.build === build && r.verdict !== 'environment') || runs.find((r) => r.type === 'regression' && r.build === build) || null;
 const runFor = (i, e) => (e.run === 'regression' ? nightOf(str(e.build))
+  : e.run === 'feature' ? runs.find((r) => r.type === 'feature' && r.build === str(e.build) && str(r.utc) === str(e.utc)) || null
   : runs.find((r) => r.type !== 'regression' && r.ref === i.ref && r.build === str(e.build) && str(r.utc) === str(e.utc)) || runs.find((r) => r.type !== 'regression' && r.ref === i.ref && r.build === str(e.build)) || null);
 const originTitle = (ref) => { const i = ALL.find((x) => x.ref === ref); return i ? str(i.origin.title) : ''; };
 // An origin — an issue or a scenario — has its own panel: its criteria, its runs, its report.
@@ -651,6 +675,7 @@ const FACETS = [
   { id: 'kind', label: 'Criterion or exploration', get: (i) => [i.kind], fmt: entName },
   { id: 'flag', label: 'Flags', get: (i) => [...i.flags, ...(pins.has(i.key) ? ['pinned'] : [])] },
   { id: 'collection', label: 'Collection', get: colls, fmt: (v) => `${ENT.collection[1]} ${v}` },
+  { id: 'feature', label: 'Feature', get: feats, fmt: (v) => `${ENT.feature[1]} ${featName(v)}` },
   { id: 'area', label: 'Area', get: (i) => (i.area ? [str(i.area)] : []) },
   { id: 'page', label: 'Page', get: (i) => i.pages, fmt: (v) => `${ENT.page[1]} ${v}` },
   { id: 'run', label: 'Type of the last test run', get: (i) => (i.verdict && i.verdict.run ? [str(i.verdict.run)] : []), fmt: (v) => RUNTYPE[v] || v },
@@ -666,8 +691,9 @@ const FACET_HELP = {
   origin: 'Where the test case comes from: 🎫 an issue on GitHub, or 💬 a scenario that a person requested.',
   ref: 'The issue or the scenario of the test case.',
   kind: '🎯 Acceptance criterion: a condition of the issue. It is part of the verdict. 🔦 Exploration: an additional check outside the criteria. It is not part of the verdict.',
-  flag: 'Special conditions: flaky, repaired after a UI change, changed after promotion, costly, has a screenshot, has a bug issue, pinned.',
+  flag: 'Special conditions: flaky, repaired after a UI change, changed after promotion, costly, has a screenshot, has a bug issue, has a maintenance proposal, pinned.',
   collection: 'Your own groups of test cases (work/CATALOG.md), for example "Upload".',
+  feature: 'Groups of recurring test cases by what the product does (work/FEATURES.md). The agent keeps them.',
   area: 'The area of the product that the test case examines.',
   page: 'The pages of the product that the test opens.',
   run: 'The type of test run that gave the newest result: issue run, nightly regression, scenario run or manual run.',
@@ -772,7 +798,7 @@ const COL_HELP = {
   report: '🎬 The report of the newest issue run or scenario run: video, screenshots, steps.', found: '🐞 The bug issue on GitHub for the failure of this test case, if there is one.',
 };
 const DEFAULT_COLS = ['ref', 'id', 'name', 'tier', 'verdict', 'area', 'last', 'found', 'report'];
-const GROUPS = { none: 'No grouping', origin: 'Issue or scenario', tier: 'Tier', area: 'Area', page: 'Page', verdict: 'Latest verdict', collection: 'Collection', label: 'Issue label' };
+const GROUPS = { none: 'No grouping', origin: 'Issue or scenario', tier: 'Tier', area: 'Area', page: 'Page', verdict: 'Latest verdict', collection: 'Collection', feature: 'Feature', label: 'Issue label' };
 const QUICK = [
   ['Nightly regression', { tier: ['regression'] }], ['Needs attention', { flag: ['needs attention'] }], ['Promotable queue', { tier: ['promotable'] }],
   ['Flaky & healed', { flag: ['flaky', 'healed'] }], ['Costly (agent.assert)', { flag: ['agent.assert'] }], ['Explorations', { kind: ['exploration'] }], ['Scenarios', { origin: ['scenario'] }],
@@ -923,7 +949,7 @@ function stepText(t) {
 }
 // The commands the page may offer: the operator's words of docs/on-demand.md and docs/modules.md,
 // built from constants and ids only. Anything else is never shown, copied or sent.
-const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|run (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?|create issue for (?:#\d{1,7} (?:AC|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})(?:, (?:#\d{1,7} (?:AC|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})){0,19}(?: for the architect)?|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+(?: as (?:false-positive|wont-fix|duplicate|by-design))?|reopen D-\d+|categorize D-\d+ (?:[a-z0-9][a-z0-9-]{0,29}|-)|(?:add (?:#\d+|S-\d+)(?: AC-\d+)? to|remove (?:#\d+|S-\d+)(?: AC-\d+)? from) the collection [A-Za-z0-9][A-Za-z0-9 _.-]{0,39})$/;
+const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|run (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?|create issue for (?:#\d{1,7} (?:AC|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})(?:, (?:#\d{1,7} (?:AC|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})){0,19}(?: for the architect)?|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+(?: as (?:false-positive|wont-fix|duplicate|by-design))?|reopen D-\d+|categorize D-\d+ (?:[a-z0-9][a-z0-9-]{0,29}|-)|(?:add (?:#\d+|S-\d+)(?: AC-\d+)? to|remove (?:#\d+|S-\d+)(?: AC-\d+)? from) the collection [A-Za-z0-9][A-Za-z0-9 _.-]{0,39}|run feature [a-z0-9][a-z0-9-]{0,39}|(?:accept|rewrite|retire|keep) M-\d{1,6})$/;
 // A problem a found issue may be about (skills/create-issue): a criterion's or an exploration's failure,
 // a design finding, a validation case, a stress check.
 const PROB_RE = /^(?:#\d{1,7} (?:AC|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})$/;
@@ -1139,6 +1165,21 @@ function issueActions(ref, hot) {
     pickRow(ref),
   ];
 }
+// A maintenance proposal's test as a link: the test case when it names a criterion, else its issue or scenario.
+function maintTest(m) {
+  const [ref, id] = m.test.split(' ');
+  const it = id ? ALL.find((i) => (i.origin.kind === 'scenario' ? i.ref : `#${num(i.ref)}`) === ref && str(i.id) === id) : null;
+  return it ? itemLink(it, false) : refLink(ref);
+}
+// The operator's four answers to a proposal (docs/maintenance.md → The operator decides).
+function maintActions(m) {
+  return [
+    m.proposal !== 'review' ? action(`✅ Accept: ${MAINT_PROP[m.proposal] || m.proposal}`, 'The agent shows you the details of the proposal and the change first. Then it does the proposal.', `accept ${m.id}`, true) : null,
+    action('✏️ Rewrite the test', 'The agent writes the test again for the current product. A check that tests something new needs your yes.', `rewrite ${m.id}`),
+    action('💤 Retire the test', 'The test stops. The catalog keeps the test case and its history.', `retire ${m.id}`),
+    action('↩️ Keep the test as it is', m.kind === 'superseded' ? 'The test goes back into the nightly regression. If its check is still false, it is a regression.' : 'The test does not change. The proposal closes.', `keep ${m.id}`),
+  ].filter(Boolean);
+}
 function renderTray() {
   const old = $('#tray'); if (old) old.remove();
   document.body.classList.toggle('has-tray', picked.length > 0);
@@ -1161,6 +1202,7 @@ function itemActions(i) {
   const bad = ATTN.has(i.latest) || ['blocked', 'observation'].includes(i.latest);
   if (i.file) out.push(action(`${ENT.run[1]} Run this test now`, `The agent runs the test of ${i.label} one time on the current build. The result shows in the history as "Manual run". It does not change a verdict or a tier, and it does not post anything.`, `run ${r} ${str(i.id)}`));
   if (i.file) out.push(action(`${ENT.run[1]} Run all the tests of ${ENT[refKind(i.ref)][0].toLowerCase()} ${r}`, 'The same for all its acceptance criteria and explorations.', `run ${r}`));
+  for (const f of feats(i)) out.push(action(`${ENT.feature[1]} Run the feature "${featName(f)}"`, 'The agent runs all the recurring tests of this feature one time on the current build. The result shows as "Feature run". It does not change a verdict or a tier.', `run feature ${f}`));
   if (i.kind === 'criterion' && i.origin.kind !== 'scenario') out.push(action(`${ENT.issue[1]} Test the full issue again`, 'A full issue run: the agent tests each acceptance criterion on the new build and on the last release, and makes a new report with video and screenshots.', `test ${r}`));
   if (i.kind === 'criterion' && ['promotable', 'exploratory', 'quarantined'].includes(i.tier)) out.push(action('🌙 Promote it into the nightly regression', 'After this, the test runs each night on the newest build. Before the agent does this, it shows you the test and its criteria.', `promote ${r}`));
   if (i.kind === 'criterion' && i.tier === 'regression') out.push(action('Demote it', 'This removes the test from the nightly regression. The catalog keeps the test case and its history.', `demote ${r}`));
@@ -1500,6 +1542,13 @@ function viewOverview() {
       att.length ? h('ul', { class: 'att' }, att.slice(0, 14).map((i) => h('li', {}, pickBox(problemRef(i)), badge(i.latest || (i.flags.includes('drift') ? 'drift' : '')),
       itemLink(i), i.evidence ? reportBtn(i.evidence) : null, foundLinks(problemRef(i))))) : h('p', { class: 'celebrate' }, h('span', { class: 'em' }, '🎉'), 'Nothing needs attention. All green!'),
       att.length > 14 ? goLink({ v: 'catalog', f: { flag: ['needs attention'] }, q: '' }, `All ${att.length}`, null, 'linkish') : null),
+    maintenance.length ? h('section', { class: 'panel' }, h('h2', {}, `${ENT.maintenance[1]} Test maintenance (${maintenance.length})`, tip(`${ENT.maintenance[2]} Open a test case to see the actions.`)),
+      h('ul', { class: 'att' }, maintenance.slice().reverse().slice(0, 12).map((m) => h('li', {}, h('b', { title: MAINT_KIND[m.kind] }, `${ENT.maintenance[1]} ${m.id}`), ' ', maintTest(m),
+        h('div', { class: 'meta' }, h('span', { title: MAINT_KIND[m.kind] }, m.kind), ` → ${MAINT_PROP[m.proposal] || m.proposal} · `, m.basis, ' · ', buildLink(m.build)))))) : null,
+    features.length ? h('section', { class: 'panel' }, h('h2', {}, `${ENT.feature[1]} Features (${features.length})`, tip(ENT.feature[2])),
+      h('ul', { class: 'att' }, features.map((f) => { const its = featItems(f.id); const rec = its.filter((i) => ['regression', 'promotable'].includes(i.tier)).length;
+        return h('li', {}, facetLink('feature', f.id, `${ENT.feature[1]} ${f.name}`), h('span', { class: 'meta' }, ` · ${rec} recurring of ${its.length}`), ' ',
+          rec ? copyBox(`run feature ${f.id}`, 'Run…', `${ENT.run[1]} Run all the recurring tests of "${f.name}" now`) : null); }))) : null,
     FOUND.length ? h('section', { class: 'panel' }, h('h2', {}, `${ENT.bug[1]} Bug issues (${new Set(FOUND.map((f) => f.issue)).size})`, tip('The GitHub issues that the agent created for problems on this page (work/FOUND.md). One bug issue can have more than one problem.')),
       h('ul', { class: 'att' }, [...new Map(FOUND.slice().reverse().map((f) => [f.issue, f])).values()].slice(0, 10).map((f) => h('li', {}, extLink(f.url, `${ENT.bug[1]} #${f.issue}`, `${ENT.bug[0]} #${f.issue} on GitHub.`, 'found'),
         h('span', { class: 'meta' }, `${fmtDate(f.utc)} · ${FOUND.filter((x) => x.issue === f.issue).map((x) => x.ref).join(', ')}${f.labels.includes(FIX_LABEL) ? ' · for the architect' : ''}`))))) : null,
@@ -1588,7 +1637,7 @@ function cards(list, gallery) {
 function groupsOf(list) {
   if (S.g === 'none') return [[null, list]];
   const get = { origin: (i) => [`${i.ref} — ${str(i.origin.title)}`], tier: (i) => [i.tier], area: (i) => [str(i.area) || '(no area)'], page: (i) => (i.pages.length ? i.pages : ['(no page)']),
-    verdict: (i) => [vLabel(i.latest)], collection: (i) => (colls(i).length ? colls(i) : ['(no collection)']), label: (i) => (arr(i.origin.labels).length ? i.origin.labels.map(str) : ['(no label)']) }[S.g];
+    verdict: (i) => [vLabel(i.latest)], collection: (i) => (colls(i).length ? colls(i) : ['(no collection)']), feature: (i) => (feats(i).length ? feats(i).map(featName) : ['(no feature)']), label: (i) => (arr(i.origin.labels).length ? i.origin.labels.map(str) : ['(no label)']) }[S.g];
   const m = new Map(); for (const i of list) for (const k of get(i)) (m.get(k) || m.set(k, []).get(k)).push(i);
   const keys = [...m.keys()];
   if (S.g === 'tier') keys.sort((a, b) => tierRank(a) - tierRank(b)); else if (S.g === 'origin') keys.sort((a, b) => num(a) - num(b) || a.localeCompare(b)); else keys.sort((a, b) => m.get(b).length - m.get(a).length || a.localeCompare(b));
@@ -1797,7 +1846,12 @@ function itemDrawer(i) {
       dt('Promoted'), h('dd', {}, i.promoted_utc ? fmtDate(i.promoted_utc) : '–'),
       dt('Checks'), h('dd', {}, i.checks ? `${i.checks.expects ?? 0} expect · ${i.checks.agent_asserts ?? 0} agent.assert` : '–', i.checks && i.checks.agent_asserts ? h('div', { class: 'meta' }, 'agent.assert calls the model on each run. It costs tokens each night.') : null),
       dt('Duration'), h('dd', {}, sparkline(i.duration_ms) || '–'),
-      dt('Collections'), h('dd', {}, colls(i).length ? joinNodes(colls(i).map((c) => facetLink('collection', c, `${ENT.collection[1]} ${c}`))) : '–')),
+      dt('Collections'), h('dd', {}, colls(i).length ? joinNodes(colls(i).map((c) => facetLink('collection', c, `${ENT.collection[1]} ${c}`))) : '–'),
+      dt('Features'), h('dd', {}, feats(i).length ? joinNodes(feats(i).map((f) => facetLink('feature', f, `${ENT.feature[1]} ${featName(f)}`))) : '–')),
+    maintOf(i).length ? h('section', { class: 'sec' }, h('h3', {}, `${ENT.maintenance[1]} Maintenance proposals (${maintOf(i).length})`, tip(ENT.maintenance[2])),
+      maintOf(i).map((m) => h('div', { class: 'action hot' }, h('b', {}, `${m.id} · ${m.kind} → ${MAINT_PROP[m.proposal] || m.proposal}`), h('p', {}, MAINT_KIND[m.kind]),
+        h('p', { class: 'meta' }, 'Evidence: ', m.basis, ' · on ', buildLink(m.build), m.opened_utc ? ` · since ${fmtDate(str(m.opened_utc))}` : ''),
+        S.at ? null : h('div', { class: 'actions' }, maintActions(m))))) : null,
     i.steps.length ? h('section', { class: 'sec' }, h('h3', {}, '👣 Steps of the test', tip('What the test does, in sequence, from its file.')), h('ol', { class: 'steps' }, i.steps.map((st) => h('li', { 'data-k': { open: '↗', act: '▶', assert: '?', expect: '=', shot: '◉' }[st.kind] || '•', class: st.kind },
       h('span', { class: 'meta', title: STEP_HELP[st.kind] || null }, `${str(st.kind)} `), st.kind === 'open' && patOf(str(st.text).replace(/\?.*$/, '')) ? pageLink(str(st.text).replace(/\?.*$/, ''), str(st.text)) : stepText(st.text)))),
       h('button', { class: 'btn k-go', type: 'button', 'data-kind': 'go', 'data-dest': `${viewOf('builder')[2]} ${viewOf('builder')[1]}, with a new draft`,
@@ -1861,7 +1915,7 @@ const fmtDur = (x) => { const n = Number(x); if (x == null || !Number.isFinite(n
 const fmtCost = (x) => { const n = Number(x); return x != null && Number.isFinite(n) && n >= 0 ? `$${n.toFixed(2)}` : null; };
 const DUR_HELP = 'How long the test run took, from its start to its result. The test run records it. Empty: the run did not record it.';
 const COST_HELP = 'What the test run cost (model tokens), in US dollars. Only when the platform gave the cost to the agent. The page never estimates it.';
-const runName = (r) => (r.type === 'regression' ? `${RUNTYPE.regression} · ${r.build}` : `${RUNTYPE[r.type]} ${r.ref} · ${r.build}`);
+const runName = (r) => (r.type === 'regression' ? `${RUNTYPE.regression} · ${r.build}` : r.type === 'feature' ? `${RUNTYPE.feature} ${ENT.feature[1]} ${featName(r.ref)} · ${r.build}` : `${RUNTYPE[r.type]} ${r.ref} · ${r.build}`);
 const COUNT_KEYS = ['regression', 'needs-review', 'flaky', 'healed', 'relearned', 'superseded', 'blocked', 'drift', 'unchanged'];
 function outcome(r) {
   if (r.counts) return COUNT_KEYS.filter((k) => +r.counts[k] > 0).map((k) => `${+r.counts[k]} ${vLabel(k).toLowerCase()}`).join(' · ') || 'nothing replayed';
@@ -1892,7 +1946,7 @@ function viewRuns() {
     h('thead', {}, h('tr', {}, [['Date', 'The date and time (UTC) of the test run.'], [`${ENT.run[1]} Test run`, 'The type of test run, and the issue or scenario that it tested.'], [`${ENT.build[1]} Build`, 'The build that the run tested, and the build that it compared with.'], [`${ENT.verdict[1]} Result`, 'The result of the whole test run.'], ['Outcome', DT_HELP.Outcome], ['⏱ Duration', DUR_HELP], costs ? ['💲 Cost', COST_HELP] : null, [`${ENT.report[1]} Report`, ENT.report[2]], ['', null]].filter(Boolean).map(([c, t]) => h('th', { scope: 'col', style: 'cursor:default', title: t }, c)))),
     h('tbody', {}, shown.map((r) => h('tr', { tabindex: 0, onclick: rowClick(() => openRun(r)), onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openRun(r); } },
       h('td', { class: 'nw', title: r.utc }, `${fmtDate(r.utc)} ${r.utc.slice(11, 16)}`),
-      h('td', { class: 'name' }, h('div', {}, r.type === 'regression' ? `🌙 ${RUNTYPE.regression}` : [`${RUNTYPE[r.type]} `, refLink(r.ref)]), r.type !== 'regression' && originTitle(r.ref) ? h('div', { class: 'meta' }, originTitle(r.ref)) : null),
+      h('td', { class: 'name' }, h('div', {}, r.type === 'regression' ? `🌙 ${RUNTYPE.regression}` : r.type === 'feature' ? `${RUNTYPE.feature} ${ENT.feature[1]} ${featName(r.ref)}` : [`${RUNTYPE[r.type]} `, refLink(r.ref)]), !['regression', 'feature'].includes(r.type) && originTitle(r.ref) ? h('div', { class: 'meta' }, originTitle(r.ref)) : null),
       h('td', { class: 'nw' }, buildLink(r.build), r.baseline ? h('div', { class: 'meta', title: DT_HELP.Baseline }, 'compared with ', buildLink(r.baseline)) : r.previous ? h('div', { class: 'meta', title: DT_HELP.Since }, 'since ', buildLink(r.previous)) : null),
       h('td', {}, badge(r.verdict)), h('td', {}, outcome(r)),
       h('td', { class: 'nw' }, fmtDur(r.secs) || h('span', { class: 'muted-t' }, '–')),
@@ -1918,10 +1972,10 @@ function runDrawer(r) {
   }
   drawerShell('run', `${runName(r)} details`, [stepOf(same[k - 1], night ? 'Night before' : 'Run before'), stepOf(same[k + 1], night ? 'Night after' : 'Run after')], [
     h('div', { class: 'crumbs' }, goLink({ v: 'runs', rt: r.type, rb: null }, `${RUNTYPE[r.type]}s`, RUNTYPE_HELP[r.type]),
-      night ? null : [h('span', { class: 'sep' }, '›'), refLink(r.ref, `${originName(r.ref)}${originTitle(r.ref) ? ` — ${originTitle(r.ref)}` : ''}`)],
+      night ? null : r.type === 'feature' ? [h('span', { class: 'sep' }, '›'), facetLink('feature', r.ref, `${ENT.feature[1]} ${featName(r.ref)}`)] : [h('span', { class: 'sep' }, '›'), refLink(r.ref, `${originName(r.ref)}${originTitle(r.ref) ? ` — ${originTitle(r.ref)}` : ''}`)],
       h('span', { class: 'sep' }, '›'), h('span', {}, r.utc)),
     h('div', { class: 'meta', style: 'margin-top:6px', title: RUNTYPE_HELP[r.type] }, `${ENT.run[1]} ${ENT.run[0]} · ${RUNTYPE[r.type]}`),
-    h('h2', {}, night ? `🌙 Night of ${fmtDate(r.utc)} · ${r.build}` : `${originName(r.ref)} · ${ENT.build[1]} ${r.build}`),
+    h('h2', {}, night ? `🌙 Night of ${fmtDate(r.utc)} · ${r.build}` : r.type === 'feature' ? `${ENT.feature[1]} ${featName(r.ref)} · ${ENT.build[1]} ${r.build}` : `${originName(r.ref)} · ${ENT.build[1]} ${r.build}`),
     h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' }, badge(r.verdict)),
     h('dl', { class: 'dl' },
       dt('Report'), h('dd', {}, artLink(r.report)),
