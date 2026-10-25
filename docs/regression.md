@@ -54,8 +54,30 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
 
 1. `env.sh lock regression` (busy → end the run, log it).
 2. `env.sh reset`, `env.sh up <candidate>`, `suite.sh run smoke-<candidate> --tag smoke`.
-   Failure → environment failure ([nested-env.md](nested-env.md) → Failures); append
-   `<ISO> ERROR: environment candidate=<c>` to `work/REGRESSION.log`, unlock, end.
+   Failure → environment failure: diagnose and try the one repair of
+   [nested-env.md](nested-env.md) → Failures. Still failing → **the night without results**:
+   1. Write `work/regression/<candidate>/environment.json` — `{"mode": "regression",
+      "verdict": "environment", "candidate", "utc", "stage", "exit", "cause", "evidence", "repair", "next"}`:
+      `utc` the write's time (the ERROR line's too); `stage` the step that failed — `reset`,
+      `up`, `smoke` or `canary` ([nested-env.md](nested-env.md) → **The injection canary**);
+      `exit` its exit code (`null` for a test); `cause` one or two sentences — what failed and
+      why, as far as the evidence shows ("the image pull of `api` was refused by the egress
+      gateway", "the pod `db` restarted 5 times: out of memory"), else "unknown: <what the
+      output shows>"; `evidence` up to 30 lines that show it, as `env.sh wait` printed them or
+      from `env.sh status` (credential values masked, never a line that holds one); `repair`
+      what you tried and what it did; `next` what fixes it and whose it is (the operator's
+      egress, disk space, a product defect — the build's, so a later build retries it, the
+      pre-flight takes this candidate again the next night). In English, in ASD-STE100.
+   2. Append `<ISO> ERROR: environment candidate=<c>` (the same `<ISO>`) to `work/REGRESSION.log`, unlock.
+   3. The summary of step 9 is the failure only: in the chat UI, and with `channel` set as one
+      `send_channel_message` to it, ledgered — every night, so a silent night is never a
+      failed one: `🟠 Nightly regression <date> · build <candidate>: the environment failed —
+      no test ran.` then `Step: <stage> (exit <n>)`, `Cause: <cause>`, `Repair: <repair>`,
+      `Next: <next>`, up to 5 lines of `evidence` in a code block, and the catalog's link.
+      `<n>` = the `ERROR: environment` lines of `work/REGRESSION.log` after its last
+      `ran candidate=` line, tonight's included (other lines, `due` among them, do not count):
+      from 2 it opens with 🔴 and `<n>. night in a row` instead.
+   4. The catalog (step 10), then end.
 3. **Build the change context** ([change-awareness.md](change-awareness.md)): the UI map
    of the candidate, its diff against `previous_candidate`'s map, the completed issues in
    the window, the published interfaces' diff, the impact per test, and your one-line

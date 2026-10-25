@@ -7,6 +7,16 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.29.0 — 2026-10-25
+
+**Upgrade:**
+Nothing to run — docs are re-read per run. New: a night whose environment fails writes why
+(`work/regression/<candidate>/environment.json`: the failed step, cause, repair, next step and
+evidence), shows it in the catalog's night panel, and posts it to `regression_channel` (🟠, or 🔴
+from the second such night in a row). `env.sh up` and `reset` keep their whole output in
+`work/env/last-up.log` / `last-reset.log`, and `env.sh wait` prints the end of a failed install.
+Earlier failed nights have no file: the catalog says the cause was not recorded.
+
 ## 3.28.0 — 2026-10-25
 
 **Upgrade:**
