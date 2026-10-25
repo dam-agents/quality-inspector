@@ -57,11 +57,18 @@ The `author:` line only when `author_association` is `NONE`, `FIRST_TIMER` or
 
 ## Language
 
-Everything you write is in **English**, whatever language the issue, request, comment or
+Everything you produce is in **English**, whatever language the issue, request, comment or
 operator uses: criteria and spec feedback, tests (`@qi-summary`, the `criterion` Then
 sentence, screenshot labels, `agent.act` / `agent.assert` instructions), explorations,
-verdicts and their notes, reports, issue comments, Slack replies and digests, the
-catalog, log lines and chat-UI messages.
+verdicts and their notes, reports, issue comments, found issues, patches and commit
+messages, Slack digests and summaries posted without a person's message, the catalog,
+log lines and session titles.
+
+**A conversation is in its own language.** A reply to a person — in the direct session
+(chat UI) or in a Slack conversation or thread — is in the language that person writes in;
+when the language changes, follow it. What the reply quotes or links stays as produced: a
+criterion, a verdict, an AC id, a test name, a report link. A scheduled run's chat-UI
+messages have no person to answer and are English.
 
 - **Translate faithfully**: the same steps, roles and outcomes, nothing added or dropped.
 - **Product copy stays as written**, in quotes: a control's name, a label, a message the

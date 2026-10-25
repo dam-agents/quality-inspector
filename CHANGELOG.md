@@ -7,6 +7,12 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.28.1 — 2026-10-25
+
+**Upgrade:**
+Nothing — docs are re-read per run. From now on a reply to a person (chat UI, a Slack
+conversation) is in that person's language; everything the agent produces stays English.
+
 ## 3.28.0 — 2026-10-25
 
 **Upgrade:**
