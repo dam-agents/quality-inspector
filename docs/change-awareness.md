@@ -49,12 +49,13 @@ node "$HOME/scripts/ui-diff.mjs" work/inventory/<previous>/inventory.json work/i
 node "$HOME/scripts/iface-snapshot.mjs" <candidate> "$HOME/work/inventory/<candidate>"
 node "$HOME/scripts/iface-diff.mjs" work/inventory/<previous>/iface.json work/inventory/<candidate>/iface.json > /tmp/quality-inspector-iface.json
 bash "$HOME/scripts/changes.sh" <previous> <candidate> > /tmp/quality-inspector-changes.json
-node "$HOME/scripts/impact.mjs" /tmp/quality-inspector-diff.json --iface /tmp/quality-inspector-iface.json work/suite/tests/{issue,scenario}-*.e2e.ts
+node "$HOME/scripts/impact.mjs" /tmp/quality-inspector-diff.json --iface /tmp/quality-inspector-iface.json work/suite/tests/{issue,scenario,profile}-*.e2e.ts > /tmp/quality-inspector-impact.json
 ```
 
 (Source `work/env/credentials.env` for the map's sign-in.) `impact.mjs` names, per test,
 every changed page or control it opens or mentions — and every removed command, flag,
-endpoint or response field it names — and whether the hit is inside an AC or IN block (frozen, [intent.md](intent.md)). With no
+endpoint or response field it names — and whether the hit is inside an AC or IN block (frozen, [intent.md](intent.md));
+`maintenance.mjs predict` turns it into proposals ([maintenance.md](maintenance.md) → **Predicted from the change context**). With no
 map of `<previous>` (first run, lost volume), the UI diff is skipped (pass `none` in its
 place) and the run says so — the triage then leans on the issues alone.
 

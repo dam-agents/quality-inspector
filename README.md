@@ -178,7 +178,8 @@ moved), *repaired* (a check followed a renamed or moved control — logged), *su
 (a completed issue changed the behaviour on purpose), *needs review*, or **regression** —
 the only one that is a product defect, and the default when the evidence is unclear.
 What the agent may not absorb alone becomes a **maintenance proposal** for the operator — what
-changed, the evidence, and accept, rewrite, retire or keep ([docs/maintenance.md](docs/maintenance.md)).
+changed, the evidence, and accept, rewrite, retire or keep ([docs/maintenance.md](docs/maintenance.md));
+a page, control or interface gone or moved in the night's UI map opens one before the test even fails.
 Recurring tests are also grouped by **feature** ("Model switching"), so anyone can ask for a
 feature by name — "run feature …" in the chat, "test feature …" in Slack — and have its tests run
 again ([docs/features.md](docs/features.md)).

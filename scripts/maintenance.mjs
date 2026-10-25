@@ -5,31 +5,41 @@
 // "rewrite M-3", "retire M-3", "keep M-3"); the agent opens them, and closes those whose cause is gone.
 //
 //   node maintenance.mjs open <test> --kind <kind> --build <build> --proposal <proposal> --basis-file <path>
-//     -> {"id", "opened": bool}   one open row per (test, kind): a second open updates its build and basis
+//     -> {"id", "opened": bool, "replaced": []}   one open row per (test, kind): a second open updates its build and basis
+//   node maintenance.mjs predict --build <build> --impact <impact.json> [--dry-run]
+//     -> {"opened": [], "updated": [], "skipped": []}   (--dry-run: {"candidates": [{test, kind, proposal, basis, file, line}]})
 //   node maintenance.mjs close <M-k> <state>   -> {"id", "state"}
 //   node maintenance.mjs list [--open]         -> {"proposals": [{id, test, kind, build, basis, proposal, state, opened_utc, closed_utc}]}
-//   node maintenance.mjs sweep [--unchanged <test>]…   -> {"resolved": ["M-2", …], "notes": []}
+//   node maintenance.mjs sweep [--unchanged <test>]… [--absorbed <test>]…   -> {"resolved": ["M-2", …], "notes": []}
 //   node maintenance.mjs check                 -> {"ok", "problems": []}
 //
 // <test>: `#N`, `#N AC-k`, `#N IN-k`, `S-k[ AC-j]`, `P-<slug>[ AC-j]` (one argument or two). <kind>: needs-review |
-// superseded | drift | quarantined | fighting. <proposal>: heal | rewrite | retire | re-promote | review.
+// superseded | drift | quarantined | fighting, or one predicted before the replay — obsolete | moved | renamed.
+// <proposal>: heal | rewrite | retire | re-promote | review.
 // <state>: accepted | rewritten | retired | kept | resolved. The basis — read from <path>, the call's own
 // `mktemp /tmp/quality-inspector-<kind>.XXXXXX` (<kind> = basis) written with a file tool, never by the
 // shell, since it may quote an issue; removed once read, before the lock is taken (lib/words.mjs) — is a short evidence pointer (a
 // UI-map change, an issue number and its quoted sentence, a build): never a triage explanation, a
 // request's words or a credential; the catalog shows it.
+// `predict` opens the predicted kinds from impact.mjs output (lib/staleness.mjs says which), basis
+// the diff's line, and skips a test that already has an open triage row (needs-review, superseded,
+// quarantined, fighting) of it. Opening such a triage row resolves the open predicted rows of the
+// same test (`replaced`): the night's triage confirmed or upgraded the prediction.
 // `sweep` resolves the open rows whose cause is gone: a drift whose file no longer drifts
 // (check-asserts.sh --json), a quarantine or a superseded test whose tier changed, a test with no
-// work/SUITE.md row, and each --unchanged test (the night replayed it plain unchanged). An unreadable
+// work/SUITE.md row, each --unchanged test (the night replayed it plain unchanged), and a predicted
+// row of each --absorbed test (relearned or healed: the triage absorbed the change). An unreadable
 // work/SUITE.md stops it with no change (exit 1): an unhydrated work/ would else resolve every row.
 // Every write holds the queue's mutex (lib/mutex.mjs) from load to save.
-// Exit 2: usage or a malformed value; the file is then left as it was. Exit 1: locked, or no SUITE.md.
+// Exit 2: usage or a malformed value; the file is then left as it was. Exit 1: locked, or no SUITE.md
+// (sweep, predict).
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withMutex, writeAtomic } from './lib/mutex.mjs';
+import { predict } from './lib/staleness.mjs';
 import { takeWords } from './lib/words.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -37,7 +47,9 @@ const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'wo
 const FILE = join(work, 'MAINTENANCE.md');
 const HEADER = '| id | test | kind | build | basis | proposal | state | opened_utc | closed_utc |';
 const TITLE = '# Test maintenance — proposals for recurring tests the product moved away from (docs/maintenance.md)';
-const KINDS = ['needs-review', 'superseded', 'drift', 'quarantined', 'fighting'];
+const TRIAGE = ['needs-review', 'superseded', 'quarantined', 'fighting'];
+const PREDICTED = ['obsolete', 'moved', 'renamed'];
+const KINDS = [...TRIAGE, 'drift', ...PREDICTED];
 const PROPOSALS = ['heal', 'rewrite', 'retire', 're-promote', 'review'];
 const CLOSED = ['accepted', 'rewritten', 'retired', 'kept', 'resolved'];
 const TEST_RE = /^(#(\d{1,7})(?: (?:AC|IN)-\d{1,3})?|S-(\d{1,6})(?: AC-\d{1,3})?|P-([a-z0-9][a-z0-9-]{0,40})(?: AC-\d{1,3})?)$/;
@@ -63,6 +75,13 @@ function save(list) {
   writeAtomic(FILE, `${TITLE}\n\n${HEADER}\n| ${COLS.map(() => '---').join(' | ')} |\n${body.join('\n')}${body.length ? '\n' : ''}`);
 }
 const fileOf = (test) => { const m = TEST_RE.exec(test); return m ? `tests/${m[2] ? `issue-${m[2]}` : m[3] ? `scenario-${m[3]}` : `profile-${m[4]}`}.e2e.ts` : null; };
+// Two rows are of the same test when they name one file and one block, or either names the whole test.
+const block = (test) => / ((?:AC|IN)-\d{1,3})$/.exec(test)?.[1] ?? null;
+const related = (a, b) => fileOf(a) === fileOf(b) && (a === b || !block(a) || !block(b));
+// A test named by --unchanged / --absorbed: the same id, or the whole test of a block's row.
+const named = (set, test) => set.has(test) || [...set].some((u) => !block(u) && test.startsWith(`${u} `));
+const sanitize = (raw) => String(raw ?? '').replace(/[|\r\n\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+const nextId = (list) => `M-${Math.max(0, ...list.map((p) => +(/^M-(\d+)$/.exec(p.id)?.[1] ?? 0))) + 1}`;
 const suite = () => { const t = read(join(work, 'SUITE.md')); return t == null ? null : new Map(rows(t).map(([test, , tier]) => [test, tier])); };
 
 const [cmd, ...args] = process.argv.slice(2);
@@ -80,18 +99,50 @@ switch (cmd) {
     const raw = basisRaw;
     const test = testAt(0);
     const kind = flag('--kind'); const build = flag('--build'); const proposal = flag('--proposal');
-    const basis = String(raw ?? '').replace(/[|\r\n\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+    const basis = sanitize(raw);
     if (!KINDS.includes(kind)) die(`--kind is one of ${KINDS.join(', ')}`);
     if (!PROPOSALS.includes(proposal)) die(`--proposal is one of ${PROPOSALS.join(', ')}`);
     if (!BUILD_RE.test(build ?? '')) die('--build <build> is required');
     if (!basis) die('--basis-file <path> is required: the evidence of the change');
     const list = load();
+    const replaced = [];
+    if (TRIAGE.includes(kind)) {
+      for (const p of list.filter((x) => x.state === 'open' && PREDICTED.includes(x.kind) && related(x.test, test))) {
+        Object.assign(p, { state: 'resolved', closed_utc: now() }); replaced.push(p.id);
+      }
+    }
     const same = list.find((p) => p.state === 'open' && p.test === test && p.kind === kind);
-    if (same) { Object.assign(same, { build, basis, proposal }); save(list); out({ id: same.id, opened: false }); break; }
-    const next = Math.max(0, ...list.map((p) => +(/^M-(\d+)$/.exec(p.id)?.[1] ?? 0))) + 1;
-    list.push({ id: `M-${next}`, test, kind, build, basis, proposal, state: 'open', opened_utc: now(), closed_utc: '-' });
+    if (same) { Object.assign(same, { build, basis, proposal }); save(list); out({ id: same.id, opened: false, replaced }); break; }
+    const id = nextId(list);
+    list.push({ id, test, kind, build, basis, proposal, state: 'open', opened_utc: now(), closed_utc: '-' });
     save(list);
-    out({ id: `M-${next}`, opened: true });
+    out({ id, opened: true, replaced });
+    break;
+  }
+  case 'predict': {
+    const build = flag('--build'); const path = flag('--impact');
+    if (!BUILD_RE.test(build ?? '')) die('--build <build> is required');
+    if (!path) die('--impact <impact.json> is required: the output of impact.mjs');
+    let impact;
+    try { impact = JSON.parse(readFileSync(path, 'utf8')); } catch { die(`${path}: not the JSON of impact.mjs`); }
+    const tiers = suite();
+    if (!tiers) throw new Error('work/SUITE.md cannot be read: nothing predicted (restore work/ first)');
+    const candidates = predict(impact, tiers).filter((c) => TEST_RE.test(c.test) && sanitize(c.basis))
+      .map((c) => ({ ...c, basis: sanitize(c.basis) }));
+    if (args.includes('--dry-run')) { out({ candidates }); break; }
+    const list = load();
+    const opened = []; const updated = []; const skipped = [];
+    for (const c of candidates) {
+      const open = list.filter((p) => p.state === 'open');
+      if (open.some((p) => TRIAGE.includes(p.kind) && related(p.test, c.test))) { skipped.push(c.test); continue; }
+      const same = open.find((p) => p.test === c.test && p.kind === c.kind);
+      if (same) { Object.assign(same, { build, basis: c.basis, proposal: c.proposal }); updated.push(same.id); continue; }
+      const id = nextId(list);
+      list.push({ id, test: c.test, kind: c.kind, build, basis: c.basis, proposal: c.proposal, state: 'open', opened_utc: now(), closed_utc: '-' });
+      opened.push(id);
+    }
+    if (opened.length || updated.length) save(list);
+    out({ opened, updated, skipped });
     break;
   }
   case 'close': {
@@ -111,8 +162,11 @@ switch (cmd) {
     break;
   }
   case 'sweep': {
-    const unchanged = new Set();
-    for (let k = 0; k < args.length; k++) if (args[k] === '--unchanged') { unchanged.add(testAt(k + 1)); }
+    const unchanged = new Set(); const absorbed = new Set();
+    for (let k = 0; k < args.length; k++) {
+      if (args[k] === '--unchanged') unchanged.add(testAt(k + 1));
+      else if (args[k] === '--absorbed') absorbed.add(testAt(k + 1));
+    }
     const notes = [];
     let drift = null;
     try {
@@ -129,7 +183,8 @@ switch (cmd) {
         || (p.kind === 'quarantined' && tier !== 'quarantined')
         || (p.kind === 'superseded' && tier !== 'retired')
         || (!tier)
-        || (['needs-review', 'fighting'].includes(p.kind) && (unchanged.has(p.test) || [...unchanged].some((u) => !/ (?:AC|IN)-/.test(u) && p.test.startsWith(`${u} `))));
+        || (['needs-review', 'fighting', ...PREDICTED].includes(p.kind) && named(unchanged, p.test))
+        || (PREDICTED.includes(p.kind) && named(absorbed, p.test));
       if (gone) { Object.assign(p, { state: 'resolved', closed_utc: now() }); resolved.push(p.id); }
     }
     if (resolved.length) save(list);
@@ -158,7 +213,7 @@ switch (cmd) {
     out({ ok: problems.length === 0, problems });
     break;
   }
-  default: die('usage: maintenance.mjs open|close|list|sweep|check — see its header');
+  default: die('usage: maintenance.mjs open|predict|close|list|sweep|check — see its header');
 }
 }
 
@@ -168,7 +223,7 @@ let basisRaw = null;
 try {
   const path = cmd === 'open' ? flag('--basis-file') : null;
   if (path) try { basisRaw = takeWords(path, 'basis'); } catch (e) { die(e.message); }
-  if (['open', 'close', 'sweep'].includes(cmd)) withMutex(`${FILE}.lock`, main); else main();
+  if (['open', 'close', 'sweep'].includes(cmd) || (cmd === 'predict' && !args.includes('--dry-run'))) withMutex(`${FILE}.lock`, main); else main();
 } catch (e) {
   console.error(`maintenance: ${e.message}`);
   process.exit(e instanceof Usage ? 2 : 1);
