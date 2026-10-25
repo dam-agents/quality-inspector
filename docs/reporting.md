@@ -56,7 +56,7 @@ Your judgment, the renderer's only input besides the runs:
 ```
 
 A scenario's file (`"mode": "scenario"`) adds `request_file`: the path under `work/` of its
-words as received (`scenarios/S-7/request.md`, `scenarios/P-<slug>/source-<spec_hash>.md`),
+words as received (`scenarios/S-7/request.md`, `scenarios/P-<slug>/source-<spec_hash>.md` or `.feature`),
 which the renderer shows verbatim above the criteria ([scenarios.md](scenarios.md) → State).
 `given` / `when` / `then` are copied from the criteria file verbatim; `baseline_run` is
 `null` when no baseline ran. `started_utc` is the run's start (the `issue_start`'s time; the

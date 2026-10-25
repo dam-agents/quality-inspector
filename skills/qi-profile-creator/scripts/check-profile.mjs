@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, delimiter, dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const usage = (code = 2) => {
   console.error('usage: check-profile.mjs [--core <dir>] [--live] [--set <key>=<value>]... [--candidate <channel>] [--baseline <channel>] <profile-dir>');
@@ -362,14 +362,29 @@ existsSync(join(dir, 'README.md')) ? pass('README.md present') : warn('README.md
 // The product team's scenarios (docs/profile-contract.md → `scenarios/`): the nightly
 // regression run adopts each one; its text is the oracle, so it must be criteria a tester
 // can freeze — a title, AC blocks with Given/When/Then — and nothing a user could not write.
+// A <slug>.feature is Gherkin, read by the core's own parser (scripts/lib/gherkin.mjs).
 const scenDir = join(dir, 'scenarios');
 if (existsSync(scenDir) && statSync(scenDir).isDirectory()) {
   let n = 0;
-  for (const f of readdirSync(scenDir).sort()) {
+  const gherkinLib = core && join(core, 'scripts/lib/gherkin.mjs');
+  const gherkin = gherkinLib && existsSync(gherkinLib) ? await import(pathToFileURL(gherkinLib).href) : null;
+  const files = readdirSync(scenDir).sort();
+  for (const f of files) {
     const id = `scenarios/${f}`;
-    if (!/^[a-z0-9][a-z0-9-]{0,47}\.md$/.test(f)) { fail(`${id}: not <slug>.md ([a-z0-9-], at most 48) — the run skips it`); continue; }
+    if (!/^[a-z0-9][a-z0-9-]{0,47}\.(md|feature)$/.test(f)) { fail(`${id}: not <slug>.md or <slug>.feature ([a-z0-9-], at most 48) — the run skips it`); continue; }
     if (statSync(join(scenDir, f)).size > 65536) { fail(`${id}: over 64 KiB — the run skips it`); continue; }
     const t = read(join(scenDir, f)) ?? '';
+    if (f.endsWith('.feature')) {
+      if (files.includes(f.replace(/\.feature$/, '.md'))) { fail(`${id}: ${f.replace(/\.feature$/, '.md')} has the same slug — the run skips the .feature`); continue; }
+      n++;
+      if (!gherkin) { warn(`${id}: Gherkin not checked without the core`); continue; }
+      const p = gherkin.parseFile(f, t);
+      for (const e of p.errors) fail(`${id}: ${e}`);
+      for (const w of p.warnings) warn(`${id}: ${w}`);
+      if (!p.acs.length && !p.errors.length) fail(`${id}: no Scenario`);
+      if (/https?:\/\//.test(t)) warn(`${id}: a URL — the agent freezes words a user could write, and never follows a link`);
+      continue;
+    }
     n++;
     if (!/^# \S/m.test(t)) fail(`${id}: no "# <title>" line`);
     const acs = [...t.matchAll(/^## (AC-(\d+)) — \S.*$/gm)];

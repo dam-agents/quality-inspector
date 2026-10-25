@@ -1553,7 +1553,7 @@ function viewOverview() {
     features.length ? h('section', { class: 'panel' }, h('h2', {}, `${ENT.feature[1]} Features (${features.length})`, tip(ENT.feature[2])),
       h('ul', { class: 'att' }, features.map((f) => { const its = featItems(f.id); const rec = its.filter((i) => ['regression', 'promotable'].includes(i.tier)).length;
         return h('li', {}, facetLink('feature', f.id, `${ENT.feature[1]} ${f.name}`), h('span', { class: 'meta' }, ` · ${rec} recurring of ${its.length}`), ' ',
-          rec ? copyBox(`run feature ${f.id}`, 'Run…', `${ENT.run[1]} Run all the recurring tests of "${f.name}" now`) : null); }))) : null,
+          rec ? copyBox(`run feature ${f.id}`, 'Run…', `${ENT.run[1]} Run all the recurring tests of "${f.name}" now`) : null, ' ', gherkinBtn(f.name, its)); }))) : null,
     FOUND.length ? h('section', { class: 'panel' }, h('h2', {}, `${ENT.bug[1]} Bug issues (${new Set(FOUND.map((f) => f.issue)).size})`, tip('The GitHub issues that the agent created for problems on this page (work/FOUND.md). One bug issue can have more than one problem.')),
       h('ul', { class: 'att' }, [...new Map(FOUND.slice().reverse().map((f) => [f.issue, f])).values()].slice(0, 10).map((f) => h('li', {}, extLink(f.url, `${ENT.bug[1]} #${f.issue}`, `${ENT.bug[0]} #${f.issue} on GitHub.`, 'found'),
         h('span', { class: 'meta' }, `${fmtDate(f.utc)} · ${FOUND.filter((x) => x.issue === f.issue).map((x) => x.ref).join(', ')}${f.labels.includes(FIX_LABEL) ? ' · for the architect' : ''}`))))) : null,
@@ -1842,6 +1842,7 @@ function itemDrawer(i) {
     h('div', { class: 'gwt', title: i.kind === 'exploration' ? ENT.exploration[2] : i.kind === 'intent' ? `${ENT.intent[2]} The goal is the sentence of the issue, verbatim.` : 'The frozen acceptance criterion: the start state (Given), the action (When) and the result that the test checks (Then).' },
       i.kind === 'intent' ? h('p', {}, h('b', {}, 'Goal'), str(i.goal) || '–') : null,
       h('p', {}, h('b', {}, 'Given'), str(i.given) || '–'), h('p', {}, h('b', {}, 'When'), str(i.when) || '–'), h('p', {}, h('b', {}, i.kind === 'exploration' ? 'Expect' : 'Then'), str(i.then) || '–')),
+    i.kind === 'criterion' ? h('div', { style: 'margin-top:6px' }, gherkinBtn(o.title || i.ref, ALL.filter((x) => x.ref === i.ref))) : null,
     src ? h('figure', { style: 'margin:10px 0' }, h('img', { src, alt: `The screen that ${i.id} checks`, style: 'width:100%;border-radius:10px;border:1px solid var(--line);background:#fff' }),
       h('figcaption', { class: 'meta', style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px' }, `📷 The screen right before the check of ${i.id}.`, i.evidence ? [' The video and all screenshots:', reportBtn(i.evidence)] : null)) : null,
     h('dl', { class: 'dl' },
@@ -2566,6 +2567,30 @@ const CHECK_HELP = {
 const checkHelp = (c) => CHECK_HELP[str(c)] || CHECK_HELP[str(c).replace(/^review:.*/, 'review').replace(/^a11y:.*/, 'a11y')] || null;
 const DSTATUS_HELP = { open: 'The newest sweep of its page found it, and you did not dismiss it.', resolved: 'A newer build was swept, and the check does not find it now.', dismissed: 'You said that it is not a defect. It stays dismissed until you reopen it.' };
 const DISMISS = [['false-positive', 'Not a defect: the check is incorrect here'], ['wont-fix', 'A defect, but the team will not repair it'], ['duplicate', 'The same as a different finding'], ['by-design', 'The team designed it like this']];
+// Test cases as Gherkin (docs/catalog.md → Gherkin): one Scenario per acceptance criterion, in its
+// frozen words; explorations stay out. The shape of `scripts/lib/gherkin.mjs export`.
+function gherkinText(title, list) {
+  const line = (x) => str(x).replace(/\s+/g, ' ').trim();
+  const acs = list.filter((x) => x.kind === 'criterion').sort((a, b) => str(a.ref).localeCompare(str(b.ref), 'en', { numeric: true }) || num(a.id) - num(b.id));
+  const many = new Set(acs.map((x) => x.ref)).size > 1;
+  const out = ['# Exported from the test catalog.', '# The frozen acceptance criteria, in words. No step definitions run them.', `Feature: ${line(title) || '(no title)'}`];
+  for (const i of acs) {
+    out.push('');
+    if (i.testable === false) out.push('  @not-testable');
+    out.push(`  Scenario: ${many ? `${line(i.ref)} ` : ''}${line(i.id)}${line(i.name) ? ` — ${line(i.name)}` : ''}`);
+    for (const [k, v] of [['Given', i.given], ['When', i.when], ['Then', i.then]]) if (line(v)) out.push(`    ${k} ${line(v)}`);
+  }
+  return `${out.join('\n')}\n`;
+}
+function gherkinBtn(title, list) {
+  if (!list.some((x) => x.kind === 'criterion')) return null;
+  const b = h('button', { class: 'btn', type: 'button', 'data-kind': 'local', 'data-dest': 'your clipboard', title: 'Copies the acceptance criteria as a Gherkin feature (Given, When, Then), for a .feature file.', onclick: async () => {
+    const text = gherkinText(title, list);
+    try { await navigator.clipboard.writeText(text); b.textContent = 'Copied ✓'; setTimeout(() => { b.textContent = 'Copy as Gherkin'; }, 1500); return; } catch { /* no clipboard */ }
+    const ta = h('textarea', { readonly: true, rows: 10, style: 'width:100%;font-family:var(--mono,monospace)', 'aria-label': 'The acceptance criteria as Gherkin' }); ta.value = text; b.replaceWith(ta); ta.select();
+  } }, 'Copy as Gherkin');
+  return b;
+}
 function designMarkdown(list) {
   return list.map((d) => `- **${str(d.id)}** (${str(d.severity)}${d.suspect ? ', suspect' : ''}) \`${str(d.pattern)}\`${d.viewport && d.viewport !== '-' ? ` @ ${str(d.viewport)}` : ''} — ${str(d.saw)}`
     + ` _(${str(d.check)}; since ${str(d.first_seen)}${d.status !== 'open' ? `; ${str(d.status)}` : ''})_`).join('\n');

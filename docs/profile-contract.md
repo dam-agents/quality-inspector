@@ -29,7 +29,7 @@ local development). The core never edits a profile; changes go to its own reposi
   bin/versions    optional — which builds exist (else its engine's)
   bin/build-time  optional — when a build was published (else its engine's)
   suite/          optional: files merged into work/suite on init (fixtures, helpers, lib/security-api.ts)
-  scenarios/      optional: the product team's scenarios, <slug>.md each (below)
+  scenarios/      optional: the product team's scenarios, <slug>.md or <slug>.feature each (below)
   sandbox/        optional: one guide per sandbox account, <name>.md (below)
   bin/sandbox     optional — `check`: the sandbox accounts answer (below)
   README.md       for the people who maintain the profile
@@ -256,9 +256,10 @@ run adopts each file — freezes its criteria, writes its test, and replays it e
 from then on ([scenarios.md](scenarios.md) → **Profile scenarios**). Merging a scenario is
 its promotion: it needs no operator "promote" (CLAUDE.md → Hard invariants).
 
-One file per flow, `scenarios/<slug>.md` — the slug `[a-z0-9]` then `[a-z0-9-]`, at most 48
-characters, is its stable id (`P-<slug>`); renaming a file retires one scenario and adds
-another. At most 64 KiB; plain files only.
+One file per flow, `scenarios/<slug>.md` or `scenarios/<slug>.feature` (Gherkin) — the slug
+`[a-z0-9]` then `[a-z0-9-]`, at most 48 characters, is its stable id (`P-<slug>`); renaming a file
+retires one scenario and adds another, and a `.feature` whose slug a `.md` has is skipped. At most
+64 KiB; plain files only.
 
 ```markdown
 # The owner schedules a task
@@ -291,8 +292,14 @@ Then the task shows Done and its message is in the Messages tab
   areas in one flow, each AC on the one thing nothing else checks.
 - Changing the text (more than whitespace) is a new version: the next night re-freezes it
   and writes a new test. Deleting the file retires its test.
+- **A `.feature`** holds one `Feature` and its scenarios, in English or Czech (`# language: cs`).
+  It becomes the AC blocks above by `scripts/lib/gherkin.mjs` (its header holds the mapping): one
+  AC per `Then`, the `Background` in every Given, one AC per `Examples` row (at most 10 a block, 50
+  ACs a file), `@requires-<role>` for `requires:`, `@wip` or `@manual` for an AC that is not
+  tested yet. The same rules hold: one user action per `When`, words a user could write.
 
-`check-profile.mjs` checks the name, size, title and AC blocks.
+`check-profile.mjs` checks the name, size, title and AC blocks — a `.feature` through the core's
+parser, with its errors.
 
 ## Choosing and changing the profile
 

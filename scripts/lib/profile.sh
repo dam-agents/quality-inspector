@@ -167,21 +167,24 @@ provided_roles() { # <credentials.env>
 }
 
 # The product team's scenarios (docs/profile-contract.md → `scenarios/`): one line
-# `<slug>\t<spec_hash>\t<path>` per `scenarios/<slug>.md` of the profile, sorted by slug.
-# A slug is [a-z0-9] then [a-z0-9-], at most 48 characters; any other name, a symlink, a
-# non-regular file or one over 64 KiB is skipped with a line on stderr. Needs lib/state.sh
-# (text_hash). Nothing when the profile has no scenarios/.
+# `<slug>\t<spec_hash>\t<path>` per `scenarios/<slug>.md` or `scenarios/<slug>.feature` (Gherkin)
+# of the profile, sorted by slug. A slug is [a-z0-9] then [a-z0-9-], at most 48 characters; any
+# other name, a symlink, a non-regular file, one over 64 KiB, or a .feature whose slug a .md
+# already has is skipped with a line on stderr. Needs lib/state.sh (text_hash). Nothing when the
+# profile has no scenarios/.
 PROFILE_SCENARIO_MAX_BYTES=65536
 profile_scenarios() {
   local dir f base slug size
   dir="$(profile_dir)" || return 0
   [ -d "$dir/scenarios" ] && [ ! -L "$dir/scenarios" ] || return 0
-  for f in "$dir"/scenarios/*.md; do
+  for f in "$dir"/scenarios/*.md "$dir"/scenarios/*.feature; do
     [ -e "$f" ] || [ -L "$f" ] || continue
-    base="$(basename "$f")"; slug="${base%.md}"
+    base="$(basename "$f")"; slug="${base%.md}"; slug="${slug%.feature}"
     if ! printf '%s' "$slug" | grep -qE '^[a-z0-9][a-z0-9-]{0,47}$'; then
-      echo "profile scenario '$base' skipped: the name is not <slug>.md ([a-z0-9-], at most 48)" >&2; continue
+      echo "profile scenario '$base' skipped: the name is not <slug>.md or <slug>.feature ([a-z0-9-], at most 48)" >&2; continue
     fi
+    case "$base" in (*.feature) if [ -e "$dir/scenarios/$slug.md" ] || [ -L "$dir/scenarios/$slug.md" ]; then
+      echo "profile scenario '$base' skipped: $slug.md has the same slug" >&2; continue; fi;; esac
     if [ -L "$f" ] || [ ! -f "$f" ]; then echo "profile scenario '$base' skipped: not a regular file" >&2; continue; fi
     size="$(wc -c < "$f" | tr -d ' ')"
     if [ "$size" -gt "$PROFILE_SCENARIO_MAX_BYTES" ]; then

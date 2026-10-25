@@ -33,6 +33,10 @@ A direct session's first request names it ([logging.md](logging.md) → **Sessio
   <id>"**, **"alias feature <id> <text>"**, **"rename feature <id> <text>"**, **"merge feature <a>
   into <b>"**, **"drop feature <id>"**, **"show features"**, **"propose features"** — the registry
   ([features.md](features.md) → Who puts a test into a feature).
+- **"export #N as Gherkin"** (or `S-<k>`, `P-<slug>`, "feature <id>") — `node "$HOME/scripts/lib/gherkin.mjs"
+  export <its criteria-*.md> --ref <id>` per origin (a feature: each member's origin, its
+  criteria only), shown here as one ```` ```gherkin ```` block; written to a file only on the
+  operator's word. The frozen criteria, never a verdict.
 - **"what changed since <build>?"** — the context of [change-awareness.md](change-awareness.md)
   for that build pair, without running tests; rewrite `work/COVERAGE.md` from the new map.
 - **"test this scenario: …"** — [scenarios.md](scenarios.md) → The pipeline, source

@@ -6,9 +6,10 @@
 #                                                 work/scenarios/S-<k>/ under the row lock (two
 #                                                 turns at once never share an id), logs
 #                                                 `scenario_new`, prints S-<k>
-#   scenarios.sh adopt <slug>                     the profile's scenarios/<slug>.md as P-<slug>:
-#                                                 creates work/scenarios/P-<slug>/, copies the
-#                                                 file byte for byte to source-<spec_hash>.md
+#   scenarios.sh adopt <slug>                     the profile's scenarios/<slug>.md (or .feature)
+#                                                 as P-<slug>: creates work/scenarios/P-<slug>/,
+#                                                 copies the file byte for byte to
+#                                                 source-<spec_hash>.md (.feature: .feature)
 #                                                 (kept when it exists), logs `scenario_adopt`,
 #                                                 prints {"id","slug","spec_hash","source",
 #                                                 "previous_spec_hash"} — the previous from the row
@@ -172,30 +173,35 @@ cmd_lint() {
 # freezes from it (docs/scenarios.md → Profile scenarios). Local only: the profile is the
 # skill already on disk.
 cmd_adopt() {
-  local slug="${1:-}" line h src dir prev row
+  local slug="${1:-}" line h src dir prev row ext
   printf '%s' "$slug" | grep -qE '^[a-z0-9][a-z0-9-]{0,47}$' || { echo "usage: $0 adopt <slug>" >&2; exit 2; }
   line="$(profile_scenarios 2>/dev/null | awk -F'\t' -v s="$slug" '$1 == s {print; exit}')"
-  [ -n "$line" ] || { echo "scenarios: the profile has no scenarios/$slug.md" >&2; exit 1; }
+  [ -n "$line" ] || { echo "scenarios: the profile has no scenarios/$slug.md or $slug.feature" >&2; exit 1; }
   h="$(printf '%s' "$line" | cut -f2)"; src="$(printf '%s' "$line" | cut -f3)"
+  ext=md; case "$src" in (*.feature) ext=feature;; esac
   dir="$WORK/scenarios/P-$slug"
   mkdir -p "$dir" || exit 1
-  [ -f "$dir/source-$h.md" ] || cp "$src" "$dir/source-$h.md" || { echo "scenarios: cannot copy $src" >&2; exit 1; }
+  [ -f "$dir/source-$h.$ext" ] || cp "$src" "$dir/source-$h.$ext" || { echo "scenarios: cannot copy $src" >&2; exit 1; }
   row="$(table_rows "$WORK/SCENARIOS.md" | awk -F'|' -v id="P-$slug" '{x=$2; gsub(/[ \t]/,"",x)} x==id {print; exit}')"
   prev="-"; [ -n "$row" ] && prev="$(cell "$row" 5)"
   logev info scenario_adopt "id=P-$slug spec=$h"
-  jq -nc --arg id "P-$slug" --arg s "$slug" --arg h "$h" --arg src "scenarios/P-$slug/source-$h.md" --arg p "$prev" \
+  jq -nc --arg id "P-$slug" --arg s "$slug" --arg h "$h" --arg src "scenarios/P-$slug/source-$h.$ext" --arg p "$prev" \
     '{id:$id, slug:$s, spec_hash:$h, source:$src, previous_spec_hash:(if $p == "-" then null else $p end)}'
 }
 
 # The adoption queue the regression pre-flight splits into adopt[] and deferred[], with each
 # file's `# ` title, so the dashboard names what waits (docs/catalog.md → Activity).
 cmd_queue() {
-  local per q titles
+  local per q titles t
   [ "$(cfg profile_scenarios)" = disabled ] && { echo null; return; }
   per="$(reg max_scenarios_per_run)"; case "$per" in (''|*[!0-9]*) per=3;; esac
   q="$(profile_scenario_queue "$WORK/SCENARIOS.md" 2>/dev/null)" || exit 1
   titles="$(profile_scenarios 2>/dev/null | while IFS=$'\t' read -r slug _ path; do
-      printf '%s\t%s\n' "$slug" "$(grep -m1 '^# ' "$path" | sed 's/^# *//; s/[[:space:]]*$//')"
+      case "$path" in
+        (*.feature) t="$(grep -m1 -E '^[[:space:]]*(Feature|Business Need|Ability|Požadavek)[[:space:]]*:' "$path" | sed 's/^[^:]*:[[:space:]]*//; s/[[:space:]]*$//')" ;;
+        (*) t="$(grep -m1 '^# ' "$path" | sed 's/^# *//; s/[[:space:]]*$//')" ;;
+      esac
+      printf '%s\t%s\n' "$slug" "$t"
     done | jq -R 'split("\t") | {key: .[0], value: ((.[1] // "")[:120])}' | jq -sc from_entries)"
   jq -c --argjson p "$per" --argjson t "$titles" \
     '{files, cap: $p, queue: [.queue[] | . + {title: ($t[.slug] | if . == "" then null else . end)}], retire}' <<<"$q"
