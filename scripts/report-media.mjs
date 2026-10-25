@@ -25,7 +25,7 @@
 //
 // The addresses are kept by content (sha256) in media-urls.json beside the report directory, so a
 // new revision of the same report uploads only what changed. An address recorded without its type
-// (before 3.31.1, uploaded untyped) counts as no address, so the next revision uploads it again.
+// (before 3.32.1, uploaded untyped) counts as no address, so the next revision uploads it again.
 // Reads only <report-dir> and that file; writes only publish.html and media-urls.json. Exit 2:
 // usage or a refused value.
 

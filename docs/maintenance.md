@@ -40,6 +40,7 @@ applied before the operator's word.
 | `fighting` | the third heal of one test inside a month | `rewrite` |
 | `obsolete` | predicted: a page, control, command, flag, endpoint or field the test needs is gone | `retire` when every block of the test is hit, else `rewrite` |
 | `moved`, `renamed` | predicted: a control a frozen block names is on another page, or has another label | `heal` with the repair ready in the diff; `review` for a likely rename (same place, unlike text) |
+| `predicted` | the Change radar ([radar.md](radar.md)): a pull request's text names the test, before a build carries it; basis `PR #<n>: <title>` | `review` |
 
 ```bash
 kind=basis; mktemp "/tmp/quality-inspector-$kind.XXXXXX"   # prints its own path, <f>: write the basis there with the file tool
@@ -62,7 +63,8 @@ and go on with the replay.
 It opens the `obsolete`, `moved` and `renamed` rows, basis the diff's line; which test and which
 proposal is `scripts/lib/staleness.mjs` (its header). Only recurring tests, and a control only where a
 frozen block names it: a navigation step outside the blocks is the replay cache's to relearn. A test
-with an open triage row (`needs-review`, `superseded`, `quarantined`, `fighting`) is skipped.
+with an open triage row (`needs-review`, `superseded`, `quarantined`, `fighting`) is skipped. Each of
+these rows, and each triage row, resolves the open `predicted` rows of its test (`replaced`).
 For each opened `heal`, prepare `M-<k>.diff` (the block's locator only, as a heal under
 [triage.md](triage.md) → Healing rules); when it would touch a matcher, an expected value or a Then
 sentence, open the row again with `--proposal review` (the row keeps its basis, whatever the basis file
@@ -94,7 +96,9 @@ regression in the next report.
 At the end of each regression run (step 7) and after each promote or demote:
 `node "$HOME/scripts/maintenance.mjs" sweep --unchanged <test> … --absorbed <test> …`, one
 `--unchanged` per test the night replayed plain `unchanged` (`#N` when all its criteria did, else
-`#N AC-k`), one `--absorbed` per test the triage found `relearned` or `healed`. It resolves the rows
+`#N AC-k`), one `--absorbed` per test the triage found `relearned` or `healed`, and `--built
+<to.utc>` (the candidate's build time, `changes.sh`'s `.to.utc`): a `predicted` row closes only when
+its pull request merged at or before it ([radar.md](radar.md)). It resolves the rows
 whose cause is gone — a drift no longer measured, a quarantine or a retirement the operator undid, a
 test no longer in `work/SUITE.md`, a `needs-review`, `fighting` or predicted test that passed
 unchanged, a predicted test the triage absorbed — and changes no test.

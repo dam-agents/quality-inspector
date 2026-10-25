@@ -20,7 +20,7 @@ assert "registry: unique ids, a doc each, switches are settings" \
 # ---------------------------------------------------------------- status
 st="$(bash "$M" status)"
 assert "status lists every module with its defaults" \
-  '(.modules | length) == 11 and (.modules[] | select(.id == "ui-sweep") | .state == "disabled" and .settings.ui_sweep_review_pages.value == "10")
+  '(.modules | length) == 12 and (.modules[] | select(.id == "ui-sweep") | .state == "disabled" and .settings.ui_sweep_review_pages.value == "10")
    and (.modules[] | select(.id == "edge-cases") | .state == "enabled") and (.modules[] | select(.id == "issues") | .state == "on")
    and .global.dashboard_interactive.value == "disabled" and .focus == [] and .schedules_as_of == null' "$st"
 echo "- ui_sweep: hourly" >> "$WORK_DIR/CONFIG.md"

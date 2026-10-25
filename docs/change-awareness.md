@@ -2,7 +2,8 @@
 
 A regression run never starts blind. Before any test replays, you know what landed since
 the build the suite last passed on, and what moved in the UI and the interfaces — from
-three black-box sources, never from code or pull requests ([black-box.md](black-box.md)).
+three black-box sources, never from code or a pull request's diff ([black-box.md](black-box.md)); the one
+pull request input is the Change radar's sanitized text, before the build ([radar.md](radar.md)).
 
 ## The three sources
 

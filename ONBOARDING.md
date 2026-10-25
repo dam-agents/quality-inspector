@@ -399,7 +399,7 @@ the criteria files and the replay cache are not reconstructable.
 Start from `mcp__platform-outbound__list_schedules`. Expected: `quality-inspector-issues-1h`,
 `quality-inspector-regression-nightly`, `quality-inspector-benchmark-monthly`,
 `quality-inspector-security-weekly`, `quality-inspector-scenarios-weekly`,
-`quality-inspector-audit-weekly`, `quality-inspector-modules-nightly`.
+`quality-inspector-audit-weekly`, `quality-inspector-modules-nightly`, `quality-inspector-radar-3h`.
 
 - Present → leave alone, including its enabled state; every schedule but the issues and the
   modules one arrives switched off on purpose — offer to turn them on, never flip them unasked

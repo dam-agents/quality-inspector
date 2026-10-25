@@ -91,7 +91,9 @@ boundary_targets() { # <target>
   h="$(_bb_host "$1")"; r="$(_bb_repo "$1")"; R="$(_bb_swapcase "$r")"
   printf '%s\n' "gh repos/$r/contents/" "gh repos/$R/contents/" "gh repos/$r/readme" \
     "gh repos/$r/git/trees/HEAD" "gh repos/$r/git/blobs/0000000000000000000000000000000000000000" \
-    "gh repos/$r/pulls?per_page=1" "gh repos/$r/commits?per_page=1" "gh repos/$r/compare/HEAD...HEAD" \
+    "gh repos/$r/pulls?per_page=1" "gh repos/$r/pulls/{pr}" "gh repos/$r/pulls/{pr}/files" "gh repos/$r/pulls/{pr}/commits" \
+    "gh repos/$r/pulls/{pr}/reviews" "gh repos/$r/pulls/{pr}/comments" "gh repos/$r/pulls/{pr}?x=/issues" \
+    "gh repos/$r/commits?per_page=1" "gh repos/$r/compare/HEAD...HEAD" \
     "gh repos/$r/branches?per_page=1" "gh repos/$r/git/refs/heads" "gh repos/$r/tarball/HEAD" "gh repos/$r/zipball/HEAD" \
     "gh repos/$r/releases?per_page=1" "gh repos/$r/actions/artifacts?per_page=1" \
     "gh repos/$r/issues/{issue}/timeline" "gh repos/$r/issues/{issue}/TIMELINE" \
@@ -103,6 +105,7 @@ boundary_targets() { # <target>
     "git https://$h/$r.git" "git https://$h/$r.wiki.git" "ssh ssh://git@$h/$r.git" \
     "url https://$h/$r/archive/HEAD.tar.gz" "url https://$h/$R/archive/HEAD.tar.gz" \
     "url https://$h/$r/blob/HEAD/README.md" "url https://$h/$r/raw/HEAD/README.md" \
+    "url https://$h/$r/pull/{pr}.diff" "url https://$h/$r/pull/{pr}.patch" "url https://$h/$r/pull/{pr}/files" \
     "url https://$h/login/oauth/authorize/%2e%2e/%2e%2e/%2e%2e/$r/blob/HEAD/README.md" \
     "url https://$h/$r.git/info/refs?service=git-upload-pack" \
     "url https://gitlab.com/" "url https://codeberg.org/"
@@ -161,15 +164,18 @@ _bb_gql() { printf 'query{repository(owner:"%s",name:"%s"){object(expression:"HE
 # fail whatever its status — the egress let the request through, and only the token's
 # permissions stood between it and the code. A probe that sent nothing proves nothing.
 boundary_probe() { # <target>
-  local h r ha=() issue kind target out code github label client
+  local h r ha=() issue pr kind target out code github label client
   h="$(_bb_host "$1")"; r="$(_bb_repo "$1")"
   [ "$h" = github.com ] || ha=(--hostname "$h")
   issue="$(_bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} "repos/$r/issues?state=all&per_page=1" --jq '.[0].number // empty' 2>/dev/null)"
   case "$issue" in (''|*[!0-9]*) issue=1;; esac
+  # {pr}: a pull request the issues listing names (the Change radar reads its text there, docs/radar.md).
+  pr="$(_bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} "repos/$r/issues?state=all&per_page=100" --jq '[.[] | select(has("pull_request")) | .number][0] // empty' 2>/dev/null)"
+  case "$pr" in (''|*[!0-9]*) pr=1;; esac
   # {id} is repository 1, public on github.com: the /repositories/* deny is host-wide, and
   # the target's own id needs GET /repos/<T>, which is not an issues endpoint.
   while read -r kind target; do
-    target="$(printf '%s' "$target" | sed "s/{issue}/$issue/g; s/{id}/1/g")"
+    target="$(printf '%s' "$target" | sed "s/{issue}/$issue/g; s/{pr}/$pr/g; s/{id}/1/g")"
     label="boundary:${target%%\?*}"
     case "$kind" in
       (gh)  out="$({ _bb_timeout 20 gh api ${ha[@]+"${ha[@]}"} -i "$target" </dev/null 2>/dev/null; echo "rc=$?"; } | LC_ALL=C sed -n '1,/^[[:space:]]*$/p;$p')" ;;

@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.31.1 — 2026-10-25
+## 3.32.1 — 2026-10-25
 
 **Upgrade:**
 Nothing to run — docs are re-read per run. Every artifact upload now sends its `Content-Type`
@@ -19,6 +19,20 @@ is until then; to repair one now, ask in the direct session to deliver its repor
 [docs/reporting.md](docs/reporting.md) → **Delivery** step 1 (the media are uploaded again, typed;
 `update_artifact` keeps the share link). The old
 mis-typed media artifacts are then unused; delete them in the app when you want to.
+
+## 3.32.0 — 2026-10-25
+
+**Upgrade:**
+1. Create the schedule `quality-inspector-radar-3h` from its `kit.yaml` entry, verbatim and switched
+   off ([ONBOARDING.md](ONBOARDING.md) Step 5); offer the operator to switch it on. Then
+   `bash "$HOME/scripts/verify-onboarding.sh" --schedules /tmp/quality-inspector-schedules.json` and
+   `bash "$HOME/scripts/modules.sh" schedules /tmp/quality-inspector-schedules.json`.
+2. Nothing else to run: `work/PRSCAN.md` is created on the first radar run. New: the Change radar
+   ([docs/radar.md](docs/radar.md)) reads the target's pull requests — title and description only,
+   sanitized by `github.sh prs` through the issues listing, never a diff; no new egress rule — and opens
+   maintenance proposals of kind `predicted` for the recurring tests a change names. The regression
+   run's `maintenance.mjs sweep` now takes `--built <to.utc>`. `github.sh comments`, `comment` and
+   `unlabel` now refuse a pull request.
 
 ## 3.31.0 — 2026-10-25
 

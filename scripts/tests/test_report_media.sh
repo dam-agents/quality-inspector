@@ -66,7 +66,7 @@ out="$(QI_REPORT_PAGE_MAX=$((size - 2000)) node "$M" publish "$D" private)"
 assert "a budget drops the baseline video first" '.inlined == 3 and (.left_out | index("media/42-ac-1-baseline-video-video.webm")) != null and (.left_out | index("media/42-ac-1-candidate-video-video.webm")) == null' "$out"
 case "$(cat "$D/publish.html")" in *'This private report has a size limit'*) ;; *) echo "  private page: no line for the dropped video"; FAILED=1;; esac
 
-# An address recorded without its type (uploaded untyped, before 3.31.1) is no address: upload again.
+# An address recorded without its type (uploaded untyped, before 3.32.1) is no address: upload again.
 cp "$SANDBOX/issues/42/media-urls.json" "$SANDBOX/urls.bak"
 jq 'with_entries(.value |= .url)' "$SANDBOX/urls.bak" > "$SANDBOX/issues/42/media-urls.json"
 assert "an untyped address is uploaded again" 'all(.media[]; .url == null)' "$(node "$M" list "$D")"

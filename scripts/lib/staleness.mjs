@@ -12,7 +12,7 @@
 //   `rewrite` per block (per test for a hit outside the blocks). `moved` / `renamed` per block, not
 //   where the block is obsolete: `heal`, or `review` for a likely rename (same place, unlike text).
 
-const RECURRING = new Set(['regression', 'promotable', 'quarantined']);
+export const RECURRING = new Set(['regression', 'promotable', 'quarantined']);
 const IDS = [
   [/^issue-(\d{1,7})\.e2e\.ts$/, (m) => `#${m[1]}`],
   [/^scenario-(\d{1,6})\.e2e\.ts$/, (m) => `S-${m[1]}`],
@@ -22,7 +22,7 @@ const IFACE = new Set(['command-removed', 'flag-removed', 'endpoint-removed', 'f
 const ANYWHERE = new Set(['page-removed', ...IFACE]);
 const GONE = new Set(['removed', ...ANYWHERE]);
 
-const idOf = (name) => { for (const [re, f] of IDS) { const m = re.exec(name); if (m) return f(m); } return null; };
+export const idOf = (name) => { for (const [re, f] of IDS) { const m = re.exec(name); if (m) return f(m); } return null; };
 const basisOf = (h) => `${IFACE.has(h.type) ? 'iface' : 'ui-map'}: ${String(h.change ?? '')}`;
 
 // predict(<impact.json object>, <Map "tests/<file>" -> tier>) -> [{test, kind, proposal, basis, file, line}]

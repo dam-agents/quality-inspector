@@ -125,7 +125,7 @@ re-run. Never retry within the same run.
      `report-media.mjs set <dir> <path> <shareUrl> <version>` from the response. Then
      `report-media.mjs publish <dir> public` (exit 1 names a file still without an address). The addresses are kept by content
      and type, so a revision uploads only new files — and again each file recorded without its
-     type (before 3.31.1). One ledger pair covers the media of one report.
+     type (before 3.32.1). One ledger pair covers the media of one report.
    - **A private report**: `report-media.mjs publish <dir> private` puts the screenshots and
      videos into the page as data, within the platform's page limit; `left_out` names what
      did not fit (the page says so) — tell it in the chat when it is a video.

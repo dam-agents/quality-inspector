@@ -627,7 +627,8 @@ const featItems = (id) => ALL.filter((i) => feats(i).includes(id));
 const MAINT_RE = /^M-\d{1,6}$/;
 const MAINT_KIND = { 'needs-review': 'The check failed or was judged, and the agent could not repair it by its rules.', superseded: 'A completed issue changed this behaviour on purpose. The agent retired the test.',
   drift: 'A person changed the checks of the test after its promotion. It does not run until you decide.', quarantined: 'The test was flaky on two builds. It does not run until you decide.', fighting: 'The agent repaired the test three times in one month. The test fights the product.',
-  obsolete: 'Before the test ran: the new build does not have a page, control or interface that the test uses.', moved: 'Before the test ran: a control that the test checks is now on a different page.', renamed: 'Before the test ran: a control that the test checks has a new label.' };
+  obsolete: 'Before the test ran: the new build does not have a page, control or interface that the test uses.', moved: 'Before the test ran: a control that the test checks is now on a different page.', renamed: 'Before the test ran: a control that the test checks has a new label.',
+  predicted: 'Before the build: the title or description of a pull request names a feature, page or control that the test uses. The agent did not read the change itself.' };
 const MAINT_PROP = { heal: 'apply the repair that the agent prepared', rewrite: 'write the test again for the current product', retire: 'stop the test (it stays in the catalog)', 're-promote': 'promote the test again, as it is now', review: 'look at it: the agent has no repair' };
 const maintenance = arr(D.maintenance).filter((m) => m && MAINT_RE.test(str(m.id)) && own(MAINT_KIND, str(m.kind))).map((m) => ({ ...m, id: str(m.id), test: str(m.test), kind: str(m.kind), proposal: str(m.proposal), basis: str(m.basis), build: str(m.build) }));
 const maintOf = (i) => { const r = i.origin.kind === 'scenario' ? i.ref : `#${num(i.ref)}`; return maintenance.filter((m) => m.test === r || m.test === `${r} ${str(i.id)}`); };
@@ -1318,7 +1319,7 @@ function nightsChart(list, w = 460, hgt = 150) {
 // the page's build (docs/catalog.md → Build and publish: also when a run claims its work).
 const A = D.activity && typeof D.activity === 'object' ? D.activity : {};
 const LOCKBY = { issues: 'Issues run', regression: 'Nightly regression', modules: 'Testing modules', security: 'Security checks', scenarios: 'Scenario run', discovery: 'Scenario discovery', benchmark: 'Benchmark', operator: 'Operator session' };
-const SCHED = { 'issues-1h': 'Issues run', 'regression-nightly': 'Nightly regression', 'modules-nightly': 'Testing modules', 'security-weekly': 'Security checks', 'scenarios-weekly': 'Scenario discovery', 'audit-weekly': 'Self-audit', 'benchmark-monthly': 'Benchmark' };
+const SCHED = { 'issues-1h': 'Issues run', 'regression-nightly': 'Nightly regression', 'modules-nightly': 'Testing modules', 'security-weekly': 'Security checks', 'scenarios-weekly': 'Scenario discovery', 'audit-weekly': 'Self-audit', 'benchmark-monthly': 'Benchmark', 'radar-3h': 'Change radar' };
 const lockBy = (o) => (/^S-\d+$/.test(str(o)) ? `Scenario ${str(o)}` : LOCKBY[str(o)] || str(o));
 const DOW = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
 function cronText(c) {
@@ -1326,6 +1327,7 @@ function cronText(c) {
   const [mi, hr, dom, mon, dw] = f; const two = (n) => String(n).padStart(2, '0');
   if (!/^\d+$/.test(mi)) return str(c);
   if (hr === '*' && dom === '*' && mon === '*' && dw === '*') return `every hour at :${two(mi)}`;
+  if (/^\*\/\d+$/.test(hr) && dom === '*' && mon === '*' && dw === '*') return `every ${hr.slice(2)} hours at :${two(mi)}`;
   if (!/^\d+$/.test(hr)) return str(c);
   const at = `${two(hr)}:${two(mi)}`;
   if (dom === '*' && mon === '*' && dw === '*') return `every day at ${at}`;
