@@ -10,7 +10,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { gherkinBlocks, parseAll } from './gherkin.mjs';
+import { gherkinBlocks, isPureGherkin, parseAll } from './gherkin.mjs';
 
 export const VAGUE = /\b(better|faster|improve[sd]?|properly|correctly|nicer|cleaner|robust|seamless|intuitive|as expected|should work|works? well|user-friendly|etc\.?)\b/gi;
 const DONE = /^#{1,6}[ \t]+[Dd]one[ \t]+[Ww]hen[ \t]*$/;
@@ -64,10 +64,12 @@ const sentences = (t) => t.replace(/<!--|-->/g, '\n').split(/\n|(?<=[.!?])\s+/)
   .map((x) => x.replace(/^[ \t]*(?:[-*+]|[0-9]+[.)]|>)[ \t]+/, '').trim()).filter(Boolean);
 export function injectionLint(spec) {
   const urls = (spec.match(/\bhttps?:\/\/\S+|\bwww\.\S+/gi) ?? []).length;
-  // A ```gherkin block is criteria in Gherkin (lib/gherkin.mjs), not code: its fence pair is not
-  // counted, and its sentences are scanned like every other sentence below.
+  // A pure-Gherkin block (lib/gherkin.mjs → isPureGherkin) is criteria, not code: its fence pair
+  // is not counted. A block with a doc string, free text, an error or no closing fence counts as
+  // code like any other. Every sentence is scanned below either way.
   const fenceLines = spec.split('\n').filter((l) => /^[ \t]*(```|~~~)/.test(l)).length;
-  const code_fences = Math.max(0, Math.ceil(fenceLines / 2) - gherkinBlocks(spec).length);
+  const pure = gherkinBlocks(spec).filter(isPureGherkin).length;
+  const code_fences = Math.max(0, Math.ceil(fenceLines / 2) - pure);
   const html_comments = (spec.match(/<!--/g) ?? []).length;
   const imperatives = [];
   for (const s of sentences(spec)) {

@@ -12,9 +12,11 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 **Upgrade:**
 Nothing to run — docs are re-read per run, and `scripts/lib/gherkin.mjs` needs no install. New:
 1. **Gherkin in** ([docs/acceptance-criteria.md](docs/acceptance-criteria.md) → Gherkin): an issue's
-   ```` ```gherkin ```` block is criteria. The worklist's `spec.gherkin` names it, and its fences no
-   longer count as code for the injection lint — an issue that was an injection suspect only for such
-   a block is not one any more. Earlier frozen criteria stay as they are (the `ac_hash` is unchanged).
+   ```` ```gherkin ```` block is criteria. The worklist's `spec.gherkin` names it. The injection lint
+   does not count a pure-Gherkin block as code (closed, no error, no doc string, comment or free text),
+   so an issue that was an injection suspect only for such a block is not one any more; any other
+   block still counts. Earlier frozen criteria stay as they are (the `ac_hash` is unchanged).
+   A Gherkin error is a new spec-feedback trigger.
 2. A profile may keep a scenario as `scenarios/<slug>.feature` ([docs/profile-contract.md](docs/profile-contract.md)
    → `scenarios/`); the nightly run adopts it like a `.md`, and its verbatim copy is `source-<spec_hash>.feature`.
    Profile maintainers: `check-profile.mjs` checks it with the core's parser.

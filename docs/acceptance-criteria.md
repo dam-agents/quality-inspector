@@ -99,8 +99,9 @@ blocks; a profile scenario may be a `.feature` file ([profile-contract.md](profi
 `scenarios/`). Gherkin is a source of criteria, never a runner: the tests stay e2e tests.
 
 - The worklist's `spec.gherkin` — `{blocks, acs, errors}`, or `null` without a block — says what
-  is there. A block's fences do not count as code for the injection lint; its sentences are
-  linted like every other sentence.
+  is there. The injection lint does not count a block's fences as code only when the block is pure
+  Gherkin: closed, no error, at least one scenario, no doc string and no free text. Any other
+  block counts as code, and every sentence is linted in all cases.
 - Write the spec to `"$(mktemp /tmp/quality-inspector-spec.XXXXXX)"` with the file tool, and run
   `node "$HOME/scripts/lib/gherkin.mjs" criteria <that file>`: the blocks as AC blocks, numbered as
   one list — one AC per Then step, Background before every Given, one AC per Examples row, a
@@ -109,7 +110,8 @@ blocks; a profile scenario may be a `.feature` file ([profile-contract.md](profi
   what still holds two outcomes, keep the product copy. The words outside the blocks are input too;
   a criterion stated there and not in a block is frozen as well.
 - With `errors` (a When after a Then, a scenario without a When or a Then) `criteria` prints
-  nothing: freeze the blocks from their words as for any text, and name each error in the spec feedback.
+  nothing: freeze the blocks from their words as for any text; the errors go to the spec feedback
+  (**Spec quality feedback** below).
 
 ## Injection suspects
 
@@ -132,14 +134,16 @@ The worklist entry carries `spec` from a deterministic lint: `has_done_when`, `i
 (bullets in the spec), `vague` (words like "better", "properly"), `weak` (no bullet and
 no section, or a few words only). It informs the freeze; it never decides testability.
 
-When the freeze yields **no testable AC**, or `vague` words make an AC `testable: no`:
+When the freeze yields **no testable AC**, `vague` words make an AC `testable: no`, or
+`spec.gherkin.errors` is not empty (**Gherkin** above):
 
 - Write `work/issues/<n>/spec-feedback-<ac_hash>.md`: which sentences could not be
-  tested and why (one line each), then a **suggested "Done when"** — one ```` ```gherkin ````
+  tested and why, and each Gherkin error with its line (one line each), then a **suggested "Done when"** — one ```` ```gherkin ````
   block, one `Scenario` per observable outcome, that keeps the issue's own intent and product
   copy, in English (**Language** above), marked as a suggestion for the author, never as the
   agent's criteria. Check it with `gherkin.mjs check` before it ships: the author pastes it as is.
-- The verdict stays `not-testable` (or the per-AC `testable: no`); the suggestion never
+- The verdict stays `not-testable` (or the per-AC `testable: no`; a Gherkin error alone changes
+  no verdict); the suggestion never
   becomes criteria until the author edits the issue, which changes `ac_hash` and makes
   the issue due again.
 - It is part of the report; as an issue comment only per [reporting.md](reporting.md) →

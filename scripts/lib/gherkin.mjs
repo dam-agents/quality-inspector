@@ -53,7 +53,7 @@ export const DIALECTS = {
 
 const FENCE_OPEN = /^[ \t]*(`{3,}|~{3,})[ \t]*(gherkin|feature|cucumber)\b.*$/i;
 
-// The ```gherkin blocks of a Markdown text, in order: [{text, line}] (line = 1-based, the fence).
+// The ```gherkin blocks of a Markdown text, in order: [{text, line, closed}] (line = 1-based, the fence).
 export function gherkinBlocks(markdown) {
   const lines = String(markdown ?? '').replace(/\r/g, '').split('\n');
   const out = [];
@@ -65,7 +65,7 @@ export function gherkinBlocks(markdown) {
     const body = [];
     let j = i + 1;
     for (; j < lines.length && !close.test(lines[j]); j++) body.push(lines[j]);
-    out.push({ text: body.join('\n'), line: i + 1 });
+    out.push({ text: body.join('\n'), line: i + 1, closed: j < lines.length });
     i = j;
   }
   return out;
@@ -108,6 +108,7 @@ export function parseFeature(text, offset = 0) {
   let examples = null;
   let doc = null; // an open doc string: {delim, lines, step}
   let inRule = false;
+  let docstrings = 0; let freeText = 0; // comments and descriptions; a pure-Gherkin block has neither (isPureGherkin)
 
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
@@ -117,7 +118,8 @@ export function parseFeature(text, offset = 0) {
       else doc.lines.push(t);
       continue;
     }
-    if (!t || t.startsWith('#')) continue;
+    if (!t) continue;
+    if (t.startsWith('#')) { if (!/^#\s*language\s*:/.test(t)) freeText++; continue; }
     if (t.startsWith('@')) { pendingTags.push(...t.split(/\s+/).filter((x) => x.startsWith('@')).map((x) => x.slice(1).toLowerCase())); continue; }
     let m;
     if ((m = RE.feature.exec(t))) {
@@ -148,7 +150,7 @@ export function parseFeature(text, offset = 0) {
     if (t === '"""' || t === '```' || t === '~~~') {
       const last = cur?.steps.at(-1);
       if (!last) { err(i, 'a doc string that belongs to no step'); continue; }
-      doc = { delim: t, lines: [], step: last }; continue;
+      doc = { delim: t, lines: [], step: last }; docstrings++; continue;
     }
     let kind = null; let words = ''; let kw = '';
     for (const k of ['given', 'when', 'then', 'and']) if ((m = RE[k].exec(t))) { kind = k; kw = m[1]; words = m[2].trim(); break; }
@@ -167,6 +169,7 @@ export function parseFeature(text, offset = 0) {
       continue;
     }
     // Free text: a description right under a Feature, Rule, Scenario or Examples line, before any step.
+    freeText++;
     if (cur && cur.steps.length && !examples) err(i, `not a step: "${t.slice(0, 80)}"`);
   }
   if (doc) err(lines.length - 1, 'a doc string that is never closed');
@@ -230,7 +233,17 @@ export function parseFeature(text, offset = 0) {
     }
   }
   if (roles.size > 1) errors.push(`more than one second role (${[...roles].join(', ')}) — one per file`);
-  return { language, title, requires: roles.size === 1 ? [...roles][0] : null, acs, errors, warnings, scenarios: scenarios.length };
+  return { language, title, requires: roles.size === 1 ? [...roles][0] : null, acs, errors, warnings, scenarios: scenarios.length,
+    docstrings, freeText };
+}
+
+// A block the injection lint need not count as code: closed, no error, at least one AC, and
+// nothing that is not a keyword line, a step, a tag or a table — no doc string, no comment (but
+// `# language:`) and no free description, where a payload could hide (scan-issues.mjs → injectionLint).
+export function isPureGherkin(block) {
+  if (!block.closed) return false;
+  const p = parseFeature(block.text);
+  return !p.errors.length && p.acs.length > 0 && p.docstrings === 0 && p.freeText === 0;
 }
 
 // Several texts (blocks of one Markdown file, or one .feature) as one list of ACs.
