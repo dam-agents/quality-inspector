@@ -176,8 +176,9 @@ retried delivery — is reused). Use the requester's mention (`<@U…>`), never 
 credentials or internal state.
 
 **Language** ([acceptance-criteria.md](acceptance-criteria.md) → **Language**): the reply is
-in the requester's language — in their turn, the language they write in; from any other run,
-the language of their words in `request.md`. `comment.md`'s own sentences and the added line
+in the requester's language on every surface, the chat UI of `thread: -` included — in their
+turn, the language they write in; from any other run, the language of their words in
+`request.md`. `comment.md`'s own sentences and the added line
 are translated; the criteria, the verdicts, the AC ids, the link, `save S-<k>` and product copy
 stay as produced.
 
