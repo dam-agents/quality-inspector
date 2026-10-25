@@ -17,7 +17,7 @@ Scope: the tests of `work/SUITE.md` tiers `regression`, `promotable`, `quarantin
 ```
 
 Written only through `node "$HOME/scripts/maintenance.mjs" …` (its header lists the commands):
-one **open** row per (test, kind) — opening it again updates its build, basis and proposal. The
+one **open** row per (test, kind) — opening it again updates its build, basis and proposal (a predicted kind keeps its basis, below). The
 `basis` is a short evidence pointer (a UI-map change, `#<n>` and its quoted sentence, a build),
 at most 160 characters — the catalog shows it, so never a triage explanation, a request's words
 or a credential. It may quote an issue, so it never goes on a command line: per call, `kind=basis; mktemp
@@ -53,8 +53,12 @@ Step 3 of the regression run ([regression.md](regression.md)), after `impact.mjs
 ([change-awareness.md](change-awareness.md)), before the replay:
 
 ```bash
-node "$HOME/scripts/maintenance.mjs" predict --build <candidate> --impact /tmp/quality-inspector-impact.json
+node "$HOME/scripts/maintenance.mjs" predict --build <candidate> --impact <ctx>/impact.json
 ```
+
+`<ctx>/impact.json` is the file that step wrote, never another run's. Exit 1 (locked, no
+`work/SUITE.md`) or 2 (no impact file, or not its JSON): log it in the run's notes, open nothing,
+and go on with the replay.
 
 It opens the `obsolete`, `moved` and `renamed` rows, basis the diff's line; which test and which
 proposal is `scripts/lib/staleness.mjs` (its header). Only recurring tests, and a control only where a
@@ -63,7 +67,10 @@ with an open triage row (`needs-review`, `superseded`, `quarantined`, `fighting`
 these rows, and each triage row, resolves the open `predicted` rows of its test (`replaced`).
 For each opened `heal`, prepare `M-<k>.diff` (the block's locator only, as a heal under
 [triage.md](triage.md) → Healing rules); when it would touch a matcher, an expected value or a Then
-sentence, open the row again with `--proposal review`. The night then decides each one: the
+sentence, open the row again with `--proposal review` (the row keeps its basis, whatever the basis file
+says: `predict` knows the change by it). A later `predict` of the same change refreshes
+the row's build and keeps its proposal; another change of the same test and kind resolves the row
+(`replaced`) and opens a new one, with its own diff. The night then decides each one: the
 triage's own row of the test resolves it (`replaced` in its output), and the sweep closes the
 prediction that did not come true.
 

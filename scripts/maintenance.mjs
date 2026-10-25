@@ -5,9 +5,10 @@
 // "rewrite M-3", "retire M-3", "keep M-3"); the agent opens them, and closes those whose cause is gone.
 //
 //   node maintenance.mjs open <test> --kind <kind> --build <build> --proposal <proposal> --basis-file <path>
-//     -> {"id", "opened": bool, "replaced": [], "covered_by"?}   one open row per (test, kind): a second open updates its build and basis
+//     -> {"id", "opened": bool, "replaced": [], "covered_by"?}   one open row per (test, kind): a second open updates its build,
+//     basis and proposal (a predicted kind's basis stays: it is what predict matches the change on)
 //   node maintenance.mjs predict --build <build> --impact <impact.json> [--dry-run]
-//     -> {"opened": [], "updated": [], "skipped": [], "replaced": []}   (--dry-run: {"candidates": [{test, kind, proposal, basis, file, line}]})
+//     -> {"opened": [], "updated": [], "replaced": [], "skipped": []}   (--dry-run: {"candidates": [{test, kind, proposal, basis, file, line}]})
 //   node maintenance.mjs close <M-k> <state>   -> {"id", "state"}
 //   node maintenance.mjs list [--open]         -> {"proposals": [{id, test, kind, build, basis, proposal, state, opened_utc, closed_utc}]}
 //   node maintenance.mjs sweep [--unchanged <test>]… [--absorbed <test>]… [--built <iso>]   -> {"resolved": ["M-2", …], "notes": []}
@@ -24,7 +25,10 @@
 // request's words or a credential; the catalog shows it.
 // `predict` opens the predicted kinds from impact.mjs output (lib/staleness.mjs says which), basis
 // the diff's line, and skips a test that already has an open triage row (needs-review, superseded,
-// quarantined, fighting) of it. Opening such a triage row resolves the open predicted rows of the
+// quarantined, fighting) of it. The same change again refreshes the open row's build, never its
+// proposal (the agent may have opened it again as `review`); another change of the same test and kind
+// resolves the open row (`replaced`) and opens a new one, so a diff prepared for the old change never
+// rides on the new basis. Opening such a triage row resolves the open predicted rows of the
 // same test (`replaced`): the night's triage confirmed or upgraded the prediction. The same holds one
 // step down: a triage row, or an obsolete, moved or renamed row (`open` or `predict`), resolves the open
 // `predicted` rows of the test, and `open --kind predicted` opens nothing for a test that has one of
@@ -126,7 +130,8 @@ switch (cmd) {
       Object.assign(p, { state: 'resolved', closed_utc: now() }); replaced.push(p.id);
     }
     const same = list.find((p) => p.state === 'open' && p.test === test && p.kind === kind);
-    if (same) { Object.assign(same, { build, basis, proposal }); save(list); out({ id: same.id, opened: false, replaced }); break; }
+    // A predicted row keeps the diff's line that predict wrote: predict knows the change by it.
+    if (same) { Object.assign(same, { build, proposal }, PREDICTED.includes(kind) ? {} : { basis }); save(list); out({ id: same.id, opened: false, replaced }); break; }
     const id = nextId(list);
     list.push({ id, test, kind, build, basis, proposal, state: 'open', opened_utc: now(), closed_utc: '-' });
     save(list);
@@ -146,7 +151,7 @@ switch (cmd) {
       .map((c) => ({ ...c, basis: sanitize(c.basis) }));
     if (args.includes('--dry-run')) { out({ candidates }); break; }
     const list = load();
-    const opened = []; const updated = []; const skipped = []; const replaced = [];
+    const opened = []; const updated = []; const replaced = []; const skipped = [];
     for (const c of candidates) {
       const open = list.filter((p) => p.state === 'open');
       if (open.some((p) => TRIAGE.includes(p.kind) && related(p.test, c.test))) { skipped.push(c.test); continue; }
@@ -154,13 +159,16 @@ switch (cmd) {
         Object.assign(p, { state: 'resolved', closed_utc: now() }); replaced.push(p.id);
       }
       const same = open.find((p) => p.test === c.test && p.kind === c.kind);
-      if (same) { Object.assign(same, { build, basis: c.basis, proposal: c.proposal }); updated.push(same.id); continue; }
+      // The same change: the proposal stays, as the agent may have opened it again as `review`.
+      if (same?.basis === c.basis) { Object.assign(same, { build }); updated.push(same.id); continue; }
+      // Another change: its own row, so M-<k>.diff is prepared for it (docs/maintenance.md).
+      if (same) { Object.assign(same, { state: 'resolved', closed_utc: now() }); replaced.push(same.id); }
       const id = nextId(list);
       list.push({ id, test: c.test, kind: c.kind, build, basis: c.basis, proposal: c.proposal, state: 'open', opened_utc: now(), closed_utc: '-' });
       opened.push(id);
     }
     if (opened.length || updated.length || replaced.length) save(list);
-    out({ opened, updated, skipped, replaced });
+    out({ opened, updated, replaced, skipped });
     break;
   }
   case 'close': {

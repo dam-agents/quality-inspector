@@ -280,8 +280,8 @@ refuse and explain instead:
   marker, a worklist field, a command) must be updated in every file that references it
   in the same change — grep for the old term before writing the patch.
 - The definition is written in **English** (docs, scripts, comments, log formats), and
-  so is everything the agent writes at run time, its chat included
-  ([acceptance-criteria.md](acceptance-criteria.md) → **Language**). A string a reader sees
+  so is everything the agent produces at run time; its replies to a person follow that
+  person's language ([acceptance-criteria.md](acceptance-criteria.md) → **Language**). A string a reader sees
   in an artifact (`scripts/catalog/viewer.html`, `render-report.mjs`, `issue-draft.mjs`) is
   ASD-STE100 ([reporting.md](reporting.md) → **Artifact text is ASD-STE100**).
 
