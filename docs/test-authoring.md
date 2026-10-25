@@ -182,3 +182,7 @@ the image's Playwright, `suite.sh init` downloads the matching Chromium into the
 ([black-box.md](black-box.md) → **Egress rules** lists the hosts). From `e2e` 0.19 the
 trace is a markdown page per test (`results/<test>/trace.md`) instead of a Playwright zip;
 the report renders either. `e2e mcp` 0.20 is headless by default and has no `--headless` flag.
+The setup test's sign-in is a secret fill, and the saved session carries it to every test that
+restores it. Below `e2e` 0.21.3 that turned off all pixels there: `app.screenshot()` failed with
+`POLICY_DENIED` and the video had no frames. From 0.21.3 only the model gets no pixels (an
+`agent.assert` with `vision` judges the tree); screenshots, evidence and video stay on.

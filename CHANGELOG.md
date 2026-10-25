@@ -7,6 +7,23 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.27.0 — 2026-10-25
+
+**Upgrade:**
+1. In `work/CONFIG.md`, a key still at the old default moves to the new one:
+   `e2e_version: 0.20.0` → `0.21.3`, `e2e_web_version: 0.14.0` → `0.15.3`. A value the
+   operator chose differently stays. Under 0.20 every test that restores the setup session failed
+   at its `app.screenshot()` with `POLICY_DENIED` and recorded a video without frames
+   ([docs/test-authoring.md](docs/test-authoring.md) → **Upgrading `e2e`**).
+2. `bash "$HOME/scripts/suite.sh" init` — installs the new pins and re-checks that
+   `playwright-core` (now 1.64.1) matches the image's browser.
+3. Expect the next run of every test to record its steps again (the replay cache misses
+   once across an `e2e` minor bump); no action.
+4. Run the smoke test as in `ONBOARDING.md` Step 6 and `verify-onboarding.sh --live`.
+5. A verdict of the last runs that is `blocked` or `failed` only by that `POLICY_DENIED` is no
+   product result: tell the operator the issues, and test each again on their "test #N"
+   ([docs/on-demand.md](docs/on-demand.md)).
+
 ## 3.26.1 — 2026-10-24
 
 **Upgrade:**
