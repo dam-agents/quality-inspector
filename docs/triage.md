@@ -29,7 +29,8 @@ the step list and screenshots in `report.json`.
 ## Order of work per failing or judged test
 
 1. **Confirm by repetition**: `suite.sh run confirm-<candidate> --strict --tag issue-<n>
-   --tag ac-<k> --tag-mode all --repeat-each 3 --no-cache`, and read `by_test[].stability`.
+   --tag ac-<k> --tag-mode all --repeat-each 3 --no-cache` (an intent test: `--tag in-<k>`),
+   and read `by_test[].stability`.
    `flaky` ends the triage of this criterion as `flaky`; only `stable-fail` can become a
    `regression` or `superseded`, and only `stable-pass` (non-strict for a judged check)
    can become `relearned` or `healed`. A stale recording is not a finding either — the
@@ -47,7 +48,7 @@ the step list and screenshots in `report.json`.
    any criterion is headed for `regression`: `env.sh lock regression` (refreshes it),
    `env.sh reset`, `env.sh up <previous_candidate>`, then per such criterion
    `suite.sh run prev-<n>-<k> --strict --tag issue-<n> --tag ac-<k> --tag-mode all
-   --repeat-each 3 --no-cache`:
+   --repeat-each 3 --no-cache` (an intent test: `--tag in-<k>`):
    - `stable-pass` → a confirmed `regression`; its verdicts entry gets
      `regressed_between: {from: <previous_candidate>, to: <candidate>}`.
    - `stable-fail` → not new: `needs-review`, explanation *"fails on <previous> as well —

@@ -86,9 +86,19 @@ cat > "$SANDBOX/issue-3.e2e.ts" <<'T'
 const res = await fetch(`${app.baseUrl}/api/agents/${id}`);
 expect(res.status).toBe(200);
 T
-i="$(node "$SCRIPTS/impact.mjs" none --iface "$SANDBOX/iface-diff.json" "$SANDBOX/issue-1.e2e.ts" "$SANDBOX/issue-2.e2e.ts" "$SANDBOX/issue-3.e2e.ts")"
+cat > "$SANDBOX/issue-4.e2e.ts" <<'T'
+await execa('widgets', ['agents', 'list']);
+// AC-1 begin
+expect(1).toBe(1);
+// AC-1 end
+// IN-1 begin
+expect((await execa('widgets', ['agents', 'list', '--limit', '1'])).exitCode).toBe(0);
+// IN-1 end
+T
+i="$(node "$SCRIPTS/impact.mjs" none --iface "$SANDBOX/iface-diff.json" "$SANDBOX/issue-1.e2e.ts" "$SANDBOX/issue-2.e2e.ts" "$SANDBOX/issue-3.e2e.ts" "$SANDBOX/issue-4.e2e.ts")"
 assert "command, flag and endpoint hit test 1" '.impacted[0].hits | map(.change) | (map(select(test("command \"widgets agents rm\""))) | length == 1) and (map(select(test("flag --limit"))) | length == 1) and (map(select(test("endpoint DELETE"))) | length == 1)' "$i"
 assert "removed flag inside the AC block" '.impacted[0].hits | map(select(.change | test("--limit"))) | .[0].inAcBlock == true' "$i"
+assert "removed flag inside an intent test's IN block" '.impacted | map(select(.test | endswith("issue-4.e2e.ts"))) | .[0].hits | map(select(.change | test("--limit"))) | .[0].inAcBlock == true' "$i"
 assert "removed field hits the test that calls its endpoint" '.impacted[1].test | endswith("issue-2.e2e.ts")' "$i"
 assert "res.status on another endpoint and GET of a surviving path are clear" '.clear == ["'"$SANDBOX"'/issue-3.e2e.ts"]' "$i"
 

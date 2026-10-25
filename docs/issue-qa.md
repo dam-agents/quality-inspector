@@ -90,7 +90,14 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    `promotable` when the file qualifies, else `exploratory`, `assert_hash` from
    `bash "$HOME/scripts/check-asserts.sh" --hash <file>` ([regression.md](regression.md) →
    Tiers); `auto_promote: verified` writes a qualifying file as `regression` instead. A
-   retest of a promoted file never demotes it and never rewrites its hash. Name every
+   retest of a promoted file never demotes it and never rewrites its hash alone. When the
+   retest changed the file's AC or IN blocks — IN blocks added to a file promoted without
+   them included — the file drifts and the nightly run skips it: open its `drift` proposal
+   now (`maintenance.mjs open "#<n>" --kind drift --build <candidate> --proposal re-promote
+   --basis-file <f>`, [maintenance.md](maintenance.md)) and name it in the run's chat summary; the operator's
+   "accept M-<k>" re-promotes it with the new hash. Only with `auto_promote: verified` and a
+   qualifying file does the run re-promote it itself (new `assert_hash`, then
+   `maintenance.mjs sweep`). Name every
    `promotable` (or auto-promoted) file in the run's chat summary. Put each of its criteria
    into a feature ([features.md](features.md) → Who puts a test into a feature).
 10. **Release.** `env.sh unlock issues` (it refuses while a background install or suite run

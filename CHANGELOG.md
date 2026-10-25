@@ -15,7 +15,10 @@ From the next issue run on, an issue that states its purpose gets up to two `IN-
 `intent-<ac_hash>.md` with the issue's goal sentence quoted, checked by the judge, run red-green with
 the criteria, and reported as `intent_verdict` beside the issue verdict, which they never change.
 Issues tested before have no intent file: "test #N" gives them one. `check-asserts.sh --hash` now
-covers IN blocks too; a promoted file without IN blocks keeps its `assert_hash`, so no drift.
+covers IN blocks too; a promoted file without IN blocks keeps its `assert_hash`, so no drift. A "test #N"
+that adds IN blocks to a promoted file changes its hash: the run opens a `drift` proposal at once, and the
+nightly run skips the file until the operator accepts it (with `auto_promote: verified` the run re-promotes
+a qualifying file itself).
 
 ## 3.28.0 — 2026-10-25
 
