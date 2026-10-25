@@ -21,15 +21,17 @@
 // (`--tag issue-42 --tag scenario-7 …`): a member that names one criterion runs its whole file, and
 // `record` keeps the member criteria only. `record` reads work/suite/.e2e/runs/<label>/report.json and
 // writes work/reruns/feature-<id>/<label>.json — a run by hand: never a verdict, no tier change.
-// Words — a query, a name, an alias — come only from a file (<path>, written with a file tool, never
-// by the shell): they are often a person's or an issue's text, and on a command line a quote in them
-// would end the argument. Every write of work/FEATURES.md holds its mutex (lib/mutex.mjs) from load to
+// Words — a query, a name, an alias — come only from a file: <path> is the call's own
+// `mktemp -t quality-inspector-words.XXXXXX`, written with a file tool, never by the shell, and
+// removed once read (lib/words.mjs). They are often a person's or an issue's text; on a command line
+// a quote in them would end the argument. Every write of work/FEATURES.md holds its mutex (lib/mutex.mjs) from load to
 // save. Exit 2: usage, an unknown feature, a malformed member or text; the file is then left as it was.
 // Exit 1: the registry stays locked by another writer.
 
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { withMutex, writeAtomic } from './lib/mutex.mjs';
+import { takeWords } from './lib/words.mjs';
 
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 const runsRoot = process.env.QI_RUNS_ROOT ?? join(work, 'suite', '.e2e', 'runs');
@@ -105,17 +107,18 @@ const idArg = (s) => { if (!ID_RE.test(s ?? '')) die(`"${s ?? ''}" is not a feat
 const memberAt = (k) => memberArg(/^AC-\d{1,3}$/.test(args[k + 1] ?? '') ? `${args[k]} ${args[k + 1]}` : args[k]);
 const memberArg = (s) => { const m = clean(s); if (!MEMBER_RE.test(m)) die(`"${m}" is not a member (#N, #N AC-k, S-k, S-k AC-j, P-<slug>, P-<slug> AC-j)`); return m; };
 const textArg = (s) => { const t = clean(s); if (!TEXT_RE.test(t)) die('a name or an alias is 1–80 printable characters without "|"'); return t; };
-// The words after <flag>, read from the file it names.
-const fileText = (flag) => {
+// The words after <flag>: the call's own mktemp file, taken (read and removed, lib/words.mjs) first
+// thing in main(), before any other check can refuse the call and leave it behind.
+const taken = {};
+const takeAll = () => { for (const flag of ['--file', '--name-file']) {
   const i = args.indexOf(flag);
-  if (i < 0 || !args[i + 1]) return null;
-  const t = read(args[i + 1]);
-  if (t == null) die(`${flag} ${args[i + 1]}: cannot read the file`);
-  return t;
-};
+  if (i >= 0 && args[i + 1]) taken[flag] = takeWords(args[i + 1], 'words');
+} };
+const fileText = (flag) => taken[flag] ?? null;
 const find = (features, id) => features.find((f) => f.id === id) ?? die(`no feature "${id}" in work/FEATURES.md`);
 
 function main() {
+try { takeAll(); } catch (e) { die(e.message); }
 switch (cmd) {
   case 'list': out({ features: load().map(resolved) }); break;
   case 'resolve': {

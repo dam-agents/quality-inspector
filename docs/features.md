@@ -21,9 +21,10 @@ free grouping; features are the agent's, kept by the rules below.
   their JSON), never by hand: the script keeps the format the catalog and the audit read
   (`features.mjs check`, the audit's `features` check).
 - **Words never go on a command line.** A query, a name or an alias is often a person's or an
-  issue's text; a quote in it would end a shell argument. Write the words with the file tool to
-  `/tmp/quality-inspector-words.txt` and pass `--file` (`--name-file` for `add`); delete the file
-  after the call.
+  issue's text; a quote in it would end a shell argument. Per call: `mktemp -t
+  quality-inspector-words.XXXXXX` prints a path of its own (two sessions never share one);
+  write the words to that path with the file tool, and pass it as `--file` (`--name-file` for
+  `add`). The script refuses any other name, and removes the file once read.
 - A member whose test is not recurring stays listed and is skipped with its reason when the
   feature runs (`skipped[]`); `check` warns about it.
 
@@ -53,8 +54,8 @@ free grouping; features are the agent's, kept by the rules below.
 | a person in `slack_channel` | "test feature <words>" | Slack ([slack.md](slack.md)), within `slack_tests_per_day` |
 | the operator, on the dashboard | its "Run this feature" button: "run feature <id>" | its message box ([catalog.md](catalog.md)) |
 
-**Resolve** — `node "$HOME/scripts/features.mjs" resolve --file /tmp/quality-inspector-words.txt`, the
-words in that file as above. Case, accents and punctuation
+**Resolve** — `node "$HOME/scripts/features.mjs" resolve --file <path>`, the words in a file of
+its own as above. Case, accents and punctuation
 do not count; a whole name or alias is an `exact` match. Then:
 
 - `exact` → run it.

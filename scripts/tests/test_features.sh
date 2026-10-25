@@ -9,7 +9,7 @@ seed_work
 W="$WORK_DIR"
 F() { node "$SCRIPTS/features.mjs" "$@"; }
 # Words reach the script only through a file (docs/features.md): T <words> writes it and prints its path.
-T() { printf '%s' "$*" > "$SANDBOX/words.txt"; echo "$SANDBOX/words.txt"; }
+T() { local f; f="$(mktemp "$SANDBOX/quality-inspector-words.XXXXXX")"; printf '%s' "$*" > "$f"; echo "$f"; }
 R() { F resolve --file "$(T "$@")"; }
 printf '| tests/issue-42.e2e.ts | 42 | regression | a | 2026-10-03T08:12:40Z |\n| tests/issue-51.e2e.ts | 51 | promotable | b | - |\n| tests/scenario-7.e2e.ts | S-7 | exploratory | c | - |\n| tests/profile-chat.e2e.ts | P-chat | quarantined | d | 2026-10-05T03:00:00Z |\n' >> "$W/SUITE.md"
 
@@ -28,9 +28,20 @@ F add 'Bad Id' '#42' 2>/dev/null; assert_eq "a bad id: exit 2" 2 "$?"
 F add model-switch '#42 EX-1' 2>/dev/null; assert_eq "an exploration is no member: exit 2" 2 "$?"
 F alias model-switch --file "$(T "a | b")" 2>/dev/null; assert_eq "a pipe in an alias: exit 2" 2 "$?"
 F alias model-switch "it's" 2>/dev/null; assert_eq "words on the command line are refused: exit 2" 2 "$?"
-F alias model-switch --file "$SANDBOX/none.txt" 2>/dev/null; assert_eq "an unreadable words file: exit 2" 2 "$?"
-F remove nope '#42' 2>/dev/null; assert_eq "an unknown feature: exit 2" 2 "$?"
+F alias model-switch --file "$SANDBOX/quality-inspector-words.none00" 2>/dev/null; assert_eq "an unreadable words file: exit 2" 2 "$?"
+F add 'Bad Id' '#42' --name-file "$(T Name)" 2>/dev/null; assert_eq "a bad id with a words file: exit 2" 2 "$?"
 assert_eq "refusals leave the file as it was" "$before" "$(cat "$W/FEATURES.md")"
+ls "$SANDBOX" | grep -qE '^quality-inspector-words\.[A-Za-z0-9]{6}$' && { echo "  a refused call left its words file"; FAILED=1; }
+# One file per call: a fixed, shared name is refused and left alone; the call's own file is removed once read.
+printf 'Shared' > "$SANDBOX/quality-inspector-words.txt"
+F alias model-switch --file "$SANDBOX/quality-inspector-words.txt" 2>/dev/null; assert_eq "a fixed words path: exit 2" 2 "$?"
+[ -e "$SANDBOX/quality-inspector-words.txt" ] || { echo "  a refused words file was removed"; FAILED=1; }
+rm -f "$SANDBOX/quality-inspector-words.txt"
+wf="$(T Model picker)"; F alias model-switch --file "$wf" >/dev/null
+[ -e "$wf" ] && { echo "  a words file stayed after its call"; FAILED=1; }
+before="$(cat "$W/FEATURES.md")"
+F remove nope '#42' 2>/dev/null; assert_eq "an unknown feature: exit 2" 2 "$?"
+assert_eq "an unknown feature leaves the file as it was" "$before" "$(cat "$W/FEATURES.md")"
 [ -e "$W/FEATURES.md.lock" ] && { echo "  a refused write left its lock"; FAILED=1; }
 ls "$W" | grep -q '\.tmp$' && { echo "  a write left a temp file"; FAILED=1; }
 # The mutex: a live lock holds a writer off (exit 1, nothing written); one over a minute old is a dead writer's.
@@ -41,6 +52,17 @@ touch -t 202601010000 "$W/FEATURES.md.lock"
 assert "a lock over a minute old is taken over" '.added' "$(F add model-switch '#77')"
 F remove model-switch '#77' >/dev/null
 [ -e "$W/FEATURES.md.lock" ] && { echo "  a write left its lock"; FAILED=1; }
+# Six writers at once over a stale lock: each one's member is kept, no lock or set-aside file stays.
+touch "$W/FEATURES.md.lock"; touch -t 202601010000 "$W/FEATURES.md.lock"
+for k in 1 2 3 4 5 6; do F add race "#9$k" >/dev/null & done; wait
+assert "concurrent writers over a stale lock lose no update" '.features[] | select(.id == "race") | (.members | sort) == ["#91","#92","#93","#94","#95","#96"]' "$(F list)"
+ls -a "$W" | grep -qE '\.(lock|aside|tmp)$|\.aside' && { echo "  a lock, a set-aside or a temp file stayed: $(ls -a "$W")"; FAILED=1; }
+F drop race >/dev/null
+# A writer releases only its own lock: one whose token changed under it stays.
+out="$(node --input-type=module -e 'import { withMutex } from "'"$SCRIPTS"'/lib/mutex.mjs"; import { writeFileSync, readFileSync } from "node:fs";
+const l = process.argv[1]; withMutex(l, () => writeFileSync(l, "other 1\n")); process.stdout.write(readFileSync(l, "utf8"));' "$W/own.lock" 2>&1)"
+assert_eq "a lock that is no longer the writer's own stays" "other 1" "$out"
+rm -f "$W/own.lock"
 
 out="$(R zmena modelu)"
 assert "resolve: a whole alias, accents and case ignored, is exact" '.match == "exact" and (.features | length == 1) and .features[0].id == "model-switch"' "$out"

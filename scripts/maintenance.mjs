@@ -13,8 +13,9 @@
 //
 // <test>: `#N`, `#N AC-k`, `S-k[ AC-j]`, `P-<slug>[ AC-j]` (one argument or two). <kind>: needs-review |
 // superseded | drift | quarantined | fighting. <proposal>: heal | rewrite | retire | re-promote | review.
-// <state>: accepted | rewritten | retired | kept | resolved. The basis — read from <path>, a file written
-// with a file tool, never by the shell, since it may quote an issue — is a short evidence pointer (a
+// <state>: accepted | rewritten | retired | kept | resolved. The basis — read from <path>, the call's own
+// `mktemp -t quality-inspector-basis.XXXXXX` written with a file tool, never by the shell, since it
+// may quote an issue; removed once read (lib/words.mjs) — is a short evidence pointer (a
 // UI-map change, an issue number and its quoted sentence, a build): never a triage explanation, a
 // request's words or a credential; the catalog shows it.
 // `sweep` resolves the open rows whose cause is gone: a drift whose file no longer drifts
@@ -29,6 +30,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withMutex, writeAtomic } from './lib/mutex.mjs';
+import { takeWords } from './lib/words.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
@@ -75,11 +77,12 @@ const testAt = (k) => {
 function main() {
 switch (cmd) {
   case 'open': {
+    // The basis file first: any later refusal must not leave the call's own file behind.
+    const path = flag('--basis-file');
+    let raw = null;
+    if (path) try { raw = takeWords(path, 'basis'); } catch (e) { die(e.message); }
     const test = testAt(0);
     const kind = flag('--kind'); const build = flag('--build'); const proposal = flag('--proposal');
-    const path = flag('--basis-file');
-    const raw = path ? read(path) : null;
-    if (path && raw == null) die(`--basis-file ${path}: cannot read the file`);
     const basis = String(raw ?? '').replace(/[|\r\n\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
     if (!KINDS.includes(kind)) die(`--kind is one of ${KINDS.join(', ')}`);
     if (!PROPOSALS.includes(proposal)) die(`--proposal is one of ${PROPOSALS.join(', ')}`);

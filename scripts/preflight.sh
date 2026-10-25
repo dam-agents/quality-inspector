@@ -398,9 +398,12 @@ mode_audit() {
   if [ -z "$mx" ]; then check maintenance warn "not measured (maintenance.mjs check failed)"
   elif [ "$(jq -r .ok <<<"$mx")" != true ]; then check maintenance fail "work/MAINTENANCE.md: $(jq -r '.problems | join("; ")' <<<"$mx")"
   else
-    old="$(node "$SCRIPT_DIR/maintenance.mjs" list --open 2>/dev/null | jq -r --arg w "$(epoch2iso $((NOW_EPOCH - 14*86400)))" \
-      '[.proposals[] | select(.opened_utc < $w) | .id] | join(", ")' 2>/dev/null)"
-    [ -z "$old" ] && check maintenance ok "no proposal open over 14 days" || check maintenance warn "open over 14 days, waiting for the operator: $old"
+    # A listing that fails is "not measured", never an empty queue.
+    if ! old="$(node "$SCRIPT_DIR/maintenance.mjs" list --open 2>/dev/null | jq -er --arg w "$(epoch2iso $((NOW_EPOCH - 14*86400)))" \
+      '[.proposals[] | select(.opened_utc < $w) | .id] | join(", ")' 2>/dev/null)"; then
+      check maintenance warn "open proposals not measured (maintenance.mjs list failed)"
+    elif [ -z "$old" ]; then check maintenance ok "no proposal open over 14 days"
+    else check maintenance warn "open over 14 days, waiting for the operator: $old"; fi
   fi
 
   # coverage of the newest UI map by regression-tier tests — informational, never a fail
