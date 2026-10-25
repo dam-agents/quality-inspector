@@ -21,8 +21,8 @@ free grouping; features are the agent's, kept by the rules below.
   their JSON), never by hand: the script keeps the format the catalog and the audit read
   (`features.mjs check`, the audit's `features` check).
 - **Words never go on a command line.** A query, a name or an alias is often a person's or an
-  issue's text; a quote in it would end a shell argument. Per call: `mktemp
-  /tmp/quality-inspector-<kind>.XXXXXX`, `<kind>` = `words`, prints a path of its own under `/tmp`
+  issue's text; a quote in it would end a shell argument. Per call: `kind=words; mktemp
+  "/tmp/quality-inspector-$kind.XXXXXX"` prints a path of its own under `/tmp`
   (two sessions never share one; never `-t`, which follows `$TMPDIR`, where the policy hook lets
   no file be written); write the words to that path with the file tool, and pass it as `--file`
   (`--name-file` for `add`). The script refuses any other name or folder, and removes the file once

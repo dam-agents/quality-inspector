@@ -19,8 +19,8 @@ Written only through `node "$HOME/scripts/maintenance.mjs" …` (its header list
 one **open** row per (test, kind) — opening it again updates its build, basis and proposal. The
 `basis` is a short evidence pointer (a UI-map change, `#<n>` and its quoted sentence, a build),
 at most 160 characters — the catalog shows it, so never a triage explanation, a request's words
-or a credential. It may quote an issue, so it never goes on a command line: per call, `mktemp
-/tmp/quality-inspector-<kind>.XXXXXX`, `<kind>` = `basis`, prints a path of its own under `/tmp`
+or a credential. It may quote an issue, so it never goes on a command line: per call, `kind=basis; mktemp
+"/tmp/quality-inspector-$kind.XXXXXX"` prints a path of its own under `/tmp`
 (never `-t`: it follows `$TMPDIR`, where the policy hook lets no file be written); write the basis
 there with the file tool and pass it as `--basis-file`. The script refuses any other name or
 folder, and removes the file once read — also when it then refuses the call. The details go to `work/maintenance/M-<k>.md`: what changed, the before and
@@ -39,7 +39,7 @@ applied before the operator's word.
 | `fighting` | the third heal of one test inside a month | `rewrite` |
 
 ```bash
-mktemp /tmp/quality-inspector-<kind>.XXXXXX   # <kind> = basis; prints its own path, <f>: write the basis there with the file tool
+kind=basis; mktemp "/tmp/quality-inspector-$kind.XXXXXX"   # prints its own path, <f>: write the basis there with the file tool
 node "$HOME/scripts/maintenance.mjs" open "#42 AC-1" --kind needs-review --build <candidate> --proposal heal --basis-file <f>
 ```
 
