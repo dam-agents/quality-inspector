@@ -305,8 +305,8 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - max_wallclock_min_per_issue: 150
 - max_model_steps_per_issue: 400
 - min_free_disk_gi: 10
-- e2e_version: 0.20.0
-- e2e_web_version: 0.14.0
+- e2e_version: 0.21.3
+- e2e_web_version: 0.15.3
 - e2e_model: claude-sonnet-5
 - audit_report: enabled
 - log_level: info
