@@ -44,17 +44,21 @@ Right after `env.sh up <candidate>` on a freshly reset platform (so the map hold
 data), before the suite runs:
 
 ```bash
+mktemp -d /tmp/quality-inspector-context.XXXXXX   # prints this run's own folder, <ctx>
 QI_BUILD=<candidate> node "$HOME/scripts/ui-inventory.mjs" "$HOME/work/inventory/<candidate>"
-node "$HOME/scripts/ui-diff.mjs" work/inventory/<previous>/inventory.json work/inventory/<candidate>/inventory.json > /tmp/quality-inspector-diff.json
+node "$HOME/scripts/ui-diff.mjs" work/inventory/<previous>/inventory.json work/inventory/<candidate>/inventory.json > <ctx>/diff.json
 node "$HOME/scripts/iface-snapshot.mjs" <candidate> "$HOME/work/inventory/<candidate>"
-node "$HOME/scripts/iface-diff.mjs" work/inventory/<previous>/iface.json work/inventory/<candidate>/iface.json > /tmp/quality-inspector-iface.json
-bash "$HOME/scripts/changes.sh" <previous> <candidate> > /tmp/quality-inspector-changes.json
-node "$HOME/scripts/impact.mjs" /tmp/quality-inspector-diff.json --iface /tmp/quality-inspector-iface.json work/suite/tests/{issue,scenario}-*.e2e.ts
+node "$HOME/scripts/iface-diff.mjs" work/inventory/<previous>/iface.json work/inventory/<candidate>/iface.json > <ctx>/iface.json
+bash "$HOME/scripts/changes.sh" <previous> <candidate> > <ctx>/changes.json
+node "$HOME/scripts/impact.mjs" <ctx>/diff.json --iface <ctx>/iface.json work/suite/tests/{issue,scenario,profile}-*.e2e.ts > <ctx>/impact.json
 ```
 
-(Source `work/env/credentials.env` for the map's sign-in.) `impact.mjs` names, per test,
+(Source `work/env/credentials.env` for the map's sign-in.) `<ctx>` is one run's own: a nightly run
+and an operator's "what changed since <build>?" never share a file (never `-t`: it follows
+`$TMPDIR`). `rm -rf <ctx>` when the run ends. `impact.mjs` names, per test,
 every changed page or control it opens or mentions — and every removed command, flag,
-endpoint or response field it names — and whether the hit is inside an AC or IN block (frozen, [intent.md](intent.md)). With no
+endpoint or response field it names — and whether the hit is inside an AC or IN block (frozen, [intent.md](intent.md));
+`maintenance.mjs predict` turns it into proposals ([maintenance.md](maintenance.md) → **Predicted from the change context**). With no
 map of `<previous>` (first run, lost volume), the UI diff is skipped (pass `none` in its
 place) and the run says so — the triage then leans on the issues alone.
 
