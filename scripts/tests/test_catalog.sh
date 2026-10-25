@@ -23,6 +23,8 @@ printf '# Sign-in\n\n## AC-1 — Owner signs in\nThen the dashboard shows\n' > "
 printf '# Upload a <b>file</b>\n\n## AC-1 — Upload\nThen the file is listed\n' > "$QI_PROFILE_DIR/scenarios/upload.md"
 printf '2026-10-09T03:00:00Z ERROR: environment candidate=c2\n2026-10-10T03:00:00Z ran candidate=c2 unchanged=0 relearned=0 healed=1 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n2026-10-12T02:10:00Z due candidate=c3 tests=1\n2026-10-12T03:00:00Z ran candidate=c3 unchanged=1 relearned=0 healed=0 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n' > "$W/REGRESSION.log"
 mkdir -p "$W/issues/42" "$W/scenarios/S-7" "$W/scenarios/P-sign-in" "$W/regression/c2" "$W/suite/tests" "$W/security/c1"
+jq -n '{mode:"regression",verdict:"environment",candidate:"c2",utc:"2026-10-09T03:00:00Z",stage:"up",exit:4,cause:"The image pull was refused.",
+  evidence:["pull refused","x"],repair:"Reset and up again: the same refusal.",next:"The operator adds the registry to the egress."}' > "$W/regression/c2/environment.json"
 cat > "$W/issues/42/criteria-abc.md" <<'C'
 # #42 — Rename <b>projects</b>
 source: done-when        frozen_utc: 2026-10-02T13:40:02Z        ac_hash: abc
@@ -209,6 +211,8 @@ assert "profile scenario item" '.items[] | select(.key == "profile-sign-in/AC-1"
 assert "nights and builds" '(.nights | length) == 2 and .nights[0].counts.healed == 1 and ([.builds[].id] | index("c3")) != null' "$data"
 assert "runs: newest first; nights, an environment failure, issue and scenario runs" '[.runs[] | .type + ":" + (.ref // "-") + ":" + .build + ":" + .verdict]
   == ["regression:-:c3:unchanged","regression:-:c2:healed","regression:-:c2:environment","scenario:S-7:c1:passed","issue:#42:c1:partial"]' "$data"
+assert "an environment failure: its step, cause, repair, next step and evidence" '.runs[2].failure == {"stage":"up","exit":4,"cause":"The image pull was refused.","repair":"Reset and up again: the same refusal.","next":"The operator adds the registry to the egress.","evidence":["pull refused","x"]}
+  and .runs[1].failure == null' "$data"
 assert "a run's length: a night from its due line, an issue run from issue_done, a scenario from its file with its cost" '[.runs[] | [.secs, .cost_usd]]
   == [[3000,null],[null,null],[null,null],[900,1.23],[2220,null]]' "$data"
 assert "a night: its entries, change context and signal counts, its report" '.runs[1] | .entries == [{"key":"issue-42/AC-1","value":"healed"}] and .previous == "c1"
