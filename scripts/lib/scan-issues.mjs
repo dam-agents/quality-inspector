@@ -5,7 +5,7 @@
 // minutes. Byte-for-byte the same spec text and hash as lib/state.sh (test_scan_parity.sh).
 //
 //   scan-issues.mjs <listing.json> <QA.md> <events-dir>   -> {"due":[…],"reports":[…],"logs":[…],"deferred":n}
-// Env: QI_RETEST_LABEL, QI_MAX_ISSUES, QI_LOCK_TTL_MIN, QI_NOW_EPOCH, QI_ENV_LOCK (lib/lock.sh state).
+// Env: QI_OPERATOR_FILE (work/OPERATOR.md), QI_RETEST_LABEL, QI_MAX_ISSUES, QI_LOCK_TTL_MIN, QI_NOW_EPOCH, QI_ENV_LOCK (lib/lock.sh state).
 
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -27,6 +27,12 @@ export function specText(title, body) {
   }
   const s = sec.join('\n');
   return s.replace(/\s/g, '') ? `${title}\n${s}\n` : `${title}\n${String(body ?? '').replace(/\r/g, '')}\n`;
+}
+// The operator's answers to an issue's open questions (work/OPERATOR.md, "<date> — #<n> Q-<k>: …")
+// join the hashed text, so an answer is a new ac_hash and a new freeze. Same as state.sh operator_answers.
+export function operatorAnswers(text, n) {
+  const re = new RegExp(`#${n} Q-[0-9]+:`);
+  return String(text ?? '').replace(/\r/g, '').split('\n').filter((l) => re.test(l)).join('\n');
 }
 export const hasDoneWhen = (body) => String(body ?? '').split('\n').some((l) => /^#{1,6}[ \t]+done[ \t]+when[ \t]*$/i.test(l.replace(/\r$/, '')));
 // Same as state.sh text_hash: whitespace runs to one space, trimmed, sha256, 12 hex.
@@ -102,6 +108,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const orphaned = ['free', 'dead'].includes(process.env.QI_ENV_LOCK ?? '');
   const now = Number(process.env.QI_NOW_EPOCH ?? Math.floor(Date.now() / 1000));
   const listing = JSON.parse(readFileSync(listingPath, 'utf8'));
+  const operator = process.env.QI_OPERATOR_FILE && existsSync(process.env.QI_OPERATOR_FILE)
+    ? readFileSync(process.env.QI_OPERATOR_FILE, 'utf8') : '';
 
   const rows = new Map();
   if (existsSync(qaPath)) {
@@ -127,7 +135,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const due = []; const reports = []; const logs = []; let deferred = 0;
   for (const it of listing.filter((x) => !x.pull_request).sort((a, b) => a.number - b.number)) {
     const n = it.number; const title = it.title ?? ''; const body = it.body ?? '';
-    const hash = textHash(specText(title, body));
+    const answers = operatorAnswers(operator, n);
+    const hash = textHash(answers ? `${specText(title, body)}${answers}\n` : specText(title, body));
     const isRetest = (it.labels ?? []).some((l) => l.name === retest);
     const row = rows.get(String(n));
     let kind = ''; let takeover = false;

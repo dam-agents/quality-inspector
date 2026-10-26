@@ -168,7 +168,15 @@ case "$cmd" in
       all="$all$c"$'\n'
       [ "$(jq length <<<"$c")" -lt 100 ] && break
     done
-    printf '%s' "$all" | jq -cs 'add // [] | [.[] | {id, user: .user.login, author_association, created_at, updated_at, body}]' ;;
+    # Each comment carries the injection lint of its text (lib/scan-issues.mjs → injectionLint);
+    # argv[1] is not the module's path, or the module would run its own CLI.
+    printf '%s' "$all" | jq -cs 'add // [] | [.[] | {id, user: .user.login, author_association, created_at, updated_at, body}]' \
+      | node --input-type=module -e "
+        import { readFileSync } from 'node:fs';
+        import { pathToFileURL } from 'node:url';
+        const { injectionLint } = await import(pathToFileURL(process.argv[2]).href);
+        const cs = JSON.parse(readFileSync(0, 'utf8'));
+        console.log(JSON.stringify(cs.map((c) => ({ ...c, ...injectionLint(c.body ?? '') }))));" - "$SCRIPT_DIR/lib/scan-issues.mjs" ;;
   (comment)
     need_target; num "${1:-}"; [ -f "${2:-}" ] || usage
     enabled issue_comments || enabled spec_feedback || refuse "issue_comments and spec_feedback are disabled"

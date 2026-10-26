@@ -135,7 +135,7 @@ mode_issues() {
 
   local scan due reports deferred tmp="/tmp/quality-inspector-listing.$$"
   printf '%s' "$listing" > "$tmp"
-  scan="$(QI_RETEST_LABEL="$RETEST_LABEL" QI_MAX_ISSUES="$MAX_ISSUES" QI_LOCK_TTL_MIN="$LOCK_TTL_MIN" QI_NOW_EPOCH="$NOW_EPOCH" QI_ENV_LOCK="$ENV_LOCK" \
+  scan="$(QI_OPERATOR_FILE="$WORK/OPERATOR.md" QI_RETEST_LABEL="$RETEST_LABEL" QI_MAX_ISSUES="$MAX_ISSUES" QI_LOCK_TTL_MIN="$LOCK_TTL_MIN" QI_NOW_EPOCH="$NOW_EPOCH" QI_ENV_LOCK="$ENV_LOCK" \
           node "$SCRIPT_DIR/lib/scan-issues.mjs" "$tmp" "$WORK/QA.md" "$WORK/logs" 2>/dev/null)"
   rm -f "$tmp"
   [ -n "$scan" ] || fail_out "the issue scan failed (node scripts/lib/scan-issues.mjs)"

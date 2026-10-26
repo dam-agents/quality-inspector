@@ -24,6 +24,8 @@ the next run. New:
    `[object Object]`); a dashboard side panel opens at half the width of the screen; a click on a
    report screenshot shows it at its full size over the page; every AC in a report links its
    source issue.
+5. The hash of an issue's criteria now covers the operator's `#<n> Q-<k>:` answers in
+   `work/OPERATOR.md`, and `github.sh comments` lints each comment for injection.
 
 ## 3.34.1 — 2026-10-26
 
