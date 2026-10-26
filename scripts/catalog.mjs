@@ -92,7 +92,7 @@ const drifted = (file) => drift.some((d) => String(d.test ?? d.file ?? d).endsWi
 // --------------------------------------------------------------------- criteria
 // `# #42 — <title>` / `# S-7 — <title>`, an issue's `summary:` line (docs/acceptance-criteria.md → Output),
 // then `## AC-1 — <name>` (or `## EX-1 (from AC-1, …)`) sections with Given/When/Then (Expected) lines,
-// surface and testable.
+// the source's `quote:`, surface and testable. A `## Q-<k>` section is no criterion.
 function parseCriteria(text) {
   if (!text) return null;
   const title = (text.match(/^# (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*) — (.*?)(?:\s{2,}\S+:.*)?$/m) ?? [])[1] ?? null;
@@ -106,6 +106,7 @@ function parseCriteria(text) {
     const testable = line('testable');
     acs.push({
       id, name: (head.match(/ — (.*)$/) ?? [])[1] ?? null, goal: line('Goal'),
+      quote: line('quote'),
       given: line('Given'), when: line('When'), then: line('Then') ?? line('Expected'),
       surface: line('surface'), testable: testable == null ? true : /^yes/.test(testable),
     });
@@ -402,7 +403,7 @@ for (const okey of [...origins].sort((a, b) => a.localeCompare(b, 'en', { numeri
       key, file: t ? file : null, origin, id,
       kind: ex ? 'exploration' : id.startsWith('IN') ? 'intent' : 'criterion',
       name: c.name ?? t?.title?.replace(/^.*?(?:AC|IN|EX)-\d+:\s*/, '') ?? null, goal: c.goal ?? null,
-      given: c.given ?? null, when: c.when ?? null, then: c.then ?? null,
+      quote: isIssue ? c.quote ?? null : null, given: c.given ?? null, when: c.when ?? null, then: c.then ?? null,
       surface: c.surface ?? null, testable: c.testable ?? true,
       tier: !t ? 'untracked' : ex ? 'exploratory' : (row?.tier ?? 'untracked'), // explorations are never promoted
       promoted_utc: t && !ex ? row?.promoted ?? null : null, drift: t && !ex ? drifted(file) : false,

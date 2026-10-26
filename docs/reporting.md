@@ -65,17 +65,20 @@ Your judgment, the renderer's only input besides the runs:
  "candidate": "0.0.0-main.5203", "baseline": "0.2.19",
  "candidate_run": "issue-42-candidate", "baseline_run": "issue-42-baseline",
  "verdict": "partial", "started_utc": "2026-10-12T18:41:07Z", "generated_utc": "2026-10-12T19:20:00Z", "display_name": "<display_name>",
- "acs": [{"id": "AC-1", "name": "…", "given": "…", "when": "…", "then": "…", "surface": "ui",
+ "acs": [{"id": "AC-1", "name": "…", "quote": "…", "given": "…", "when": "…", "then": "…", "surface": "ui",
           "testable": true, "verdict": "verified", "baseline_blocked_reason": null,
           "cause": null, "note": "optional, one sentence"}],
+ "open_questions": [{"id": "Q-1", "ac": "AC-2", "question": "…",
+                     "variants": [{"source": "the issue", "quote": "…"}, {"source": "a comment of 2026-10-20", "quote": "…"}]}],
  "notes": ["assertion edits after the first run, blocked reasons, anything a reader needs"]}
 ```
 
 A scenario's file (`"mode": "scenario"`) adds `request_file`: the path under `work/` of its
 words as received (`scenarios/S-7/request.md`, `scenarios/P-<slug>/source-<spec_hash>.md` or `.feature`),
 which the renderer shows verbatim above the criteria ([scenarios.md](scenarios.md) → State).
-`given` / `when` / `then` are copied from the criteria file verbatim; `baseline_run` is
-`null` when no baseline ran. `started_utc` is the run's start (the `issue_start`'s time; the
+`given`, `when`, `then`, `quote` and `open_questions` are copied from the criteria file verbatim
+([acceptance-criteria.md](acceptance-criteria.md) → **Contradictions**); they never change a
+verdict. `baseline_run` is `null` when no baseline ran. `started_utc` is the run's start (the `issue_start`'s time; the
 dashboard shows the run's length from it); `cost_usd` only when the platform states the run's
 cost — never an estimate, else leave it out. Intent tests (`intents`, `intent_verdict`, [intent.md](intent.md) → Verdict), explorations and `noticed` add their own keys, never touching
 `acs` or `verdict` ([explorations.md](explorations.md) → **Reporting**, **Noticed in passing**). Never: credentials,
@@ -98,7 +101,10 @@ product text and the frozen criteria stay verbatim.
   the frozen criterion, then candidate and baseline side by side, each with the **video
   of the whole test**, the screenshots captioned by their step (the `AC-<k>` still first),
   the step list with durations and replay-cache use, the assertion error, and the trace
-  (Playwright `trace.zip`, or the trace page from `e2e` 0.19 on).
+  (Playwright `trace.zip`, or the trace page from `e2e` 0.19 on). Each AC names its source issue,
+  linked to it when `target_repo` is set, and quotes the source verbatim; an open question
+  (`open_questions`) has its own section above the criteria. A click on a screenshot shows it at
+  its full size over the page, never the browser's own viewer, which downloads a media file.
 - `media/` — the copied videos, screenshots and traces it links to by relative paths, which
   only `report-media.mjs` turns into the published file `publish.html` (**Delivery** step 1).
 - `comment.md` — the short issue comment, with the literal `EVIDENCE_LINK` to replace.
