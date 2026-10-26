@@ -7,6 +7,12 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.33.1 — 2026-10-26
+
+**Upgrade:**
+Nothing to run — docs are re-read per run. A refused served type now blocks the report's media
+(`media-urls.json` key `blocked`) until the operator says so; then `report-media.mjs unblock <dir>`.
+
 ## 3.33.0 — 2026-10-25
 
 **Upgrade:**
