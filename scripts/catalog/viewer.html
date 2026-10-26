@@ -77,6 +77,14 @@ main{padding:6px 0 56px}
 .badge{display:inline-flex;align-items:center;gap:3px;border-radius:999px;padding:0 8px;font-size:12px;font-weight:600;white-space:nowrap;line-height:1.7}
 .badge.ok::before{content:"✓"}.badge.warn::before{content:"!"}.badge.bad::before{content:"✕"}.badge.muted::before{content:"–"}.badge.none::before{content:"○"}
 .ok{color:var(--ok);background:var(--okbg)}.warn{color:var(--warn);background:var(--warnbg)}.bad{color:var(--bad);background:var(--badbg)}.muted{color:var(--muted);background:var(--mutedbg)}.none{color:var(--dim);background:transparent;border:1px dashed var(--line)}
+.badge.cause::before{content:none}.cause{border:1px solid currentColor;background:var(--surface)}
+.causes{margin:4px 0 8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.c-product{color:var(--bad)}.c-test{color:var(--warn)}.c-environment{color:var(--link)}.c-unknown{color:var(--dim)}
+#zoom{position:fixed;inset:0;z-index:80;background:rgba(10,10,20,.88);overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:48px 16px 16px}
+#zoom img{max-width:100%;height:auto;background:#fff;border-radius:6px;cursor:zoom-in;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+#zoom.real img{max-width:none;cursor:zoom-out}
+#zoom .close{position:fixed;top:10px;right:16px}
+.zoomable{cursor:zoom-in}
 .tier{display:inline-flex;gap:3px;align-items:center;border:1px solid var(--line);border-radius:999px;padding:0 8px;font-size:12px;white-space:nowrap;line-height:1.6;background:var(--surface)}
 .tier.regression{border-color:var(--link);color:var(--link)}
 .tier.regression::before{content:"🌙"}.tier.promotable::before{content:"⭐"}.tier.exploratory::before{content:"🆕"}.tier.quarantined::before{content:"🚧"}.tier.retired::before{content:"💤"}.tier.untracked::before{content:"❔"}
@@ -227,6 +235,7 @@ td.nw{white-space:nowrap}
 .card .then{color:var(--dim);font-size:12.5px}
 .card .open-hint{position:absolute;right:10px;bottom:8px;font-size:12px;color:var(--link);opacity:0;transition:opacity .15s;display:inline-flex;gap:3px;align-items:center}
 .card:hover .open-hint,.card:focus-visible .open-hint{opacity:1}
+.about{margin:6px 0;padding:6px 10px;border-left:3px solid var(--link);background:var(--card);border-radius:4px}
 .card img,.gal img{width:100%;display:block;border-radius:8px;border:1px solid var(--line);background:#fff}
 .ph{aspect-ratio:16/10;border-radius:8px;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:12px;background:var(--card)}
 .gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
@@ -476,6 +485,22 @@ try {
 if (typeof D !== 'object' || Array.isArray(D)) D = {};
 const images = D.images && typeof D.images === 'object' ? D.images : {};
 const img = (id) => { const v = id == null ? null : images[id]; return typeof v === 'string' && v.startsWith('data:image/') ? v : null; };
+// The sharp copy where the page has room for it, else the small one (docs/catalog.md → Images).
+const sharp = (x, k) => img(x && x[`${k}_sharp`]) || img(x && x[k]);
+// A screenshot at its own size, over the page: a click on the image changes between "fit" and
+// "real size"; Esc, Close or a click outside it closes it.
+function zoom(src, alt) {
+  if (!src) return;
+  const close = () => { box.remove(); document.removeEventListener('keydown', esc, true); if (opener && opener.focus) opener.focus(); };
+  const esc = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  const opener = document.activeElement;
+  const pic = h('img', { src, alt: str(alt), title: 'Click to change between "fit to the window" and "real size".', onclick: (e) => { e.stopPropagation(); box.classList.toggle('real'); } });
+  const box = h('div', { id: 'zoom', role: 'dialog', 'aria-modal': 'true', 'aria-label': str(alt) || 'Screenshot', tabindex: -1, onclick: (e) => { if (e.target === box) close(); } },
+    h('button', { class: 'btn close', type: 'button', 'data-kind': 'local', onclick: close }, ico('close'), 'Close'), pic);
+  document.addEventListener('keydown', esc, true);
+  document.body.append(box); box.focus();
+}
+const zoomBtn = (src, alt) => (src ? h('button', { class: 'btn', type: 'button', 'data-kind': 'local', title: 'Shows the screenshot at its full size over the page. Esc closes it.', onclick: (e) => { e.stopPropagation(); zoom(src, alt); } }, '🔍 Full size') : null);
 
 const VAL = {
   verified: ['Verified', 'ok'], passed: ['Passed', 'ok'], unchanged: ['Unchanged', 'ok'], relearned: ['UI changed · steps re-learned', 'ok'], 'observed-ok': ['Observed OK', 'ok'],
@@ -546,6 +571,29 @@ const SEV = { bad: 0, warn: 1, muted: 2, ok: 3, none: 4 };
 const TIERS = ['regression', 'promotable', 'exploratory', 'quarantined', 'retired', 'untracked'];
 const tierRank = (t) => { const i = TIERS.indexOf(t); return i < 0 ? 9 : i; };
 const ATTN = new Set(['regression', 'failed', 'needs-review', 'flaky']);
+// Why a result is not a pass, at first sight: the feature, the test, or the environment that the
+// product runs in (its installation and deployment in the agent's machine). [name, icon, meaning].
+const CAUSE = {
+  product: ['Product defect', '💥', 'The function under test does not work as the criterion says. The test and the environment worked. This is possibly a bug in the new function.'],
+  test: ['Test defect', '🔧', 'The test itself is wrong: a step, a control name, a wait or a check. The product possibly works. The agent repairs the test, or a person must examine it.'],
+  environment: ['Environment problem', '🏗️', 'The product did not work as a whole in the agent\u2019s machine: its installation, the configuration of its deployment, a service that it needs, or the machine. This is not a defect of the function under test.'],
+  unknown: ['Cause not known', '❔', 'The agent did not record why this result is not a pass. Open the report and examine the failed step.'],
+};
+const CAUSE_OF = new Set(['failed', 'regression', 'needs-review', 'blocked', 'flaky']);
+const causeKey = (value, cause) => (!CAUSE_OF.has(str(value)) ? null : own(CAUSE, str(cause)) && cause !== 'unknown' ? str(cause) : 'unknown');
+const causeB = (value, cause) => { const k = causeKey(value, cause);
+  return k ? h('span', { class: `badge cause c-${k}`, title: `Cause: ${CAUSE[k][0]}. ${CAUSE[k][2]}` }, `${CAUSE[k][1]} ${CAUSE[k][0]}`) : null; };
+// Overview: the failing test cases by cause, each a link to them; and a night whose environment failed.
+function causeSummary(att) {
+  const n = {}; for (const i of att) { const k = causeKey(i.latest, i.verdict && i.verdict.cause); if (k) n[k] = (n[k] || 0) + 1; }
+  const night = runs.find((r) => r.type === 'regression');
+  const envNight = night && night.verdict === 'environment' ? night : null;
+  if (!Object.keys(n).length && !envNight) return null;
+  return h('div', { class: 'causes', title: FACET_HELP.cause },
+    h('b', {}, 'Why: '), joinNodes(Object.keys(CAUSE).filter((k) => n[k]).map((k) => facetLink('cause', k, [causeB('failed', k), ` ${n[k]}`])), ' '),
+    envNight ? h('div', { class: 'meta', style: 'margin-top:4px' }, causeB('failed', 'environment'), ' The newest nightly regression did not run: the product did not start. ', runLink(envNight, 'Why')) : null);
+}
+const itemCause = (i) => causeB(i.latest, i.verdict && i.verdict.cause);
 
 const ALL = arr(D.items).filter((x) => x && typeof x === 'object' && x.key).map((x) => {
   const o = x.origin && typeof x.origin === 'object' ? x.origin : {};
@@ -650,7 +698,7 @@ const RUNTYPE_HELP = { regression: 'Each night, the promoted tests run on the ne
   scenario: 'The agent tests a scenario that a person requested (in Slack, in the chat or on this page) on the newest build.', rerun: 'You started this test. It shows the result only. It is not a verdict and it has no report.',
   feature: 'A person asked for all the recurring tests of one feature. It shows the results only. It is not a verdict and it has no report.' };
 const runs = arr(D.runs).filter((r) => r && typeof r === 'object' && r.utc && own(RUNTYPE, r.type)).map((r) => ({
-  ...r, type: str(r.type), ref: r.ref == null ? '' : str(r.ref), build: str(r.build), utc: str(r.utc), entries: arr(r.entries).filter((e) => e && e.key).map((e) => ({ key: str(e.key), value: str(e.value) })),
+  ...r, type: str(r.type), ref: r.ref == null ? '' : str(r.ref), build: str(r.build), utc: str(r.utc), entries: arr(r.entries).filter((e) => e && e.key).map((e) => ({ key: str(e.key), value: str(e.value), cause: e.cause == null ? null : str(e.cause) })),
   issues: arr(r.issues).filter((x) => x && x.number != null), counts: r.counts && typeof r.counts === 'object' ? r.counts : null, signals: r.signals && typeof r.signals === 'object' ? r.signals : null,
   failure: r.failure && typeof r.failure === 'object' ? { ...r.failure, stage: str(r.failure.stage), cause: str(r.failure.cause), repair: str(r.failure.repair), next: str(r.failure.next), evidence: arr(r.failure.evidence).map(str) } : null,
   id: [r.type, r.ref, r.build, r.utc].map(str).join('~') }));
@@ -660,6 +708,18 @@ const runFor = (i, e) => (e.run === 'regression' ? nightOf(str(e.build))
   : e.run === 'feature' ? runs.find((r) => r.type === 'feature' && r.build === str(e.build) && str(r.utc) === str(e.utc)) || null
   : runs.find((r) => r.type !== 'regression' && r.ref === i.ref && r.build === str(e.build) && str(r.utc) === str(e.utc)) || runs.find((r) => r.type !== 'regression' && r.ref === i.ref && r.build === str(e.build)) || null);
 const originTitle = (ref) => { const i = ALL.find((x) => x.ref === ref); return i ? str(i.origin.title) : ''; };
+// Every title the data knows for an issue or a scenario: its test cases', the nights' completed
+// issues, the activity rows, the requests and the profile queue.
+const TITLES = new Map();
+{ const put = (ref, t) => { if (ref && str(t) && !TITLES.has(ref)) TITLES.set(ref, str(t)); };
+  for (const i of ALL) put(i.ref, i.origin.title);
+  const A0 = D.activity && typeof D.activity === 'object' ? D.activity : {};
+  for (const x of [...arr(A0.issues), ...arr(A0.waiting)]) if (x && Number.isInteger(x.issue)) put(`#${x.issue}`, x.title);
+  for (const r of arr(D.runs)) for (const x of arr(r && r.issues)) if (x && x.number != null) put(`#${+x.number}`, x.title);
+  const F0 = D.findings && typeof D.findings === 'object' ? D.findings : {};
+  for (const x of [...arr(F0.requests), ...arr(F0.profile_queue && F0.profile_queue.list)]) if (x && x.id) put(str(x.id), x.title); }
+const refTitle = (ref) => TITLES.get(str(ref)) || '';
+const refSummary = (ref) => { const i = ALL.find((x) => x.ref === str(ref)); return i ? str(i.origin.summary) : ''; };
 // An origin — an issue or a scenario — has its own panel: its criteria, its runs, its report.
 const origins = new Map();
 for (const i of ALL) if (!origins.has(i.ref)) origins.set(i.ref, i.origin);
@@ -676,6 +736,7 @@ const FACETS = [
   { id: 'verdict', label: 'Latest verdict', get: (i) => [i.latest || 'none'], fmt: (v) => (v === 'none' ? 'No verdict yet' : vLabel(v)) },
   { id: 'origin', label: 'Issue or scenario', get: (i) => [i.origin.kind || 'issue'], fmt: entName },
   { id: 'ref', label: 'Which issue or scenario', get: (i) => [i.ref], order: (a, b) => str(a).localeCompare(str(b), 'en', { numeric: true }), fmt: (v) => `${ENT[refKind(v)][1]} ${v}${originTitle(v) ? ` ${originTitle(v).slice(0, 40)}` : ''}` },
+  { id: 'cause', label: 'Cause of the failure', get: (i) => (causeKey(i.latest, i.verdict && i.verdict.cause) ? [causeKey(i.latest, i.verdict && i.verdict.cause)] : []), fmt: (v) => (own(CAUSE, v) ? `${CAUSE[v][1]} ${CAUSE[v][0]}` : str(v)) },
   { id: 'kind', label: 'Criterion, intent or exploration', get: (i) => [i.kind], fmt: entName },
   { id: 'flag', label: 'Flags', get: (i) => [...i.flags, ...(pins.has(i.key) ? ['pinned'] : [])] },
   { id: 'collection', label: 'Collection', get: colls, fmt: (v) => `${ENT.collection[1]} ${v}` },
@@ -694,6 +755,7 @@ const FACET_HELP = {
   verdict: 'The newest result of each test case. Put the pointer on a badge to see its meaning.',
   origin: 'Where the test case comes from: 🎫 an issue on GitHub, or 💬 a scenario that a person requested.',
   ref: 'The issue or the scenario of the test case.',
+  cause: 'Why the newest result is not a pass: 💥 a defect of the function under test, 🔧 a defect of the test itself, or 🏗️ a problem of the environment (the installation or the deployment of the product in the agent\u2019s machine).',
   kind: '🎯 Acceptance criterion: a condition of the issue. It is part of the verdict. 💡 Intent test: the purpose of the issue, tested like a criterion. It is not part of the verdict. 🔦 Exploration: an additional check outside the criteria. It is not part of the verdict.',
   flag: 'Special conditions: flaky, repaired after a UI change, changed after promotion, costly, has a screenshot, has a bug issue, has a maintenance proposal, pinned.',
   collection: 'Your own groups of test cases (work/CATALOG.md), for example "Upload".',
@@ -1078,16 +1140,30 @@ const refKind = (ref) => (str(ref).startsWith('#') ? 'issue' : 'scenario');
 const itemTag = (i) => `${ENT[i.kind][1]} ${i.ref} ${str(i.id)}`;
 const itemLong = (i) => `${ENT.testcase[0]} — ${ENT[i.kind][0].toLowerCase()} ${str(i.id)} of ${ENT[refKind(i.ref)][0].toLowerCase()} ${i.ref}${i.origin.title ? ` "${str(i.origin.title)}"` : ''}: ${str(i.name) || str(i.then)}`;
 // A link to a test case's panel: its tag, and its name when there is room.
+// The origin's title beside a test case in a list that mixes issues and scenarios.
+const ofRef = (i) => (refTitle(i.ref) ? h('span', { class: 'meta', title: refTip(i.ref) }, ` · ${cut(refTitle(i.ref), 48)}`) : null);
 const itemLink = (i, withName = true) => goLink({ i: i.key }, [h('b', {}, itemTag(i)), withName && str(i.name) ? ` ${str(i.name)}` : ''], itemLong(i), 'linkish');
 const runLink = (r, text) => (r ? goLink({ r: r.id }, text ?? `${ENT.run[1]} ${runName(r)}`, `${ENT.run[0]} — ${RUNTYPE_HELP[r.type] || ''}`, 'linkish') : null);
 // Links between the places: an issue or a scenario, a build, a page of the map, an area, a facet value.
 const issueHref = (n) => { const tpl = str(D.issue_url); return tpl.startsWith('https://') && tpl.includes('{n}') && Number.isInteger(n) ? tpl.replace('{n}', String(n)) : null; };
 const extIssue = (n, text) => (issueHref(n) ? extLink(issueHref(n), text ?? `${ENT.issue[1]} #${n} on GitHub`, `${ENT.issue[0]} #${n} on GitHub.`) : null);
+// An issue or a scenario is never only its number: its link shows its title (cut at TITLE_MAX), and
+// its tooltip the whole title and the issue's summary. `refTag` is the number alone, for a place
+// that shows the title beside it.
+const TITLE_MAX = 60;
+const cut = (t, n = TITLE_MAX) => (str(t).length > n ? `${str(t).slice(0, n - 1).trimEnd()}…` : str(t));
+const refTag = (ref) => `${ENT[refKind(ref)][1]} ${str(ref)}`;
+const refText = (ref) => (refTitle(ref) ? [h('b', {}, refTag(ref)), ` ${cut(refTitle(ref))}`] : refTag(ref));
+const refTip = (ref) => `${ENT[refKind(ref)][0]} ${str(ref)}${refTitle(ref) ? ` "${refTitle(ref)}"` : ''}.${refSummary(ref) ? ` ${refSummary(ref)}` : ''}`;
+// What the issue is about: the agent's summary of the issue text, written when it froze the criteria.
+const SUMMARY_TIP = 'A short summary of the issue. The agent wrote it from the issue text when it froze the acceptance criteria.';
+const aboutIssue = (o, short) => (str(o.summary) ? h('p', { class: 'about', title: SUMMARY_TIP }, h('b', {}, short ? `${ENT.issue[1]} About ${str(o.ref)}: ` : 'About this issue: '), str(o.summary))
+  : o.kind === 'issue' && !short ? h('p', { class: 'meta', title: SUMMARY_TIP }, 'No summary yet. The agent writes it at the next freeze of the criteria.') : null);
 function refLink(ref, text) {
   const r = str(ref); const k = refKind(r);
-  if (origins.has(r)) return goLink({ o: r }, text ?? `${ENT[k][1]} ${r}`, `${ENT[k][0]} ${r}${originTitle(r) ? ` "${originTitle(r)}"` : ''}: its test cases, test runs and report.`);
+  if (origins.has(r)) return goLink({ o: r }, text ?? refText(r), `${refTip(r)} Opens its panel: its test cases, test runs and report.`);
   const n = /^#(\d+)$/.exec(r);
-  return n && issueHref(+n[1]) ? extIssue(+n[1], text ?? `${ENT.issue[1]} ${r}`) : h('span', { title: ENT[k][2] }, text ?? `${ENT[k][1]} ${r}`);
+  return n && issueHref(+n[1]) ? extLink(issueHref(+n[1]), text ?? refText(r), `${refTip(r)} Opens the issue on GitHub.`) : h('span', { title: `${refTip(r)} ${ENT[k][2]}` }, text ?? refText(r));
 }
 const issueRef = (n, text) => refLink(`#${n}`, text);
 function buildLink(b) {
@@ -1102,7 +1178,7 @@ function pageLink(path, text) {
 }
 const facetLink = (k, v, text) => (v ? goLink({ v: 'catalog', f: { [k]: [str(v)] }, q: '' }, text ?? str(v), `All test cases with ${FACET[k].label.toLowerCase()} "${v}".`) : '–');
 const joinNodes = (list, sep = ', ') => list.flatMap((x, k) => (k ? [sep, x] : [x]));
-const cells = (hist, n = 12) => h('span', { class: 'cells', role: 'img', 'aria-label': `The newest ${Math.min(n, hist.length)} results`, title: `The newest ${Math.min(n, hist.length)} results, oldest at the left: ${hist.slice(-n).map((e) => vLabel(e.value)).join(', ')}` },
+const cells = (hist, n = 12) => h('span', { class: 'cells', role: 'img', 'aria-label': `The newest ${Math.min(n, hist.length)} results`, title: `The newest ${Math.min(n, hist.length)} results, oldest at the left: ${hist.slice(-n).map((e) => `${vLabel(e.value)}${causeKey(e.value, e.cause) ? ` (${CAUSE[causeKey(e.value, e.cause)][0].toLowerCase()})` : ''}`).join(', ')}` },
   hist.slice(-n).map((e) => h('i', { class: vClass(e.value) })));
 // A report with a share link (artifact.url) opens in a new tab. A private report has no address that a
 // page can open: the page says so. It never asks the agent to open a report.
@@ -1142,8 +1218,8 @@ const LABELS = D.issue_labels && typeof D.issue_labels === 'object' ? D.issue_la
 const FIX_LABEL = /^[A-Za-z0-9][A-Za-z0-9:._/ -]{0,49}$/.test(str(LABELS.fix)) ? str(LABELS.fix) : null;
 const foundOf = (ref) => (ref ? FOUND.filter((f) => f.ref === ref) : []);
 const foundLinks = (ref) => { const l = foundOf(ref);
-  return l.length ? h('span', {}, joinNodes([...new Map(l.map((f) => [f.issue, f])).values()].map((f) => extLink(f.url, `${ENT.bug[1]} #${f.issue}`,
-    `${ENT.bug[0]} #${f.issue} on GitHub, created ${fmtDate(f.utc)} for ${f.ref}${f.labels.length ? `. Labels: ${f.labels.join(', ')}` : ''}.`, 'found')), ' ')) : ''; };
+  return l.length ? h('span', {}, joinNodes([...new Map(l.map((f) => [f.issue, f])).values()].map((f) => extLink(f.url, `${ENT.bug[1]} #${f.issue}${str(f.title) ? ` ${cut(f.title, 40)}` : ''}`,
+    `${ENT.bug[0]} #${f.issue}${str(f.title) ? ` "${str(f.title)}"` : ''} on GitHub, created ${fmtDate(f.utc)} for ${f.ref}${f.labels.length ? `. Labels: ${f.labels.join(', ')}` : ''}.`, 'found')), ' ')) : ''; };
 // The ref of a test case's problem: `#42 AC-2`, `#42 EX-1`, `S-7 AC-1`, `P-sign-in AC-1` (a scenario's exploration has none).
 const problemRef = (i) => { const r = i.origin.kind === 'scenario' ? `${i.ref} ${str(i.id)}` : `#${num(i.ref)} ${str(i.id)}`; return PROB_RE.test(r) ? r : null; };
 // A problem's kind, for its icon: a test case, a design finding, a validation finding, a stress check.
@@ -1279,6 +1355,7 @@ function toggleLegend() {
     h('b', {}, 'Names and icons'), namesList(),
     h('b', {}, 'Verdicts'),
     Object.entries(groups).map(([c, l]) => h('ul', {}, l.map(([k]) => h('li', {}, badge(k), ' ', h('span', { class: 'muted-t' }, own(VAL_HELP, k) ? VAL_HELP[k] : k))))),
+    h('b', {}, 'Cause of a failure'), h('ul', {}, Object.keys(CAUSE).map((k) => h('li', {}, causeB('failed', k), ' ', h('span', { class: 'muted-t' }, CAUSE[k][2])))),
     h('b', {}, 'Tiers'), h('ul', {},
       TIERS.map((t) => h('li', {}, tierB(t), ' ', h('span', { class: 'muted-t' }, TIER_HELP[t])))),
     h('b', {}, `${ENT.run[1]} Test runs`), h('ul', {}, Object.entries(RUNTYPE).map(([k, l]) => h('li', {}, h('b', {}, l), ' — ', h('span', { class: 'muted-t' }, RUNTYPE_HELP[k]))))));
@@ -1351,7 +1428,7 @@ function profileQueue() {
   return q ? { cap: Number.isInteger(q.cap) ? q.cap : 3, list: arr(q.list).filter((x) => x && /^P-[a-z0-9-]+$/.test(str(x.id))) } : null;
 }
 function pqTable(pq, tableOf) {
-  return tableOf(['Scenario', 'Title', 'Kind', 'When'], pq.list.map((x) => [refLink(str(x.id)), str(x.title) || h('span', { class: 'muted-t' }, 'no title'),
+  return tableOf(['Scenario', 'Title', 'Kind', 'When'], pq.list.map((x) => [refLink(str(x.id), refTag(str(x.id))), str(x.title) || h('span', { class: 'muted-t' }, 'no title'),
     PQ_KIND[x.kind] || str(x.kind), h('span', { class: `badge ${x.when === 'next' ? 'ok' : 'muted'}` }, PQ_WHEN[x.when] || str(x.when))]));
 }
 function activityNow() {
@@ -1371,8 +1448,8 @@ function activityNow() {
   const m = mins(since, D.generated_utc ? new Date(D.generated_utc).getTime() : Date.now());
   const frac = m == null ? 0 : m / budget;
   const cls = frac >= 1 ? 'bad' : frac >= 0.75 ? 'warn' : 'ok';
-  const what = active.length ? active.map((x) => [h('b', {}, issueRef(x.issue)), x.title ? ` ${str(x.title)}` : '', x.build ? h('span', { class: 'meta' }, ' · ', buildLink(x.build), x.baseline ? [' compared with ', buildLink(x.baseline)] : null) : null])
-    : scen.length ? scen.map((x) => [h('b', {}, refLink(str(x.id))), x.title ? ` ${str(x.title)}` : '', x.build ? h('span', { class: 'meta' }, ' · ', buildLink(x.build)) : null])
+  const what = active.length ? active.map((x) => [issueRef(x.issue), refTitle(`#${x.issue}`) ? '' : h('span', { class: 'meta' }, ' (no title known)'), x.build ? h('span', { class: 'meta' }, ' · ', buildLink(x.build), x.baseline ? [' compared with ', buildLink(x.baseline)] : null) : null])
+    : scen.length ? scen.map((x) => [refLink(str(x.id)), x.build ? h('span', { class: 'meta' }, ' · ', buildLink(x.build)) : null])
       : [lockBy(lock.owner)];
   card.append(h('div', { class: 'now-head' }, h('span', { class: 'pulse', 'aria-hidden': 'true' }), h('h2', {}, '⚙️ Working now'),
     lock ? h('span', { class: 'chip-s', title: 'The run that has the test environment now.' }, lockBy(lock.owner)) : null),
@@ -1391,11 +1468,11 @@ function activityQueue() {
   const pq = profileQueue();
   const issueA = (n) => issueRef(n);
   const groups = [
-    [`${ENT.issue[1]} New issues`, 'q-new', waiting.filter((x) => x.kind === 'new').map((x) => [issueA(x.issue), ' ', str(x.title)])],
-    [`${ENT.issue[1]} Retests`, 'q-re', waiting.filter((x) => x.kind === 'retest').map((x) => [issueA(x.issue), ' ', str(x.title)])],
-    [`${ENT.scenario[1]} Requested scenarios`, 'q-sc', rq.map((x) => [h('b', {}, refLink(str(x.id))), ' ', str(x.title) || h('span', { class: 'meta' }, `from ${str(x.source)} · ${rel(x.utc)}`)])],
-    [`${ENT.report[1]} Reports on their way`, 'q-rp', [...pending.map((x) => [issueA(x.issue), ' ', str(x.title), ' ', badge(x.verdict)]), ...rp.map((x) => [h('b', {}, refLink(str(x.id))), ' ', str(x.title), ' ', badge(x.verdict)])]],
-    [`${ENT.scenario[1]} Profile scenarios to adopt`, 'q-ps', (pq ? pq.list : []).map((x) => [h('b', {}, refLink(str(x.id))), ' ', str(x.title), ' ', h('span', { class: 'meta' }, `· ${PQ_KIND[x.kind] || str(x.kind)} · ${PQ_WHEN[x.when] || str(x.when)}`)])],
+    [`${ENT.issue[1]} New issues`, 'q-new', waiting.filter((x) => x.kind === 'new').map((x) => [issueA(x.issue)])],
+    [`${ENT.issue[1]} Retests`, 'q-re', waiting.filter((x) => x.kind === 'retest').map((x) => [issueA(x.issue)])],
+    [`${ENT.scenario[1]} Requested scenarios`, 'q-sc', rq.map((x) => [refLink(str(x.id)), str(x.title) ? '' : h('span', { class: 'meta' }, ` from ${str(x.source)} · ${rel(x.utc)}`)])],
+    [`${ENT.report[1]} Reports on their way`, 'q-rp', [...pending.map((x) => [issueA(x.issue), ' ', badge(x.verdict)]), ...rp.map((x) => [refLink(str(x.id)), ' ', badge(x.verdict)])]],
+    [`${ENT.scenario[1]} Profile scenarios to adopt`, 'q-ps', (pq ? pq.list : []).map((x) => [refLink(str(x.id)), ' ', h('span', { class: 'meta' }, `· ${PQ_KIND[x.kind] || str(x.kind)} · ${PQ_WHEN[x.when] || str(x.when)}`)])],
   ];
   const total = groups.reduce((n, g) => n + g[2].length, 0);
   const card = h('section', { class: 'panel' }, h('h2', {}, `📥 Queue (${total})`, tip('The issues and scenarios that wait for a test run, and the reports that the agent did not deliver yet.')));
@@ -1544,8 +1621,9 @@ function viewOverview() {
       m.last_run && m.last_run.utc ? h('span', { class: 'meta' }, ` · ${rel(m.last_run.utc)}`) : null))),
       h('p', { class: 'meta' }, openD.length ? goLink({ v: 'design' }, `${ENT.design[1]} ${openD.length} open design finding(s), ${openD.filter((d) => d.severity === 'major').length} major`, ENT.design[2], 'linkish') : 'No open design finding.')) : null,
     h('section', { class: 'panel' }, h('h2', {}, `🚨 Needs attention (${att.length})`, tip('Test cases that failed, have a regression, are flaky, need review or changed after promotion. The worst are first. Select them (☐) to report them in one bug issue. Click a name to open the panel of the test case.')),
-      att.length ? h('ul', { class: 'att' }, att.slice(0, 14).map((i) => h('li', {}, pickBox(problemRef(i)), badge(i.latest || (i.flags.includes('drift') ? 'drift' : '')),
-      itemLink(i), i.evidence ? reportBtn(i.evidence) : null, foundLinks(problemRef(i))))) : h('p', { class: 'celebrate' }, h('span', { class: 'em' }, '🎉'), 'Nothing needs attention. All green!'),
+      causeSummary(att),
+      att.length ? h('ul', { class: 'att' }, att.slice(0, 14).map((i) => h('li', {}, pickBox(problemRef(i)), badge(i.latest || (i.flags.includes('drift') ? 'drift' : '')), ' ', itemCause(i), ' ',
+      itemLink(i), ofRef(i), i.evidence ? reportBtn(i.evidence) : null, foundLinks(problemRef(i))))) : h('p', { class: 'celebrate' }, h('span', { class: 'em' }, '🎉'), 'Nothing needs attention. All green!'),
       att.length > 14 ? goLink({ v: 'catalog', f: { flag: ['needs attention'] }, q: '' }, `All ${att.length}`, null, 'linkish') : null),
     maintenance.length ? h('section', { class: 'panel' }, h('h2', {}, `${ENT.maintenance[1]} Test maintenance (${maintenance.length})`, tip(`${ENT.maintenance[2]} Open a test case to see the actions.`)),
       h('ul', { class: 'att' }, maintenance.slice().reverse().slice(0, 12).map((m) => h('li', {}, h('b', { title: MAINT_KIND[m.kind] }, `${ENT.maintenance[1]} ${m.id}`), ' ', maintTest(m),
@@ -1555,7 +1633,7 @@ function viewOverview() {
         return h('li', {}, facetLink('feature', f.id, `${ENT.feature[1]} ${f.name}`), h('span', { class: 'meta' }, ` · ${rec} recurring of ${its.length}`), ' ',
           rec ? copyBox(`run feature ${f.id}`, 'Run…', `${ENT.run[1]} Run all the recurring tests of "${f.name}" now`) : null, ' ', gherkinBtn(f.name, its)); }))) : null,
     FOUND.length ? h('section', { class: 'panel' }, h('h2', {}, `${ENT.bug[1]} Bug issues (${new Set(FOUND.map((f) => f.issue)).size})`, tip('The GitHub issues that the agent created for problems on this page (work/FOUND.md). One bug issue can have more than one problem.')),
-      h('ul', { class: 'att' }, [...new Map(FOUND.slice().reverse().map((f) => [f.issue, f])).values()].slice(0, 10).map((f) => h('li', {}, extLink(f.url, `${ENT.bug[1]} #${f.issue}`, `${ENT.bug[0]} #${f.issue} on GitHub.`, 'found'),
+      h('ul', { class: 'att' }, [...new Map(FOUND.slice().reverse().map((f) => [f.issue, f])).values()].slice(0, 10).map((f) => h('li', {}, extLink(f.url, `${ENT.bug[1]} #${f.issue}${str(f.title) ? ` ${cut(f.title, TITLE_MAX)}` : ''}`, `${ENT.bug[0]} #${f.issue}${str(f.title) ? ` "${str(f.title)}"` : ''} on GitHub.`, 'found'),
         h('span', { class: 'meta' }, `${fmtDate(f.utc)} · ${FOUND.filter((x) => x.issue === f.issue).map((x) => x.ref).join(', ')}${f.labels.includes(FIX_LABEL) ? ' · for the architect' : ''}`))))) : null,
     h('section', { class: 'panel' }, h('h2', {}, '📈 Test cases over builds', tip('How many test cases have a test (blue), and how many of them run each night (green), on each build.')), buildsAt.length ? lineChart([{ name: 'test cases', color: 'var(--link)', values: all }, { name: 'nightly (regression tier)', color: 'var(--ok)', values: reg }], labels) : h('p', { class: 'muted-t' }, 'No builds yet.')),
     h('section', { class: 'panel' }, h('h2', {}, `${ENT.run[1]} Latest test runs`, tip(ENT.run[2])), runsAt.length ? [h('ul', { class: 'att' }, runsAt.slice(0, 8).map((r) => h('li', {}, badge(r.verdict),
@@ -1578,7 +1656,7 @@ function sidebar() {
     let vals = [...counts.keys()].sort(f.order || ((a, b) => counts.get(b) - counts.get(a) || str(a).localeCompare(str(b))));
     const many = vals.length > 10 && !S['all_' + f.id];
     const shown = many ? vals.slice(0, 10) : vals;
-    const det = h('details', { open: sel.length || ['tier', 'verdict', 'flag', 'origin'].includes(f.id) ? true : null },
+    const det = h('details', { open: sel.length || ['tier', 'verdict', 'cause', 'flag', 'origin'].includes(f.id) ? true : null },
       h('summary', { title: FACET_HELP[f.id] || null }, f.label, sel.length ? ` (${sel.length})` : '', tip(FACET_HELP[f.id])),
       shown.map((v) => h('label', { class: counts.get(v) ? '' : 'zero', title: f.id === 'verdict' ? (own(VAL_HELP, v) ? VAL_HELP[v] : VAL_HELP['']) : f.id === 'tier' ? TIER_HELP[v] || null : null }, h('input', { type: 'checkbox', checked: sel.includes(v) ? true : null, onchange: () => { toggleFacet(f.id, v); writeHash(); render(); } }),
         h('span', {}, f.fmt ? f.fmt(v) : str(v)), h('span', { class: 'n' }, String(counts.get(v))))),
@@ -1617,7 +1695,7 @@ function table(list) {
     h('td', {}, pickBox(problemRef(i))), storageOK ? h('td', {}, star(i)) : null,
     S.cols.map((k) => h('td', { class: k === 'name' ? 'name' : ['last', 'promoted', 'build', 'duration', 'ref', 'id', 'report'].includes(k) ? 'nw' : null },
       k === 'name' ? [h('div', {}, str(i.name) || str(i.then)), i.kind === 'exploration' ? h('span', { class: 'meta', title: ENT.exploration[2] }, `${ENT.exploration[1]} exploration`) : null]
-        : k === 'tier' ? tierB(i.tier) : k === 'verdict' ? badge(i.latest) : COLS[k][3] ? COLS[k][3](i) : COLS[k][1](i))),
+        : k === 'tier' ? tierB(i.tier) : k === 'verdict' ? [badge(i.latest), ' ', itemCause(i)] : COLS[k][3] ? COLS[k][3](i) : COLS[k][1](i))),
     h('td', {}, h('button', { class: 'rowgo', type: 'button', 'data-kind': 'panel', 'data-dest': placeOf({ i: i.key }), 'aria-label': `Open ${i.label}`, onclick: () => openItem(i.key) }, ico('panel'))))));
   return h('div', { class: 'tablewrap' }, h('table', { class: 'list' }, h('thead', {}, head), body));
 }
@@ -1630,10 +1708,10 @@ function sortBy(k, add) {
 }
 function cards(list, gallery) {
   return h('div', { class: gallery ? 'gal' : 'cards' }, list.map((i) => {
-    const src = img(i.still);
+    const src = gallery ? sharp(i, 'still') : img(i.still);
     return h('div', { class: `card${picked.includes(problemRef(i)) ? ' picked' : ''}`, role: 'button', tabindex: 0, 'aria-label': itemLong(i), onclick: rowClick(() => openItem(i.key)), onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(i.key); } },
       gallery ? (src ? h('img', { src, alt: `${i.label}: ${str(i.then)}`, loading: 'lazy' }) : h('div', { class: 'ph' }, '📷 no screenshot yet')) : null,
-      h('div', { style: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' }, pickBox(problemRef(i)), refLink(i.ref), h('b', { title: itemLong(i) }, `${ENT[i.kind][1]} ${str(i.id)}`), tierB(i.tier), badge(i.latest), star(i), h('span', { style: 'flex:1' }), foundLinks(problemRef(i)), reportBtn(i.evidence)),
+      h('div', { style: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' }, pickBox(problemRef(i)), refLink(i.ref), h('b', { title: itemLong(i) }, `${ENT[i.kind][1]} ${str(i.id)}`), tierB(i.tier), badge(i.latest), itemCause(i), star(i), h('span', { style: 'flex:1' }), foundLinks(problemRef(i)), reportBtn(i.evidence)),
       h('div', {}, str(i.name)), i.then ? h('div', { class: 'then' }, `Then ${str(i.then)}`) : null,
       !gallery && src ? h('img', { src, alt: '', loading: 'lazy', style: 'max-height:120px;object-fit:cover;object-position:top' }) : null,
       h('span', { class: 'open-hint', 'aria-hidden': 'true' }, ico('panel'), 'Open'));
@@ -1825,7 +1903,7 @@ const STEP_HELP = { open: 'The test opens a page.', act: 'The model does an acti
 function itemDrawer(i) {
   const o = i.origin;
   const sib = items.filter((x) => x.key !== i.key && x.ref === i.ref);
-  const src = img(i.still);
+  const src = sharp(i, 'still');
   const [pv, nx] = siblingsOf(i.key);
   const ok = refKind(i.ref);
   const stepOf = (x, text) => (x ? { text, title: `${itemTag(x)} ${str(x.name)}`, go: () => openItem(x.key) } : null);
@@ -1835,16 +1913,17 @@ function itemDrawer(i) {
     h('div', { class: 'meta', style: 'margin-top:6px' }, h('span', { title: ENT[i.kind][2] }, `${ENT[i.kind][1]} ${ENT[i.kind][0]} ${str(i.id)}`), ` of ${ENT[ok][0].toLowerCase()} ${i.ref}`,
       o.kind === 'scenario' ? (o.source ? ` · requested from ${str(o.source)}` : '') : (o.state ? ` · the issue is ${str(o.state)}` : '')),
     h('h2', {}, str(i.name) || str(i.then), ' ', star(i)),
+    aboutIssue(o, true),
     labelChips(o.labels),
-    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' }, tierB(i.tier), badge(i.latest), i.kind === 'exploration' ? h('span', { class: 'badge muted', title: ENT.exploration[2] }, 'outside every verdict') : i.kind === 'intent' ? h('span', { class: 'badge muted', title: ENT.intent[2] }, 'outside the issue verdict') : null,
+    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' }, tierB(i.tier), badge(i.latest), itemCause(i), i.kind === 'exploration' ? h('span', { class: 'badge muted', title: ENT.exploration[2] }, 'outside every verdict') : i.kind === 'intent' ? h('span', { class: 'badge muted', title: ENT.intent[2] }, 'outside the issue verdict') : null,
       i.drift ? h('span', { class: 'badge muted', title: VAL_HELP.drift }, 'drift — not run until re-promoted') : null, i.testable === false ? h('span', { class: 'badge muted', title: VAL_HELP['not-testable'] }, 'not testable') : null),
     i.summary ? h('p', {}, str(i.summary)) : null,
     h('div', { class: 'gwt', title: i.kind === 'exploration' ? ENT.exploration[2] : i.kind === 'intent' ? `${ENT.intent[2]} The goal is the sentence of the issue, verbatim.` : 'The frozen acceptance criterion: the start state (Given), the action (When) and the result that the test checks (Then).' },
       i.kind === 'intent' ? h('p', {}, h('b', {}, 'Goal'), str(i.goal) || '–') : null,
       h('p', {}, h('b', {}, 'Given'), str(i.given) || '–'), h('p', {}, h('b', {}, 'When'), str(i.when) || '–'), h('p', {}, h('b', {}, i.kind === 'exploration' ? 'Expect' : 'Then'), str(i.then) || '–')),
     i.kind === 'criterion' ? h('div', { style: 'margin-top:6px' }, gherkinBtn(o.title || i.ref, ALL.filter((x) => x.ref === i.ref))) : null,
-    src ? h('figure', { style: 'margin:10px 0' }, h('img', { src, alt: `The screen that ${i.id} checks`, style: 'width:100%;border-radius:10px;border:1px solid var(--line);background:#fff' }),
-      h('figcaption', { class: 'meta', style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px' }, `📷 The screen right before the check of ${i.id}.`, i.evidence ? [' The video and all screenshots:', reportBtn(i.evidence)] : null)) : null,
+    src ? h('figure', { style: 'margin:10px 0' }, h('img', { src, alt: `The screen that ${i.id} checks`, class: 'zoomable', title: 'Click to see it at its full size.', onclick: () => zoom(src, `The screen that ${i.label} checks`), style: 'width:100%;border-radius:10px;border:1px solid var(--line);background:#fff' }),
+      h('figcaption', { class: 'meta', style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px' }, `📷 The screen right before the check of ${i.id}.`, zoomBtn(src, `The screen that ${i.label} checks`), i.evidence ? [' The video and all screenshots:', reportBtn(i.evidence)] : null)) : null,
     h('dl', { class: 'dl' },
       dt('Report'), h('dd', {}, artLink(i.evidence)),
       dt('Test file'), h('dd', {}, i.file ? h('code', {}, `${ENT.file[1]} ${str(i.file)}`) : '– (no test)'),
@@ -1872,7 +1951,7 @@ function itemDrawer(i) {
     i.flaky.length ? h('section', { class: 'sec' }, h('h3', {}, '🎲 Flaky confirmations', tip(VAL_HELP.flaky)), h('ul', {}, i.flaky.map((x) => h('li', {}, `${fmtDate(x.utc)} on `, buildLink(x.build), ` — ${x.passes ?? '?'} of ${x.runs ?? '?'} runs passed`)))) : null,
     S.at ? null : h('section', { class: 'sec' }, h('h3', {}, '🤖 What you can ask the agent', tip(bridge() ? 'Each violet button opens a box at the bottom with its message. "Send to the agent" in the box sends the message to the chat of the agent as your message. Nothing changes before the agent does the action.' : 'Each violet button opens a box at the bottom with its message. Copy the message into the chat of the agent. Or open this page next to that chat: the box then sends it. Nothing changes before the agent does the action.')),
       h('div', { class: 'actions' }, itemActions(i))),
-    sib.length ? h('section', { class: 'sec' }, h('h3', {}, `${ENT.testcase[1]} Other test cases of ${ENT[ok][0].toLowerCase()} ${i.ref}`), h('ul', { class: 'att' }, sib.map((x) => h('li', {}, badge(x.latest), itemLink(x))))) : null,
+    sib.length ? h('section', { class: 'sec' }, h('h3', {}, `${ENT.testcase[1]} Other test cases of ${ENT[ok][0].toLowerCase()} ${i.ref}`), h('ul', { class: 'att' }, sib.map((x) => h('li', {}, badge(x.latest), ' ', itemCause(x), ' ', itemLink(x))))) : null,
   ]);
 }
 // An issue or a scenario: its criteria and explorations, every run that judged them, its report.
@@ -1893,10 +1972,12 @@ function originDrawer(ref) {
   const k = keys.indexOf(ref);
   const stepOf = (x, text) => (x ? { text, title: `${originName(x)} — ${originTitle(x)}`, go: () => openOrigin(x) } : null);
   const ok = refKind(ref);
-  drawerShell(ok, `${originName(ref)} details`, [stepOf(keys[k - 1], keys[k - 1]), stepOf(keys[k + 1], keys[k + 1])], [
+  const near = (x) => (x ? `${x}${refTitle(x) ? ` ${cut(refTitle(x), 28)}` : ''}` : x);
+  drawerShell(ok, `${originName(ref)} details`, [stepOf(keys[k - 1], near(keys[k - 1])), stepOf(keys[k + 1], near(keys[k + 1]))], [
     h('div', { class: 'meta' }, h('span', { title: ENT[ok][2] }, `${ENT[ok][1]} ${ENT[ok][0]}`), o.kind === 'scenario' ? (o.source ? ` · requested from ${str(o.source)}` : '') : (o.state ? ` · ${str(o.state)}` : ''),
       o.kind === 'issue' && issueHref(o.number) ? [' · ', extIssue(o.number)] : null),
     h('h2', {}, `${ref}${o.title ? ` — ${str(o.title)}` : ''}`),
+    aboutIssue(o),
     labelChips(o.labels),
     h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px' }, minibar(its), h('span', { class: 'count' }, `${ENT.criterion[1]}${ENT.exploration[1]} ${its.length} test cases · ${ENT.run[1]} ${rs.length} test runs`)),
     h('dl', { class: 'dl' },
@@ -1957,7 +2038,7 @@ function viewRuns() {
     h('thead', {}, h('tr', {}, [['Date', 'The date and time (UTC) of the test run.'], [`${ENT.run[1]} Test run`, 'The type of test run, and the issue or scenario that it tested.'], [`${ENT.build[1]} Build`, 'The build that the run tested, and the build that it compared with.'], [`${ENT.verdict[1]} Result`, 'The result of the whole test run.'], ['Outcome', DT_HELP.Outcome], ['⏱ Duration', DUR_HELP], costs ? ['💲 Cost', COST_HELP] : null, [`${ENT.report[1]} Report`, ENT.report[2]], ['', null]].filter(Boolean).map(([c, t]) => h('th', { scope: 'col', style: 'cursor:default', title: t }, c)))),
     h('tbody', {}, shown.map((r) => h('tr', { tabindex: 0, onclick: rowClick(() => openRun(r)), onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openRun(r); } },
       h('td', { class: 'nw', title: r.utc }, `${fmtDate(r.utc)} ${r.utc.slice(11, 16)}`),
-      h('td', { class: 'name' }, h('div', {}, r.type === 'regression' ? `🌙 ${RUNTYPE.regression}` : r.type === 'feature' ? `${RUNTYPE.feature} ${ENT.feature[1]} ${featName(r.ref)}` : [`${RUNTYPE[r.type]} `, refLink(r.ref)]), !['regression', 'feature'].includes(r.type) && originTitle(r.ref) ? h('div', { class: 'meta' }, originTitle(r.ref)) : null),
+      h('td', { class: 'name' }, h('div', {}, r.type === 'regression' ? `🌙 ${RUNTYPE.regression}` : r.type === 'feature' ? `${RUNTYPE.feature} ${ENT.feature[1]} ${featName(r.ref)}` : [`${RUNTYPE[r.type]} `, refLink(r.ref, refTag(r.ref))]), !['regression', 'feature'].includes(r.type) && refTitle(r.ref) ? h('div', { class: 'meta' }, refTitle(r.ref)) : null),
       h('td', { class: 'nw' }, buildLink(r.build), r.baseline ? h('div', { class: 'meta', title: DT_HELP.Baseline }, 'compared with ', buildLink(r.baseline)) : r.previous ? h('div', { class: 'meta', title: DT_HELP.Since }, 'since ', buildLink(r.previous)) : null),
       h('td', {}, badge(r.verdict)), h('td', {}, outcome(r)),
       h('td', { class: 'nw' }, fmtDur(r.secs) || h('span', { class: 'muted-t' }, '–')),
@@ -2013,11 +2094,11 @@ function runDrawer(r) {
     night && tested.size ? h('section', { class: 'sec' }, h('h3', {}, `${ENT.testcase[1]} Test cases of this night (${tested.size})`, tip('All the test cases that the nightly regression had on this build, by issue or scenario, each with its result. Drift: a person changed the checks, so the test did not run.')),
       caseGroups([...tested.keys()].map((k) => byKey.get(k)), (i) => tested.get(i.key))) : null,
     h('section', { class: 'sec' }, h('h3', {}, night ? `${ENT.verdict[1]} Results that were not unchanged (${ents.length})` : `${ENT.verdict[1]} Verdicts (${ents.length})`),
-      ents.length ? h('ul', { class: 'att' }, ents.map((e) => { const i = byKey.get(e.key); return h('li', {}, badge(e.value),
-        i ? itemLink(i) : h('code', {}, e.key)); })) : null,
+      ents.length ? h('ul', { class: 'att' }, ents.map((e) => { const i = byKey.get(e.key); return h('li', {}, badge(e.value), ' ', causeB(e.value, e.cause), ' ',
+        i ? [itemLink(i), ofRef(i)] : h('code', {}, e.key)); })) : null,
       night && r.verdict !== 'environment' && !tested.size ? h('p', { class: 'muted-t' }, 'All other nightly test cases were unchanged that night. Test cases with changed checks (drift) did not run.') : null),
     r.signals && Object.values(r.signals).some((n) => +n > 0) ? h('section', { class: 'sec' }, h('h3', {}, '📡 Signals that no test covers', tip('New console errors, slow tests and other changes that the agent saw on this build, outside the checks of the tests.')), h('ul', {}, Object.entries(r.signals).filter(([, n]) => +n > 0).map(([key, n]) => h('li', {}, `${key.replace(/_/g, ' ')}: ${+n}`)))) : null,
-    r.issues.length ? h('section', { class: 'sec' }, h('h3', {}, `${ENT.issue[1]} Completed issues in the window (${r.issues.length})`, tip('The issues that were closed between the night before and this night. They tell what changed in the product.')), h('ul', { class: 'att' }, r.issues.map((x) => h('li', {}, issueRef(+x.number), ' ', str(x.title),
+    r.issues.length ? h('section', { class: 'sec' }, h('h3', {}, `${ENT.issue[1]} Completed issues in the window (${r.issues.length})`, tip('The issues that were closed between the night before and this night. They tell what changed in the product.')), h('ul', { class: 'att' }, r.issues.map((x) => h('li', {}, issueRef(+x.number),
       origins.has(`#${+x.number}`) && issueHref(+x.number) ? [' ', extIssue(+x.number)] : null)))) : null,
     r.ui_diff ? h('section', { class: 'sec' }, h('h3', {}, '🔀 What moved in the UI', tip('The changes of the UI map between the night before and this night.')), h('pre', { class: 'diff' }, str(r.ui_diff))) : null,
   ]);
@@ -2040,12 +2121,12 @@ function onMap(i) {
 const byNum = (a, b) => str(a).localeCompare(str(b), undefined, { numeric: true });
 function caseGroups(list, valueOf) {
   const by = new Map(); for (const i of list) (by.get(i.ref) ?? by.set(i.ref, []).get(i.ref)).push(i);
-  return h('ul', { class: 'att' }, [...by].sort(([a], [b]) => byNum(a, b)).map(([ref, l]) => h('li', {}, h('b', {}, refLink(ref)), originTitle(ref) ? ` ${originTitle(ref)}` : '',
+  return h('ul', { class: 'att' }, [...by].sort(([a], [b]) => byNum(a, b)).map(([ref, l]) => h('li', {}, refLink(ref),
     h('ul', { class: 'att', style: 'margin-top:4px' }, l.sort((a, b) => byNum(a.id, b.id)).map((i) => { const val = valueOf ? valueOf(i) : null;
       return h('li', {}, val ? [badge(val), ' '] : null, itemLink(i)); })))));
 }
 function itemRow(i, full = true) {
-  return h('li', { style: 'margin:8px 0' }, badge(i.latest), itemLink(i), tierB(i.tier), full && i.evidence ? reportBtn(i.evidence) : null,
+  return h('li', { style: 'margin:8px 0' }, badge(i.latest), ' ', itemCause(i), ' ', itemLink(i), tierB(i.tier), full && i.evidence ? reportBtn(i.evidence) : null,
     i.history.length ? h('div', { style: 'flex-basis:100%;display:flex;gap:6px;align-items:center;flex-wrap:wrap' }, cells(i.history), full ? [h('span', { class: 'meta' }, 'of'), refLink(i.ref, `${originName(i.ref)}${i.origin.title ? ` — ${str(i.origin.title).slice(0, 60)}` : ''}`)] : null) : null);
 }
 // A walk through the map is a step like any other: "back" returns to the page before.
@@ -2066,7 +2147,7 @@ function viewMap() {
   const sel = h('select', { class: 'pagepick', 'aria-label': 'Page', onchange: (e) => pick(pageOf(e.target.value)) },
     pagesData.map((x) => h('option', { value: x.pattern, selected: x === p ? true : null }, `${str(x.title) || x.pattern} — ${x.pattern}`)));
 
-  const src = img(p.shot);
+  const src = sharp(p, 'shot');
   const vp = arr(p.viewport).map(Number);
   const ratio = vp.length === 2 && vp[0] > 0 && vp[1] > 0 ? vp[0] / vp[1] : 1.6;
   const showAll = !S.only || !src;
@@ -2098,7 +2179,7 @@ function viewMap() {
       p.hotspots.length ? h('span', { title: 'A test names a control when it uses its name, or when it opens the page that the control leads to.' }, `${ENT.control[1]} ${named} of ${p.hotspots.length} controls named by a test`) : h('span', {}, 'This UI map has no control positions yet. They show here after the next nightly run.'),
       h('span', {}, h('i', { class: 'sw bad' }), 'regression / failed'), h('span', {}, h('i', { class: 'sw warn' }), 'needs a look'), h('span', {}, h('i', { class: 'sw ok' }), 'passing'), h('span', {}, h('i', { class: 'sw' }), 'blocked / no verdict'),
       p.hotspots.length ? h('span', {}, h('i', { class: 'sw none' }), 'no test names it yet') : null, p.hotspots.length ? h('span', {}, '↗ goes to its page') : null,
-      src && p.hotspots.length ? h('label', { 'data-kind': 'local', title: 'Hides the controls that no test names.' }, h('input', { type: 'checkbox', checked: S.only ? true : null, onchange: () => { S.only = !S.only; render(); } }), ' only the controls a test names') : null));
+      src && p.hotspots.length ? h('label', { 'data-kind': 'local', title: 'Hides the controls that no test names.' }, h('input', { type: 'checkbox', checked: S.only ? true : null, onchange: () => { S.only = !S.only; render(); } }), ' only the controls a test names') : null, zoomBtn(src, `Screenshot of ${str(p.title) || p.pattern}`)));
   if (!src && !p.hotspots.length) stage.append(h('div', { class: 'ph', style: 'position:absolute;inset:0;border:0' }, 'No screenshot and no control positions for this page.'));
   const x = S.hs != null ? p.hotspots[S.hs] : null;
   const its = x ? hsItems(x) : [];
@@ -2275,7 +2356,7 @@ function bStage(f) {
         : f.path ? [h('b', {}, `${ENT.page[1]} ${f.path}`), h('span', {}, 'This page is not on the UI map. The agent finds it in the product.')]
           : [h('b', {}, 'No page yet'), h('span', {}, 'Add an Open step before this step. The preview then shows the page of the product.')]);
   }
-  const src = img(p.shot); const vp = arr(p.viewport).map(Number);
+  const src = sharp(p, 'shot'); const vp = arr(p.viewport).map(Number);
   const ratio = vp.length === 2 && vp[0] > 0 && vp[1] > 0 ? vp[0] / vp[1] : 1.6;
   const stage = h('div', { class: `stage${src ? '' : ' wf'}`, style: `aspect-ratio:${ratio}` }, src ? h('img', { src, alt: `Screenshot of ${str(p.title) || p.pattern}` }) : null);
   const order = p.hotspots.map((x, k) => k).sort((a, b) => p.hotspots[b].box[2] * p.hotspots[b].box[3] - p.hotspots[a].box[2] * p.hotspots[a].box[3]);
@@ -2538,7 +2619,7 @@ function viewFindings() {
   const RQ = { queued: ['waiting for the environment', 'muted'], in_progress: ['being tested', 'warn'], report_pending: ['tested, report on its way', 'ok'], rejected: ['not testable as written', 'bad'] };
   v.append(sec2(`${ENT.scenario[1]} Requested scenarios`, rq.length ? 'Scenarios that people requested in Slack, in the chat or on this page, and that have no report yet. Finished scenarios are in Runs (🏃).' : null,
     !rq.length ? h('p', { class: 'muted-t' }, 'No request waits. You can ask for a test on the Product map (🗺️).') : tableOf(['Scenario', 'From', 'State', 'Title', 'Updated'],
-      rq.map((x) => [refLink(str(x.id)), str(x.source), h('span', { class: `badge ${(RQ[x.status] || ['', 'none'])[1]}` }, (RQ[x.status] || [str(x.status)])[0]),
+      rq.map((x) => [refLink(str(x.id), refTag(str(x.id))), str(x.source), h('span', { class: `badge ${(RQ[x.status] || ['', 'none'])[1]}` }, (RQ[x.status] || [str(x.status)])[0]),
         str(x.title) || h('span', { class: 'muted-t' }, 'criteria not frozen yet'), x.utc ? rel(x.utc) : '']))));
   const pq = profileQueue();
   if (pq) v.append(sec2(`${ENT.scenario[1]} Profile scenarios to adopt`, pq.list.length ? `Scenarios of the product profile that the agent did not adopt yet. The nightly regression adopts ${pq.cap} each night, in this sequence.` : null,

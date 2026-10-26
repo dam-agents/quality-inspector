@@ -40,6 +40,22 @@ Doubt between `absent` and the others is not `absent`: a `verified` needs the pr
 A `failed` verdict claims a product defect. Before you write it, read the candidate
 trace and confirm the assertion evaluated a screen that got there the way a user would.
 
+**Cause of a failure.** Every AC, intent test or exploration whose verdict is `failed`,
+`blocked` or `flaky` gets one `cause` — the dashboard shows it beside the verdict, so a reader
+sees at once whose problem it is ([catalog.md](catalog.md)):
+
+- `product` — the function under test does not do what the criterion says; the test and the
+  environment worked. The only cause a `failed` may have.
+- `test` — the test itself is wrong: a step, a control name, a wait, a check, or the agent
+  step (`model`) that went wrong on a screen that has the control.
+- `environment` — the product as a whole did not work in this VM, not the function under test:
+  its install, its deployment configuration, a service it needs, the nested platform, the VM
+  (the product did not answer, a page of another area failed, sign-in failed).
+
+Doubt between `product` and the others is `product` for a `failed` (it claims the defect);
+for a `blocked` or `flaky` result name the cause the evidence shows, else leave `cause` out —
+the dashboard then says "cause not known". Every other verdict has `cause: null`.
+
 ## Verdicts file — `work/issues/<n>/verdicts-<ac_hash>-<candidate>.json`
 
 Your judgment, the renderer's only input besides the runs:
@@ -51,7 +67,7 @@ Your judgment, the renderer's only input besides the runs:
  "verdict": "partial", "started_utc": "2026-10-12T18:41:07Z", "generated_utc": "2026-10-12T19:20:00Z", "display_name": "<display_name>",
  "acs": [{"id": "AC-1", "name": "…", "given": "…", "when": "…", "then": "…", "surface": "ui",
           "testable": true, "verdict": "verified", "baseline_blocked_reason": null,
-          "note": "optional, one sentence"}],
+          "cause": null, "note": "optional, one sentence"}],
  "notes": ["assertion edits after the first run, blocked reasons, anything a reader needs"]}
 ```
 

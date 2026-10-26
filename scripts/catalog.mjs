@@ -3,8 +3,8 @@
 // work/suite as one self-contained, browsable HTML page (docs/catalog.md). Reads work/ and,
 // once, the target's labelled issues (GET, for labels and state); writes work/catalog/ only.
 //
-//   node catalog.mjs   -> {"html", "bytes", "items", "images", "dropped_images", "thumbnails",
-//                          "notes", "hash", "changed"}
+//   node catalog.mjs   -> {"html", "bytes", "items", "images", "dropped_images", "sharp_images",
+//                          "sharp_dropped", "thumbnails", "notes", "hash", "changed"}
 //
 // `notes` names every source that could not be read (the issues listing, the drift check, the
 // coverage of the UI map): the page is still built, without what that source gives. A credential
@@ -14,8 +14,10 @@
 // requester or thread, a verdict's notes, a triage explanation, LESSONS.md, the operator
 // conversation, a security finding, or anything of work/env/. `hash` covers the data without its
 // generation time; `changed` = it differs from work/catalog/published.hash, which the agent
-// writes after a publish. Stills and page shots are cached as small JPEGs in
-// work/catalog/thumbs/ (rendered by the suite's own playwright-core; none without it).
+// writes after a publish. Stills and page shots are cached in work/catalog/thumbs/ twice — a small
+// JPEG for lists and cards, a sharp WebP for the panel, the zoom and the product map (rendered by
+// the suite's own playwright-core; none without it). Every small one is embedded first; then the
+// sharp ones in the same order, while the page stays under its limit.
 // `runs` lists every night, issue run, scenario run and run by hand with its build, verdicts and report
 // reference — the page is the way into all of them; `found` the issues opened from its problems; `pages[].hotspots` are the controls of the
 // newest UI map with the items that name them, or reach the page the control leads to (the product map). `modules`, `design` and
@@ -40,11 +42,12 @@ const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'wo
 const runsRoot = process.env.QI_RUNS_ROOT ?? join(work, 'suite', '.e2e', 'runs');
 const outDir = join(work, 'catalog');
 const thumbsDir = join(outDir, 'thumbs');
-const IMG_BUDGET = Number(process.env.QI_CATALOG_IMG_BUDGET ?? 6 * 1024 * 1024); // base64 bytes
+const IMG_BUDGET = Number(process.env.QI_CATALOG_IMG_BUDGET ?? 8 * 1024 * 1024); // base64 bytes
 const PAGE_MAX = 9 * 1024 * 1024; // the platform renders a page up to 10 MiB; images give way first
 const notes = [];
 const THUMB_W = 360;
 const MAP_W = 720; // a page shot of the product map: wide enough to click a control on it
+const SHARP_W = 1440; // the sharp copy: the screen at its own size, up to a wide viewport
 const HISTORY_MAX = 30; // newest history entries per item: the page stays a few MB at a year of nights
 const RUNS_MAX = 400; // newest runs of the Runs view
 const HOTSPOTS_MAX = 120; // controls per page of the product map
@@ -87,11 +90,13 @@ try {
 const drifted = (file) => drift.some((d) => String(d.test ?? d.file ?? d).endsWith(file));
 
 // --------------------------------------------------------------------- criteria
-// `# #42 — <title>` / `# S-7 — <title>`, then `## AC-1 — <name>` (or `## EX-1 (from AC-1, …)`)
-// sections with Given/When/Then (Expected) lines, surface and testable.
+// `# #42 — <title>` / `# S-7 — <title>`, an issue's `summary:` line (docs/acceptance-criteria.md → Output),
+// then `## AC-1 — <name>` (or `## EX-1 (from AC-1, …)`) sections with Given/When/Then (Expected) lines,
+// surface and testable.
 function parseCriteria(text) {
   if (!text) return null;
   const title = (text.match(/^# (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*) — (.*?)(?:\s{2,}\S+:.*)?$/m) ?? [])[1] ?? null;
+  const summary = (text.split(/^## /m)[0].match(/^summary:\s*(\S.*?)\s*$/m) ?? [])[1]?.slice(0, 400) ?? null;
   const acs = [];
   for (const sec of text.split(/^## /m).slice(1)) {
     const head = sec.split('\n')[0];
@@ -105,7 +110,7 @@ function parseCriteria(text) {
       surface: line('surface'), testable: testable == null ? true : /^yes/.test(testable),
     });
   }
-  return { title, acs };
+  return { title, summary, acs };
 }
 
 // ------------------------------------------------------------------- test files
@@ -170,6 +175,15 @@ const span = (from, to) => { const a = epoch(from); const b = epoch(to); return 
 const secsOf = (v, utc) => (typeof v.minutes === 'number' && v.minutes > 0 && v.minutes < 1440 ? Math.round(v.minutes * 60) : span(v.started_utc, utc));
 const costOf = (v) => (typeof v.cost_usd === 'number' && Number.isFinite(v.cost_usd) && v.cost_usd >= 0 ? Math.round(v.cost_usd * 100) / 100 : null);
 
+// Why a result is not a pass (docs/reporting.md → Cause of a failure): the product (the feature under
+// test), the test itself, or the environment (the product as a whole did not work in the agent's VM:
+// its install, its deployment configuration, the nested platform). The verdict's own `cause`, else
+// what the verdict claims: `failed` and `regression` a product defect, `needs-review` the test.
+const CAUSES = ['product', 'test', 'environment'];
+const CAUSE_OF = new Set(['failed', 'regression', 'needs-review', 'blocked', 'flaky']);
+const CAUSE_DEFAULT = { failed: 'product', regression: 'product', 'needs-review': 'test' };
+const causeOf = (e, judged = true) => (!CAUSE_OF.has(e?.verdict ?? e?.status) ? null
+  : CAUSES.includes(e?.cause) ? e.cause : judged ? CAUSE_DEFAULT[e?.verdict] ?? null : null);
 const WORST = ['regression', 'failed', 'needs-review', 'flaky', 'inconclusive', 'partial', 'blocked', 'not-testable', 'passed', 'verified'];
 const rank = (v) => (WORST.includes(v) ? WORST.indexOf(v) : WORST.length);
 function readVerdicts(dir, okey, run, ref) {
@@ -182,16 +196,16 @@ function readVerdicts(dir, okey, run, ref) {
     // A scenario's file has no top verdict: its worst criterion stands for the run.
     const worst = (v.acs ?? []).map((e) => e?.verdict).filter(Boolean).sort((a, b) => rank(a) - rank(b))[0] ?? null;
     runs.push({ type: run, ref, build, baseline: v.baseline ?? null, utc, verdict: v.verdict ?? worst, report: artRef(dir), secs: secsOf(v, utc), cost_usd: costOf(v),
-      entries: [...(v.acs ?? []), ...(v.intents ?? []), ...(v.explorations ?? [])].filter((e) => e?.id && e.verdict).map((e) => ({ key: `${okey}/${e.id}`, value: e.verdict })) });
+      entries: [...(v.acs ?? []), ...(v.intents ?? []), ...(v.explorations ?? [])].filter((e) => e?.id && e.verdict).map((e) => ({ key: `${okey}/${e.id}`, value: e.verdict, cause: causeOf(e) })) });
     // An intent test (docs/intent.md) runs in the same candidate run as the criteria.
     for (const ac of [...(v.acs ?? []), ...(v.intents ?? [])]) {
       const key = `${okey}/${ac.id}`;
-      addHist(key, { build, run, value: ac.verdict, utc });
+      addHist(key, { build, run, value: ac.verdict, utc, cause: causeOf(ac) });
       if (v.candidate_run) (stillRuns.get(key) ?? stillRuns.set(key, []).get(key)).push({ label: v.candidate_run, utc });
     }
     for (const ex of v.explorations ?? []) {
       const key = `${okey}/${ex.id}`;
-      addHist(key, { build, run: 'exploration', value: ex.verdict, utc });
+      addHist(key, { build, run: 'exploration', value: ex.verdict, utc, cause: causeOf(ex) });
       if (v.explorations_run) (stillRuns.get(key) ?? stillRuns.set(key, []).get(key)).push({ label: v.explorations_run, utc });
     }
   }
@@ -208,8 +222,8 @@ for (const stem of ls(join(work, 'reruns')).filter((x) => /^(issue-\d+|scenario-
     if (!v || typeof v.results !== 'object') continue;
     const utc = v.utc ?? new Date(mtime(join(work, 'reruns', stem, f))).toISOString().replace(/\.\d+Z$/, 'Z');
     const entries = Object.entries(v.results).filter(([id, r]) => /^(AC|IN|EX)-\d+$/.test(id) && ['passed', 'failed', 'blocked'].includes(r?.status))
-      .map(([id, r]) => ({ key: `${stem}/${id}`, value: r.status }));
-    for (const e of entries) addHist(e.key, { build: v.build ?? null, run: 'rerun', value: e.value, utc });
+      .map(([id, r]) => ({ key: `${stem}/${id}`, value: r.status, cause: causeOf(r, false) }));
+    for (const e of entries) addHist(e.key, { build: v.build ?? null, run: 'rerun', value: e.value, utc, cause: e.cause });
     const worst = entries.map((e) => e.value).sort((a, b) => rank(a) - rank(b))[0] ?? null;
     runs.push({ type: 'rerun', ref: stemRef(stem), build: v.build ?? null, utc, verdict: worst, report: null, secs: secsOf(v, utc), cost_usd: costOf(v),
       label: /^[A-Za-z0-9._-]{1,120}$/.test(String(v.label)) ? v.label : null, entries });
@@ -224,8 +238,8 @@ for (const dir of ls(join(work, 'reruns')).filter((x) => /^feature-[a-z0-9][a-z0
     if (!v || typeof v.results !== 'object') continue;
     const utc = v.utc ?? new Date(mtime(join(work, 'reruns', dir, f))).toISOString().replace(/\.\d+Z$/, 'Z');
     const entries = Object.entries(v.results).filter(([k, r]) => /^(issue-\d+\/(?:AC|IN)|scenario-\d+\/AC|profile-[a-z0-9][a-z0-9-]*\/AC)-\d+$/.test(k) && ['passed', 'failed', 'blocked'].includes(r?.status))
-      .map(([k, r]) => ({ key: k, value: r.status }));
-    for (const e of entries) addHist(e.key, { build: v.build ?? null, run: 'feature', value: e.value, utc });
+      .map(([k, r]) => ({ key: k, value: r.status, cause: causeOf(r, false) }));
+    for (const e of entries) addHist(e.key, { build: v.build ?? null, run: 'feature', value: e.value, utc, cause: e.cause });
     const worst = entries.map((e) => e.value).sort((a, b) => rank(a) - rank(b))[0] ?? null;
     runs.push({ type: 'feature', ref: dir.slice(8), build: v.build ?? null, utc, verdict: worst, report: null, secs: secsOf(v, utc), cost_usd: costOf(v),
       label: /^[A-Za-z0-9._-]{1,120}$/.test(String(v.label)) ? v.label : null, entries });
@@ -247,17 +261,19 @@ const envFailure = (file, utc) => {
 };
 const nights = [];
 const nightOutcomes = new Map(); // build -> Map(item key -> value)
+const nightCauses = new Map(); // build -> Map(item key -> cause)
 const nightFile = new Map(); // build -> its verdicts.json
 for (const c of ls(join(work, 'regression'))) {
   const v = readJson(join(work, 'regression', c, 'verdicts.json'));
   if (!v) continue;
   nightFile.set(c, v);
-  const per = new Map();
+  const per = new Map(); const why = new Map();
   for (const e of v.acs ?? v.entries ?? []) {
     const okey = e.scenario ? scenKey(e.scenario) : `issue-${e.issue}`;
     per.set(`${okey}/${e.id}`, e.verdict);
+    if (causeOf(e)) why.set(`${okey}/${e.id}`, causeOf(e));
   }
-  nightOutcomes.set(c, per);
+  nightOutcomes.set(c, per); nightCauses.set(c, why);
 }
 const TOP = ['regression', 'needs-review', 'healed', 'relearned'];
 const due = new Map(); // candidate -> the pre-flight's `due` time: the night's start
@@ -288,7 +304,7 @@ for (const line of (read(join(work, 'REGRESSION.log')) ?? '').split('\n')) {
     issues: (ctx.issues ?? []).filter((x) => x?.number != null).slice(0, 60).map((x) => ({ number: x.number, title: x.title ?? null })),
     ui_diff: typeof ctx.ui_diff === 'string' ? ctx.ui_diff.slice(0, 4000) : null, signals,
     report: artRef(join(work, 'regression', m[2])),
-    entries: [...(nightOutcomes.get(m[2]) ?? new Map())].map(([key, value]) => ({ key, value })) });
+    entries: [...(nightOutcomes.get(m[2]) ?? new Map())].map(([key, value]) => ({ key, value, cause: nightCauses.get(m[2])?.get(key) ?? null })) });
 }
 // A run whose file says nothing of its length: the events log (docs/logging.md, 14 days) — an issue
 // run's `issue_done minutes=` nearest its verdicts, a scenario run's `scenario_run` before them.
@@ -360,7 +376,7 @@ for (const okey of [...origins].sort((a, b) => a.localeCompare(b, 'en', { numeri
   const parsed = src ? parseTestFile(src) : { summary: null, area: null, tests: [] };
   const meta = isIssue ? issueMeta.get(num) : null;
   const origin = isIssue
-    ? { kind: 'issue', ref, number: +num, title: meta?.title ?? titles.get(okey) ?? crit?.title ?? null, labels: meta?.labels ?? null, state: meta?.state ?? null }
+    ? { kind: 'issue', ref, number: +num, title: meta?.title ?? titles.get(okey) ?? crit?.title ?? null, summary: crit?.summary ?? null, labels: meta?.labels ?? null, state: meta?.state ?? null }
     : { kind: 'scenario', ref, title: crit?.title ?? titles.get(okey) ?? null, source: scen.get(ref)?.source ?? null };
   const ids = [...new Set([...(crit?.acs ?? []).map((a) => a.id), ...(ins?.acs ?? []).map((a) => a.id), ...(exps?.acs ?? []).map((a) => a.id),
     ...parsed.tests.map((t) => t.id).filter(Boolean)])];
@@ -377,7 +393,7 @@ for (const okey of [...origins].sort((a, b) => a.localeCompare(b, 'en', { numeri
       let skipped = since.length;
       if (drifted(file)) while (skipped > 0 && since[skipped - 1].counts.drift > 0) skipped--;
       since.forEach((n, j) => hist.push({ build: n.build, run: 'regression',
-        value: nightOutcomes.get(n.build)?.get(key) ?? (j >= skipped ? 'drift' : 'unchanged'), utc: n.utc }));
+        value: nightOutcomes.get(n.build)?.get(key) ?? (j >= skipped ? 'drift' : 'unchanged'), utc: n.utc, cause: nightCauses.get(n.build)?.get(key) ?? null }));
     }
     hist.sort((a, b) => String(a.utc).localeCompare(String(b.utc)));
     hist.splice(0, Math.max(0, hist.length - HISTORY_MAX));
@@ -485,8 +501,9 @@ const design = (readJson(join(work, 'design', 'findings.json'))?.findings ?? [])
 // The issues opened from the dashboard's problems (skills/create-issue, work/FOUND.md): per problem
 // its issue's number and address — one issue may stand for several problems.
 const found = rows(join(work, 'FOUND.md')).filter(([ref, issue, url]) => ref && /^#\d+$/.test(issue ?? '') && /^https:\/\/\S+$/.test(url ?? ''))
-  .map(([ref, issue, url, build, labels, utc]) => ({ ref, issue: +issue.slice(1), url, build: build && build !== '-' ? build : null,
-    labels: String(labels ?? '').split(',').map((x) => x.trim()).filter((x) => x && x !== '-'), utc: utc || null }));
+  .map(([ref, issue, url, build, labels, utc, title]) => ({ ref, issue: +issue.slice(1), url, build: build && build !== '-' ? build : null,
+    labels: String(labels ?? '').split(',').map((x) => x.trim()).filter((x) => x && x !== '-'), utc: utc || null,
+    title: title && title !== '-' ? title.slice(0, 200) : null }));
 const valFile = newestOf('validation', 'results.json');
 const val = valFile ? readJson(valFile) : null;
 const stressFile = newestOf('stress', 'stress.json');
@@ -540,7 +557,9 @@ const findings = {
 // issues with no row yet, the queued scenario requests, and the schedules' name, switch and cron.
 const lockLine = (read(join(work, 'env', 'LOCK')) ?? '').trim().split(/\s+/);
 const qaRows = rows(join(work, 'QA.md')).filter(([n]) => /^\d+$/.test(n));
-const qaRow = ([n, , candidate, baseline, verdict, status, utc]) => ({ issue: +n, title: issueMeta.get(n)?.title ?? null, build: candidate && candidate !== '-' ? candidate : null,
+// An issue's title: GitHub's, else its frozen criteria's (the listing may have failed).
+const issueTitle = (n) => issueMeta.get(n)?.title ?? parseCriteria(read(join(work, 'issues', n, `criteria-${qa.get(n)?.acHash}.md`)))?.title ?? null;
+const qaRow = ([n, , candidate, baseline, verdict, status, utc]) => ({ issue: +n, title: issueTitle(n), build: candidate && candidate !== '-' ? candidate : null,
   baseline: baseline && baseline !== '-' ? baseline : null, verdict: verdict && verdict !== '-' ? verdict : null, status, utc: utc || null });
 const retestLabel = cfg('retest_label') || 'qa:retest';
 const sched = readJson(join(work, 'schedules.json'));
@@ -583,17 +602,19 @@ function stillSource(item) {
 
 const jobs = [];
 const thumbOf = (name) => join(thumbsDir, `${slug(name)}.jpg`);
-for (const item of items) {
-  const dst = thumbOf(item.key);
-  const src = stillSource(item);
-  if (src && mtime(src) > mtime(dst)) jobs.push({ src, dst, w: THUMB_W });
-  item._thumb = dst;
-}
+const sharpOf = (name) => join(thumbsDir, `${slug(name)}.full.webp`);
+// Each source twice: the small JPEG (`h` at most 1.25 × its width, as before) and the sharp WebP
+// (a still up to twice its width tall; a page shot as its small one, so the map's outlines agree).
+const queue = (src, name, w, tall) => {
+  const dst = thumbOf(name); const full = sharpOf(name);
+  if (src && mtime(src) > mtime(dst)) jobs.push({ src, dst, w, tall: 1.25, type: 'image/jpeg', q: 0.72 });
+  if (src && mtime(src) > mtime(full)) jobs.push({ src, dst: full, w: SHARP_W, tall, type: 'image/webp', q: 0.82 });
+  return [dst, full];
+};
+for (const item of items) [item._thumb, item._sharp] = queue(stillSource(item), item.key, THUMB_W, 2);
 for (const p of pages) {
-  const dst = thumbOf(`map-${p.pattern}`);
   const src = p._shot ? join(newestMap, p._shot) : null;
-  if (src && existsSync(src) && mtime(src) > mtime(dst)) jobs.push({ src, dst, w: MAP_W });
-  p._thumb = dst;
+  [p._thumb, p._sharp] = queue(src && existsSync(src) ? src : null, `map-${p.pattern}`, MAP_W, 1.25);
 }
 
 // A browser draws each image onto a canvas `w` wide (tall shots cropped) and returns a JPEG.
@@ -611,19 +632,20 @@ async function renderThumbs(list) {
     await page.route('**', (r) => r.abort());
     mkdirSync(thumbsDir, { recursive: true });
     let n = 0;
-    for (const { src, dst, w } of list) {
+    for (const { src, dst, w, tall, type, q } of list) {
       const mime = src.endsWith('.png') ? 'image/png' : 'image/jpeg';
       const data = `data:${mime};base64,${readFileSync(src).toString('base64')}`;
-      const out = await page.evaluate(async ({ data, w }) => {
+      const out = await page.evaluate(async ({ data, w, tall, type, q }) => {
         const img = new Image(); img.src = data; await img.decode();
         const s = Math.min(1, w / img.naturalWidth);
         const c = document.createElement('canvas');
-        c.width = Math.round(img.naturalWidth * s); c.height = Math.round(Math.min(img.naturalHeight * s, w * 1.25));
+        c.width = Math.round(img.naturalWidth * s); c.height = Math.round(Math.min(img.naturalHeight * s, c.width * tall));
         const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+        g.imageSmoothingQuality = 'high';
         g.drawImage(img, 0, 0, img.naturalWidth * s, img.naturalHeight * s);
-        return c.toDataURL('image/jpeg', 0.62);
-      }, { data, w }).catch(() => null);
-      if (!out) continue;
+        return c.toDataURL(type, q);
+      }, { data, w, tall, type, q }).catch(() => null);
+      if (!out || !out.startsWith(`data:${type};`)) continue;
       writeFileSync(`${dst}.tmp`, Buffer.from(out.split(',')[1], 'base64')); renameSync(`${dst}.tmp`, dst); n++;
     }
     return `${n} rendered`;
@@ -633,23 +655,25 @@ async function renderThumbs(list) {
 const thumbnails = await renderThumbs(jobs);
 
 // Thumbnails of items and pages that no longer exist are a stale cache: removed one by one.
-const wanted = new Set([...items, ...pages].map((x) => x._thumb));
-for (const f of ls(thumbsDir).filter((x) => x.endsWith('.jpg'))) if (!wanted.has(join(thumbsDir, f))) { try { rmSync(join(thumbsDir, f)); } catch { /* next run */ } }
+const wanted = new Set([...items, ...pages].flatMap((x) => [x._thumb, x._sharp]));
+for (const f of ls(thumbsDir).filter((x) => x.endsWith('.jpg') || x.endsWith('.webp'))) if (!wanted.has(join(thumbsDir, f))) { try { rmSync(join(thumbsDir, f)); } catch { /* next run */ } }
 
 // Embed within the budget — what the data leaves of PAGE_MAX, at most IMG_BUDGET: regression
 // items' stills first, then the design crops, then the product map's page shots (pages tests reach first), then the
 // other stills by tier, newest verdict first. A page without its shot still shows its controls.
+// What the small ones leave goes to the sharp copies, in the same order; the page shows the small
+// one where its sharp copy did not fit.
 const images = {};
-let used = 0; let dropped = 0; let seq = 0;
+let used = 0; let dropped = 0; let seq = 0; let sharpN = 0; let sharpDropped = 0;
 const base = Buffer.byteLength(JSON.stringify({ items, pages, nights, runs, modules, design, findings, found, features, maintenance }, (k, v) => (k.startsWith('_') ? undefined : v)))
   + Buffer.byteLength(read(join(HERE, 'catalog', 'viewer.html')) ?? '');
 const budget = Math.max(0, Math.min(IMG_BUDGET, PAGE_MAX - base));
 if (budget < IMG_BUDGET) notes.push(`image budget cut to ${Math.round(budget / 1024)} KiB by the size of the data`);
-const embed = (path) => {
-  if (!existsSync(path)) return null;
-  const uri = `data:image/jpeg;base64,${readFileSync(path).toString('base64')}`;
-  if (used + uri.length > budget) { dropped++; return null; }
-  used += uri.length; const id = `i${seq++}`; images[id] = uri; return id;
+const embed = (path, sharp = false) => {
+  if (!path || !existsSync(path)) return null;
+  const uri = `data:image/${path.endsWith('.webp') ? 'webp' : 'jpeg'};base64,${readFileSync(path).toString('base64')}`;
+  if (used + uri.length > budget) { if (sharp) sharpDropped++; else dropped++; return null; }
+  used += uri.length; const id = `i${seq++}`; images[id] = uri; if (sharp) sharpN++; return id;
 };
 const RANK = { regression: 0, promotable: 1, exploratory: 2 };
 const byRank = items.slice().sort((a, b) => (RANK[a.tier] ?? 3) - (RANK[b.tier] ?? 3)
@@ -659,9 +683,13 @@ const DSEV = { major: 0, minor: 1 };
 for (const f of design.slice().sort((a, b) => (a.status === 'open' ? 0 : 1) - (b.status === 'open' ? 0 : 1) || (DSEV[a.severity] ?? 2) - (DSEV[b.severity] ?? 2)
   || String(b.last_seen ?? '').localeCompare(String(a.last_seen ?? ''))).slice(0, DESIGN_CROPS_MAX)) f.crop = embed(f._crop);
 const COV = { regression: 0, exploratory: 1 };
-for (const p of pages.slice().sort((a, b) => (COV[a.covered] ?? 2) - (COV[b.covered] ?? 2))) p.shot = embed(p._thumb);
+const pagesByCov = pages.slice().sort((a, b) => (COV[a.covered] ?? 2) - (COV[b.covered] ?? 2));
+for (const p of pagesByCov) p.shot = embed(p._thumb);
 for (const item of byRank.filter((i) => i.tier !== 'regression')) item.still = embed(item._thumb);
-for (const x of [...items, ...pages, ...design]) { delete x._thumb; delete x._shot; delete x._body; delete x._crop; }
+for (const item of byRank.filter((i) => i.tier === 'regression')) item.still_sharp = item.still ? embed(item._sharp, true) : null;
+for (const p of pagesByCov) p.shot_sharp = p.shot ? embed(p._sharp, true) : null;
+for (const item of byRank.filter((i) => i.tier !== 'regression')) item.still_sharp = item.still ? embed(item._sharp, true) : null;
+for (const x of [...items, ...pages, ...design]) { delete x._thumb; delete x._sharp; delete x._shot; delete x._body; delete x._crop; }
 
 // ------------------------------------------------------------------------ output
 const builds = [...new Map([...items.flatMap((i) => i.history), ...nights].filter((h) => h.build)
@@ -709,4 +737,4 @@ const html = template.replace('__QI_CATALOG_DATA__', () => JSON.stringify(data).
 writeFileSync(join(outDir, 'index.html.tmp'), html); renameSync(join(outDir, 'index.html.tmp'), join(outDir, 'index.html'));
 const published = (read(join(outDir, 'published.hash')) ?? '').trim();
 console.log(JSON.stringify({ html: join(outDir, 'index.html'), bytes: Buffer.byteLength(html), items: items.length,
-  images: Object.keys(images).length, dropped_images: dropped, thumbnails, notes, hash, changed: hash !== published }));
+  images: Object.keys(images).length, dropped_images: dropped, sharp_images: sharpN, sharp_dropped: sharpDropped, thumbnails, notes, hash, changed: hash !== published }));
