@@ -7,6 +7,21 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.34.0 — 2026-10-26
+
+**Upgrade:**
+Nothing to run — docs are re-read per run. New on the dashboard ([docs/catalog.md](docs/catalog.md)):
+1. Every link to an issue or a scenario shows its title, and the issue's panels its summary: a
+   criteria file now has a `summary:` line ([docs/acceptance-criteria.md](docs/acceptance-criteria.md)
+   → Output). A file frozen before has none until its next freeze.
+2. Every result that is not a pass names its `cause` — `product`, `test` or `environment`
+   ([docs/reporting.md](docs/reporting.md) → Cause of a failure; regression entries
+   [docs/triage.md](docs/triage.md) → Cause). Earlier verdicts files stay as they are: a `failed`
+   or `regression` shows as a product defect, a `needs-review` as a test defect, the rest as not known.
+3. Sharp screenshots: a WebP copy up to 1440 px beside each small JPEG in `work/catalog/thumbs/`,
+   rendered on the next build of the catalog; the image budget is 8 MiB.
+4. `work/FOUND.md` gets a `title` column, written by `github.sh create-issue`; earlier rows have none.
+
 ## 3.33.1 — 2026-10-26
 
 **Upgrade:**

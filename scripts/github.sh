@@ -106,10 +106,11 @@ create_issue() { # <draft-dir> [--fix] [--again]
     --jq '{number, url: .html_url, labels: [.labels[]?.name]}')" || exit 1
   n="$(jq -r '.number // empty' <<<"$out" 2>/dev/null)"; url="$(jq -r '.url // empty' <<<"$out" 2>/dev/null)"
   [[ "$n" =~ ^[0-9]+$ ]] || { echo "github.sh: the answer names no issue number" >&2; exit 1; }
-  [ -f "$WORK/FOUND.md" ] || printf '%s\n| --- | --- | --- | --- | --- | --- |\n' "$FOUND_HEADER" > "$WORK/FOUND.md"
+  [ -f "$WORK/FOUND.md" ] || printf '%s\n| --- | --- | --- | --- | --- | --- | --- |\n' "$FOUND_HEADER" > "$WORK/FOUND.md"
   got="$(jq -r '.labels | join(",")' <<<"$out")"; now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  # The title is the dashboard's name of the issue: one table cell, so a `|` becomes `/`.
   for ref in "${refs[@]}"; do
-    printf '| %s | #%s | %s | %s | %s | %s |\n' "$ref" "$n" "$url" "$build" "${got:--}" "$now" >> "$WORK/FOUND.md" \
+    printf '| %s | #%s | %s | %s | %s | %s | %s |\n' "$ref" "$n" "$url" "$build" "${got:--}" "$now" "${title//|//}" >> "$WORK/FOUND.md" \
       || echo "github.sh: issue #$n created, but work/FOUND.md could not be written" >&2
   done
   logev info issue_created "issue=$n refs=${#refs[@]} fix=$fix build=$build"
