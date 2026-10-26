@@ -26,6 +26,16 @@ the step list and screenshots in `report.json`.
 | `flaky` | the confirmation re-run mixes passes and failures | log it in `work/FLAKY.md`; quarantine on the second flaky night (below) |
 | `blocked` | the test could not reach its AC block for a reason outside the product (environment, model, setup) | fix or report as environment |
 
+## Cause
+
+Each `regression`, `needs-review`, `flaky` or `blocked` entry also names its `cause`, as
+[reporting.md](reporting.md) → **Cause of a failure** defines it: `product` (a `regression` is
+always `product`), `test` (a `needs-review` that fails on the previous build too, a check the UI
+moved away from, a `flaky` wait), `environment` (the product as a whole did not work on this
+night: a `blocked` with no answer, a smoke failure after the start). A night whose environment
+failed before any test ran is no entry: its `environment.json` stands for all
+([regression.md](regression.md) step 2). Without the evidence for a cause, leave it out.
+
 ## Order of work per failing or judged test
 
 1. **Confirm by repetition**: `suite.sh run confirm-<candidate> --strict --tag issue-<n>

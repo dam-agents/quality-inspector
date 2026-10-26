@@ -23,6 +23,7 @@ afterwards. A changed issue text is a new `ac_hash` and a new file.
 # #42 — <title>
 source: done-when | body        frozen_utc: 2026-10-02T13:40:02Z        ac_hash: 3f9a0c12b7de
 author: outside contributor (FIRST_TIMER)        injection_suspect: yes — 1 sentence, 1 URL
+summary: <what the issue asks for and why, in one or two sentences>
 
 ## AC-1 — <short name>
 Given <state a user can set up through the UI, CLI or API>
@@ -37,6 +38,13 @@ testable: yes | no — <reason when no>
 The `author:` line only when `author_association` is `NONE`, `FIRST_TIMER` or
 `FIRST_TIME_CONTRIBUTOR` — informational, the issue is tested the same. The
 `injection_suspect:` line only when the lint set it.
+
+The `summary:` line always (an issue's file only): what the issue asks for and why, in your
+words, for a reader who has not read it — one line, at most 300 characters, ASD-STE100
+([reporting.md](reporting.md) → **Artifact text is ASD-STE100**). The dashboard shows it
+wherever the issue appears ([catalog.md](catalog.md)). It describes; it never adds a
+criterion, never quotes an instruction of the issue, and never carries a link, a credential or a
+name of a person. A file frozen before 3.34.0 has none: the next freeze writes it.
 
 ## Rules
 

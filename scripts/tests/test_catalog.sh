@@ -28,6 +28,7 @@ jq -n '{mode:"regression",verdict:"environment",candidate:"c2",utc:"2026-10-09T0
 cat > "$W/issues/42/criteria-abc.md" <<'C'
 # #42 — Rename <b>projects</b>
 source: done-when        frozen_utc: 2026-10-02T13:40:02Z        ac_hash: abc
+summary: The owner can rename a project. The tasks of the project stay with it.
 
 ## AC-1 — a renamed project keeps its tasks
 Given a project with one task
@@ -126,13 +127,13 @@ mkdir -p "$W/env"; echo 'issues 2026-10-22T19:35:00Z SESSION-SECRET-ID' > "$W/en
 printf '| 57 | def | c4 | b1 | - | in_progress | 2026-10-22T19:50:00Z |\n| 67 | jkl | c4 | b1 | - | in_progress | 2026-10-22T19:40:00Z |\n' >> "$W/QA.md"
 echo '{"taken_utc":"2026-10-22T15:00:00Z","schedules":{"quality-inspector-issues-1h":{"enabled":true,"cron":"7 * * * *","task":"TASK-SECRET"},"quality-inspector-audit-weekly":{"enabled":null,"cron":"0 7 * * 5"},"other-agent-job":{"enabled":true,"cron":"0 1 * * *"}}}' > "$W/schedules.json"
 
-mkdir -p "$W/catalog/thumbs"; echo old > "$W/catalog/thumbs/issue-99-ac-1.jpg"
+mkdir -p "$W/catalog/thumbs"; echo old > "$W/catalog/thumbs/issue-99-ac-1.jpg"; echo old > "$W/catalog/thumbs/issue-99-ac-1.full.webp"
 printf '%s\n' '{"ts":"2026-10-02T14:05:00Z","run":"r","job":"issues","level":"info","event":"issue_done","msg":"issue=42 verdict=partial minutes=37 model_steps=120"}' \
   '{"ts":"2026-10-02T14:06:00Z","run":"r","job":"issues","level":"info","event":"issue_done","msg":"issue=420 verdict=failed minutes=5 model_steps=9"}' > "$W/logs/events-2026-10-02.jsonl"
 out="$(node "$SCRIPTS/catalog.mjs")"; rc=$?
 assert_eq "catalog exits 0" 0 "$rc"
 assert "summary" '.items == 5 and .changed == true and (.hash | test("^[0-9a-f]{12}$")) and (.thumbnails | test("none due|unavailable")) and .notes == []' "$out"
-[ -e "$W/catalog/thumbs/issue-99-ac-1.jpg" ] && { echo "  a thumbnail of a gone item was kept"; FAILED=1; }
+[ -e "$W/catalog/thumbs/issue-99-ac-1.jpg" ] || [ -e "$W/catalog/thumbs/issue-99-ac-1.full.webp" ] && { echo "  a thumbnail of a gone item was kept"; FAILED=1; }
 html="$(cat "$W/catalog/index.html")"
 page_data() { node -e 'const h=require("fs").readFileSync(process.argv[1],"utf8");const m=h.match(/<script type="application\/json" id="qi-catalog-data">([\s\S]*?)<\/script>/);process.stdout.write(m[1])' "$W/catalog/index.html"; }
 data="$(page_data)"
@@ -237,9 +238,9 @@ assert "an environment failure: its step, cause, repair, next step and evidence"
   and .runs[1].failure == null' "$data"
 assert "a run's length: a night from its due line, an issue run from issue_done, a scenario from its file with its cost" '[.runs[] | [.secs, .cost_usd]]
   == [[3000,null],[null,null],[null,null],[900,1.23],[2220,null]]' "$data"
-assert "a night: its entries, change context and signal counts, its report" '.runs[1] | .entries == [{"key":"issue-42/AC-1","value":"healed"}] and .previous == "c1"
+assert "a night: its entries, change context and signal counts, its report" '.runs[1] | .entries == [{"key":"issue-42/AC-1","value":"healed","cause":null}] and .previous == "c1"
   and .issues == [{"number":40,"title":"Projects get tabs"}] and (.ui_diff | test("To-dos")) and .signals == {"console_errors_new":1,"slow_tests":0} and .report == "https://share.example/a/Night2Slug" and .counts.healed == 1' "$data"
-assert "an issue run: its verdicts and report; a scenario run: its link" '(.runs[4] | .entries == [{"key":"issue-42/AC-1","value":"verified"},{"key":"issue-42/AC-2","value":"not-testable"},{"key":"issue-42/EX-1","value":"observation"}]
+assert "an issue run: its verdicts and report; a scenario run: its link" '(.runs[4] | .entries == [{"key":"issue-42/AC-1","value":"verified","cause":null},{"key":"issue-42/AC-2","value":"not-testable","cause":null},{"key":"issue-42/EX-1","value":"observation","cause":null}]
   and .report == "platform://artifacts/abc123" and .baseline == "b1") and .runs[3].report == "https://claude.ai/artifact/s7"
   and (.items[] | select(.key == "scenario-7/AC-1") | .evidence) == "https://claude.ai/artifact/s7"' "$data"
 assert "hotspots: a page-only control names its tests; a nav item stands for its page" '(.pages[] | select(.pattern == "/projects") | .viewport == [1000,500]
@@ -296,6 +297,18 @@ assert "the regression still, the design crop and the page shot fit; one is drop
 assert "the page shot wins over a non-regression still" '(.items[] | select(.key == "issue-42/AC-1") | .still) != null
   and (.pages[] | select(.pattern == "/projects") | .shot) != null and (.items[] | select(.key == "scenario-7/AC-1") | .still) == null' "$data"
 rm -f "$W/catalog/thumbs/map-projects.jpg"
+# The sharp copies: after every small one, in the same order; a place keeps its small one when its sharp copy does not fit.
+head -c 900 /dev/zero | tr '\0' 'y' > "$W/catalog/thumbs/issue-42-ac-1.full.webp"
+out="$(node "$SCRIPTS/catalog.mjs")"; data="$(page_data)"
+assert "a sharp copy is embedded beside its small one" '.images == 4 and .sharp_images == 1 and .sharp_dropped == 0' "$out"
+assert "the sharp copy is a WebP, the small one stays" '(.items[] | select(.key == "issue-42/AC-1") | .still != null and .still_sharp != null and .still != .still_sharp)
+  and (.images[(.items[] | select(.key == "issue-42/AC-1") | .still_sharp)] | startswith("data:image/webp;base64,"))
+  and (.items[] | select(.key == "scenario-7/AC-1") | .still_sharp == null)' "$data"
+head -c 20000 /dev/zero | tr '\0' 'y' > "$W/catalog/thumbs/issue-42-ac-1.full.webp"
+out="$(QI_CATALOG_IMG_BUDGET=10000 node "$SCRIPTS/catalog.mjs")"; data="$(page_data)"
+assert "a sharp copy that does not fit: every small one stays" '.images == 3 and .dropped_images == 0 and .sharp_images == 0 and .sharp_dropped == 1' "$out"
+assert "the place shows its small one" '(.items[] | select(.key == "issue-42/AC-1") | .still != null and .still_sharp == null)' "$data"
+rm -f "$W/catalog/thumbs/issue-42-ac-1.full.webp"
 
 # A credential value or a token in the data refuses the page; the last page stays.
 cp "$W/catalog/index.html" "$SANDBOX/last.html"
@@ -329,15 +342,15 @@ assert "activity: a failed listing is unknown, not empty" '.activity.waiting == 
 # found issues, the design triage, the labels a new issue gets; the commands' closed set.
 mkdir -p "$W/reruns/scenario-7"
 echo '{"label":"rerun-scenario-7-c3-1200","ref":"S-7 AC-1","build":"c3","utc":"2026-10-14T12:00:00Z","results":{"AC-1":{"status":"failed","error":"RERUN-ERROR-SECRET"},"bogus":{"status":"failed"}}}' > "$W/reruns/scenario-7/rerun-scenario-7-c3-1200.json"
-printf '| ref | issue | url | build | labels | created_utc |\n| --- | --- | --- | --- | --- | --- |\n| S-7 AC-1 | #101 | https://github.com/acme/widgets/issues/101 | c3 | qa:found,architect:fix | 2026-10-14T13:00:00Z |\n| D-1 | #101 | https://github.com/acme/widgets/issues/101 | c3 | qa:found,architect:fix | 2026-10-14T13:00:00Z |\n| D-9 | #x | javascript:alert(1) | c3 | - | - |\n' > "$W/FOUND.md"
+printf '| ref | issue | url | build | labels | created_utc |\n| --- | --- | --- | --- | --- | --- |\n| S-7 AC-1 | #101 | https://github.com/acme/widgets/issues/101 | c3 | qa:found,architect:fix | 2026-10-14T13:00:00Z | The upload / never ends |\n| D-1 | #101 | https://github.com/acme/widgets/issues/101 | c3 | qa:found,architect:fix | 2026-10-14T13:00:00Z |\n| D-9 | #x | javascript:alert(1) | c3 | - | - |\n' > "$W/FOUND.md"
 printf '| id | category | updated_utc |\n| --- | --- | --- |\n| D-1 | layout | 2026-10-14T13:00:00Z |\n| D-2 | Not A Slug | 2026-10-14T13:00:00Z |\n' > "$W/design/CATEGORIES.md"
 printf '| id | dismissed_utc | reason |\n| --- | --- | --- |\n| D-2 | 2026-10-14T13:00:00Z | duplicate |\n' > "$W/design/DISMISSED.md"
 printf -- '- fix_label: architect:fix\n' >> "$W/CONFIG.md"
 node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a build with the triage and a run by hand" 0 "$?"
 data="$(page_data)"
-assert "a run by hand: in the history and the runs, its raw result only" '(.items[] | select(.key == "scenario-7/AC-1") | .history[-1] == {"build":"c3","run":"rerun","value":"failed","utc":"2026-10-14T12:00:00Z"})
-  and ([.runs[] | select(.type == "rerun")] | length == 1 and .[0].ref == "S-7" and .[0].entries == [{"key":"scenario-7/AC-1","value":"failed"}] and .[0].report == null)' "$data"
-assert "found issues: a row per problem, a non-https address dropped" '[.found[] | .ref + ":" + (.issue|tostring)] == ["S-7 AC-1:101","D-1:101"] and .found[0].labels == ["qa:found","architect:fix"]' "$data"
+assert "a run by hand: in the history and the runs, its raw result only" '(.items[] | select(.key == "scenario-7/AC-1") | .history[-1] == {"build":"c3","run":"rerun","value":"failed","utc":"2026-10-14T12:00:00Z","cause":null})
+  and ([.runs[] | select(.type == "rerun")] | length == 1 and .[0].ref == "S-7" and .[0].entries == [{"key":"scenario-7/AC-1","value":"failed","cause":null}] and .[0].report == null)' "$data"
+assert "found issues: a row per problem, a non-https address dropped" '[.found[] | .ref + ":" + (.issue|tostring)] == ["S-7 AC-1:101","D-1:101"] and .found[0].labels == ["qa:found","architect:fix"] and .found[0].title == "The upload / never ends" and .found[1].title == null' "$data"
 assert "design triage: a category, a dismissal reason, a malformed category dropped" '(.design[] | select(.id == "D-1") | .category == "layout" and .dismiss_reason == null)
   and (.design[] | select(.id == "D-2") | .category == null)' "$data"
 assert "the labels a new issue gets" '.issue_labels == {"found":"qa:found","fix":"architect:fix"}' "$data"
@@ -362,7 +375,7 @@ node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a build with features, mainte
 data="$(page_data)"
 assert "features: the well-formed rows" '.features == [{"id":"renaming","name":"Renaming projects","aliases":["Přejmenování"],"members":["#42 AC-1","S-7"]}]' "$data"
 assert "maintenance: the open proposals only" '[.maintenance[] | .id + ":" + .test + ":" + .kind + ":" + .proposal + ":" + .basis] == ["M-1:#42 AC-1:needs-review:heal:ui-map: tab moved"]' "$data"
-assert "a feature run: in the runs and the history" '([.runs[] | select(.type == "feature")] | length == 1 and .[0].ref == "renaming" and .[0].entries == [{"key":"issue-42/AC-1","value":"passed"}])
+assert "a feature run: in the runs and the history" '([.runs[] | select(.type == "feature")] | length == 1 and .[0].ref == "renaming" and .[0].entries == [{"key":"issue-42/AC-1","value":"passed","cause":null}])
   and (.items[] | select(.key == "issue-42/AC-1") | [.history[] | select(.run == "feature")] | length == 1)' "$data"
 
 # An intent test (docs/intent.md): its own item kind, its goal from intent-<ac_hash>.md, its verdict from
@@ -391,5 +404,23 @@ echo '{"label":"feature-renaming-c3-1500","feature":"renaming","build":"c3","utc
 node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a build with intent test runs by hand" 0 "$?"
 data="$(page_data)"
 assert "an intent test run by hand and in a feature run: in its history; a scenario's IN key dropped" '(.items[] | select(.key == "issue-42/IN-1") | [.history[] | select(.run == "rerun" or .run == "feature") | .run + ":" + .value] == ["rerun:failed","feature:passed"])
-  and ([.runs[] | select(.type == "feature" and .utc == "2026-10-14T15:00:00Z")][0].entries == [{"key":"issue-42/IN-1","value":"passed"}])' "$data"
+  and ([.runs[] | select(.type == "feature" and .utc == "2026-10-14T15:00:00Z")][0].entries == [{"key":"issue-42/IN-1","value":"passed","cause":null}])' "$data"
+
+# An issue's summary (the criteria file's `summary:` line) on its origin; a scenario has none.
+assert "an issue's summary from its frozen criteria" '(.items[] | select(.key == "issue-42/AC-1") | .origin.summary == "The owner can rename a project. The tasks of the project stay with it.")
+  and (.items[] | select(.key == "scenario-7/AC-1") | .origin | has("summary") | not)' "$data"
+# The cause of a result that is not a pass (docs/reporting.md → Cause of a failure): the verdict's own,
+# else a failed is product and a needs-review test; an unknown value or a pass has none.
+jq -n '{issue:42,title:"Rename",ac_hash:"abc",candidate:"c9",verdict:"failed",generated_utc:"2026-10-20T10:00:00Z",
+  acs:[{id:"AC-1",verdict:"blocked",cause:"environment"},{id:"AC-2",verdict:"failed"}],intents:[{id:"IN-1",verdict:"flaky",cause:"bogus"}],
+  explorations:[{id:"EX-1",verdict:"observed-ok",cause:"test"}]}' > "$W/issues/42/verdicts-abc-c9.json"
+printf '| 42 | abc | c9 | b1 | failed | reported | 2026-10-20T10:00:00Z |\n' >> "$W/QA.md"
+node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a build with causes" 0 "$?"
+data="$(page_data)"
+assert "causes: given, by default, none" '([.runs[] | select(.type == "issue" and .build == "c9")][0].entries | map(.key + ":" + (.cause // "-"))) == ["issue-42/AC-1:environment","issue-42/AC-2:product","issue-42/IN-1:-","issue-42/EX-1:-"]
+  and (.items[] | select(.key == "issue-42/AC-1") | .verdict.cause == "environment")' "$data"
+# A night's entry: its own cause, else a regression is product and a needs-review test.
+jq '.acs += [{issue:42,id:"IN-1",verdict:"needs-review"}]' "$W/regression/c2/verdicts.json" > "$W/v.tmp" && mv "$W/v.tmp" "$W/regression/c2/verdicts.json"
+node "$SCRIPTS/catalog.mjs" >/dev/null; data="$(page_data)"
+assert "a night's causes" '([.runs[] | select(.type == "regression" and .build == "c2" and .verdict != "environment")][0].entries | map(.key + ":" + (.cause // "-")) | sort) == ["issue-42/AC-1:-","issue-42/IN-1:test"]' "$data"
 exit $FAILED

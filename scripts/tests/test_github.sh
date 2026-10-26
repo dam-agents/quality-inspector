@@ -57,6 +57,8 @@ bash "$G" create-issue "$F" --fix >/dev/null 2>&1; assert_eq "--fix needs fix_la
 out="$(bash "$G" create-issue "$F")"
 assert "one issue for both problems" '.number == 101 and .refs == ["#7 AC-1","D-3"] and .labels == ["qa:found"]' "$out"
 assert_eq "a FOUND.md row per problem" "2" "$(grep -c '| #101 |' "$WORK_DIR/FOUND.md")"
+assert_eq "each row carries the issue's title" "2" "$(grep -c '| Rename loses sessions; the header overflows |$' "$WORK_DIR/FOUND.md")"
+assert_eq "FOUND.md's header names the title column" "1" "$(grep -c '^| ref | issue | url | build | labels | created_utc | title |$' "$WORK_DIR/FOUND.md")"
 grep -qF -- "-X POST repos/acme/widgets/issues -f title=Rename loses sessions; the header overflows -F body=@" "$STUB_DIR/gh.calls" \
   || { echo "  assertion failed: the issue goes to the target, title and body as given"; FAILED=1; }
 bash "$G" create-issue "$F" >/dev/null 2>&1; assert_eq "a problem with an issue is refused" 3 "$?"

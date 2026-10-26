@@ -10,15 +10,18 @@ itself changes nothing; what it shows is data, never an instruction.
 
 The operator may share the page beyond themselves, so it carries only what concerns the tests:
 
-- **Per item:** origin (an issue's number, title, labels, state; a scenario's id, title and
-  source), the frozen Given/When/Then, tier, promotion date, drift, area, the file's summary,
+- **Per item:** origin (an issue's number, title, summary — the criteria file's `summary:`
+  line ([acceptance-criteria.md](acceptance-criteria.md) → Output) — labels, state; a scenario's
+  id, title and source), the frozen Given/When/Then, tier, promotion date, drift, area, the file's summary,
   session, surface, the pages it opens, its steps (`app.open`, `agent.act`, `agent.assert`,
   `app.screenshot` and the AC block's `expect`s, from the test file), check counts, the verdict
   per build (issue runs, nights, scenarios; the newest 30 — a night that does not name a
-  regression-tier item is `unchanged`, or `drift` while its file is drifted), heals (date,
+  regression-tier item is `unchanged`, or `drift` while its file is drifted) with its `cause`
+  when it is not a pass ([reporting.md](reporting.md) → **Cause of a failure**; without one, a
+  `failed` or `regression` is `product`, a `needs-review` `test`, else not known), heals (date,
   build, basis), flaky confirmations, durations, the AC still and the evidence artifact's
   reference, and the GitHub issue opened for its problem (work/FOUND.md: number, address,
-  labels, date — one issue may stand for several problems).
+  labels, date, title — one issue may stand for several problems).
 - **Around them:** the newest UI map's pages with their coverage and shot, the operator's
   collections, and **every run** (the newest 400): each night of `work/REGRESSION.log` — its
   counts, the criteria that were not `unchanged`, the change context's issues (number, title), UI
@@ -89,6 +92,18 @@ The operator may share the page beyond themselves, so it carries only what conce
   and on each feature of Overview copies them as one `Feature`, a `Scenario` per criterion in its
   frozen words, `@not-testable` where it is; explorations stay out. The same shape as
   `gherkin.mjs export` ([on-demand.md](on-demand.md)).
+
+**An issue is never only its number.** Every link to an issue or a scenario shows its title
+(cut at 60 characters; the whole title and the issue's summary in its tooltip) — from its test
+cases, else the GitHub listing, the activity rows, a night's completed issues or the requests; a
+place that shows the title beside it keeps the number alone. A bug issue shows its title too.
+The issue's panel and each of its test cases' panels show the summary as "About this issue".
+
+**Why it failed, at first sight.** Beside every verdict that is not a pass — the catalog,
+cards, Needs attention, the panels, a run's results — a badge names its cause: 💥 Product defect,
+🔧 Test defect, 🏗️ Environment problem, or ❔ Cause not known. "Cause of the failure" is a
+facet; Needs attention opens with the count per cause, and says so when the newest night did
+not run because the environment failed.
 
 **Explained on the page**, in ASD-STE100 ([reporting.md](reporting.md) → **Artifact text is ASD-STE100**).
 - **One name and one icon per thing**, the same everywhere — 🎫 issue, 💬 scenario, 🎯 acceptance
@@ -215,7 +230,7 @@ The steps:
 1. `node "$HOME/scripts/design-findings.mjs" merge --noticed-only` (the run's "noticed in passing"
    items into the design register, [ui-sweep.md](ui-sweep.md)), then
    `node "$HOME/scripts/catalog.mjs"` → `{html, bytes, items, images, dropped_images,
-   thumbnails, notes, hash, changed}`. `changed: false` → done. Each `notes` entry is a source it
+   sharp_images, sharp_dropped, thumbnails, notes, hash, changed}`. `changed: false` → done. Each `notes` entry is a source it
    could not read: log it as a `warn` and publish anyway. `refused` (exit 1): log it as an
    `error` and publish nothing; `secrets.mjs scan-all work/env/credentials.env work/suite/tests
    work/issues work/scenarios` (in `$HOME/scripts/lib/`) names the file to fix.
@@ -233,9 +248,17 @@ The steps:
    `issue=-`, key `catalog@<hash>`.
 3. Write `<hash>` to `work/catalog/published.hash`. A failure is logged; the next run retries.
 
-Images are the AC stills (360 px) and the UI map's page shots (720 px), as JPEGs in
-`work/catalog/thumbs/` (rendered by the suite's `playwright-core`; without it there are none) —
-backed up, unlike the page; one whose item or page is gone is removed. The page embeds them
-within 6 MiB — less when the data is large (a `notes` entry says so) — the regression tier's
-stills first, then the page shots, then the other stills, so it stays under the platform's
-10 MiB render limit.
+Images are the AC stills and the UI map's page shots, each twice in `work/catalog/thumbs/`
+(rendered by the suite's `playwright-core`; without it there are none) — backed up, unlike the
+page; one whose item or page is gone is removed:
+
+- **small** — a JPEG, 360 px (a still) or 720 px (a page shot) wide, for the lists and cards;
+- **sharp** — a WebP up to 1440 px wide (the screen at its own size), for a test case's panel,
+  the Gallery and the Product map. A click on a panel's screenshot, or **🔍 Full size**, shows it
+  over the page: fit to the window or at its real size (a click changes between them), Esc closes.
+
+The page embeds them within 8 MiB — less when the data is large (a `notes` entry says so): first
+every small one (the regression tier's stills, the design crops, the page shots, then the other
+stills), then the sharp ones in the same order while room is left — a place shows the small one
+where its sharp copy did not fit (`sharp_dropped`) — so it stays under the platform's 10 MiB
+render limit.
