@@ -85,7 +85,7 @@ stripped. Every script reads it through `scripts/lib/config.sh`, so the verifier
 - `max_wallclock_min_per_issue` (`150`, < `lock_ttl_min`), `max_model_steps_per_issue` (`400`) —
   [docs/nested-env.md](docs/nested-env.md) → **Budgets**; `min_free_disk_gi` (`10`) — `env.sh up` refuses below it.
 - `lend_model` (`disabled`; tokens per product AI step) — [docs/profile-contract.md](docs/profile-contract.md); `live_browser`
-  (`disabled`) — [docs/test-authoring.md](docs/test-authoring.md) → **Watching live**; `slack_channel` (none = Slack
+  (empty = detected; `disabled` turns it off) — [docs/test-authoring.md](docs/test-authoring.md) → **Watching live**; `slack_channel` (none = Slack
   orders nothing), `slack_tests_per_day` (`3`), `slack_report_visibility` (`private` | `public`: a report answered in a
   Slack thread gets a link anyone holding it opens, posted in that thread only) — [docs/slack.md](docs/slack.md).
 

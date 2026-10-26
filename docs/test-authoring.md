@@ -131,11 +131,14 @@ onboarding): open a session, look at the screen, use its `locate` tool to turn a
 
 ## Watching live
 
-With `live_browser` set to the CDP endpoint of the platform's shared browser on this VM
-(`http://127.0.0.1:<port>`; `/etc/AGENTS.md` names it), `npx e2e mcp` and every
+The platform's shared browser starts on a random port that changes at every restart, so
+`live_cdp` finds it itself: the first line of `~/.local/share/platform/browser/DevToolsActivePort`,
+used when `/json/version` answers there. Nothing needs setting. `live_browser: http://127.0.0.1:<port>`
+is an explicit override, tried first and replaced by the detection when it does not answer;
+`live_browser: disabled` turns live off. `npx e2e mcp` and every
 `--evidence failures` run (smoke, authoring iterations) attach to that browser, so the
 operator watches you explore in the Browser Panel. Only in a direct session, only while it
-answers (`scripts/lib/config.sh` → `live_cdp`); scheduled and Slack turns, a session whose
+answers (`scripts/lib/config.sh` → `live_cdp`; no port file or no answer: headless, one log line); scheduled and Slack turns, a session whose
 transcript the shell cannot find (`CLAUDE_CODE_SESSION_ID`), and every `--evidence full` run
 stay headless, so evidence never depends on it. When you start exploring live, paste the
 line `bash "$HOME/scripts/env.sh" watch` prints into your reply, once and unchanged: the
