@@ -199,9 +199,9 @@ if [ -f "$CONFIG" ]; then
   case "$(cfg slack_channel)" in ('') ok cfg:slack_channel "none — Slack orders no issue test";;
     (*) printf '%s' "$(cfg slack_channel)" | grep -qE '^[CGD][A-Z0-9]{6,}$' && ok cfg:slack_channel "$(cfg slack_channel)" \
           || fail cfg:slack_channel "'$(cfg slack_channel)' is not a Slack chat id" "use the id describe_channel lists, e.g. C0123ABCD (docs/slack.md)";; esac
-  case "$(cfg live_browser)" in (''|disabled) ok cfg:live_browser "disabled";;
+  case "$(cfg live_browser)" in (''|disabled) ok cfg:live_browser "disabled or detected";;
     (http://127.0.0.1:[0-9]*|http://localhost:[0-9]*) ok cfg:live_browser "$(cfg live_browser)";;
-    (*) fail cfg:live_browser "'$(cfg live_browser)' is not a CDP endpoint on this VM" "http://127.0.0.1:<port> from /etc/AGENTS.md, or disabled (docs/test-authoring.md → Watching live)";; esac
+    (*) fail cfg:live_browser "'$(cfg live_browser)' is not a CDP endpoint on this VM" "http://127.0.0.1:<port> as an override, empty to detect, or disabled (docs/test-authoring.md → Watching live)";; esac
   for k in lock_ttl_min media_retention_days min_free_disk_gi max_scenarios_per_day slack_tests_per_day; do
     v="$(cfg "$k")"; case "$v" in (''|*[!0-9]*) [ -z "$v" ] && ok "cfg:$k" "default" || fail "cfg:$k" "'$v' is not a number" "set a positive integer";; (*) ok "cfg:$k" "$v";; esac
   done
@@ -348,7 +348,7 @@ if [ "$LIVE" = 1 ]; then
     [ -n "$mk" ] && ok lend_model "lends this agent's $mkind connection by its placeholder" \
       || fail lend_model "this agent has no model connection to lend" "give it one in its settings, or set lend_model: disabled"
   fi
-  case "$(cfg live_browser)" in (''|disabled) ;;
+  case "$(cfg live_browser)" in (disabled) ;;
     (*) live_cdp >/dev/null 2>&1 && ok live_browser "answers" || warn live_browser "does not answer, or this session is not shown direct (a scheduled run, a channel turn, no transcript) — runs stay headless";; esac
   if [ "$(profile_field '.requires.root')" = true ]; then
     [ "$(id -u)" = 0 ] && ok vm_root "root" || fail vm_root "not running as root" "recreate the agent on the vm backend (README → Setup)"

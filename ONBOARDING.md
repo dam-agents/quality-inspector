@@ -269,8 +269,9 @@ file → keep its values, show them once, and ask only for the keys it lacks. As
    connection). Tick item 7 once one answers.
 10. Everything else — defaults; show them and change only what the operator asks for. Offer
    `lend_model: enabled` when the profile's `SKILL.md` names criteria only a real model makes
-   testable (tokens per product AI step), and `live_browser` when `/etc/AGENTS.md` names the
-   shared browser's CDP endpoint. Offer the testing modules ([docs/modules.md](docs/modules.md)), all off
+   testable (tokens per product AI step), and nothing for the live browser: it is detected from the shared browser's
+   `DevToolsActivePort` ([docs/test-authoring.md](docs/test-authoring.md) → Watching live); set `live_browser`
+   only to override it, or `disabled` to turn it off. Offer the testing modules ([docs/modules.md](docs/modules.md)), all off
    by default, and `dashboard_interactive: enabled` when the operator has Interactive artifacts on
    in the platform (the dashboard's buttons then send commands to this chat). Name, never
    enable on your own, `report_visibility: public`: the dashboard then opens a report in one
@@ -321,7 +322,7 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - max_scenarios_per_run: 3
 - max_scenarios_per_day: 10
 - lend_model: disabled
-- live_browser: disabled
+- live_browser:
 - slack_channel:
 - slack_tests_per_day: 3
 - slack_report_visibility: private

@@ -7,6 +7,14 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.33.2 — 2026-10-26
+
+**Upgrade:**
+Nothing to run — scripts and docs are re-read per run. `live_cdp` now reads the shared browser's current
+port from `~/.local/share/platform/browser/DevToolsActivePort` when `live_browser` is empty or its port
+does not answer. Optional, operator: in `work/CONFIG.md` empty `live_browser:` (or drop the stale port) so
+it follows the browser across restarts; `disabled` still turns live off.
+
 ## 3.33.1 — 2026-10-26
 
 **Upgrade:**

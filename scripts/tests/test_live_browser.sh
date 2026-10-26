@@ -5,12 +5,13 @@
 . "$(dirname "$0")/lib.sh"
 export HOME="$SANDBOX/home" CLAUDE_CONFIG_DIR="$SANDBOX/claude"
 mkdir -p "$HOME" "$WORK_DIR/env" "$CLAUDE_CONFIG_DIR/projects/p" "$SANDBOX/cbin"
-printf '#!/usr/bin/env bash\nexit "${STUB_CURL_RC:-0}"\n' > "$SANDBOX/cbin/curl"; chmod +x "$SANDBOX/cbin/curl"
+printf '#!/usr/bin/env bash\ncase "$*" in (*":${STUB_CURL_DEAD_PORT:-x}/"*) exit 7;; esac\nexit "${STUB_CURL_RC:-0}"\n' > "$SANDBOX/cbin/curl"; chmod +x "$SANDBOX/cbin/curl"
 export PATH="$SANDBOX/cbin:$PATH" CONFIG="$WORK_DIR/CONFIG.md"
 printf -- '- live_browser: http://127.0.0.1:9222/\n- lock_ttl_min: 180\n' > "$CONFIG"
 T="$CLAUDE_CONFIG_DIR/projects/p/sess-1.jsonl"
 printf '{"type":"user","message":{"content":"explore #7"}}\n' > "$T"
-cdp() { ( . "$SCRIPTS/lib/config.sh"; live_cdp 2>/dev/null ); }
+cdp() { ( . "$SCRIPTS/lib/config.sh"; live_cdp 2>&3 ); }
+exec 3>&2
 
 assert_eq "direct session: attaches" "http://127.0.0.1:9222" "$(CLAUDE_CODE_SESSION_ID=sess-1 cdp)"
 link() { ( . "$SCRIPTS/lib/config.sh"; live_link "$1" 2>/dev/null ); }
@@ -33,4 +34,19 @@ printf '{"type":"user","message":{"content":"<how-to-respond>\\nreply …\\n</ho
 assert_eq "channel turn: headless" "" "$(CLAUDE_CODE_SESSION_ID=sess-1 cdp)"
 printf -- '- live_browser: http://example.com:9222\n' > "$CONFIG"
 assert_eq "an endpoint off this VM: headless" "" "$(CLAUDE_CODE_SESSION_ID=sess-1 cdp)"
+# auto-detection: an empty or stale live_browser falls back to the shared browser's port file
+printf '{"type":"user","message":{"content":"explore #7"}}\n' > "$T"
+export LIVE_BROWSER_PORT_FILE="$SANDBOX/DevToolsActivePort"
+printf '39583\n/devtools/browser/x\n' > "$LIVE_BROWSER_PORT_FILE"
+printf -- '- lock_ttl_min: 180\n' > "$CONFIG"
+assert_eq "empty live_browser: port file" "http://127.0.0.1:39583" "$(CLAUDE_CODE_SESSION_ID=sess-1 cdp)"
+printf -- '- live_browser: http://127.0.0.1:9222\n' > "$CONFIG"
+assert_eq "stale port: port file" "http://127.0.0.1:39583" "$(STUB_CURL_DEAD_PORT=9222 CLAUDE_CODE_SESSION_ID=sess-1 cdp)"
+printf -- '- live_browser: disabled\n' > "$CONFIG"
+assert_eq "disabled: no detection" "" "$(CLAUDE_CODE_SESSION_ID=sess-1 cdp)"
+printf -- '- lock_ttl_min: 180\n' > "$CONFIG"
+assert_eq "detection, not direct: headless" "" "$(CLAUDE_CODE_SESSION_ID= cdp)"
+assert_eq "port does not answer: headless" "" "$(STUB_CURL_RC=7 CLAUDE_CODE_SESSION_ID=sess-1 cdp)"
+rm -f "$LIVE_BROWSER_PORT_FILE"
+assert_eq "no port file: headless" "" "$(CLAUDE_CODE_SESSION_ID=sess-1 cdp)"
 exit $FAILED

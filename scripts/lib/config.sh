@@ -75,18 +75,28 @@ direct_session() {
   return 0
 }
 
-# live_cdp: the live_browser CDP endpoint when a run may attach to it — set, on this VM, in a
+# live_cdp: the live_browser CDP endpoint when a run may attach to it — enabled, on this VM, in a
 # direct session, and answering. Prints it, or nothing (docs/test-authoring.md → Watching
 # live). Not direct = a scheduled run or a channel turn (lib/channel.sh), or a session whose
-# transcript cannot be found: all run headless.
+# transcript cannot be found: all run headless. A set endpoint is an explicit override; empty,
+# or not answering, the shared browser's current port is read from its DevToolsActivePort
+# (first line), because it starts on a random port that changes at every restart.
+# `disabled` turns it off.
 live_cdp() {
-  local u; u="$(cfg live_browser)"
-  case "$u" in (''|disabled) return 1;; (http://127.0.0.1:*|http://localhost:*) ;;
+  local u f p; u="$(cfg live_browser)"
+  [ "$u" = disabled ] && return 1
+  case "$u" in (''|http://127.0.0.1:*|http://localhost:*) ;;
     (*) echo "live_browser '$u' is not a CDP endpoint on this VM — running headless" >&2; return 1;; esac
   direct_session || { echo "live_browser: $WHY_NOT_DIRECT — running headless" >&2; return 1; }
-  curl -fsS --noproxy '*' --max-time 3 -o /dev/null "${u%/}/json/version" 2>/dev/null \
-    || { echo "live_browser $u does not answer — running headless" >&2; return 1; }
-  printf '%s\n' "${u%/}"
+  if [ -n "$u" ] && curl -fsS --noproxy '*' --max-time 3 -o /dev/null "${u%/}/json/version" 2>/dev/null; then
+    printf '%s\n' "${u%/}"; return 0
+  fi
+  f="${LIVE_BROWSER_PORT_FILE:-$HOME/.local/share/platform/browser/DevToolsActivePort}"
+  p="$(head -n1 "$f" 2>/dev/null | tr -d '[:space:]')"
+  case "$p" in (''|*[!0-9]*) echo "live_browser: ${u:+$u does not answer and }no port in $f — running headless" >&2; return 1;; esac
+  curl -fsS --noproxy '*' --max-time 3 -o /dev/null "http://127.0.0.1:$p/json/version" 2>/dev/null \
+    || { echo "live_browser: port $p from $f does not answer — running headless" >&2; return 1; }
+  printf 'http://127.0.0.1:%s\n' "$p"
 }
 
 # live_link <url>: the chat button that opens the Browser Panel on <url> (the platform's
