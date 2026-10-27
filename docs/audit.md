@@ -51,7 +51,8 @@ when `audit_report: disabled` (still append the log line).
      definition bug → one deduplicated issue on the definition repository (search open
      issues first) — the audit's only external write, ledgered as `definition_issue`.
    - Sample up to three reports of the week: criteria and intent files predate the test file; no
-     `verified` without a baseline failure or `baseline_blocked_reason: absent`; every
+     `verified` without a baseline failure or `baseline_blocked_reason: absent`; no candidate
+     pass counted whose `AC-<k>` screenshot shows an error (reporting.md → Error at the check); every
      tested AC has a candidate video and its `AC-<k>` screenshot; AC blocks contain checks
      only; no internal identifiers or credentials in the text, the screenshots or the
      first and last frames you look at; every block `check-asserts.sh --lint` lists checks

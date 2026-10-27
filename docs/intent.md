@@ -85,7 +85,7 @@ puts it in every AC run: red-green, confirmation, heal, the nightly replay.
 Each IN is judged like an AC, by the same table and the same baseline rules
 ([reporting.md](reporting.md) → Verdicts), into `intents[]` of the verdicts file —
 `{"id": "IN-1", "name", "goal", "given", "when", "then", "covers", "surface", "testable",
-"verdict", "baseline_blocked_reason", "cause", "note"}`, the frozen lines verbatim — never into
+"verdict", "baseline_blocked_reason", "cause", "error_at_check", "note"}`, the frozen lines verbatim — never into
 `acs[]`. The file's `intent_verdict`:
 
 | `intent_verdict` | When |

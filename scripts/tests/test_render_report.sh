@@ -75,6 +75,17 @@ es="$(node "$SCRIPTS/evidence-sheet.mjs" "$SANDBOX/out-es")"
 assert "evidence-sheet: a src outside media/ is never read" '.sheet == null and .rows == 0 and (.reason | startswith("no criterion"))' "$es"
 [ -f "$SANDBOX/out-es/evidence.png" ] && { echo "  a stale evidence.png survived"; FAILED=1; }
 
+# Error at the check (docs/reporting.md): a pass on a screen that shows an error is blocked, the
+# report quotes the message; a baseline that stopped in setup is no red and no longer "inconclusive".
+jq '.verdict = "blocked" | .acs[0] += {verdict: "blocked", baseline_blocked_reason: "setup", cause: "environment",
+  error_at_check: "the VM runner <cannot> be scheduled"}' "$SANDBOX/v.json" > "$SANDBOX/ve.json"
+QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/ve.json" "$SANDBOX/oute" >/dev/null
+he="$(cat "$SANDBOX/oute/index.html")"
+case "$he" in *'Error at the check:</b> “the VM runner &lt;cannot&gt; be scheduled”'*'the pass does not count'*) ;; *) echo "  error at the check not rendered"; FAILED=1;; esac
+case "$he" in *'in the test setup. This is not a red, so the test cannot prove the change.'*) ;; *) echo "  setup baseline reason not rendered"; FAILED=1;; esac
+case "$he" in *'stays inconclusive'*) echo "  a stopped baseline still claims inconclusive"; FAILED=1;; esac
+case "$h" in *'Error at the check'*) echo "  error at the check rendered without error_at_check"; FAILED=1;; esac
+
 # Explorations: their own run, tagged issue-<n>-ex + ex-<k>; candidate only, never in the verdict.
 d="$R/expl/artifacts/web/ex1/default/attempt-0"
 mkdir -p "$d/video" "$d/screenshots"
