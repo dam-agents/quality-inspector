@@ -39,6 +39,11 @@ p="$(node "$SCRIPTS/ui-sweep.mjs" "$SANDBOX/inv.json" --build c2 --dry-run --pat
 assert "--pattern sweeps that page only" '[.pages[] | "\(.pattern)@\(.viewport)"] == ["/projects/:id@390x844"]' "$p"
 node "$SCRIPTS/ui-sweep.mjs" "$SANDBOX/inv.json" --build c2 --dry-run --pattern /nope >/dev/null 2>&1
 assert_eq "a pattern the map does not have is refused" 2 "$?"
+for skip in /broken /sso; do
+  e="$(node "$SCRIPTS/ui-sweep.mjs" "$SANDBOX/inv.json" --build c2 --dry-run --pattern "$skip" 2>&1 >/dev/null)"
+  assert_eq "a pattern the map skips ($skip) is refused" 2 "$?"
+  case "$e" in (*"cannot be swept"*) ;; (*) echo "  $skip: the refusal does not say why: $e"; FAILED=1;; esac
+done
 [ ! -e "$D/c2" ] || { echo "  a dry run wrote its out dir"; FAILED=1; }
 
 # No browser is the module's failure (exit 3), never the environment's (exit 1: sign-in).

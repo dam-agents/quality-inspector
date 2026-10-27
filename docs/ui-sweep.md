@@ -107,8 +107,11 @@ next modules run. Direct session only ([on-demand.md](on-demand.md)); it is not 
 4. `node "$HOME/scripts/ui-sweep.mjs" "$HOME/work/inventory/<c>/inventory.json" --build <c>
    --pattern <sweep.pattern> --viewports <sweep.viewports> --out "$HOME/work/design/recheck/<c>-D-<k>"` —
    never `work/design/<c>/`, which the next sweep reads as `--previous`. Exit 2 naming the
-   pattern: the page is not in this build's map — say so, merge nothing, offer the dismissal.
-   Exit 1 or 3: as in **1. Sweep**, said to the operator.
+   pattern: the page is not in this build's map, or the map skips it (no example, an error, a
+   redirect) — say so with the reason, merge nothing, offer the dismissal. Exit 1 or 3: as in
+   **1. Sweep**, said to the operator. A `sweep.json` with no page without an `error`: the sweep
+   did not look at the page — say so with its error, merge nothing, end; never report the
+   finding as still open.
 5. `review: true` → look at the one shot again by the rubric of **2. Model review** and write
    `…/recheck/<c>-D-<k>/review.json` (`[]` when the shot shows nothing).
 6. `node "$HOME/scripts/design-findings.mjs" merge "$HOME/work/design/recheck/<c>-D-<k>/sweep.json"

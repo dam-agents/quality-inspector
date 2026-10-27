@@ -10,7 +10,8 @@
 //        [--viewports 1440x900,768x1024,390x844] [--base URL] [--max-pages 60] [--pattern P] [--dry-run]
 //
 // --pattern sweeps only that page of the UI map (a design finding's recheck, docs/ui-sweep.md →
-// Recheck); a pattern the map does not have is exit 2.
+// Recheck); a pattern the map does not have, or that the map skips (no example, an error, a
+// redirect), is exit 2.
 // --dry-run prints the plan (pages × viewports, out paths) with no browser and no network.
 // Default --out: work/design/<build>; --viewports: config `ui_sweep_viewports`, else the above
 // (WxH, at most 4; a viewport under 600 px wide is a touch phone). Writes <out>/sweep.json
@@ -88,6 +89,7 @@ if (flags.pattern !== undefined && !routes.length) die(`--pattern '${flags.patte
 const skipped = routes.filter(([, r]) => !r?.example || r.error || r.redirected)
   .map(([p, r]) => ({ pattern: p, reason: !r?.example ? 'no example path' : r.error ? `errored in the UI map: ${String(r.error).slice(0, 80)}` : `redirected to ${r.redirected}` }));
 const pages = routes.filter(([, r]) => r?.example && !r.error && !r.redirected).slice(0, maxPages);
+if (flags.pattern !== undefined && !pages.length) die(`--pattern '${flags.pattern}' cannot be swept: ${skipped[0].reason}`);
 if (routes.length - skipped.length > maxPages) notes.push(`${routes.length - skipped.length - maxPages} pages over --max-pages ${maxPages} not swept`);
 const shotOf = (p, v) => `shots/${slug(p)}@${v.id}.png`;
 const visits = viewports.flatMap((v) => pages.map(([p, r]) => ({ pattern: p, example: r.example, vp: v, shot: shotOf(p, v) })));
