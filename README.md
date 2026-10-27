@@ -62,8 +62,8 @@ library for evidence, the skill catalog for profiles, sub-agents for independent
 This repository is its own **Starter Kit** ([`kit.yaml`](kit.yaml)):
 
 1. **Find it under Starter kits** and open its setup page.
-2. **Grant the GitHub connection** (required) — reads the target's issues; with issue
-   comments enabled it also posts verdicts and removes the retest label, and on the
+2. **Grant the GitHub connection** (required) — reads the target's issues and removes
+   the retest label after a test; with issue comments enabled it also posts verdicts, and on the
    operator's word it opens issues about the problems it found (the dashboard's "Report it as
    a GitHub issue"), so the account needs issue write access on the target. Use a dedicated bot account, and where the
    connection allows it (a GitHub App installation, a fine-grained token) only Issues on
@@ -234,10 +234,10 @@ configuration.
   any letter case (dam-agents/dam#4909) — without that, a profile inside the target
   repository opens the whole repository.
 - **Identity:** the GitHub connection's account — a dedicated bot; read access to the
-  target's issues, plus issues write when comments are enabled.
+  target's issues, plus issues write (the retest label removal, and comments when enabled).
 - **External surfaces:** artifacts in the platform's artifact library (private by
-  default); with `issue_comments: enabled`, **public comments** on the target's issues,
-  and removal of the retest label; on the operator's "create issue for …" only, **new issues**
+  default); removal of the retest label after a test; with `issue_comments: enabled`,
+  **public comments** on the target's issues; on the operator's "create issue for …" only, **new issues**
   on the target about found problems, labelled `found_label` (and `fix_label` for the software
   architect) — [`skills/create-issue`](skills/create-issue/SKILL.md); optionally a Slack channel bound to the agent (replies
   in request threads; with `scenario_channel`, one weekly digest post; with `regression_channel`, one nightly summary post and a black-box breach alert; with `slack_channel`,

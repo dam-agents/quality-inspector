@@ -7,6 +7,15 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.38.2 — 2026-10-27
+
+**Upgrade:**
+Nothing to run — docs are re-read per run. From now on every finished report removes the retest
+label, also with `issue_comments: disabled` ([docs/reporting.md](docs/reporting.md) → **Delivery**
+step 4), so the GitHub connection needs issues write on the target. With a read-only connection the
+removal fails and the report stays `report_pending`: give the account issues write, or remove the
+label by hand. A `reports_due` entry now carries `retest_label_present`.
+
 ## 3.38.1 — 2026-10-27
 
 **Upgrade:**

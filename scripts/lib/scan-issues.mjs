@@ -146,9 +146,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       if (orphaned) { kind = 'takeover'; takeover = true; logs.push(`issue #${n}: in progress, but no run holds the environment (${process.env.QI_ENV_LOCK}) — takeover`); }
       else if (age >= ttl && silent >= 30) { kind = 'takeover'; takeover = true; logs.push(`issue #${n}: stale lock (${age}m old, ${silent}m silent) — takeover`); }
       else { logs.push(`issue #${n}: in progress (${age}m) — skip`); continue; }
-    } else if (isRetest) kind = 'retest';
+    } else if (row.status === 'report_pending') { reports.push({ issue: n, retest_label_present: isRetest }); logs.push(`issue #${n}: report pending delivery — due`); continue; }
+    else if (isRetest) kind = 'retest';
     else if (row.hash !== hash) kind = 'ac_changed';
-    else if (row.status === 'report_pending') { reports.push({ issue: n }); logs.push(`issue #${n}: report pending delivery — due`); continue; }
     else { logs.push(`issue #${n}: done at ac=${hash} — skip`); continue; }
     if (due.length >= max) { deferred++; logs.push(`issue #${n}: ${kind} — deferred (max_issues_per_run)`); continue; }
     due.push({ issue: n, ac_hash: hash, kind, takeover, has_done_when: hasDoneWhen(body), retest_label_present: isRetest,

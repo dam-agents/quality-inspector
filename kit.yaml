@@ -34,8 +34,8 @@ connections:
     required: true
     note: >-
       Reads issues of the target repository (and the profile's skill source when it is
-      private) and, when issue comments are enabled,
-      posts verdict comments and removes the retest label; on the operator's word it opens
+      private), removes the retest label after a test and, when issue comments are
+      enabled, posts verdict comments; on the operator's word it opens
       issues about the problems it found; with `work_repo`, it pushes
       the backup of work/ to that private repository. Egress rules must confine it to
       the issues endpoints of the target (README → Black-box boundary).

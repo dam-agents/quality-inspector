@@ -22,7 +22,8 @@
 #                                             with --fix), one work/FOUND.md row per problem;
 #                                             {"refs","number","url","labels"}
 #
-# Writes need issue_comments (or, for a comment, spec_feedback) enabled. create-issue is the
+# A comment needs issue_comments or spec_feedback enabled; unlabel needs neither — a finished
+# report always takes the retest label off (docs/reporting.md → Delivery). create-issue is the
 # operator's alone (skills/create-issue): the direct session only (lib/config.sh →
 # direct_session), a draft under work/found/ that carries its marker, no EVIDENCE_LINK left, no
 # credential value or token in it (lib/secrets.mjs), and once per problem unless --again. Exit: 0
@@ -184,7 +185,6 @@ case "$cmd" in
     api -X POST "repos/$RP/issues/$1/comments" -F body=@"$2" --jq .html_url ;;
   (unlabel)
     need_target; num "${1:-}"
-    enabled issue_comments || refuse "issue_comments is disabled"
     not_pr "$1"
     l="$(cfg retest_label)"; l="$(jq -rn --arg l "${l:-qa:retest}" '$l | @uri')"
     api -X DELETE "repos/$RP/issues/$1/labels/$l" >/dev/null ;;

@@ -10,7 +10,7 @@ A direct session's first request names it ([logging.md](logging.md) → **Sessio
 - **"test #N"** — run `bash "$HOME/scripts/preflight.sh" issues` for the current
   `candidate`/`baseline`, compute the entry for #N yourself (`ac_hash` via
   `scripts/lib/state.sh` → `text_hash "$(issue_spec_text …; operator_answers N)"`, `kind: first` or
-  `retest`), then follow [issue-qa.md](issue-qa.md). The QA label is not required for an
+  `retest`; `retest_label_present` when the issue carries `retest_label`), then follow [issue-qa.md](issue-qa.md). The QA label is not required for an
   operator request; say so in the report notes.
 - **"answer #N Q-<k>: <what applies>"** — record the decision as one dated line in
   `work/OPERATOR.md` ([persistence.md](persistence.md) → Operator preferences), never in a frozen
