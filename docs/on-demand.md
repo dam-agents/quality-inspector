@@ -9,9 +9,13 @@ A direct session's first request names it ([logging.md](logging.md) → **Sessio
 
 - **"test #N"** — run `bash "$HOME/scripts/preflight.sh" issues` for the current
   `candidate`/`baseline`, compute the entry for #N yourself (`ac_hash` via
-  `scripts/lib/state.sh` → `text_hash "$(issue_spec_text …)"`, `kind: first` or
+  `scripts/lib/state.sh` → `text_hash "$(issue_spec_text …; operator_answers N)"`, `kind: first` or
   `retest`), then follow [issue-qa.md](issue-qa.md). The QA label is not required for an
   operator request; say so in the report notes.
+- **"answer #N Q-<k>: <what applies>"** — record the decision as one dated line in
+  `work/OPERATOR.md` ([persistence.md](persistence.md) → Operator preferences), never in a frozen
+  file; offer "test #N" to freeze and test the decided variant now
+  ([acceptance-criteria.md](acceptance-criteria.md) → **Contradictions**).
 - **"promote #N"** (optionally a file) — show the file's AC and IN blocks beside the criteria
   and intent files, then on a yes write or update its `work/SUITE.md` row: tier `regression`,
   `assert_hash` from `bash "$HOME/scripts/check-asserts.sh" --hash <file>`,

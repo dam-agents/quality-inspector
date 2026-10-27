@@ -53,6 +53,14 @@ issue_spec_text() { # <title> <body>
   fi
 }
 
+# The operator's answers to issue <n>'s open questions: the lines of work/OPERATOR.md naming
+# "#<n> Q-<k>:". The AC hash covers them (docs/acceptance-criteria.md → Contradictions).
+operator_answers() { # <n> [<OPERATOR.md>]
+  local f="${2:-${WORK_DIR:-${HOME_DIR:-$HOME}/work}/OPERATOR.md}"
+  [ -f "$f" ] || return 0
+  tr -d '\r' < "$f" | grep -E "#$1 Q-[0-9]+:" || true
+}
+
 # Deterministic spec lint: is there something observable to test? JSON on stdout.
 VAGUE_WORDS='better|faster|improve[sd]?|properly|correctly|nicer|cleaner|robust|seamless|intuitive|as expected|should work|works? well|user-friendly|etc\.?'
 spec_lint() { # <title> <body>

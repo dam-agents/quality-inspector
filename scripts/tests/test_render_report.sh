@@ -29,12 +29,20 @@ J
 mk_run cand passed; mk_run base failed
 cat > "$SANDBOX/v.json" <<'J'
 {"issue":42,"title":"Rename <b>","ac_hash":"abc","candidate":"c1","baseline":"b1","candidate_run":"cand","baseline_run":"base",
- "verdict":"verified","acs":[{"id":"AC-1","name":"renamed","then":"the new name shows","testable":true,"verdict":"verified","baseline_blocked_reason":"absent"},
- {"id":"AC-2","name":"internal","testable":false,"verdict":"not-testable"}]}
+ "verdict":"verified","acs":[{"id":"AC-1","name":"renamed","quote":"A renamed project keeps its tasks.","then":"the new name shows","testable":true,"verdict":"verified","baseline_blocked_reason":"absent"},
+ {"id":"AC-2","name":"internal","testable":false,"verdict":"not-testable"}],
+ "open_questions":[{"id":"Q-1","ac":"AC-2","question":"Does an editor rename a project?",
+   "variants":[{"source":"the issue","quote":"the owner renames it"},{"source":"a comment of 2026-10-20","quote":"an editor renames it"}]}]}
 J
+# The target repository: an AC names its source issue and links it (docs/reporting.md).
+printf -- '- target_repo: acme/widgets\n' > "$WORK_DIR/CONFIG.md"
 out="$(QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/v.json" "$SANDBOX/out")"
 assert "two videos, two screenshots" '.videos == 2 and .screenshots == 2' "$out"
 h="$(cat "$SANDBOX/out/index.html")"
+case "$h" in *'<a href="https://github.com/acme/widgets/issues/42"'*'#42</a> AC-1 — renamed'*) ;; *) echo "  an AC does not link its source issue"; FAILED=1;; esac
+case "$h" in *'id="zoom"'*'Click the image to fit it to the window'*) ;; *) echo "  the full-size image viewer is missing"; FAILED=1;; esac
+case "$h" in *'From the source</b> “A renamed project keeps its tasks.”'*) ;; *) echo "  an AC does not quote its source"; FAILED=1;; esac
+case "$h" in *'Open questions (1)'*'Q-1'*'Does an editor rename a project?'*'the owner renames it'*'an editor renames it'*) ;; *) echo "  the open questions are missing"; FAILED=1;; esac
 case "$h" in *'<video controls'*'poster="media/'*) ;; *) echo "  no video with a poster"; FAILED=1;; esac
 case "$h" in *'AC-1: the renamed agent'*) ;; *) echo "  screenshot caption missing"; FAILED=1;; esac
 case "$h" in *'Rename &lt;b&gt;'*) ;; *) echo "  title not escaped"; FAILED=1;; esac
@@ -174,6 +182,7 @@ assert "scenario: both sides found by the scenario tag" '.videos == 2 and .scree
 h="$(cat "$SANDBOX/s-out/index.html")"
 case "$h" in *'S-7 — Export the usage table'*) ;; *) echo "  scenario title missing"; FAILED=1;; esac
 case "$h" in *'agrees (product-defect)'*) ;; *) echo "  judge reading missing"; FAILED=1;; esac
+case "$h" in *'Open questions'*) echo "  open questions rendered without open_questions"; FAILED=1;; esac
 grep -q '^• AC-1 csv downloads — regression$' "$SANDBOX/s-out/comment.md" || { echo "  scenario reply line missing"; FAILED=1; }
 assert "scenario proof: a regression shows the last release passing and the build failing" '.mode == "scenario" and .subject == "S-7"
   and ([.rows[0].shots[] | [.side, .state, .build]] == [["baseline","passed","b1"],["candidate","failed","c1"]])' "$(cat "$SANDBOX/s-out/proof.json")"

@@ -31,6 +31,7 @@ source: done-when        frozen_utc: 2026-10-02T13:40:02Z        ac_hash: abc
 summary: The owner can rename a project. The tasks of the project stay with it.
 
 ## AC-1 — a renamed project keeps its tasks
+quote: The owner renames a project. The tasks stay with it.
 Given a project with one task
 When the owner renames it
 Then the project shows its new name with the task
@@ -43,6 +44,12 @@ When anything
 Then the cache is warm
 surface: api
 testable: no — internal
+
+## Q-1 — who renames the project
+about: AC-1
+question: Does an editor rename a project, or only the owner?
+says A: the issue — "When the owner renames it"
+says B: a comment of 2026-10-02 — "an editor renames a project"
 C
 cat > "$W/issues/42/explorations-abc.md" <<'C'
 # #42 — explorations        frozen_utc: 2026-10-02T13:41:10Z        ac_hash: abc
@@ -67,7 +74,7 @@ cat > "$W/regression/c2/verdicts.json" <<'J'
 {"mode":"regression","candidate":"c2","acs":[{"issue":42,"id":"AC-1","verdict":"healed","explanation":"EXPLAIN-SECRET the tab moved"}],
  "context":{"previous":"c1","issues":[{"number":40,"title":"Projects get tabs"}],"ui_diff":"- renamed tab \"Tasks\" → \"To-dos\" on /projects","signals":{"console_errors_new":["E1"],"slow_tests":[]}}}
 J
-printf '# S-7 — upload a <i>large</i> file\n\n## AC-1 — the upload finishes\nGiven a 50 MB file\nWhen the owner uploads it\nThen it is listed\nsurface: ui\ntestable: yes\n' > "$W/scenarios/S-7/criteria-s1.md"
+printf '# S-7 — upload a <i>large</i> file\n\n## AC-1 — the upload finishes\nquote: REQUEST-SECRET the owner uploads a large file\nGiven a 50 MB file\nWhen the owner uploads it\nThen it is listed\nsurface: ui\ntestable: yes\n' > "$W/scenarios/S-7/criteria-s1.md"
 echo 'REQUEST-SECRET please test the upload, my boss asked' > "$W/scenarios/S-7/request.md"
 echo '{"scenario":"S-7","candidate":"c1","started_utc":"2026-10-04T09:45:00Z","generated_utc":"2026-10-04T10:00:00Z","cost_usd":1.234,"acs":[{"id":"AC-1","verdict":"passed"}],"notes":["NOTE-SECRET"]}' > "$W/scenarios/S-7/verdicts-s1-c1.json"
 echo 'https://claude.ai/artifact/s7' > "$W/scenarios/S-7/artifact.id"
@@ -137,10 +144,21 @@ assert "summary" '.items == 5 and .changed == true and (.hash | test("^[0-9a-f]{
 html="$(cat "$W/catalog/index.html")"
 page_data() { node -e 'const h=require("fs").readFileSync(process.argv[1],"utf8");const m=h.match(/<script type="application\/json" id="qi-catalog-data">([\s\S]*?)<\/script>/);process.stdout.write(m[1])' "$W/catalog/index.html"; }
 data="$(page_data)"
+# A criterion quotes its source verbatim (docs/acceptance-criteria.md); a `## Q-<k>` section of a
+# contradiction is no criterion.
+assert "a criterion quotes its source, and a Q section is no criterion" '(.items[] | select(.key == "issue-42/AC-1") | .quote == "The owner renames a project. The tasks stay with it.")
+  and ([.items[] | select(.key | test("/Q-"))] | length == 0)' "$data"
 # The viewer's script parses: no test drives the page, so a syntax error would ship silently.
 node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");require("fs").writeFileSync(process.argv[2],[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((x)=>x[1]).join("\n"))' \
   "$SCRIPTS/catalog/viewer.html" "$SANDBOX/viewer.js" && node --check "$SANDBOX/viewer.js" 2>/dev/null
 assert_eq "the viewer's script parses" 0 "$?"
+# A run's window is {from, to} with a build tag and a time at each end (docs/regression.md -> step 7):
+# it prints as text, never `[object Object]`. A side panel opens at half the screen (docs/catalog.md).
+win="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const f=(s.match(/^function winText\([\s\S]*?^}$/m)||[""])[0];eval(f);process.stdout.write(winText({from:{tag:"c1",utc:"2026-10-24T02:02:55Z"},to:{tag:"c2",utc:"2026-10-25T21:36:01Z"}}))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "the viewer: a run's window as text, never [object Object]" "c1 · 2026-10-24 02:02 → c2 · 2026-10-25 21:36" "$win"
+dw=0
+grep -q 'width:min(var(--dw,max(360px,50vw)),100%)' "$SCRIPTS/catalog/viewer.html" && grep -q 'right:min(var(--dw,max(360px,50vw)),100%)' "$SCRIPTS/catalog/viewer.html" && dw=1
+assert_eq "the viewer: a side panel opens at half the screen" 1 "$dw"
 # Every move to another place is a history step the browser's back undoes, with an in-memory "back" where
 # the frame may not touch the history (docs/catalog.md → Links and navigation).
 nav="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");

@@ -24,8 +24,12 @@
 // screenshots an AC names as "before_shot", the new map's screenshots a context.signals
 // item names as "shot", and the screenshot a "noticed" item names as "shot".
 
+import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 const [verdictsPath, outDir] = process.argv.slice(2);
 if (!verdictsPath || !outDir) {
@@ -34,6 +38,20 @@ if (!verdictsPath || !outDir) {
 }
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 const runsRoot = process.env.QI_RUNS_ROOT ?? join(work, 'suite', '.e2e', 'runs');
+// The issue a criterion came from, as a link (docs/reporting.md): the target repository, read
+// through lib/config.sh like every other script. Every target host is a GitHub host (scripts/
+// github.sh reaches it with gh --hostname), so one address shape holds for all of them.
+const cfgOf = (key) => { try {
+  return execFileSync('bash', ['-c', '. "$1"; CONFIG="$2"; cfg "$3"', '_', join(HERE, 'lib', 'config.sh'), join(work, 'CONFIG.md'), key], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+} catch { return ''; } };
+const TARGET = cfgOf('target_repo');
+const issueHref = (n) => {
+  const seg = TARGET.split('/');
+  if (!Number.isInteger(n) || n <= 0 || seg.length < 2) return null;
+  const host = seg.length === 3 ? seg[0] : 'github.com';
+  if (!/^[A-Za-z0-9.-]+$/.test(host) || !seg.slice(-2).every(Boolean)) return null;
+  return `https://${host}/${seg.slice(-2).join('/')}/issues/${n}`;
+};
 const v = JSON.parse(readFileSync(verdictsPath, 'utf8'));
 // A scenario is never verified: no change is under test, so no red-green ran (CLAUDE.md →
 // Hard invariants). Refused before anything is written, so an earlier report stays.
@@ -79,6 +97,14 @@ function owner(ac) {
   const n = ac.issue ?? v.issue;
   return { tag: `issue-${n}`, name: `#${n}` };
 }
+// A criterion names its source, linked to its issue where there is one (docs/reporting.md):
+// a regression report covers many issues, and an issue report still lets a reader reach it.
+const sourceHtml = (ac) => {
+  const name = owner(ac).name; const m = /^#(\d+)$/.exec(name);
+  const href = m ? issueHref(+m[1]) : null;
+  return href ? `<a href="${esc(href)}" title="Opens ${esc(name)} on GitHub.">${esc(name)}</a>` : esc(name);
+};
+const srcTag = (ac) => (/^#\d+$/.test(owner(ac).name) ? `${sourceHtml(ac)} ` : '');
 
 // The evidence of one AC on one side: the last attempt of the test tagged with its owner
 // + ac-<k> (an exploration: issue-<n>-ex + ex-<k>).
@@ -211,7 +237,37 @@ figure{margin:0}img{width:100%;border-radius:6px;border:1px solid var(--line);di
 pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;max-height:420px;overflow:auto}
 pre.error{color:var(--bad)}details{margin:6px 0}summary{cursor:pointer;color:var(--dim)}
 .steps{margin:6px 0;padding-left:22px;font-size:13px}.steps li.failed{color:var(--bad)}.steps code{font-size:12px}
-.note{font-style:italic;color:var(--dim)}.signals li{margin:0 0 12px}.sigshot{max-width:320px;margin-top:6px}footer{color:var(--dim);font-size:13px;margin-top:32px}`;
+.note{font-style:italic;color:var(--dim)}.quote{margin:0 0 12px;padding:6px 10px;border-left:3px solid var(--line);color:var(--dim)}.signals li{margin:0 0 12px}.sigshot{max-width:320px;margin-top:6px}footer{color:var(--dim);font-size:13px;margin-top:32px}
+figure img{cursor:zoom-in}
+#zoom{position:fixed;inset:0;z-index:100;display:none;overflow:auto;padding:16px;background:rgba(8,10,14,.92)}
+#zoom.on{display:block}
+#zoom img{display:block;margin:0 auto;width:auto;max-width:none;border:0;border-radius:0;cursor:zoom-out}
+#zoom.fit img{max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);cursor:zoom-in}
+#zoom .hint{position:fixed;left:16px;bottom:10px;color:#fff;font:12px/1.4 system-ui,sans-serif;opacity:.75;pointer-events:none}`;
+
+// A click on a screenshot shows it at its full size over the page. The browser's own viewer
+// downloads a media file (docs/reporting.md → Delivery step 1); the page draws it itself.
+const ZOOM = `<div id="zoom" role="dialog" aria-modal="true" aria-label="Image at full size" tabindex="-1"><img alt=""><span class="hint">Click the image to fit it to the window. Esc closes.</span></div>
+<script>
+(() => {
+  const z = document.getElementById('zoom'), zi = z.querySelector('img');
+  const close = () => { z.classList.remove('on', 'fit'); zi.removeAttribute('src'); };
+  document.addEventListener('click', (e) => {
+    if (z.classList.contains('on')) {
+      if (e.target === zi) { z.classList.toggle('fit'); return; }
+      if (e.target !== z && z.contains(e.target)) return;
+      e.preventDefault(); close(); return;
+    }
+    const fig = e.target.closest ? e.target.closest('figure') : null;
+    const img = e.target.tagName === 'IMG' ? e.target : (fig ? fig.querySelector('img') : null);
+    if (!img) return;
+    e.preventDefault();
+    zi.src = img.currentSrc || img.src; zi.alt = img.alt || '';
+    z.classList.add('on'); z.classList.remove('fit'); z.focus();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && z.classList.contains('on')) { e.preventDefault(); close(); } });
+})();
+</script>`;
 
 if (v.mode === 'security') { renderSecurity(); process.exit(0); }
 
@@ -308,8 +364,9 @@ ${ctx.iface_diff ? `<p><b>CLI and API difference</b></p><pre>${esc(ctx.iface_dif
 
 const acHtml = acs.map((ac) => `
 <article class="ac" id="${esc(slug(key(ac)))}">
-  <header><h3>${regression ? `${esc(owner(ac).name)} ` : ''}${esc(ac.id)} — ${esc(ac.name)}</h3>${badge(ac.verdict)}</header>
+  <header><h3>${srcTag(ac)}${esc(ac.id)} — ${esc(ac.name)}</h3>${badge(ac.verdict)}</header>
   <blockquote>${ac.given ? `<b>Given</b> ${esc(ac.given)}<br>` : ''}${ac.when ? `<b>When</b> ${esc(ac.when)}<br>` : ''}${ac.then ? `<b>Then</b> ${esc(ac.then)}` : ''}</blockquote>
+  ${ac.quote ? `<p class="quote"><b>From the source</b> “${esc(ac.quote)}”</p>` : ''}
   ${ac.note ? `<p class="note">${esc(ac.note)}</p>` : ''}
   ${ac.explanation ? `<p><b>Why:</b> ${esc(ac.explanation)}${ac.because_issue ? ` — see #${esc(ac.because_issue)}` : ''}</p>` : ''}
   ${ac.heal ? `<p class="dim">Check repaired: <code>${esc(ac.heal.from)}</code> → <code>${esc(ac.heal.to)}</code></p>` : ''}
@@ -320,6 +377,16 @@ const acHtml = acs.map((ac) => `
     ? (ac.before ? `<section class="side"><h4>Previous build ${esc(ctx?.previous ?? '')}</h4><figure><a href="${esc(ac.before)}" target="_blank"><img src="${esc(ac.before)}" alt="previous build"></a><figcaption>the same page on the previous build</figcaption></figure></section>` : '')
     : sideHtml(`Baseline ${v.baseline ?? ''}`, ac.base)}</div>`}
 </article>`).join('');
+
+// Open questions: the source contradicts itself, the operator decides, and the AC tested is the
+// one the issue states (docs/acceptance-criteria.md → Contradictions).
+const questions = (v.open_questions ?? []).filter((q) => q && q.id);
+const qHtml = !questions.length ? '' : `
+<section id="open-questions">
+<h2>Open questions (${questions.length})</h2>
+<p class="dim">The issue and its comments do not agree. The agent tested the issue. The operator decides which statement applies, and the next freeze follows that decision.</p>
+<ul>${questions.map((q) => `<li><b>${esc(q.id)}</b>${q.ac ? ` · ${esc(q.ac)}` : ''} — ${esc(q.question)}${(q.variants ?? []).map((x) => `<br><span class="dim">${esc(x.source)}:</span> “${esc(x.quote)}”`).join('')}</li>`).join('')}</ul>
+</section>`;
 
 // An AC is tested when its verdict was judged; blocked, flaky and not-testable never count.
 const coverage = `${acs.filter((ac) => ['verified', 'failed', 'inconclusive'].includes(ac.verdict)).length} of ${acs.length} criteria tested`;
@@ -344,13 +411,14 @@ ${(() => { const t = requestText(); return t == null ? '' : `<details class="req
 <p class="meta">candidate <code>${esc(v.candidate ?? '–')}</code> · baseline <code>${esc(v.baseline ?? '–')}</code> · criteria <code>ac=${esc(v.ac_hash)}</code> (source: ${esc(v.criteria_source ?? 'done-when')}) · ${esc(coverage)} · ${esc(v.generated_utc ?? '')}</p>
 <p class="dim">The agent tested each criterion on the candidate build and on the baseline release. <b>Verified</b> means that the test fails on the baseline and passes on the candidate. You can examine the videos and screenshots to check the result.</p>
 <table><thead><tr><th>AC</th><th>Criterion</th><th>Candidate</th><th>Baseline</th><th>Verdict</th></tr></thead><tbody>${summaryRows}</tbody></table>`}
+${qHtml}
 ${acHtml}
 ${inHtml}
 ${exHtml}
 ${noticedHtml}
 ${(v.notes ?? []).length ? `<h3>Notes</h3><ul>${v.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
 <footer>${esc(v.display_name ?? 'Quality Inspector')} · black-box test of the build in a nested environment · e2e ${esc(runs.candidate?.version ?? '')}</footer>
-</main></body></html>
+</main>${ZOOM}</body></html>
 `;
 writeFileSync(join(outDir, 'index.html'), html);
 
@@ -430,7 +498,7 @@ ${CSS}
 ${findings.filter((f) => f.status === 'fail').map(detail).join('')}
 ${(v.notes ?? []).length ? `<h3>Notes</h3><ul>${v.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
 <footer>${esc(v.display_name ?? 'Quality Inspector')} · security run · e2e ${esc(runs.candidate?.version ?? '')}</footer>
-</main></body></html>
+</main>${ZOOM}</body></html>
 `;
   writeFileSync(join(outDir, 'index.html'), html);
   console.log(JSON.stringify({ out: outDir, findings: findings.length, failed: findings.filter((f) => f.status === 'fail').length }));

@@ -12,7 +12,9 @@ The operator may share the page beyond themselves, so it carries only what conce
 
 - **Per item:** origin (an issue's number, title, summary — the criteria file's `summary:`
   line ([acceptance-criteria.md](acceptance-criteria.md) → Output) — labels, state; a scenario's
-  id, title and source), the frozen Given/When/Then, tier, promotion date, drift, area, the file's summary,
+  id, title and source), the frozen Given/When/Then and the verbatim quote of an issue
+  criterion's source (`quote:`; a scenario's criteria carry none — its request text never reaches
+  the page), tier, promotion date, drift, area, the file's summary,
   session, surface, the pages it opens, its steps (`app.open`, `agent.act`, `agent.assert`,
   `app.screenshot` and the AC block's `expect`s, from the test file), check counts, the verdict
   per build (issue runs, nights, scenarios; the newest 30 — a night that does not name a
@@ -125,8 +127,9 @@ not run because the environment failed.
   browser); a panel names its kind (test case, test run, issue, scenario).
 - **Day / night:** the header switch picks the colours — Auto (as the system), Day or Night — per
   browser; the tabs wrap to more lines, never scroll sideways.
-- **Panel width:** drag the left edge of a side panel (or focus it and use the arrow keys) to make the
-  panel wider or narrower; the width stays per browser, and a double click on the edge resets it.
+- **Panel width:** a side panel opens at half the width of the screen; drag the left edge (or focus it
+  and use the arrow keys) to make it wider or narrower; the width stays per browser, and a double click
+  on the edge resets it to the default.
 - Overview has a "How this page works" guide (the kinds of control, then issue, test case, test
   run, verdict, tier, report, commands, reporting a bug); every verdict badge, tier, severity,
   design check, validation input, run type, column, filter, quick filter, label of a panel and

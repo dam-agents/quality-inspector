@@ -7,6 +7,26 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.35.0 — 2026-10-26
+
+**Upgrade:**
+Nothing to run — docs are re-read per run, and the dashboard and the reports rebuild themselves on
+the next run. New:
+1. `include_comments` now defaults to `enabled`: an issue run reads the issue's comments too. A
+   `work/CONFIG.md` line written before this version keeps its value; set `enabled` or `disabled`
+   there as you want it.
+2. A criterion quotes its source verbatim: `quote:` in the criteria file, shown in the report and
+   in the dashboard. A file frozen before this version has none until its next freeze.
+3. A contradiction between the issue and a comment, or between two comments, is an open question
+   (`## Q-<k>`); the report and the run's chat summary show it. The operator's answer is a dated
+   line in `work/OPERATOR.md`, and the next freeze follows it.
+4. A run's panel shows its window as text (the builds and times of the night, never
+   `[object Object]`); a dashboard side panel opens at half the width of the screen; a click on a
+   report screenshot shows it at its full size over the page; every AC in a report links its
+   source issue.
+5. The hash of an issue's criteria now covers the operator's `#<n> Q-<k>:` answers in
+   `work/OPERATOR.md`, and `github.sh comments` lints each comment for injection.
+
 ## 3.34.1 — 2026-10-26
 
 **Upgrade:**

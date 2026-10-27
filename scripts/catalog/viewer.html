@@ -267,11 +267,11 @@ td.nw{white-space:nowrap}
 .funnel .fill{height:20px;border-radius:999px;background:var(--grad);opacity:.85;min-width:4px}
 
 /* The side panel of a test, a run, an issue or a scenario. */
-#drawer{position:fixed;inset:0 0 0 auto;width:min(var(--dw,640px),100%);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow2);overflow:auto;z-index:20;padding:14px 18px 48px;animation:qi-in .18s ease-out}
+#drawer{position:fixed;inset:0 0 0 auto;width:min(var(--dw,max(360px,50vw)),100%);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow2);overflow:auto;z-index:20;padding:14px 18px 48px;animation:qi-in .18s ease-out}
 @keyframes qi-in{from{transform:translateX(24px)}to{transform:none}}
 #scrim{position:fixed;inset:0;background:rgba(20,16,50,.28);z-index:19}
 /* Drag the panel's left edge to make it wider or narrower; the width stays in this browser. */
-#dgrip{position:fixed;top:0;bottom:0;right:min(var(--dw,640px),100%);width:10px;transform:translateX(50%);cursor:col-resize;z-index:21;touch-action:none}
+#dgrip{position:fixed;top:0;bottom:0;right:min(var(--dw,max(360px,50vw)),100%);width:10px;transform:translateX(50%);cursor:col-resize;z-index:21;touch-action:none}
 #dgrip::after{content:"";position:absolute;top:0;bottom:0;left:4px;width:2px;background:transparent;transition:background .15s}
 #dgrip:hover::after,#dgrip:focus-visible::after,#dgrip.drag::after{background:var(--link)}
 body.dragging{user-select:none;cursor:col-resize}
@@ -283,6 +283,8 @@ body.dragging{user-select:none;cursor:col-resize}
 .gwt{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;margin:10px 0}
 .gwt p{margin:4px 0}
 .gwt b{display:inline-block;width:56px;color:var(--dim);font-weight:600}
+.gwt .quote{margin:8px 0 0;padding:6px 10px;border-left:3px solid var(--line);color:var(--dim);font-size:13px}
+.gwt .quote b{width:auto;margin-right:6px}
 .steps{list-style:none;padding:0;margin:8px 0 8px 8px;border-left:2px solid var(--line)}
 .steps li{position:relative;padding:4px 0 4px 22px;overflow-wrap:anywhere}
 .steps li::before{content:attr(data-k);position:absolute;left:-10px;top:6px;width:18px;height:18px;border-radius:50%;background:var(--surface);border:1px solid var(--line);font-size:9px;text-align:center;line-height:17px;color:var(--dim)}
@@ -1852,7 +1854,7 @@ function drawerShell(kind, label, step, kids) {
 const DW_KEY = 'qi-catalog:drawer-width';
 const dwRight = () => document.documentElement.clientWidth; // the panel's right edge: the page without its scrollbar
 const dwClamp = (w) => Math.round(Math.max(360, Math.min(w, dwRight() - 80)));
-const dwNow = () => { const d = $('#drawer'); return d ? d.getBoundingClientRect().width : 640; };
+const dwNow = () => { const d = $('#drawer'); return d ? d.getBoundingClientRect().width : Math.round(Math.max(360, dwRight() / 2)); };
 const dwSet = (w) => document.documentElement.style.setProperty('--dw', `${dwClamp(w)}px`);
 const dwSave = () => { try { localStorage.setItem(DW_KEY, String(Math.round(dwNow()))); } catch { /* this browser only */ } };
 if (storageOK) try { const w = Number(localStorage.getItem(DW_KEY)); if (w > 0) document.documentElement.style.setProperty('--dw', `${Math.round(w)}px`); } catch { /* default width */ }
@@ -1920,7 +1922,8 @@ function itemDrawer(i) {
     i.summary ? h('p', {}, str(i.summary)) : null,
     h('div', { class: 'gwt', title: i.kind === 'exploration' ? ENT.exploration[2] : i.kind === 'intent' ? `${ENT.intent[2]} The goal is the sentence of the issue, verbatim.` : 'The frozen acceptance criterion: the start state (Given), the action (When) and the result that the test checks (Then).' },
       i.kind === 'intent' ? h('p', {}, h('b', {}, 'Goal'), str(i.goal) || '–') : null,
-      h('p', {}, h('b', {}, 'Given'), str(i.given) || '–'), h('p', {}, h('b', {}, 'When'), str(i.when) || '–'), h('p', {}, h('b', {}, i.kind === 'exploration' ? 'Expect' : 'Then'), str(i.then) || '–')),
+      h('p', {}, h('b', {}, 'Given'), str(i.given) || '–'), h('p', {}, h('b', {}, 'When'), str(i.when) || '–'), h('p', {}, h('b', {}, i.kind === 'exploration' ? 'Expect' : 'Then'), str(i.then) || '–'),
+      i.quote ? h('p', { class: 'quote', title: 'The words of the source that state this criterion, verbatim.' }, h('b', {}, 'From the source'), `“${str(i.quote)}”`) : null),
     i.kind === 'criterion' ? h('div', { style: 'margin-top:6px' }, gherkinBtn(o.title || i.ref, ALL.filter((x) => x.ref === i.ref))) : null,
     src ? h('figure', { style: 'margin:10px 0' }, h('img', { src, alt: `The screen that ${i.id} checks`, class: 'zoomable', title: 'Click to see it at its full size.', onclick: () => zoom(src, `The screen that ${i.label} checks`), style: 'width:100%;border-radius:10px;border:1px solid var(--line);background:#fff' }),
       h('figcaption', { class: 'meta', style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px' }, `📷 The screen right before the check of ${i.id}.`, zoomBtn(src, `The screen that ${i.label} checks`), i.evidence ? [' The video and all screenshots:', reportBtn(i.evidence)] : null)) : null,
@@ -2047,6 +2050,26 @@ function viewRuns() {
       h('td', {}, h('button', { class: 'rowgo', type: 'button', 'data-kind': 'panel', 'data-dest': placeOf({ r: r.id }), 'aria-label': `Open ${runName(r)}`, onclick: () => openRun(r) }, ico('panel')))))))));
   if (list.length > S.limit) v.append(h('div', { class: 'more-row' }, h('button', { class: 'btn', type: 'button', 'data-kind': 'local', onclick: () => { S.limit += 100; render(); } }, `Show more (${list.length - S.limit} left)`)));
 }
+// A run's window (docs/regression.md -> step 7): {from, to}, each a build tag with its time.
+// Any other shape prints as text, never `[object Object]`.
+function winText(w) {
+  const end = (x) => {
+    if (x == null) return '';
+    if (typeof x !== 'object') return String(x);
+    if (Array.isArray(x)) return x.map(end).join(' → ');
+    const tag = x.tag ?? x.build ?? x.version ?? null;
+    const utc = x.utc ?? x.at ?? x.time ?? null;
+    if (tag != null || utc != null) {
+      const d = utc != null ? new Date(utc) : null;
+      const when = d && !isNaN(d) ? `${d.toISOString().slice(0, 10)} ${d.toISOString().slice(11, 16)}` : utc != null ? String(utc) : '';
+      return [tag != null ? String(tag) : null, when || null].filter(Boolean).join(' · ');
+    }
+    return Object.entries(x).map(([k, v]) => `${k} ${end(v)}`).join(', ');
+  };
+  if (w == null) return '';
+  if (typeof w !== 'object') return String(w);
+  return w.from != null || w.to != null ? [end(w.from), end(w.to)].filter(Boolean).join(' → ') : end(w);
+}
 function runDrawer(r) {
   const night = r.type === 'regression';
   const ents = r.entries.slice().sort((a, b) => SEV[vClass(a.value)] - SEV[vClass(b.value)]);
@@ -2074,7 +2097,7 @@ function runDrawer(r) {
       dt('Build'), h('dd', {}, buildLink(r.build)),
       night ? [dt('Since'), h('dd', {}, prevNight ? goLink({ r: prevNight.id }, [h('code', {}, str(r.previous))], 'The nightly regression before this one.') : r.previous ? buildLink(r.previous) : 'the first night')]
         : [dt('Baseline'), h('dd', {}, r.baseline ? buildLink(r.baseline) : '–')],
-      r.window ? [dt('Window'), h('dd', {}, typeof r.window === 'object' ? Object.values(r.window).map(str).join(' → ') : str(r.window))] : null,
+      r.window ? [dt('Window'), h('dd', {}, winText(r.window))] : null,
       dt('Outcome'), h('dd', {}, outcome(r) || '–'),
       h('dt', { title: DUR_HELP }, 'Duration'), h('dd', {}, fmtDur(r.secs) || '–'),
       fmtCost(r.cost_usd) ? [h('dt', { title: COST_HELP }, 'Cost'), h('dd', {}, fmtCost(r.cost_usd))] : null),

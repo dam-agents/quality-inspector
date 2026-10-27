@@ -101,7 +101,7 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
    third heal in a month is a proposal ([maintenance.md](maintenance.md) → What opens a proposal).
 7. **Report**: write `work/regression/<candidate>/verdicts.json` with `"mode": "regression"`
    — one entry per criterion that was not `unchanged`, each with `issue`, `id`, `name`,
-   `then`, `verdict` (the category), `cause` for a `regression`, `needs-review`, `flaky` or
+   `quote` (from the criteria file), `then`, `verdict` (the category), `cause` for a `regression`, `needs-review`, `flaky` or
    `blocked` ([triage.md](triage.md) → **Cause**), `explanation`, `because_issue` when an issue explains
    it, `heal` `{from, to}` for a repair, `regressed_between` `{from, to, builds_between}`
    for a confirmed regression, and `before_shot` (the previous map's screenshot of the
