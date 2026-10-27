@@ -7,12 +7,24 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.36.0 — 2026-10-27
+## 3.37.0 — 2026-10-27
 
 **Upgrade:**
 Nothing to run — docs are re-read per run. Existing `work/MAINTENANCE.md`, `work/HEALS.md` and
 `work/REGRESSION.log` stay valid (the new kind `rework` and the log key `reworked=` are additive);
 the dashboard shows "Repair this test" from the next catalog build.
+
+## 3.36.0 — 2026-10-27
+
+**Upgrade:**
+Nothing to run — docs are re-read per run, and the reports and the dashboard rebuild themselves on
+the next run. Changed:
+1. A criterion that passes on the candidate while its baseline stopped for `environment`, `model`
+   or `setup` is now `blocked` (with its `cause`), not `inconclusive`. A report written before this
+   version keeps its verdict until the issue is tested again.
+2. A pass whose `AC-<k>` screenshot shows an error message that the criterion does not expect does
+   not count: the criterion is `blocked`, and the new verdicts-file field `error_at_check` quotes
+   the message in the report.
 
 ## 3.35.1 — 2026-10-27
 
