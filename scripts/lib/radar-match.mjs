@@ -9,6 +9,11 @@
 //   or link of at least 4 characters) counts the same way: score 0.6 for each recurring test that
 //   names it in a quoted string — per frozen block (`#N AC-k`) where that line sits in one, else the
 //   whole test — and 0.5 for one that only opens its page.
+// - A test's own step string counts when the text names it as whole words: a quoted string of the
+//   test (a field label, a dialog title, an agent instruction's words) of at least 2 words or 8
+//   characters, never a URL, a template or a control of the newest map (those count above): score 0.5
+//   per frozen block where its line sits, else the whole test. It finds the step a change replaced,
+//   which the newest map no longer shows.
 // - Only the tiers `regression`, `promotable` and `quarantined`; an ad-hoc test is out of scope.
 // - A whole test's hits fold into its blocks' where the text names a block of it. Per test the best
 //   score, +0.05 for each further reason, at most 1; at most MAX candidates,
@@ -71,6 +76,23 @@ export function matchPr(text, { features = [], tiers = new Map(), routes = {}, t
         } else if (opens.test(x.src)) add(id, x.file, 0.5, { via: 'page', page: p.page, term: n });
       }
     }
+  }
+  // The test's own step strings: what the text says the change replaced.
+  const STR_RE = /(['"`])([^'"`\n]{4,80})\1/g;
+  for (const x of tests) {
+    const id = idOf(x.file.split('/').at(-1));
+    if (!id) continue;
+    const seenTerm = new Set();
+    x.src.split('\n').forEach((line, i) => {
+      for (const [, , term] of line.matchAll(STR_RE)) {
+        const k = norm(term);
+        if (seenTerm.has(k) || /[/$]|^\s|\s$/.test(term) || !/[A-Za-z]/.test(term)) continue;
+        if (!(k.includes(' ') || k.length >= 8) || pagesOf.has(k) || !has(t, term)) continue; // a map control: counted above
+        seenTerm.add(k);
+        const b = blockAt(x.src, i);
+        add(b && (id.startsWith('#') || b.startsWith('AC-')) ? `${id} ${b}` : id, x.file, 0.5, { via: 'step', term });
+      }
+    });
   }
   // A whole test's hits fold into its blocks' when the text also names a block of it.
   for (const c of [...found.values()]) {

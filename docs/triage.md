@@ -20,11 +20,12 @@ the step list and screenshots in `report.json`.
 | `unchanged` | passed, nothing judged, nothing re-learned | nothing |
 | `relearned` | passed; only steps outside AC blocks were re-learned | nothing — the next passing run re-records; note which steps moved |
 | `healed` | passed with `judged` checks, and the healing rules below hold | repair the check, log it |
+| `reworked` | did not reach its frozen block because a step before it no longer works (`cause` `test`), and the rework rules below hold | rewrite those steps, log it |
 | `needs-review` | passed with `judged` checks, but a healing rule fails; or fails on the previous build too (step 5) | leave the file; open a proposal for the operator ([maintenance.md](maintenance.md)) |
 | `superseded` | the criterion is false, and a completed issue in the window that `may_supersede` changes exactly this behaviour on purpose | retire the test (below) and open a proposal |
 | `regression` | the criterion is false (strict re-run fails and the judge agrees), and nothing in the context explains it | report it with both screens |
 | `flaky` | the confirmation re-run mixes passes and failures | log it in `work/FLAKY.md`; quarantine on the second flaky night (below) |
-| `blocked` | the test could not reach its AC block for a reason outside the product (environment, model, setup) | fix or report as environment |
+| `blocked` | the test could not reach its frozen block, and the cause is `environment` or not known | fix or report as environment |
 
 ## Cause
 
@@ -33,7 +34,8 @@ Each `regression`, `needs-review`, `flaky` or `blocked` entry also names its `ca
 always `product`), `test` (a `needs-review` that fails on the previous build too, a check the UI
 moved away from, a `flaky` wait), `environment` (the product as a whole did not work on this
 night: a `blocked` with no answer, a smoke failure after the start). A night whose environment
-failed before any test ran is no entry: its `environment.json` stands for all
+failed before any test ran is no entry. A `test` cause that stops a test before its frozen block is
+never left as `blocked`: it goes to **Reworking the steps before a block** (below): its `environment.json` stands for all
 ([regression.md](regression.md) step 2). Without the evidence for a cause, leave it out.
 
 ## Order of work per failing or judged test
@@ -42,13 +44,14 @@ failed before any test ran is no entry: its `environment.json` stands for all
    --tag ac-<k> --tag-mode all --repeat-each 3 --no-cache` (an intent test: `--tag in-<k>`),
    and read `by_test[].stability`.
    `flaky` ends the triage of this criterion as `flaky`; only `stable-fail` can become a
-   `regression` or `superseded`, and only `stable-pass` (non-strict for a judged check)
+   `regression`, `superseded` or `reworked` (a fail before the frozen block), and only `stable-pass` (non-strict for a judged check)
    can become `relearned` or `healed`. A stale recording is not a finding either — the
    re-run is uncached.
 2. **Look at the evidence**: the AC screenshot, the failing step, the previous build's
    screenshot of the same page (`work/inventory/<previous>/shots/`).
 3. **Check the context** ([change-awareness.md](change-awareness.md)): the test's
-   `impact` hits and every completed issue whose title or spec touches this area.
+   `impact` hits, its `issue_hits` (completed issues whose text names it), and every completed
+   issue whose title or spec touches this area.
 4. **Decide** by the table. Write one `explanation` sentence that names the evidence
    (*"the tab is now 'Access tokens' — UI map, likely rename"*, *"#4552 replaces the
    export button with a share link"*, *"nothing in 13 completed issues touches agent
@@ -99,6 +102,35 @@ Then update the file, set its `work/SUITE.md` `assert_hash` from
 
 A heal never touches a criteria file. Three heals of the same test inside a month →
 `needs-review` from then on, and a `fighting` proposal: the test is fighting the product.
+
+## Reworking the steps before a block
+
+A test that stops at a step outside every frozen block — a field, a dialog or a sequence the
+product replaced — is out of date, not broken product. The agent rewrites those steps without the
+operator when all of these hold:
+
+- The confirmation re-run (step 1) stops **at the same step outside the frozen blocks** each time.
+- The change is **explained**: a completed issue in the window (its `issue_hits` or
+  `changes.json`) or a merged pull request of the Change radar ([radar.md](radar.md)) states the
+  new flow, quoted; or the UI map shows the step's control removed or moved.
+- The rewritten steps reach **the state the criterion's Given and When describe**, through the
+  nested product alone (its UI, and its CLI or API as [test-authoring.md](test-authoring.md)
+  allows). A flow that needs a surface the test cannot drive — another product's app, a mailbox,
+  a chat client — is no rework.
+- The frozen blocks stay **byte-identical**: `scripts/check-asserts.sh --hash` prints the same
+  value before and after.
+- The rewritten file **passes strict** (`suite.sh run rework-<candidate> --strict --tag <its tag>`).
+
+Then save the file and append a `work/HEALS.md` row with `old_hash` = `new_hash` and basis
+`rework: #<n> "<quoted sentence>"` (or the UI-map line). A rework counts as a heal for the
+three-heals rule above. Its verdicts entry: `reworked`, `cause: null`, `because_issue`.
+
+Any rule fails → the verdict stays honest — `needs-review` (`cause` `test`), or `blocked` (`cause`
+`environment`) when the environment stopped the strict run — and the agent opens a `rework`
+proposal ([maintenance.md](maintenance.md)): `rewrite` with the rewritten file as its diff when one
+is ready, else `review`, the basis naming what is missing (*"#3810: the channel is bound in the
+chat client — no product surface"*). For a profile scenario (`P-<slug>`) the report also tells the
+product team what its profile must give the test.
 
 ## Flaky tests and quarantine
 

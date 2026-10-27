@@ -58,7 +58,8 @@ the catalog ([catalog.md](catalog.md) → Build and publish) when a proposal ope
 `scripts/lib/radar-match.mjs` (its header holds the rule and the scores): a feature's name or alias
 ([features.md](features.md)), a page title or a control that only one page of the newest UI map shows
 ([change-awareness.md](change-awareness.md)), standing in the text as whole words, map to the
-recurring tests that are members of that feature, open that page or name that control. An ad-hoc
+recurring tests that are members of that feature, open that page or name that control. A quoted string of a test's own steps (a field or a dialog
+the change replaced) that stands in the text counts too. An ad-hoc
 test — an exploration, a rerun, an unsaved scenario, a retired test — is never a candidate.
 
 ## The ledger — `work/PRSCAN.md`

@@ -88,7 +88,9 @@ The operator may share the page beyond themselves, so it carries only what conce
 - **Maintenance**, from `work/MAINTENANCE.md` ([maintenance.md](maintenance.md)): the open proposals
   on Overview (id, test, kind, basis, proposal) with the operator's four actions (`accept M-<k>`,
   `rewrite M-<k>`, `retire M-<k>`, `keep M-<k>`), the test's own in its panel, and the flag
-  "maintenance". Closed proposals are not shown.
+  "maintenance". Closed proposals are not shown. A failing recurring test whose cause is not
+  `product` or `environment`, with no open proposal, gets "Repair this test" (`repair <ref> <AC-k>`,
+  [on-demand.md](on-demand.md)); the bug-issue action is then not the highlighted one.
 - **Pins:** each viewer's own, kept in their browser.
 - **Gherkin:** "Copy as Gherkin" in a criterion's panel (every criterion of its issue or scenario)
   and on each feature of Overview copies them as one `Feature`, a `Scenario` per criterion in its

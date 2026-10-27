@@ -34,6 +34,7 @@ applied before the operator's word.
 | kind | opened by | proposal |
 | --- | --- | --- |
 | `needs-review` | the triage's `needs-review` ([triage.md](triage.md)): a healing rule failed | `heal` with the repair ready in the diff; `review` when none is (it fails on the previous build too) |
+| `rework` | a step before a frozen block no longer works, and a rule of [triage.md](triage.md) → **Reworking the steps before a block** failed; or the operator's "repair" | `rewrite` with the rewritten file ready in the diff; `review` when none is (its basis names what is missing) |
 | `superseded` | the triage retired the test for a completed issue | `retire` — already done; accept confirms it, keep restores it |
 | `drift` | the worklist's `assert_drift` ([regression.md](regression.md) step 4) | `re-promote`, or `rewrite` when the changed block no longer matches the criterion |
 | `quarantined` | the triage moved it to `quarantined` | `re-promote` once its cause is fixed, else `retire` |
@@ -63,7 +64,7 @@ and go on with the replay.
 It opens the `obsolete`, `moved` and `renamed` rows, basis the diff's line; which test and which
 proposal is `scripts/lib/staleness.mjs` (its header). Only recurring tests, and a control only where a
 frozen block names it: a navigation step outside the blocks is the replay cache's to relearn. A test
-with an open triage row (`needs-review`, `superseded`, `quarantined`, `fighting`) is skipped. Each of
+with an open triage row (`needs-review`, `rework`, `superseded`, `quarantined`, `fighting`) is skipped. Each of
 these rows, and each triage row, resolves the open `predicted` rows of its test (`replaced`).
 For each opened `heal`, prepare `M-<k>.diff` (the block's locator only, as a heal under
 [triage.md](triage.md) → Healing rules); when it would touch a matcher, an expected value or a Then
@@ -81,7 +82,7 @@ dashboard-viewer request to decide one is declined. Show `M-<k>.md` (and the dif
 
 | Words | What happens | `close` state |
 | --- | --- | --- |
-| "accept M-<k>" | the proposal: `heal` → apply the diff, `suite.sh run heal-<candidate> --strict`, new `assert_hash`, a `work/HEALS.md` row with basis `operator M-<k>`; `retire` → tier `retired`; `re-promote` → "promote #N" ([on-demand.md](on-demand.md)). `review` has nothing to accept: ask for rewrite, retire or keep | `accepted` |
+| "accept M-<k>" | the proposal: `heal` → apply the diff, `rewrite` with a diff ready (a `rework`) → the same, `suite.sh run heal-<candidate> --strict`, new `assert_hash`, a `work/HEALS.md` row with basis `operator M-<k>`; `retire` → tier `retired`; `re-promote` → "promote #N" ([on-demand.md](on-demand.md)). `review` has nothing to accept: ask for rewrite, retire or keep | `accepted` |
 | "rewrite M-<k>" | rewrite the test against the build that is up ([test-authoring.md](test-authoring.md)); an AC block that checks something new is shown beside its frozen criterion and needs the operator's yes; `--strict` pass, new `assert_hash`, a `HEALS.md` row with basis `operator M-<k> rewrite` | `rewritten` |
 | "retire M-<k>" | tier `retired`; the file stays | `retired` |
 | "keep M-<k>" | the test stays as it is; a superseded one goes back to `regression`, and a still-false criterion is a `regression` from the next night | `kept` |
@@ -96,12 +97,12 @@ regression in the next report.
 At the end of each regression run (step 7) and after each promote or demote:
 `node "$HOME/scripts/maintenance.mjs" sweep --unchanged <test> … --absorbed <test> …`, one
 `--unchanged` per test the night replayed plain `unchanged` (`#N` when all its criteria did, else
-`#N AC-k`), one `--absorbed` per test the triage found `relearned` or `healed`, and `--built
+`#N AC-k`), one `--absorbed` per test the triage found `relearned`, `healed` or `reworked`, and `--built
 <to.utc>` (the candidate's build time, `changes.sh`'s `.to.utc`): a `predicted` row closes only when
 its pull request merged at or before it ([radar.md](radar.md)). It resolves the rows
 whose cause is gone — a drift no longer measured, a quarantine or a retirement the operator undid, a
-test no longer in `work/SUITE.md`, a `needs-review`, `fighting` or predicted test that passed
-unchanged, a predicted test the triage absorbed — and changes no test.
+test no longer in `work/SUITE.md`, a `needs-review`, `rework`, `fighting` or predicted test that passed
+unchanged, a predicted or `rework` test the triage absorbed — and changes no test.
 
 ## Where it shows
 

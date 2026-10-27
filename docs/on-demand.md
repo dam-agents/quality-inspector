@@ -32,6 +32,12 @@ A direct session's first request names it ([logging.md](logging.md) → **Sessio
 - **"accept M-<k>"**, **"rewrite M-<k>"**, **"retire M-<k>"**, **"keep M-<k>"**, **"show maintenance"** —
   a test maintenance proposal ([maintenance.md](maintenance.md) → The operator decides);
   "accept the review of #N" / "reject …" name that test's open `needs-review` proposal.
+- **"repair #N[ AC-k]"** (or `IN-<k>`, `S-<k>[ AC-<j>]`, `P-<slug>[ AC-<j>]`) — a test that stops
+  before its frozen block: the "run" procedure below with `--no-cache` finds the step; the explaining
+  change comes from `radar.mjs issues` over the window since the build it last passed
+  ([change-awareness.md](change-awareness.md)) or from the operator's words (basis `operator: <words>`);
+  then [triage.md](triage.md) → **Reworking the steps before a block** on the build that is up. Rules
+  hold → save, `HEALS.md` row, answer with the strict run; a rule fails → a `rework` proposal, shown here.
 - **"run feature <words>"** — a feature's recurring tests now, by hand: [features.md](features.md)
   → Asking for a feature. **"add #N[ AC-k|IN-k] to the feature <id>"**, **"remove … from the feature
   <id>"**, **"alias feature <id> <text>"**, **"rename feature <id> <text>"**, **"merge feature <a>

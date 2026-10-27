@@ -15,7 +15,7 @@
 //   node maintenance.mjs check                 -> {"ok", "problems": []}
 //
 // <test>: `#N`, `#N AC-k`, `#N IN-k`, `S-k[ AC-j]`, `P-<slug>[ AC-j]` (one argument or two). <kind>: needs-review |
-// superseded | drift | quarantined | fighting, one predicted before the replay — obsolete | moved | renamed —, or
+// rework (a step before a frozen block no longer works, and the agent could not rewrite it alone) | superseded | drift | quarantined | fighting, one predicted before the replay — obsolete | moved | renamed —, or
 // `predicted`: a pull request's text names the test (the Change radar, docs/radar.md; proposal `review`, basis
 // `PR #<n>: <title>`). <proposal>: heal | rewrite | retire | re-promote | review.
 // <state>: accepted | rewritten | retired | kept | resolved. The basis — read from <path>, the call's own
@@ -24,7 +24,7 @@
 // UI-map change, an issue number and its quoted sentence, a build): never a triage explanation, a
 // request's words or a credential; the catalog shows it.
 // `predict` opens the predicted kinds from impact.mjs output (lib/staleness.mjs says which), basis
-// the diff's line, and skips a test that already has an open triage row (needs-review, superseded,
+// the diff's line, and skips a test that already has an open triage row (needs-review, rework, superseded,
 // quarantined, fighting) of it. The same change again refreshes the open row's build, never its
 // proposal (the agent may have opened it again as `review`); another change of the same test and kind
 // resolves the open row (`replaced`) and opens a new one, so a diff prepared for the old change never
@@ -36,7 +36,7 @@
 // `sweep` resolves the open rows whose cause is gone: a drift whose file no longer drifts
 // (check-asserts.sh --json), a quarantine or a superseded test whose tier changed, a test with no
 // work/SUITE.md row, each --unchanged test (the night replayed it plain unchanged), and a predicted
-// row of each --absorbed test (relearned or healed: the triage absorbed the change) — a `predicted` row only when
+// row and a rework row of each --absorbed test (relearned, healed or reworked: the triage absorbed the change) — a `predicted` row only when
 // a pull request that holds it (work/PRSCAN.md) was merged at or before --built, the candidate's build time:
 // before that the build did not carry the change. An unreadable
 // work/SUITE.md stops it with no change (exit 1): an unhydrated work/ would else resolve every row.
@@ -58,7 +58,7 @@ const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'wo
 const FILE = join(work, 'MAINTENANCE.md');
 const HEADER = '| id | test | kind | build | basis | proposal | state | opened_utc | closed_utc |';
 const TITLE = '# Test maintenance — proposals for recurring tests the product moved away from (docs/maintenance.md)';
-const TRIAGE = ['needs-review', 'superseded', 'quarantined', 'fighting'];
+const TRIAGE = ['needs-review', 'rework', 'superseded', 'quarantined', 'fighting'];
 const PREDICTED = ['obsolete', 'moved', 'renamed'];
 // A pull request's text names the test (docs/radar.md): the weakest evidence, replaced by any other.
 const PR_KIND = 'predicted';
@@ -217,8 +217,8 @@ switch (cmd) {
         || (p.kind === 'quarantined' && tier !== 'quarantined')
         || (p.kind === 'superseded' && tier !== 'retired')
         || (!tier)
-        || (['needs-review', 'fighting', ...PREDICTED].includes(p.kind) && named(unchanged, p.test))
-        || (PREDICTED.includes(p.kind) && named(absorbed, p.test))
+        || (['needs-review', 'rework', 'fighting', ...PREDICTED].includes(p.kind) && named(unchanged, p.test))
+        || ([...PREDICTED, 'rework'].includes(p.kind) && named(absorbed, p.test))
         || (p.kind === PR_KIND && inBuild(p.id) && (named(unchanged, p.test) || named(absorbed, p.test)));
       if (gone) { Object.assign(p, { state: 'resolved', closed_utc: now() }); resolved.push(p.id); }
     }

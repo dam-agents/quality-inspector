@@ -15,6 +15,9 @@
 //     -> {"pr", "state", "proposals", "resolved": []}
 //   node radar.mjs list                     -> {"prs": [{pr, text_hash, state, merged_at, updated_at, proposals, scanned_utc}]}
 //   node radar.mjs check                    -> {"ok", "problems": []}
+//   node radar.mjs issues <changes.json>    -> {"issues": [{issue, title, candidates}]}   the completed issues of
+//                                              changes.sh, each with the recurring tests its title and spec name
+//                                              (lib/radar-match.mjs; docs/change-awareness.md). Read-only.
 //
 // scan: <prs.json> is `github.sh prs` output. Oldest update first, a pull request is due as
 //   `new` (no ledger row; open or merged — one closed unmerged before any scan is skipped), `changed`
@@ -121,6 +124,18 @@ function scan() {
   out({ due, deferred, truncated: listing.truncated, advance, stalled, inventory: ctx.inventory, logs });
 }
 
+// The completed issues of a build window against the suite: the leads of a night's triage.
+function issues() {
+  const path = args[0] ?? die('usage: radar.mjs issues <changes.json>');
+  let ch;
+  try { ch = JSON.parse(readFileSync(path, 'utf8')); } catch { die(`${path}: not the JSON of changes.sh`); }
+  if (ch?.error) die(`${path}: changes.sh failed: ${ch.error}`);
+  if (!Array.isArray(ch?.issues)) die(`${path}: not the JSON of changes.sh`);
+  const ctx = context();
+  out({ issues: ch.issues.filter((i) => Number.isInteger(i?.number)).map((i) => ({ issue: i.number, title: i.title ?? '',
+    candidates: matchPr(`${i.title ?? ''}\n${i.spec ?? ''}`, ctx) })).filter((i) => i.candidates.length) });
+}
+
 function record() {
   const pr = args[0];
   if (!/^[1-9]\d{0,6}$/.test(pr ?? '')) die('usage: radar.mjs record <pr> --hash <h> --state <s> --updated-at <iso> [--merged-at <iso>] [--proposal M-k]… [--keep]');
@@ -189,6 +204,7 @@ try {
   switch (cmd) {
     case 'since': out({ since: sinceNow() }); break;
     case 'scan': scan(); break;
+    case 'issues': issues(); break;
     case 'advance': {
       if (!UTC_RE.test(args[0] ?? '')) die('usage: radar.mjs advance <YYYY-MM-DDTHH:MM:SSZ>');
       const from = sinceNow();
@@ -201,7 +217,7 @@ try {
     case 'record': out(record()); break;
     case 'list': out({ prs: load() }); break;
     case 'check': out(check()); break;
-    default: die('usage: radar.mjs since|scan|advance|record|list|check — see its header');
+    default: die('usage: radar.mjs since|scan|issues|advance|record|list|check — see its header');
   }
 } catch (e) {
   console.error(`radar: ${e.message}`);

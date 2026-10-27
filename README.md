@@ -272,6 +272,9 @@ loses it. Definition updates arrive as the platform's Kit Update and never touch
 - [`engines/`](engines/) — reusable runners of the profile's `bin/` contract.
 - [`skills/qi-profile-creator/`](skills/qi-profile-creator/SKILL.md) — the skill a product
   team writes and checks its profile with; the agent never uses it.
+- [`skills/qi-test-sync/`](skills/qi-test-sync/SKILL.md) — the skill a product team (or its
+  code reviewer) runs on a product change: it updates the profile in the same change and writes
+  the pull request's "QA impact" note; the agent never uses it.
 - [`skills/create-issue/`](skills/create-issue/SKILL.md) — the agent's own: one GitHub issue
   about found problems (failed tests, design, validation, stress findings) on the operator's word.
 - [`scripts/`](scripts/) — pre-flight and Precheck, the environment lock and profile

@@ -7,6 +7,13 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.36.0 — 2026-10-27
+
+**Upgrade:**
+Nothing to run — docs are re-read per run. Existing `work/MAINTENANCE.md`, `work/HEALS.md` and
+`work/REGRESSION.log` stay valid (the new kind `rework` and the log key `reworked=` are additive);
+the dashboard shows "Repair this test" from the next catalog build.
+
 ## 3.35.0 — 2026-10-26
 
 **Upgrade:**

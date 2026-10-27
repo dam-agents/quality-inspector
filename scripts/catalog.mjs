@@ -276,7 +276,7 @@ for (const c of ls(join(work, 'regression'))) {
   }
   nightOutcomes.set(c, per); nightCauses.set(c, why);
 }
-const TOP = ['regression', 'needs-review', 'healed', 'relearned'];
+const TOP = ['regression', 'needs-review', 'healed', 'reworked', 'relearned'];
 const due = new Map(); // candidate -> the pre-flight's `due` time: the night's start
 for (const line of (read(join(work, 'REGRESSION.log')) ?? '').split('\n')) {
   const d = line.match(/^(\S+) due candidate=(\S+)/);
