@@ -14,6 +14,15 @@ Nothing to run — docs are re-read per run. Existing `work/MAINTENANCE.md`, `wo
 `work/REGRESSION.log` stay valid (the new kind `rework` and the log key `reworked=` are additive);
 the dashboard shows "Repair this test" from the next catalog build.
 
+## 3.35.1 — 2026-10-27
+
+**Upgrade:**
+Nothing to run — the reports and the evidence pages of found issues rebuild themselves on the next run.
+A click on a screenshot, or "Enlarge" under a video, shows it larger over the page, with zoom in
+and out, fit and 1:1. A screenshot no longer links its file, which opened an empty page in a
+strict viewer and downloaded the file after a reload. A report made before this version keeps the
+old behavior.
+
 ## 3.35.0 — 2026-10-26
 
 **Upgrade:**

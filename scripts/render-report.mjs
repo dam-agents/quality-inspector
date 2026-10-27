@@ -28,6 +28,7 @@ import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { VIEWER_CSS, VIEWER_HTML } from './lib/media-viewer.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -204,7 +205,7 @@ function sideHtml(name, ev) {
     ? `<video controls preload="metadata" src="${esc(ev.video)}"${poster ? ` poster="${esc(poster)}"` : ''}></video>`
     : `<p class="dim">No video recorded.</p>`;
   const shots = ev.shots.length
-    ? `<div class="shots">${ev.shots.map((s) => `<figure><a href="${esc(s.src)}" target="_blank"><img loading="lazy" src="${esc(s.src)}" alt="${esc(s.caption)}"></a><figcaption>${esc(s.caption)}</figcaption></figure>`).join('')}</div>`
+    ? `<div class="shots">${ev.shots.map((s) => `<figure><img loading="lazy" src="${esc(s.src)}" alt="${esc(s.caption)}"><figcaption>${esc(s.caption)}</figcaption></figure>`).join('')}</div>`
     : '';
   const err = ev.error ? `<pre class="error">${esc(ev.error.code)}\n${esc(ev.error.message)}</pre>` : '';
   const steps = `<details><summary>Steps (${ev.steps.length}) · ${esc(ms(ev.durationMs))}</summary><ol class="steps">${ev.steps
@@ -238,36 +239,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:var(--
 pre.error{color:var(--bad)}details{margin:6px 0}summary{cursor:pointer;color:var(--dim)}
 .steps{margin:6px 0;padding-left:22px;font-size:13px}.steps li.failed{color:var(--bad)}.steps code{font-size:12px}
 .note{font-style:italic;color:var(--dim)}.quote{margin:0 0 12px;padding:6px 10px;border-left:3px solid var(--line);color:var(--dim)}.signals li{margin:0 0 12px}.sigshot{max-width:320px;margin-top:6px}footer{color:var(--dim);font-size:13px;margin-top:32px}
-figure img{cursor:zoom-in}
-#zoom{position:fixed;inset:0;z-index:100;display:none;overflow:auto;padding:16px;background:rgba(8,10,14,.92)}
-#zoom.on{display:block}
-#zoom img{display:block;margin:0 auto;width:auto;max-width:none;border:0;border-radius:0;cursor:zoom-out}
-#zoom.fit img{max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);cursor:zoom-in}
-#zoom .hint{position:fixed;left:16px;bottom:10px;color:#fff;font:12px/1.4 system-ui,sans-serif;opacity:.75;pointer-events:none}`;
-
-// A click on a screenshot shows it at its full size over the page. The browser's own viewer
-// downloads a media file (docs/reporting.md → Delivery step 1); the page draws it itself.
-const ZOOM = `<div id="zoom" role="dialog" aria-modal="true" aria-label="Image at full size" tabindex="-1"><img alt=""><span class="hint">Click the image to fit it to the window. Esc closes.</span></div>
-<script>
-(() => {
-  const z = document.getElementById('zoom'), zi = z.querySelector('img');
-  const close = () => { z.classList.remove('on', 'fit'); zi.removeAttribute('src'); };
-  document.addEventListener('click', (e) => {
-    if (z.classList.contains('on')) {
-      if (e.target === zi) { z.classList.toggle('fit'); return; }
-      if (e.target !== z && z.contains(e.target)) return;
-      e.preventDefault(); close(); return;
-    }
-    const fig = e.target.closest ? e.target.closest('figure') : null;
-    const img = e.target.tagName === 'IMG' ? e.target : (fig ? fig.querySelector('img') : null);
-    if (!img) return;
-    e.preventDefault();
-    zi.src = img.currentSrc || img.src; zi.alt = img.alt || '';
-    z.classList.add('on'); z.classList.remove('fit'); z.focus();
-  });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && z.classList.contains('on')) { e.preventDefault(); close(); } });
-})();
-</script>`;
+${VIEWER_CSS}`;
 
 if (v.mode === 'security') { renderSecurity(); process.exit(0); }
 
@@ -327,7 +299,7 @@ const noticedShot = (p) => {
   if (!p || !existsSync(p)) return '';
   const to = `media/noticed-${++notN}-${basename(p).replace(/[^A-Za-z0-9._-]/g, '_')}`;
   copyFileSync(p, join(outDir, to));
-  return `<figure class="sigshot"><a href="${esc(to)}" target="_blank"><img loading="lazy" src="${esc(to)}" alt="what was seen"></a></figure>`;
+  return `<figure class="sigshot"><img loading="lazy" src="${esc(to)}" alt="what was seen"></figure>`;
 };
 const noticedHtml = !noticed.length ? '' : `
 <section id="noticed">
@@ -344,7 +316,7 @@ function signalShot(p) {
   if (!p || !existsSync(p)) return '';
   const to = `media/signal-${++sigN}-${basename(p).replace(/[^A-Za-z0-9._-]/g, '_')}`;
   copyFileSync(p, join(outDir, to));
-  return `<figure class="sigshot"><a href="${esc(to)}" target="_blank"><img loading="lazy" src="${esc(to)}" alt="the page on this build"></a></figure>`;
+  return `<figure class="sigshot"><img loading="lazy" src="${esc(to)}" alt="the page on this build"></figure>`;
 }
 const sg = ctx?.signals ?? {};
 const why = (x) => (x.explanation ? `<br><span class="dim">${esc(x.explanation)}</span>` : '');
@@ -374,7 +346,7 @@ const acHtml = acs.map((ac) => `
   ${ac.baseline_blocked_reason ? `<p class="dim">${BLOCKED[ac.baseline_blocked_reason] ?? `On the baseline, the test stopped before the check (${esc(ac.baseline_blocked_reason)}).`}</p>` : ''}
   ${ac.regressed_between ? `<p><b>Regressed between</b> <code>${esc(ac.regressed_between.from)}</code> (passes) and <code>${esc(ac.regressed_between.to)}</code> (fails)${ac.regressed_between.builds_between == null ? '' : ac.regressed_between.builds_between ? ` · ${esc(ac.regressed_between.builds_between)} untested builds in between` : ' · adjacent builds'}</p>` : ''}
   ${ac.testable === false ? '' : `<div class="sides">${sideHtml(`${regression ? 'Build' : 'Candidate'} ${v.candidate ?? ''}`, ac.cand)}${regression
-    ? (ac.before ? `<section class="side"><h4>Previous build ${esc(ctx?.previous ?? '')}</h4><figure><a href="${esc(ac.before)}" target="_blank"><img src="${esc(ac.before)}" alt="previous build"></a><figcaption>the same page on the previous build</figcaption></figure></section>` : '')
+    ? (ac.before ? `<section class="side"><h4>Previous build ${esc(ctx?.previous ?? '')}</h4><figure><img src="${esc(ac.before)}" alt="previous build"><figcaption>the same page on the previous build</figcaption></figure></section>` : '')
     : sideHtml(`Baseline ${v.baseline ?? ''}`, ac.base)}</div>`}
 </article>`).join('');
 
@@ -418,7 +390,7 @@ ${exHtml}
 ${noticedHtml}
 ${(v.notes ?? []).length ? `<h3>Notes</h3><ul>${v.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
 <footer>${esc(v.display_name ?? 'Quality Inspector')} · black-box test of the build in a nested environment · e2e ${esc(runs.candidate?.version ?? '')}</footer>
-</main>${ZOOM}</body></html>
+</main>${VIEWER_HTML}</body></html>
 `;
 writeFileSync(join(outDir, 'index.html'), html);
 
@@ -498,7 +470,7 @@ ${CSS}
 ${findings.filter((f) => f.status === 'fail').map(detail).join('')}
 ${(v.notes ?? []).length ? `<h3>Notes</h3><ul>${v.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
 <footer>${esc(v.display_name ?? 'Quality Inspector')} · security run · e2e ${esc(runs.candidate?.version ?? '')}</footer>
-</main>${ZOOM}</body></html>
+</main>${VIEWER_HTML}</body></html>
 `;
   writeFileSync(join(outDir, 'index.html'), html);
   console.log(JSON.stringify({ out: outDir, findings: findings.length, failed: findings.filter((f) => f.status === 'fail').length }));
