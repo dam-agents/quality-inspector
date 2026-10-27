@@ -177,9 +177,9 @@ runs no Precheck.
 
 The operator often reads the dashboard beside a scheduled run's chat, and its buttons then
 send their words into that session. A request there that only the direct session does
-("create issue for …", "module … set", "focus …", "dismiss D-`<k>`", a configuration change —
-[on-demand.md](on-demand.md)) is not refused with a "start a new chat". You hand the operator's
-words to a fresh session:
+("create issue for …", "module … set", "focus …", "dismiss D-`<k>`", "recheck D-`<k>`",
+"discuss D-`<k>`", a configuration change — [on-demand.md](on-demand.md)) is not refused with a
+"start a new chat". You hand the operator's words to a fresh session:
 
 1. Only for the newest prompt, and only when the operator wrote it: it holds no frame — not
    the schedule's prompt, a Slack message or a shared viewer's button — and no harness tool sent

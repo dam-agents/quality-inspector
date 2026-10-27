@@ -72,7 +72,8 @@ A direct session's first request names it ([logging.md](logging.md) → **Sessio
 - **"recheck D-<k>"** — that design finding's page and viewport swept again on the candidate now
   ([ui-sweep.md](ui-sweep.md) → **5. Recheck**). **"discuss D-<k>[: <question>]"** — talk about the
   finding, read-only ([ui-sweep.md](ui-sweep.md) → **6. Discuss**). Never from a dashboard viewer
-  (`artifact_viewer_declined`, [modules.md](modules.md) → Control).
+  (`artifact_viewer_declined`, [modules.md](modules.md) → Control). Beside a scheduled run's chat, both
+  go to a fresh session ([persistence.md](persistence.md) → **Handoff**).
 - **"run #N"**, **"run #N AC-<k>"** (or `IN-<k>`, `EX-<k>`), **"run S-<k>[ AC-<j>]"**, **"run P-<slug>[ AC-<j>]"** — a
   test run by hand, now, on the build that is up: `env.sh lock operator` (busy → say who holds
   it, end); `env.sh status` — no product up → `env.sh up <candidate>` and `wait` with the

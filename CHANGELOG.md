@@ -14,8 +14,9 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    hook for the platform's schedule tools too (rule `platform-schedule`). Re-running changes nothing;
    until then the audit's `policy_schedules` warns, and the gate stays green.
 2. Nothing else — docs are re-read per run. A dashboard button pressed beside a scheduled run's chat
-   ("create issue for …", "module … set", "dismiss D-k") now goes to a fresh session of its own
-   ([docs/persistence.md](docs/persistence.md) → **Handoff**); look for its answer there.
+   ("create issue for …", "module … set", "dismiss D-k", "recheck D-k", "discuss D-k") now goes to a
+   fresh session of its own ([docs/persistence.md](docs/persistence.md) → **Handoff**); look for its
+   answer there.
 
 ## 3.41.0 — 2026-10-27
 

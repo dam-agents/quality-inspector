@@ -95,7 +95,8 @@ card also offers **5. Recheck** and **6. Discuss**.
 
 One finding's page and viewport swept again on the candidate now, instead of waiting for the
 next modules run. Direct session only ([on-demand.md](on-demand.md)); it is not a module run
-(no `modules.sh ran`) and changes no verdict.
+(no `modules.sh ran`) and changes no verdict. Beside a scheduled run's chat, the request goes to a
+fresh session ([persistence.md](persistence.md) → **Handoff**).
 
 1. `node "$HOME/scripts/design-findings.mjs" recheck-plan D-<k>` (exit 2: no such finding — say so, end).
    `sweep: null` (a noticed item, or a page no sweep can repeat) → say its `note`, change
@@ -126,8 +127,9 @@ next modules run. Direct session only ([on-demand.md](on-demand.md)); it is not 
 ## 6. Discuss — the operator's "discuss D-`<k>`[: `<question>`]"
 
 A conversation about one finding; it reads only and changes nothing (no lock, no product
-action, no state but the answer). Read its register entry, its crop and shot, the page's
-entry in `work/design/<last_seen>/sweep.json` (a failed request's address and status, a
+action, no state but the answer). Beside a scheduled run's chat, the request goes to a fresh
+session ([persistence.md](persistence.md) → **Handoff**). Read its register entry, its crop and
+shot, the page's entry in `work/design/<last_seen>/sweep.json` (a failed request's address and status, a
 console line), its rows in `DISMISSED.md`, `CATEGORIES.md` and `work/FOUND.md`, and the other
 findings with the same target or `saw`. Answer the question — or, without one: what a user
 sees, the probable cause and how sure you are, which findings are probably the same defect,
