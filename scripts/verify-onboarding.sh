@@ -99,6 +99,7 @@ if [ "$STRUCTURE" = 1 ]; then
   ph="$(bash "$SCRIPT_DIR/hooks/install.sh" --check 2>&1)" && ok policy_hook "$ph" \
     || fail policy_hook "$ph" "bash \"\$HOME/scripts/hooks/install.sh\" (ONBOARDING.md Step 2e), then start a new session"
   th="$(bash "$SCRIPT_DIR/hooks/install.sh" --check-trace 2>&1)" && ok trace_hook "$th" || warn trace_hook "$th"
+  ph="$(bash "$SCRIPT_DIR/hooks/install.sh" --check-schedules 2>&1)" && ok policy_schedules "$ph" || warn policy_schedules "$ph"
   [ "$(grep -v '^[[:space:]]*#' "$HOME_DIR/.gitignore" 2>/dev/null | grep -v '^[[:space:]]*$' | head -1)" = '/*' ] \
     && ok gitignore_allowlist "first rule is /*" \
     || fail gitignore_allowlist ".gitignore is not an allowlist" "restore .gitignore from origin/main"

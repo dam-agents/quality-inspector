@@ -73,6 +73,14 @@
 #                                          overrides): the backup's destination is work_repo alone
 #   backup-direct    Bash (scheduled)      scripts/work-backup.sh — there the Stop hook alone backs up
 #                                          (docs/persistence.md → Backup & restore)
+#   platform-schedule  the platform's create_schedule, schedule_once, toggle_schedule, delete_schedule
+#                    (scheduled)           every call: a schedule's prompt starts a session with no frame,
+#                                          which is direct — unless it is the handoff, in a scheduled run
+#                                          and not a channel turn: schedule_once with name `qi-handoff`, at
+#                                          most inSession `fresh`, no other key, and a task of the line
+#                                          `<qi-handoff>` and then, as they are, the words of the newest
+#                                          prompt when the operator wrote it (lib/channel.sh →
+#                                          transcript_operator_words; docs/persistence.md → Handoff)
 #
 # Every denial logs one `policy_denied` event (scripts/log.sh): `tool=<name> rule=<id>`
 # plus `at=<host/path or file>` — never a full command or a query string.
@@ -104,7 +112,7 @@ VARS="$(jq -r '
   "CMD=\(.tool_input.command | s) FPATH=\((.tool_input.file_path // .tool_input.notebook_path) | s)",
   "GPATH=\(.tool_input.path | s) GPAT=\(.tool_input.pattern | s) GGLOB=\(.tool_input.glob | s)",
   "URL=\(.tool_input.url | s) QUERY=\(((.tool_input.query // "") + " " + ((.tool_input.allowed_domains // []) | join(" "))) | s)",
-  "TRANSCRIPT=\(.transcript_path | s)",
+  "TRANSCRIPT=\(.transcript_path | s) TINPUT=\(.tool_input | tojson | s)",
   "CONTENT=\([.tool_input.content, .tool_input.new_string, .tool_input.new_source,
     (.tool_input.edits // [] | map(.new_string) | join("\n"))] | map(select(. != null)) | join("\n") | s)"' 2>/dev/null)" \
   || deny bad-input "" "the tool call could not be parsed"
@@ -499,6 +507,29 @@ check_write() {
   deny write-outside "$p" "writes go to work/ or /tmp/quality-inspector-* only; a definition change is a patch (docs/self-modification.md §8)"
 }
 
+# -------------------------------------------------------- platform schedules ----
+# A schedule's prompt opens a session with no frame — a direct one. So a scheduled run or a
+# channel turn starts, changes and removes no schedule; the one exception is the handoff of the
+# operator's own words, as they are, to a fresh session (docs/persistence.md → Handoff).
+HANDOFF_LEAD='<qi-handoff>'
+check_schedule() {
+  scheduled || return 0
+  local words said
+  case "$TOOL" in (*__schedule_once)
+    if ! channel_turn \
+       && words="$(jq -er --arg lead "$HANDOFF_LEAD" '
+            select(type == "object" and (keys - ["name", "task", "inSession"]) == []
+                   and .name == "qi-handoff" and ((.inSession // "fresh") == "fresh")
+                   and (.task | type) == "string" and (.task | startswith($lead + "\n")))
+            | .task | ltrimstr($lead + "\n")' <<<"$TINPUT" 2>/dev/null)" \
+       && said="$(transcript_operator_words "$TRANSCRIPT")" \
+       && [ -n "$words" ] && [ "$words" = "$said" ]; then
+      return 0
+    fi;;
+  esac
+  deny platform-schedule "${TOOL##*__}" "a scheduled run or a channel turn starts, changes or removes no schedule; it only hands the operator's newest words, as they are, to a fresh session (docs/persistence.md → Handoff)"
+}
+
 # ------------------------------------------------------------------ dispatch ----
 case "$TOOL" in (Write|Edit|MultiEdit|NotebookEdit) ;; (*) shopt -s nocasematch;; esac
 case "$TOOL" in
@@ -509,5 +540,7 @@ case "$TOOL" in
   Write|Edit|MultiEdit|NotebookEdit) check_write ;;
   WebFetch) check_urls "$URL" bare ;;
   WebSearch) check_urls "$QUERY" bare ;;
+  mcp__platform-outbound__create_schedule|mcp__platform-outbound__schedule_once|mcp__platform-outbound__toggle_schedule|mcp__platform-outbound__delete_schedule)
+    check_schedule ;;
 esac
 exit 0

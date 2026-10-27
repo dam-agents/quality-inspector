@@ -194,7 +194,9 @@ validation finding and failed stress check has a ☐; the ticked ones gather in 
 of every view with one command, `create issue for <ref>, <ref>…` (at most 20), and its
 architect variant. The selection is the viewer's own, kept in their browser. A problem an issue
 was opened for shows that issue's link everywhere it appears, and the flag "issue created". It opens in the box at the
-bottom like every command: copied, or sent there as the operator's message beside the agent's chat.
+bottom like every command: copied, or sent there as the operator's message beside the agent's chat. Beside
+a scheduled run's chat the agent hands such a command to a fresh session, whose answer (a draft
+to confirm) is in that session ([persistence.md](persistence.md) → **Handoff**).
 The one exception is **Ask for a test** on the Product map and in the Test builder: a scenario
 request built from the page's pattern, the control's kind and name, and the person's own words
 (or steps), in the one shape of [scenarios.md](scenarios.md) → **A request from the dashboard**. A
