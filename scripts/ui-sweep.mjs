@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // ui-sweep.mjs — a read-only walk of every page of the UI map at a few viewports, hunting UI
 // and visual defects: the deterministic checks of lib/ui-checks.mjs, layout shift, console
-// errors, failed same-origin requests, axe-core's WCAG 2 A/AA rules (when the suite has it),
+// errors, failed same-origin requests (but the profile's expected_requests), axe-core's WCAG 2 A/AA rules (when the suite has it),
 // a full-page screenshot per page and viewport, and whether that shot changed since the
 // previous sweep. The design findings register is built from it (design-findings.mjs).
 // Rationale: docs/ui-sweep.md.
@@ -28,6 +28,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseExpected, isExpected } from './lib/expected-requests.mjs';
 import { pattern } from './lib/url-pattern.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -72,6 +73,10 @@ if (!Number.isInteger(maxPages) || maxPages < 1) die(`--max-pages '${flags['max-
 let inv;
 try { inv = JSON.parse(readFileSync(pos[0], 'utf8')); } catch (e) { die(`cannot read the UI map ${pos[0]}: ${String(e.message).split('\n')[0]}`); }
 const profile = (() => { try { return JSON.parse(readFileSync(join(sh('profile_dir'), 'profile.json'), 'utf8')); } catch { return {}; } })();
+// A failed request the profile declares expected is no finding (lib/expected-requests.mjs).
+const expected = parseExpected(profile);
+notes.push(...expected.notes);
+const expectedSeen = new Set();
 let base;
 try { base = new URL(flags.base ?? process.env.APP_URL ?? inv.base ?? profile.app?.url ?? 'http://localhost'); } catch { die('the base is not a URL'); }
 if (!['localhost', '127.0.0.1'].includes(base.hostname)) { console.error(`refusing ${base.origin}: only the nested product on localhost`); process.exit(2); }
@@ -91,7 +96,7 @@ const visits = viewports.flatMap((v) => pages.map(([p, r]) => ({ pattern: p, exa
 
 if (flags.dry) {
   console.log(JSON.stringify({
-    build, base: base.origin, out, previous, viewports: viewports.map((v) => v.id), max_pages: maxPages,
+    build, base: base.origin, out, previous, viewports: viewports.map((v) => v.id), max_pages: maxPages, expected_requests: expected.list,
     pages: visits.map((x) => ({ pattern: x.pattern, example: x.example, viewport: x.vp.id, shot: join(out, x.shot),
       previous_shot: previous && existsSync(join(previous, x.shot)) ? join(previous, x.shot) : null })),
     skipped, notes,
@@ -226,7 +231,13 @@ for (const vp of viewports) {
   let sig = null;
   page.on('console', (m) => { if (sig && m.type() === 'error' && !/^Failed to load resource/.test(m.text())) sig.errors.add(vol(m.text())); });
   page.on('pageerror', (e) => { if (sig) sig.errors.add(vol(`${e?.name || 'Error'}: ${String(e?.message ?? e).split('\n')[0]}`)); });
-  page.on('response', (r) => { if (sig && r.status() >= 400 && sameOrigin(r.url())) sig.requests.set(`${r.request().method()} ${pattern(new URL(r.url()))} → ${r.status()}`, String(r.status())); });
+  page.on('response', (r) => {
+    if (!sig || r.status() < 400 || !sameOrigin(r.url())) return;
+    const method = r.request().method(); const path = pattern(new URL(r.url()));
+    const k = `${method} ${path} → ${r.status()}`;
+    if (isExpected(expected.list, method, path, r.status())) expectedSeen.add(k);
+    else sig.requests.set(k, String(r.status()));
+  });
   page.on('requestfailed', (r) => {
     const err = r.failure()?.errorText ?? 'failed';
     if (sig && sameOrigin(r.url()) && !/ERR_ABORTED/.test(err)) sig.requests.set(`${r.method()} ${pattern(new URL(r.url()))} → failed`, err);
@@ -264,6 +275,7 @@ await browser.close();
 const all = results.flatMap((p) => p.findings);
 const counts = { major: all.filter((f) => f.severity === 'major').length, minor: all.filter((f) => f.severity === 'minor').length, pages: results.length };
 for (const p of results.filter((x) => x.error)) notes.push(`${p.pattern} @${p.viewport}: ${p.error}`);
+for (const k of [...expectedSeen].sort()) notes.push(`${k}: expected by the profile (expected_requests) — no finding`);
 const sweep = { build, generated_utc: new Date().toISOString().replace(/\.\d+Z$/, 'Z'), base: base.origin, viewports: viewports.map((v) => v.id),
   axe: !!axeSource, pages: results, counts, notes };
 const file = join(out, 'sweep.json');

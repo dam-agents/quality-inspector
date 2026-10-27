@@ -78,6 +78,7 @@ this contract (`--live` also lists its builds).
   "requires": { "root": true, "commands": ["docker"], "memory_gi": 8 },
   "canary": { "thing": "widget, under Widgets → New", "field": "description" },
   "interfaces": { "cli": "widgets", "openapi": "/api/openapi.json" },
+  "expected_requests": [{ "method": "GET", "path": "/api/billing/status", "status": 404, "why": "the QA install sets no billing provider" }],
   "config": {
     "image_ref": { "default": "registry.example.com/widgets", "about": "image repository the builds come from" },
     "admin_email": { "default": "", "about": "which address the seeded admin account uses", "ask": true }
@@ -114,6 +115,16 @@ this contract (`--live` also lists its builds).
   or installed into `work/suite`), and `openapi`, the path under `app.url` that serves the
   API description as JSON. Their snapshots are change context
   ([change-awareness.md](change-awareness.md)); absent → no snapshot.
+- `validation` (optional) — `exclude`: page patterns, form names or submit labels, each an
+  exact match, that the validation module never submits ([validation.md](validation.md)).
+- `expected_requests` (optional) — same-origin requests the UI sends that the nested install
+  answers with an error on purpose, because it leaves a feature out (no billing provider, no
+  chat app). Each names `method`, `path` — the pattern as the UI map records it (ids as `:id`),
+  no query and no wildcard —, `status` (400–599) and `why`. Only an exact match counts: the UI
+  sweep records no `failed-request` finding for it ([ui-sweep.md](ui-sweep.md)) and the UI
+  diff never reports it as new ([change-awareness.md](change-awareness.md)); the UI map keeps
+  it. List only what the install cannot do — the same thing the SKILL.md says in words — never
+  a failure to hide.
 - `config` — the profile's own keys, written in `work/CONFIG.md` as
   `- profile.<key>: <value>`, each with a default and an `about` sentence; `"ask": true`
   makes onboarding ask the operator instead of defaulting. The core validates that no
