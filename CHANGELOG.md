@@ -7,6 +7,11 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.38.1 — 2026-10-27
+
+**Upgrade:**
+Nothing to run: the next run of `scripts/hooks/install.sh` takes `~/.claude/settings.json.lock` while it merges, so it no longer races the platform's own settings writes.
+
 ## 3.38.0 — 2026-10-27
 
 **Upgrade:**

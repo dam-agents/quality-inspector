@@ -109,4 +109,24 @@ assert_eq "check sees a missing backup hook" "backup hook not registered" "$(bas
 mv "$SANDBOX/full" "$QI_CLAUDE_SETTINGS"
 jq '.permissions.deny -= ["Bash(git clean:*)"]' "$QI_CLAUDE_SETTINGS" > "$SANDBOX/s" && mv "$SANDBOX/s" "$QI_CLAUDE_SETTINGS"
 bash "$SCRIPTS/hooks/install.sh" --check >/dev/null; assert_eq "check sees a missing deny rule" 1 "$?"
+
+# install.sh under the settings lock: another writer holds it, the install waits, and that
+# writer's key survives; a lock left by a dead holder is broken; a held lock is never overwritten.
+echo '{"env":{"OTEL_X":"1"}}' > "$QI_CLAUDE_SETTINGS"
+L="$QI_CLAUDE_SETTINGS.lock"
+( printf '%s:platform' "$BASHPID" > "$L"; sleep 1.5
+  jq '.hooks.Stop=[{"hooks":[{"type":"command","command":"sync"}]}]' "$QI_CLAUDE_SETTINGS" > "$QI_CLAUDE_SETTINGS.p" \
+    && mv "$QI_CLAUDE_SETTINGS.p" "$QI_CLAUDE_SETTINGS"; rm -f "$L" ) &
+sleep 0.3
+bash "$SCRIPTS/hooks/install.sh" >/dev/null; assert_eq "install waits for the lock and succeeds" 0 "$?"; wait
+s="$(cat "$QI_CLAUDE_SETTINGS")"
+assert "the other writer's keys survive" '.env.OTEL_X == "1" and ([.hooks.Stop[].hooks[]?.command] | index("sync") != null)' "$s"
+assert "the kit's hooks are there too" '.hooks.PreToolUse | length == 1' "$s"
+[ ! -e "$L" ]; assert_eq "lock released" 0 "$?"
+printf '%s:platform' "$$" > "$L"; before="$(cat "$QI_CLAUDE_SETTINGS")"
+QI_LOCK_WAIT=1 bash "$SCRIPTS/hooks/install.sh" >/dev/null 2>&1; assert_eq "install gives up on a held lock" 1 "$?"
+assert_eq "file untouched, foreign lock kept" "$before:$$:platform" "$(cat "$QI_CLAUDE_SETTINGS"):$(cat "$L")"
+printf '99999999:platform' > "$L"; touch -d '2 minutes ago' "$L"
+bash "$SCRIPTS/hooks/install.sh" >/dev/null; assert_eq "a stale lock of a dead holder is broken" 0 "$?"
+[ ! -e "$L" ]; assert_eq "lock released after break" 0 "$?"
 exit $FAILED
