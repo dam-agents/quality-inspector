@@ -7,8 +7,11 @@
 // Rationale: docs/ui-sweep.md.
 //
 //   node ui-sweep.mjs <inventory.json> --build <c> [--out <dir>] [--previous <dir>]
-//        [--viewports 1440x900,768x1024,390x844] [--base URL] [--max-pages 60] [--dry-run]
+//        [--viewports 1440x900,768x1024,390x844] [--base URL] [--max-pages 60] [--pattern P] [--dry-run]
 //
+// --pattern sweeps only that page of the UI map (a design finding's recheck, docs/ui-sweep.md →
+// Recheck); a pattern the map does not have, or that the map skips (no example, an error, a
+// redirect), is exit 2.
 // --dry-run prints the plan (pages × viewports, out paths) with no browser and no network.
 // Default --out: work/design/<build>; --viewports: config `ui_sweep_viewports`, else the above
 // (WxH, at most 4; a viewport under 600 px wide is a touch phone). Writes <out>/sweep.json
@@ -39,7 +42,7 @@ for (let i = 2; i < process.argv.length; i++) {
   else if (a.startsWith('--')) flags[a.slice(2)] = process.argv[++i];
   else pos.push(a);
 }
-const usage = 'usage: ui-sweep.mjs <inventory.json> --build B [--out DIR] [--previous DIR] [--viewports WxH,…] [--base URL] [--max-pages N] [--dry-run]';
+const usage = 'usage: ui-sweep.mjs <inventory.json> --build B [--out DIR] [--previous DIR] [--viewports WxH,…] [--base URL] [--max-pages N] [--pattern P] [--dry-run]';
 const die = (m) => { console.error(`ui-sweep: ${m}`); process.exit(2); };
 if (!pos[0]) { console.error(usage); process.exit(2); }
 
@@ -86,10 +89,12 @@ const out = resolve(flags.out ?? join(WORK, 'design', build));
 const previous = flags.previous ? resolve(flags.previous) : null;
 
 const slug = (p) => (p === '/' ? 'root' : p.replace(/^\//, '').replace(/[^A-Za-z0-9]+/g, '_')).slice(0, 80);
-const routes = Object.entries(inv.routes ?? {});
+const routes = Object.entries(inv.routes ?? {}).filter(([p]) => flags.pattern === undefined || p === flags.pattern);
+if (flags.pattern !== undefined && !routes.length) die(`--pattern '${flags.pattern}' is not a page of the UI map ${pos[0]}`);
 const skipped = routes.filter(([, r]) => !r?.example || r.error || r.redirected)
   .map(([p, r]) => ({ pattern: p, reason: !r?.example ? 'no example path' : r.error ? `errored in the UI map: ${String(r.error).slice(0, 80)}` : `redirected to ${r.redirected}` }));
 const pages = routes.filter(([, r]) => r?.example && !r.error && !r.redirected).slice(0, maxPages);
+if (flags.pattern !== undefined && !pages.length) die(`--pattern '${flags.pattern}' cannot be swept: ${skipped[0].reason}`);
 if (routes.length - skipped.length > maxPages) notes.push(`${routes.length - skipped.length - maxPages} pages over --max-pages ${maxPages} not swept`);
 const shotOf = (p, v) => `shots/${slug(p)}@${v.id}.png`;
 const visits = viewports.flatMap((v) => pages.map(([p, r]) => ({ pattern: p, example: r.example, vp: v, shot: shotOf(p, v) })));

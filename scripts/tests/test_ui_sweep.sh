@@ -42,6 +42,16 @@ node "$SCRIPTS/ui-sweep.mjs" "$SANDBOX/inv.json" --build c2 --dry-run --base htt
 assert_eq "a non-local base is refused" 2 "$?"
 node "$SCRIPTS/ui-sweep.mjs" "$SANDBOX/inv.json" --build ../x --dry-run >/dev/null 2>&1
 assert_eq "a build that is not a plain id is refused" 2 "$?"
+# --pattern: one page of the map, every viewport (a recheck, docs/ui-sweep.md → Recheck).
+p="$(node "$SCRIPTS/ui-sweep.mjs" "$SANDBOX/inv.json" --build c2 --dry-run --pattern /projects/:id --viewports 390x844)"
+assert "--pattern sweeps that page only" '[.pages[] | "\(.pattern)@\(.viewport)"] == ["/projects/:id@390x844"]' "$p"
+node "$SCRIPTS/ui-sweep.mjs" "$SANDBOX/inv.json" --build c2 --dry-run --pattern /nope >/dev/null 2>&1
+assert_eq "a pattern the map does not have is refused" 2 "$?"
+for skip in /broken /sso; do
+  e="$(node "$SCRIPTS/ui-sweep.mjs" "$SANDBOX/inv.json" --build c2 --dry-run --pattern "$skip" 2>&1 >/dev/null)"
+  assert_eq "a pattern the map skips ($skip) is refused" 2 "$?"
+  case "$e" in (*"cannot be swept"*) ;; (*) echo "  $skip: the refusal does not say why: $e"; FAILED=1;; esac
+done
 [ ! -e "$D/c2" ] || { echo "  a dry run wrote its out dir"; FAILED=1; }
 
 # No browser is the module's failure (exit 3), never the environment's (exit 1: sign-in).
@@ -115,6 +125,18 @@ assert "noticed: where as pattern, viewport -, minor, shot resolved beside its f
 case "$reg" in *SECRET*|*judge*) echo "  a verdicts file's notes or a judge file reached the register"; FAILED=1;; esac
 assert "real UTC timestamps" '.updated_utc | test("^20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z$")' "$reg"
 assert "first and last seen are builds: the sweep's, a noticed item's file name's" 'all(.findings[]; .first_seen == "b1" and .last_seen == "b1")' "$reg"
+
+# recheck-plan: what "recheck D-<k>" sweeps, read from the register only.
+rp="$(node "$SCRIPTS/design-findings.mjs" recheck-plan D-1)"
+assert "recheck-plan: a sweep finding's page and viewport" '.id == "D-1" and .source == "sweep" and .sweep == {"pattern":"/","viewports":"1440x900"} and .review == false and .note == null' "$rp"
+rid="$(jq -r '[.findings[] | select(.source=="review")][0].id' "$D/findings.json")"
+assert "recheck-plan: a review finding is reviewed again" '.review == true and (.sweep.pattern | startswith("/"))' "$(node "$SCRIPTS/design-findings.mjs" recheck-plan "$rid")"
+nid="$(jq -r '[.findings[] | select(.source=="noticed")][0].id' "$D/findings.json")"
+assert "recheck-plan: a noticed item has no sweep" '.sweep == null and (.note | test("noticed"))' "$(node "$SCRIPTS/design-findings.mjs" recheck-plan "$nid")"
+for bad in D-99 D-x "D-1;x" ""; do
+  node "$SCRIPTS/design-findings.mjs" recheck-plan "$bad" >/dev/null 2>&1
+  assert_eq "recheck-plan '$bad' refused" 2 "$?"
+done
 
 # Second merge of the same sweep: same ids, nothing new, first_seen kept.
 cp "$D/findings.json" "$SANDBOX/reg1.json"

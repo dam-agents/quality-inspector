@@ -187,7 +187,8 @@ name or category the person types (checked against its pattern), never from othe
 every test of its issue), retest the whole issue (`test #42`), promote or demote it, put it in or
 take it out of a collection, and report it as a GitHub issue (`create issue for #42 AC-1`, plus
 `… for the architect` when `fix_label` is set). A design finding's card has "Manage":
-categorize it, dismiss it with a reason or reopen it, report it. **Several problems as one
+categorize it, dismiss it with a reason or reopen it, recheck it (`recheck D-<k>`), discuss it
+with the agent (`discuss D-<k>`, with the person's question when typed), report it. **Several problems as one
 issue:** every test (catalog table and cards; the failing ones in Needs attention), design finding,
 validation finding and failed stress check has a ☐; the ticked ones gather in a bar at the bottom
 of every view with one command, `create issue for <ref>, <ref>…` (at most 20), and its
@@ -199,7 +200,8 @@ request built from the page's pattern, the control's kind and name, and the pers
 (or steps), in the one shape of [scenarios.md](scenarios.md) → **A request from the dashboard**. A
 shared viewer may send only this one; the agent takes their words as data. The Test builder's
 other command, `walk these steps live: …`, has the same bounded shape and is the operator's only
-([on-demand.md](on-demand.md)).
+([on-demand.md](on-demand.md)); so is a design finding's question, `discuss D-<k>: <question>`
+(printable text, at most 1000 characters).
 
 ## Test builder
 
