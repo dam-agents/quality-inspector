@@ -11,8 +11,10 @@
 // value or a token in the data -> exit 1, {"refused", "notes", "hash", "changed": false}, no page.
 //
 // Test-related content only — the page may be shared: never a scenario's request text, its
-// requester or thread, a verdict's notes, a triage explanation, LESSONS.md, the operator
-// conversation, a security finding, or anything of work/env/. `hash` covers the data without its
+// requester or thread, a verdicts file's `notes`, LESSONS.md, the operator
+// conversation, a security finding, or anything of work/env/. The agent's `analysis` of a run and its
+// sentence on a result (`explanation`, `note`) are written for the page (docs/reporting.md → The agent's
+// analysis) and travel; the secrets scan holds them like everything else. `hash` covers the data without its
 // generation time; `changed` = it differs from work/catalog/published.hash, which the agent
 // writes after a publish. Stills and page shots are cached in work/catalog/thumbs/ twice — a small
 // JPEG for lists and cards, a sharp WebP for the panel, the zoom and the product map (rendered by
@@ -185,6 +187,22 @@ const CAUSE_OF = new Set(['failed', 'regression', 'needs-review', 'blocked', 'fl
 const CAUSE_DEFAULT = { failed: 'product', regression: 'product', 'needs-review': 'test' };
 const causeOf = (e, judged = true) => (!CAUSE_OF.has(e?.verdict ?? e?.status) ? null
   : CAUSES.includes(e?.cause) ? e.cause : judged ? CAUSE_DEFAULT[e?.verdict] ?? null : null);
+// The agent's reading of a run (docs/reporting.md → The agent's analysis) and its one sentence on a
+// result that is not a pass: text only, each field capped.
+const txt = (x, n = 600) => (typeof x === 'string' && x.trim() ? x.trim().slice(0, n) : null);
+const CERTAINTY = new Set(['high', 'medium', 'low']);
+const analysisOf = (v) => {
+  const a = v?.analysis;
+  if (!a || typeof a !== 'object') return null;
+  const problems = (Array.isArray(a.problems) ? a.problems : []).filter((p) => p && typeof p === 'object' && txt(p.title, 120)).slice(0, 20).map((p) => ({
+    title: txt(p.title, 120), cause: CAUSES.includes(p.cause) ? p.cause : null, certainty: CERTAINTY.has(p.certainty) ? p.certainty : null,
+    about: (Array.isArray(p.about) ? p.about : []).map((r) => txt(r, 80)).filter((r) => r && /^(#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)( (AC|IN|EX)-\d+)?$/.test(r)).slice(0, 30),
+    what: txt(p.what), where: txt(p.where), why: txt(p.why), fix: txt(p.fix) }));
+  const out = { summary: txt(a.summary, 1200), problems, next: txt(a.next) };
+  return out.summary || problems.length || out.next ? out : null;
+};
+const whyOf = (e) => (CAUSE_OF.has(e?.verdict) || e?.verdict === 'inconclusive' || e?.verdict === 'healed' || e?.verdict === 'superseded' ? txt(e.explanation) ?? txt(e.note) : null);
+const withWhy = (o, w) => (w ? { ...o, why: w } : o); // only a result the agent explained carries `why`
 const WORST = ['regression', 'failed', 'needs-review', 'flaky', 'inconclusive', 'partial', 'blocked', 'not-testable', 'passed', 'verified'];
 const rank = (v) => (WORST.includes(v) ? WORST.indexOf(v) : WORST.length);
 function readVerdicts(dir, okey, run, ref) {
@@ -197,16 +215,17 @@ function readVerdicts(dir, okey, run, ref) {
     // A scenario's file has no top verdict: its worst criterion stands for the run.
     const worst = (v.acs ?? []).map((e) => e?.verdict).filter(Boolean).sort((a, b) => rank(a) - rank(b))[0] ?? null;
     runs.push({ type: run, ref, build, baseline: v.baseline ?? null, utc, verdict: v.verdict ?? worst, report: artRef(dir), secs: secsOf(v, utc), cost_usd: costOf(v),
-      entries: [...(v.acs ?? []), ...(v.intents ?? []), ...(v.explorations ?? [])].filter((e) => e?.id && e.verdict).map((e) => ({ key: `${okey}/${e.id}`, value: e.verdict, cause: causeOf(e) })) });
+      analysis: analysisOf(v),
+      entries: [...(v.acs ?? []), ...(v.intents ?? []), ...(v.explorations ?? [])].filter((e) => e?.id && e.verdict).map((e) => withWhy({ key: `${okey}/${e.id}`, value: e.verdict, cause: causeOf(e) }, whyOf(e))) });
     // An intent test (docs/intent.md) runs in the same candidate run as the criteria.
     for (const ac of [...(v.acs ?? []), ...(v.intents ?? [])]) {
       const key = `${okey}/${ac.id}`;
-      addHist(key, { build, run, value: ac.verdict, utc, cause: causeOf(ac) });
+      addHist(key, withWhy({ build, run, value: ac.verdict, utc, cause: causeOf(ac) }, whyOf(ac)));
       if (v.candidate_run) (stillRuns.get(key) ?? stillRuns.set(key, []).get(key)).push({ label: v.candidate_run, utc });
     }
     for (const ex of v.explorations ?? []) {
       const key = `${okey}/${ex.id}`;
-      addHist(key, { build, run: 'exploration', value: ex.verdict, utc, cause: causeOf(ex) });
+      addHist(key, withWhy({ build, run: 'exploration', value: ex.verdict, utc, cause: causeOf(ex) }, whyOf(ex)));
       if (v.explorations_run) (stillRuns.get(key) ?? stillRuns.set(key, []).get(key)).push({ label: v.explorations_run, utc });
     }
   }
@@ -255,7 +274,6 @@ for (const dir of ls(join(work, 'reruns')).filter((x) => /^feature-[a-z0-9][a-z0
 const envFailure = (file, utc) => {
   const f = readJson(file);
   if (!f || f.utc !== utc) return null;
-  const txt = (x, n) => (typeof x === 'string' && x.trim() ? x.trim().slice(0, n) : null);
   return { stage: /^(lock|reset|up|smoke|canary)$/.test(f.stage) ? f.stage : null, exit: Number.isInteger(f.exit) ? f.exit : null,
     cause: txt(f.cause, 600), repair: txt(f.repair, 600), next: txt(f.next, 600),
     evidence: (Array.isArray(f.evidence) ? f.evidence : []).filter((l) => typeof l === 'string').slice(-30).map((l) => l.slice(0, 300)) };
@@ -263,18 +281,20 @@ const envFailure = (file, utc) => {
 const nights = [];
 const nightOutcomes = new Map(); // build -> Map(item key -> value)
 const nightCauses = new Map(); // build -> Map(item key -> cause)
+const nightWhy = new Map(); // build -> Map(item key -> the agent's sentence)
 const nightFile = new Map(); // build -> its verdicts.json
 for (const c of ls(join(work, 'regression'))) {
   const v = readJson(join(work, 'regression', c, 'verdicts.json'));
   if (!v) continue;
   nightFile.set(c, v);
-  const per = new Map(); const why = new Map();
+  const per = new Map(); const why = new Map(); const said = new Map();
   for (const e of v.acs ?? v.entries ?? []) {
     const okey = e.scenario ? scenKey(e.scenario) : `issue-${e.issue}`;
     per.set(`${okey}/${e.id}`, e.verdict);
     if (causeOf(e)) why.set(`${okey}/${e.id}`, causeOf(e));
+    if (whyOf(e)) said.set(`${okey}/${e.id}`, whyOf(e));
   }
-  nightOutcomes.set(c, per); nightCauses.set(c, why);
+  nightOutcomes.set(c, per); nightCauses.set(c, why); nightWhy.set(c, said);
 }
 const TOP = ['regression', 'needs-review', 'healed', 'relearned'];
 const due = new Map(); // candidate -> the pre-flight's `due` time: the night's start
@@ -294,7 +314,7 @@ for (const line of (read(join(work, 'REGRESSION.log')) ?? '').split('\n')) {
   for (const [, k, v] of m[3].matchAll(/(\w[\w-]*)=(\d+)/g)) counts[k.replace(/_/g, '-')] = +v;
   nights.push({ build: m[2], utc: m[1], counts });
   // What the night's report says beside its entries: the change context's issues, the UI diff's
-  // text and the signals' counts — never an entry's explanation.
+  // text, the signals' counts and the agent's analysis.
   const v = nightFile.get(m[2]);
   const ctx = v?.context ?? {};
   const signals = Object.fromEntries(Object.entries(ctx.signals ?? {}).map(([k, x]) => [k, Array.isArray(x) ? x.length : +x || 0]));
@@ -304,8 +324,8 @@ for (const line of (read(join(work, 'REGRESSION.log')) ?? '').split('\n')) {
     previous: ctx.previous ?? nights.at(-2)?.build ?? null, window: ctx.window ?? null,
     issues: (ctx.issues ?? []).filter((x) => x?.number != null).slice(0, 60).map((x) => ({ number: x.number, title: x.title ?? null })),
     ui_diff: typeof ctx.ui_diff === 'string' ? ctx.ui_diff.slice(0, 4000) : null, signals,
-    report: artRef(join(work, 'regression', m[2])),
-    entries: [...(nightOutcomes.get(m[2]) ?? new Map())].map(([key, value]) => ({ key, value, cause: nightCauses.get(m[2])?.get(key) ?? null })) });
+    report: artRef(join(work, 'regression', m[2])), analysis: analysisOf(v),
+    entries: [...(nightOutcomes.get(m[2]) ?? new Map())].map(([key, value]) => withWhy({ key, value, cause: nightCauses.get(m[2])?.get(key) ?? null }, nightWhy.get(m[2])?.get(key))) });
 }
 // A run whose file says nothing of its length: the events log (docs/logging.md, 14 days) — an issue
 // run's `issue_done minutes=` nearest its verdicts, a scenario run's `scenario_run` before them.
@@ -393,8 +413,8 @@ for (const okey of [...origins].sort((a, b) => a.localeCompare(b, 'en', { numeri
       const since = nights.filter((n) => !row.promoted || n.utc >= row.promoted);
       let skipped = since.length;
       if (drifted(file)) while (skipped > 0 && since[skipped - 1].counts.drift > 0) skipped--;
-      since.forEach((n, j) => hist.push({ build: n.build, run: 'regression',
-        value: nightOutcomes.get(n.build)?.get(key) ?? (j >= skipped ? 'drift' : 'unchanged'), utc: n.utc, cause: nightCauses.get(n.build)?.get(key) ?? null }));
+      since.forEach((n, j) => hist.push(withWhy({ build: n.build, run: 'regression',
+        value: nightOutcomes.get(n.build)?.get(key) ?? (j >= skipped ? 'drift' : 'unchanged'), utc: n.utc, cause: nightCauses.get(n.build)?.get(key) ?? null }, nightWhy.get(n.build)?.get(key))));
     }
     hist.sort((a, b) => String(a.utc).localeCompare(String(b.utc)));
     hist.splice(0, Math.max(0, hist.length - HISTORY_MAX));

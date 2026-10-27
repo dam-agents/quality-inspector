@@ -20,17 +20,20 @@ The operator may share the page beyond themselves, so it carries only what conce
   per build (issue runs, nights, scenarios; the newest 30 — a night that does not name a
   regression-tier item is `unchanged`, or `drift` while its file is drifted) with its `cause`
   when it is not a pass ([reporting.md](reporting.md) → **Cause of a failure**; without one, a
-  `failed` or `regression` is `product`, a `needs-review` `test`, else not known), heals (date,
+  `failed` or `regression` is `product`, a `needs-review` `test`, else not known) and the agent's
+  sentence on it when it is not a pass (a night entry's `explanation`, else the criterion's `note`), heals (date,
   build, basis), flaky confirmations, durations, the AC still and the evidence artifact's
   reference, and the GitHub issue opened for its problem (work/FOUND.md: number, address,
   labels, date, title — one issue may stand for several problems).
 - **Around them:** the newest UI map's pages with their coverage and shot, the operator's
   collections, and **every run** (the newest 400): each night of `work/REGRESSION.log` — its
   counts, the criteria that were not `unchanged`, the change context's issues (number, title), UI
-  diff text and signal counts — or its environment failure (the step, cause, repair, next step and
+  diff text and signal counts, the agent's `analysis` ([reporting.md](reporting.md) → **The agent's
+  analysis**) — or its environment failure (the step, cause, repair, next step and
   evidence of `work/regression/<c>/environment.json`, [regression.md](regression.md) step 2); each issue and scenario run with its
   verdicts; each run by hand (`work/reruns/`, [on-demand.md](on-demand.md) → "run #N") with its raw
-  results; each feature run (`work/reruns/feature-<id>/`) with its criteria's raw results; each with its length — the run file's `minutes`, else its `started_utc` to its time;
+  results; each feature run (`work/reruns/feature-<id>/`) with its criteria's raw results; an issue or
+  scenario run with its `analysis` too; each with its length — the run file's `minutes`, else its `started_utc` to its time;
   else a night from its `due` line, an issue run from its `issue_done minutes=`, a scenario run
   from its `scenario_run` ([logging.md](logging.md)) — and its `cost_usd` only when the file
   states it (never estimated); each with its build and report reference (a link when the report has one —
@@ -60,8 +63,9 @@ The operator may share the page beyond themselves, so it carries only what conce
   status`), the focus queue and the areas; the design findings register with each finding's crop
   ([ui-sweep.md](ui-sweep.md)) with the operator's category and dismissal reason; the newest validation results and stress checks; of the newest
   security run only its counts by severity and its report's reference.
-- **Never:** a scenario's request text, requester or thread; a verdict's notes or a triage
-  explanation; `work/LESSONS.md`; the operator conversation; a security finding or anything else
+- **Never:** a scenario's request text, requester or thread; a verdicts file's `notes` (the agent's
+  `analysis`, `explanation` and a criterion's `note` are written for the page, [reporting.md](reporting.md)
+  → **The agent's analysis**); a run by hand's error text; `work/LESSONS.md`; the operator conversation; a security finding or anything else
   of `work/security/`; anything of `work/env/`; a credential value or a token (the builder refuses the page). A new field follows
   the same rule; `scripts/tests/test_catalog.sh` holds it.
 
@@ -106,6 +110,15 @@ cards, Needs attention, the panels, a run's results — a badge names its cause:
 🔧 Test defect, 🏗️ Environment problem, or ❔ Cause not known. "Cause of the failure" is a
 facet; Needs attention opens with the count per cause, and says so when the newest night did
 not run because the environment failed.
+
+**What the agent found, first.** A run's panel opens, under its verdict, with **🧠 What the agent
+found**: the `summary`, then each problem as a card — its title, its cause badge, the test cases it
+is about (links), *What happened*, *Where*, *Probable cause* (with its certainty), *How to repair it*
+— and *Next step*. A run without an `analysis` (older runs) gets a sentence the page builds from the
+data — why its verdict is what it is (for a night `needs-review` with no such result: a signal no test
+covers, else the agent's choice) — marked as the page's, not the agent's. Each result in the run's
+list shows the agent's sentence on it under its link; a test case's panel shows it beside its latest
+result that is not a pass, and the Runs view a run's `summary` under its result.
 
 **Explained on the page**, in ASD-STE100 ([reporting.md](reporting.md) → **Artifact text is ASD-STE100**).
 - **One name and one icon per thing**, the same everywhere — 🎫 issue, 💬 scenario, 🎯 acceptance
