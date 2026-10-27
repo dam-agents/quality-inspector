@@ -124,7 +124,7 @@ else {
 if (m !== null && !obj(m)) { fail('profile.json: not an object'); m = null; }
 
 if (m) {
-  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'security', 'canary', 'interfaces', 'config', 'sandbox'];
+  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'security', 'canary', 'interfaces', 'validation', 'expected_requests', 'config', 'sandbox'];
   for (const k of Object.keys(m)) if (!TOP.includes(k)) warn(`profile.json: unknown key '${k}' — the core ignores it`);
   m.schema === 'qi-profile/v1' ? pass('schema qi-profile/v1') : fail(`schema '${m.schema ?? ''}' is not qi-profile/v1`);
   str(m.product) ? pass(`product: ${m.product}`) : fail('product: missing');
@@ -297,6 +297,24 @@ if (m) {
       if (it.cli !== undefined && !str(it.cli)) fail('interfaces.cli: must be the published CLI\'s command');
       if (it.openapi !== undefined && !/^\/\S*$/.test(String(it.openapi))) fail('interfaces.openapi: must be a path under app.url (/…)');
       if (fails === before) pass(`interfaces: cli ${it.cli ?? '-'}, openapi ${it.openapi ?? '-'}`);
+    }
+  }
+
+  // expected_requests: optional; a failed request the tested install answers ≥ 400 on purpose.
+  if (m.expected_requests !== undefined) {
+    const er = m.expected_requests;
+    if (!Array.isArray(er)) fail('expected_requests: not a list');
+    else {
+      const before = fails;
+      const METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
+      er.forEach((e, i) => {
+        if (!obj(e)) { fail(`expected_requests[${i}]: not an object`); return; }
+        if (!METHODS.includes(e.method)) fail(`expected_requests[${i}].method '${e.method ?? ''}': one of ${METHODS.join(', ')}`);
+        if (!/^\/[^\s?#*]*$/.test(String(e.path ?? ''))) fail(`expected_requests[${i}].path '${e.path ?? ''}': a path pattern as the UI map records it (/api/x/:id), no query or wildcard`);
+        if (!Number.isInteger(e.status) || e.status < 400 || e.status > 599) fail(`expected_requests[${i}].status '${e.status ?? ''}': an integer 400-599`);
+        if (!str(e.why)) fail(`expected_requests[${i}].why: must say why the tested install answers it with an error`);
+      });
+      if (fails === before) pass(`expected_requests: ${er.map((e) => `${e.method} ${e.path} → ${e.status}`).join(', ') || 'none'}`);
     }
   }
 

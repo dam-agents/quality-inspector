@@ -135,11 +135,27 @@ function evidence(run, ac, suffix = '') {
     error: att.error ? { code: att.error.code, message: att.error.message } : null,
     steps,
     video: video ? copyMedia(run, video.path, key(ac)) : null,
+    videoSteps: video ? stepMarks(att.steps ?? [], video.startedAt ?? att.startedAt) : null,
     shots: shots.map(({ caption, a }) => ({ caption, src: copyMedia(run, a.path, key(ac)) })).filter((s) => s.src),
     trace: trace ? copyMedia(run, trace.path, key(ac)) : null,
     tracePage,
     screenText: screenLog ? readText(resolve(run, screenLog.path)) : null,
   };
+}
+
+// Where each step starts and ends in the video, in seconds from its first frame: the player holds
+// at each end and names the step from the step list beside it (lib/media-viewer.mjs). Only with
+// the video's start time and every step's own; else null, and the video plays as recorded.
+function stepMarks(steps, videoStart) {
+  const t0 = Date.parse(videoStart ?? '');
+  if (!steps.length || !Number.isFinite(t0)) return null;
+  const marks = [];
+  for (const s of steps) {
+    const at = Date.parse(s.startedAt ?? '');
+    if (!Number.isFinite(at) || !Number.isFinite(s.durationMs)) return null;
+    marks.push({ s: Math.max(0, (at - t0) / 1000), e: Math.max(0, (at + s.durationMs - t0) / 1000) });
+  }
+  return marks;
 }
 
 // e2e >= 0.19 writes a markdown trace page per test beside its attempts.
@@ -206,7 +222,7 @@ function sideHtml(name, ev) {
   }
   const poster = ev.shots[0]?.src;
   const video = ev.video
-    ? `<video controls preload="metadata" src="${esc(ev.video)}"${poster ? ` poster="${esc(poster)}"` : ''}></video>`
+    ? `<video controls preload="metadata" src="${esc(ev.video)}"${poster ? ` poster="${esc(poster)}"` : ''}${ev.videoSteps ? ` data-steps="${esc(JSON.stringify(ev.videoSteps.map((m) => [+m.s.toFixed(2), +m.e.toFixed(2)])))}"` : ''}></video>`
     : `<p class="dim">No video recorded.</p>`;
   const shots = ev.shots.length
     ? `<div class="shots">${ev.shots.map((s) => `<figure><img loading="lazy" src="${esc(s.src)}" alt="${esc(s.caption)}"><figcaption>${esc(s.caption)}</figcaption></figure>`).join('')}</div>`
