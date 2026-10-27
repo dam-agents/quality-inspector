@@ -65,6 +65,15 @@ grep -q '^PASS  canary: agent, under New agent, text in its name' <<<"$out" || {
 grep -q "unknown key 'canary'" <<<"$out" && { echo "  canary is a contract key"; FAILED=1; }
 P="$(helm_profile canary-bad)"; edit "$P" '.canary = {"field":"name"}'
 check "$P" | grep -q '^FAIL  canary.thing' || { echo "  a canary without its object must fail"; FAILED=1; }
+P="$(helm_profile expected)"; edit "$P" '.expected_requests = [{"method":"GET","path":"/api/slack/install/status","status":404,"why":"the QA install sets no Slack app"}]'
+out="$(check "$P")"
+grep -q '^PASS  expected_requests: GET /api/slack/install/status → 404' <<<"$out" || { echo "  expected_requests not reported"; FAILED=1; }
+grep -q "unknown key 'expected_requests'" <<<"$out" && { echo "  expected_requests is a contract key"; FAILED=1; }
+P="$(helm_profile expected-bad)"; edit "$P" '.expected_requests = [{"method":"get","path":"/api/*?x=1","status":200}]'
+out="$(check "$P")"
+for k in method path status why; do grep -q "^FAIL  expected_requests\[0\]\.$k" <<<"$out" || { echo "  a bad expected_requests.$k must fail"; FAILED=1; }; done
+P="$(helm_profile validation)"; edit "$P" '.validation = {"exclude":["/admin"]}'
+check "$P" | grep -q "unknown key 'validation'" && { echo "  validation is a contract key"; FAILED=1; }
 P="$(helm_profile canary-none)"; edit "$P" '.canary = {"none":"nothing a user names"}'
 check "$P" | grep -q '^PASS  canary: none — nothing a user names' || { echo "  canary.none not reported"; FAILED=1; }
 { grep -q 'QI_CANARY_THING' "$SCRIPTS/suite.sh" && grep -q 'QI_CANARY_THING' "$SCRIPTS/suite-skeleton/tests/canary.e2e.ts"; } \

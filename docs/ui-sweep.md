@@ -29,12 +29,13 @@ or Chromium does not launch; `{error: "no browser: …"}` on stdout): an `ERROR:
 | `contrast` | text below WCAG AA contrast | minor |
 | `tap-target` | a control smaller than 24 px on a phone screen | minor |
 | `layout-shift` | cumulative layout shift above 0.1 | minor |
-| `console-error`, `failed-request` | an error in the console, a same-origin request answered ≥ 400 | minor |
+| `console-error`, `failed-request` | an error in the console, a same-origin request answered ≥ 400 — but one the profile's `expected_requests` names ([profile-contract.md](profile-contract.md)), which only gets a note | minor |
 
 Each page also gets `changed` against the previous build's shot of the same page and viewport
 (`null` = a new page), and `axe`: whether axe-core ran on it. axe-core comes with the suite
 (`suite.sh init`); without it, or where it fails on a page, the `a11y` checks are skipped with a
-note — and that page's `a11y` findings stay as they are.
+note — and that page's `a11y` findings stay as they are. An open `failed-request` finding of a
+request the profile now declares expected resolves on the next sweep of its page and viewport.
 
 ## 2. Model review (you, within `ui_sweep_review_pages`)
 
