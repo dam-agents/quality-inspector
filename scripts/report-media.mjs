@@ -161,7 +161,7 @@ if (cmd === 'list') {
     console.log(JSON.stringify({ file: out, content_type: HTML_TYPE, bytes: Buffer.byteLength(r.body), linked: urls.size, inlined: r.inlined, left_out: r.leftOut }));
   } else {
     // Without media/, a video's poster only repeats bytes: it goes.
-    const NOTE = '<p class="dim">This private report has a size limit. This file is not in it. With report_visibility: public, the report shows all its files.</p>';
+    const NOTE = '<p class="dim">This private report has a size limit. This file is not in it. With report_visibility: public, the report links its screenshots and has more space for its videos.</p>';
     const r = inline(html.replace(/ poster="media\/[^"]+"/g, ''), refs, () => null, NOTE, 'not in this private report');
     writeFileSync(out, r.body);
     console.log(JSON.stringify({ file: out, content_type: HTML_TYPE, bytes: Buffer.byteLength(r.body), linked: 0, inlined: r.inlined, left_out: r.leftOut }));

@@ -105,6 +105,8 @@ size="$(wc -c < "$D/publish.html" | tr -d ' ')"
 out="$(QI_REPORT_PAGE_MAX=$((size - 2000)) node "$M" publish "$D" private)"
 assert "a budget drops the baseline video first" '.inlined == 3 and (.left_out | index("media/42-ac-1-baseline-video-video.webm")) != null and (.left_out | index("media/42-ac-1-candidate-video-video.webm")) == null' "$out"
 case "$(cat "$D/publish.html")" in *'This private report has a size limit'*) ;; *) echo "  private page: no line for the dropped video"; FAILED=1;; esac
+# A public page has a budget too: the private line never promises every file there.
+case "$(cat "$D/publish.html")" in *'shows all its files'*) echo "  private page: the line promises every file in a public report"; FAILED=1;; esac
 
 # An address recorded without its type (uploaded untyped, before 3.32.1) is no address: upload again.
 cp "$SANDBOX/issues/42/media-urls.json" "$SANDBOX/urls.bak"
