@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/catalog.mjs: items from criteria, tests, verdicts, nights, heals and flakes; the runs (nights,
 # environment failures, issue and scenario runs) with their reports; the product map's hotspots; test-related
-# content only (no request text, requester, notes, explanations, lessons); escaped data; a stable
+# content only (no request text, requester, notes, lessons; the agent's analysis and explanations travel); escaped data; a stable
 # hash and `changed` against the published one; collections; coverage pages; drift nights; the
 # image budget; the credential and token refusal; the verifier's CATALOG.md and test_catalog checks;
 # the profile scenarios still to adopt.
@@ -71,7 +71,9 @@ J
 echo abc123 > "$W/issues/42/artifact.id"
 echo 'http://share.example/a/plain' > "$W/issues/42/artifact.url" # not https: the reference stays
 cat > "$W/regression/c2/verdicts.json" <<'J'
-{"mode":"regression","candidate":"c2","acs":[{"issue":42,"id":"AC-1","verdict":"healed","explanation":"EXPLAIN-SECRET the tab moved"}],
+{"mode":"regression","candidate":"c2","acs":[{"issue":42,"id":"AC-1","verdict":"healed","explanation":"The tab moved to the side bar."}],
+ "analysis":{"summary":"One check was repaired.","next":null,"problems":[{"title":"The tab moved","about":["#42 AC-1","rm -rf /","#42"],"cause":"bogus","certainty":"high",
+   "what":"The tab is not in the top bar.","where":"/projects","why":"The new build moved it.","fix":"Nothing: the agent repaired the check.","extra":"dropped"},{"what":"no title: dropped"}]},
  "context":{"previous":"c1","issues":[{"number":40,"title":"Projects get tabs"}],"ui_diff":"- renamed tab \"Tasks\" → \"To-dos\" on /projects","signals":{"console_errors_new":["E1"],"slow_tests":[]}}}
 J
 printf '# S-7 — upload a <i>large</i> file\n\n## AC-1 — the upload finishes\nquote: REQUEST-SECRET the owner uploads a large file\nGiven a 50 MB file\nWhen the owner uploads it\nThen it is listed\nsurface: ui\ntestable: yes\n' > "$W/scenarios/S-7/criteria-s1.md"
@@ -256,7 +258,7 @@ assert "an environment failure: its step, cause, repair, next step and evidence"
   and .runs[1].failure == null' "$data"
 assert "a run's length: a night from its due line, an issue run from issue_done, a scenario from its file with its cost" '[.runs[] | [.secs, .cost_usd]]
   == [[3000,null],[null,null],[null,null],[900,1.23],[2220,null]]' "$data"
-assert "a night: its entries, change context and signal counts, its report" '.runs[1] | .entries == [{"key":"issue-42/AC-1","value":"healed","cause":null}] and .previous == "c1"
+assert "a night: its entries, change context and signal counts, its report" '.runs[1] | .entries == [{"key":"issue-42/AC-1","value":"healed","cause":null,"why":"The tab moved to the side bar."}] and .previous == "c1"
   and .issues == [{"number":40,"title":"Projects get tabs"}] and (.ui_diff | test("To-dos")) and .signals == {"console_errors_new":1,"slow_tests":0} and .report == "https://share.example/a/Night2Slug" and .counts.healed == 1' "$data"
 assert "an issue run: its verdicts and report; a scenario run: its link" '(.runs[4] | .entries == [{"key":"issue-42/AC-1","value":"verified","cause":null},{"key":"issue-42/AC-2","value":"not-testable","cause":null},{"key":"issue-42/EX-1","value":"observation","cause":null}]
   and .report == "platform://artifacts/abc123" and .baseline == "b1") and .runs[3].report == "https://claude.ai/artifact/s7"
@@ -283,7 +285,13 @@ assert "a focus run, its checks without their notes" '.findings.focus == [{"run"
 assert "areas for a focus" '.areas | index("projects") != null and index("files") != null' "$data"
 assert "coverage pages" '[.pages[] | {pattern, covered, nav}] | (map(select(.pattern == "/projects"))[0] == {"pattern":"/projects","covered":"regression","nav":"Projects"})
   and (map(select(.pattern == "/files"))[0].covered == "exploratory")' "$data"
-for secret in U0SECRETUSER C0SECRET REQUEST-SECRET SOURCE-SECRET NOTE-SECRET EXPLAIN-SECRET LESSON-SECRET SEC-SECRET FOCUS-NOTE-SECRET; do
+# The agent's analysis and its sentence on a result are written for the page (docs/reporting.md →
+# The agent's analysis): text only, a bad cause or reference dropped, a problem without a title dropped.
+assert "a night: the agent's analysis" '.runs[1].analysis == {"summary":"One check was repaired.","next":null,"problems":[{"title":"The tab moved","cause":null,"certainty":"high",
+  "about":["#42 AC-1","#42"],"what":"The tab is not in the top bar.","where":"/projects","why":"The new build moved it.","fix":"Nothing: the agent repaired the check."}]}
+  and .runs[4].analysis == null' "$data"
+assert "a result's sentence in the history of its test case" '[.items[] | select(.key == "issue-42/AC-1") | .history[] | select(.build == "c2")][0].why == "The tab moved to the side bar."' "$data"
+for secret in U0SECRETUSER C0SECRET REQUEST-SECRET SOURCE-SECRET NOTE-SECRET LESSON-SECRET SEC-SECRET FOCUS-NOTE-SECRET; do
   case "$html" in (*"$secret"*) echo "  not test-related, must not be in the page: $secret"; FAILED=1;; esac
 done
 case "$html" in (*'<b>projects'*|*'<i>large'*) echo "  data not escaped inside the page"; FAILED=1;; esac
@@ -441,4 +449,15 @@ assert "causes: given, by default, none" '([.runs[] | select(.type == "issue" an
 jq '.acs += [{issue:42,id:"IN-1",verdict:"needs-review"}]' "$W/regression/c2/verdicts.json" > "$W/v.tmp" && mv "$W/v.tmp" "$W/regression/c2/verdicts.json"
 node "$SCRIPTS/catalog.mjs" >/dev/null; data="$(page_data)"
 assert "a night's causes" '([.runs[] | select(.type == "regression" and .build == "c2" and .verdict != "environment")][0].entries | map(.key + ":" + (.cause // "-")) | sort) == ["issue-42/AC-1:-","issue-42/IN-1:test"]' "$data"
+# The agent's text never carries a scenario's request or its requester (docs/catalog.md → Never): a field
+# that repeats 6 words in a row of a request, or names a requester or thread, is dropped, and a note says so.
+jq '.acs[0].explanation = "The requester asked: please test the upload, my boss asked. EXPLAIN-QUOTE-CANARY"
+  | .analysis.summary = "Asked by U0SECRETUSER. EXPLAIN-WHO-CANARY" | .analysis.problems[0].why = "The new build moved it."' "$W/regression/c2/verdicts.json" > "$W/v.tmp" && mv "$W/v.tmp" "$W/regression/c2/verdicts.json"
+out="$(node "$SCRIPTS/catalog.mjs")"; data="$(page_data)"; html="$(cat "$W/catalog/index.html")"
+for secret in EXPLAIN-QUOTE-CANARY EXPLAIN-WHO-CANARY U0SECRETUSER "my boss asked"; do
+  case "$html" in (*"$secret"*) echo "  a request's words or its requester reached the page in the agent's text: $secret"; FAILED=1;; esac
+done
+assert "the agent's text that quotes a request is dropped, the rest kept, a note says so" '[.runs[] | select(.type == "regression" and .build == "c2" and .verdict != "environment")][0]
+  | (.analysis.summary == null and .analysis.problems[0].why == "The new build moved it." and ([.entries[] | select(.key == "issue-42/AC-1")][0] | has("why") | not))' "$data"
+assert "a note counts the dropped texts" '.notes | any(test("^2 text\\(s\\) of the agent.s analysis left out"))' "$out"
 exit $FAILED

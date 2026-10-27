@@ -174,12 +174,17 @@ cat > "$SANDBOX/r2.json" <<'J'
 {"mode":"regression","candidate":"c2","candidate_run":"cand","verdict":"regression",
  "context":{"previous":"c1","issues":[],"iface_diff":"- removed flag --force of widgets agents rm"},
  "acs":[{"issue":42,"id":"AC-1","name":"renamed","then":"the new name shows","verdict":"regression",
-         "explanation":"passes on c1, fails on c2","regressed_between":{"from":"c1.5","to":"c2","builds_between":0}}]}
+         "explanation":"passes on c1, fails on c2","regressed_between":{"from":"c1.5","to":"c2","builds_between":0}}],
+ "analysis":{"summary":"One <b>regression</b>: the rename does not save.","next":"Send it to the team.","problems":[{"title":"The rename does not save","about":["#42 AC-1"],
+   "cause":"product","what":"The new name shows, then the old name.","where":"/projects","why":"PUT /api/projects answered 500.","fix":"The product team repairs the save.","certainty":"high"}]}}
 J
 QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/r2.json" "$SANDBOX/rout2" >/dev/null
 h="$(cat "$SANDBOX/rout2/index.html")"
 case "$h" in *'Regressed between</b> <code>c1.5</code> (passes) and <code>c2</code> (fails) · adjacent builds'*) ;; *) echo "  regressed_between not rendered"; FAILED=1;; esac
 case "$h" in *'removed flag --force'*) ;; *) echo "  interface diff not rendered"; FAILED=1;; esac
+# The agent's analysis (docs/reporting.md → The agent's analysis): above the table, escaped.
+case "$h" in *'What the agent found'*'One &lt;b&gt;regression'*'Product defect'*'The rename does not save'*'Probable cause</dt><dd>PUT /api/projects answered 500. (certainty: high)'*'How to repair it'*'Next step:</b> Send it to the team.'*'<table>'*) ;; *) echo "  the agent's analysis missing, unescaped or below the table"; FAILED=1;; esac
+grep -q 'What the agent found' "$SANDBOX/rout/index.html" && { echo "  a report without an analysis shows the section"; FAILED=1; }
 
 # Scenario mode: tests tagged scenario-<k>, the judge's reading, the channel reply as comment.md.
 mk_run s-cand failed scenario-7; mk_run s-base passed scenario-7

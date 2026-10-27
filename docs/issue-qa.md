@@ -85,7 +85,8 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    Judge each IN the same way, into `intents[]` and `intent_verdict`, never into the issue
    verdict ([intent.md](intent.md) → Verdict). Judge each EX per [explorations.md](explorations.md)
    → **Run and judge** — never into an AC verdict. Write
-   `verdicts-<ac_hash>-<candidate>.json` ([reporting.md](reporting.md) → Verdicts file).
+   `verdicts-<ac_hash>-<candidate>.json` ([reporting.md](reporting.md) → Verdicts file), its
+   `analysis` last ([reporting.md](reporting.md) → **The agent's analysis**).
 8. **Report.** Render it — `node "$HOME/scripts/render-report.mjs" <verdicts.json>
    work/issues/<n>/report-<ac_hash>-<candidate>` — open its `index.html` and check
    every tested AC shows a video, set the row to the issue verdict with

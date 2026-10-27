@@ -7,6 +7,20 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.37.0 — 2026-10-27
+
+**Upgrade:**
+Nothing to run — docs are re-read per run, and the dashboard and the reports rebuild themselves on
+the next run. New:
+1. Every verdicts file (an issue run, a scenario run, a night) carries the agent's `analysis`:
+   a summary, each problem with what happened, where, the probable cause, its certainty and the
+   repair, and the next step ([docs/reporting.md](docs/reporting.md) → **The agent's analysis**).
+   The report shows it above its table; a run's panel on the dashboard opens with it.
+2. The dashboard now shows the agent's sentence on each result that is not a pass (a night's
+   `explanation`, a criterion's `note`). A verdicts file's `notes` stay off the page.
+3. A run written before this version has no `analysis`: its panel shows a sentence that the page
+   builds from the results ("Why this result"), until the next run of that kind.
+
 ## 3.36.0 — 2026-10-27
 
 **Upgrade:**
