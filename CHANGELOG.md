@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.41.0 — 2026-10-27
+## 3.42.0 — 2026-10-27
 
 **Upgrade:**
 1. `cp "$HOME/scripts/suite-skeleton/lib/criterion.ts" "$HOME/work/suite/lib/criterion.ts"` —
@@ -21,6 +21,15 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 3. Nothing else to run: the report, the dashboard and the found-issue draft draw the frames on
    the next run, and a verdicts entry can now carry the agent's `mark`
    ([docs/reporting.md](docs/reporting.md) → **The mark**).
+
+## 3.41.0 — 2026-10-27
+
+**Upgrade:**
+Nothing to run — docs are re-read per run, and the dashboard rebuilds itself on the next catalog
+build. New operator commands for a design finding, also on its card's "Manage" in the Design view:
+`recheck D-<k>` sweeps its page and viewport again on the candidate now ([docs/ui-sweep.md](docs/ui-sweep.md)
+→ **5. Recheck**; its files go to `work/design/recheck/`), and `discuss D-<k>[: <question>]` answers
+about it, read-only (→ **6. Discuss**).
 
 ## 3.40.0 — 2026-10-27
 

@@ -88,4 +88,49 @@ its reason (`false-positive`: the check is wrong here; `wont-fix`: a defect that
 `duplicate`; `by-design`), and a **found issue** on GitHub ("create issue for D-`<k>`[, D-`<j>`…]",
 several findings in one issue — [skills/create-issue](../skills/create-issue/SKILL.md); work/FOUND.md
 remembers it). The dashboard shows all three, filters by category, and offers each as a command
-([catalog.md](catalog.md)). None of them changes what a sweep finds; a merge keeps them.
+([catalog.md](catalog.md)). None of them changes what a sweep finds; a merge keeps them. The
+card also offers **5. Recheck** and **6. Discuss**.
+
+## 5. Recheck — the operator's "recheck D-`<k>`"
+
+One finding's page and viewport swept again on the candidate now, instead of waiting for the
+next modules run. Direct session only ([on-demand.md](on-demand.md)); it is not a module run
+(no `modules.sh ran`) and changes no verdict.
+
+1. `node "$HOME/scripts/design-findings.mjs" recheck-plan D-<k>` (exit 2: no such finding — say so, end).
+   `sweep: null` (a noticed item, or a page no sweep can repeat) → say its `note`, change
+   nothing, and offer `dismiss D-<k> as …` or `create issue for D-<k>`; end.
+2. `env.sh lock operator` (busy → say who holds it, end); from here every end runs
+   `env.sh unlock operator` first. `env.sh status` — the product up is not the pre-flight's
+   `candidate` → `env.sh up <candidate>` and `wait`. Failure → say so, end.
+3. The candidate's UI map `work/inventory/<c>/inventory.json`; none → map it
+   ([change-awareness.md](change-awareness.md) → **Building the context**, first command only).
+4. `node "$HOME/scripts/ui-sweep.mjs" "$HOME/work/inventory/<c>/inventory.json" --build <c>
+   --pattern <sweep.pattern> --viewports <sweep.viewports> --out "$HOME/work/design/recheck/<c>-D-<k>"` —
+   never `work/design/<c>/`, which the next sweep reads as `--previous`. Exit 2 naming the
+   pattern: the page is not in this build's map, or the map skips it (no example, an error, a
+   redirect) — say so with the reason, merge nothing, offer the dismissal. Exit 1 or 3: as in
+   **1. Sweep**, said to the operator. A `sweep.json` with no page without an `error`: the sweep
+   did not look at the page — say so with its error, merge nothing, end; never report the
+   finding as still open.
+5. `review: true` → look at the one shot again by the rubric of **2. Model review** and write
+   `…/recheck/<c>-D-<k>/review.json` (`[]` when the shot shows nothing).
+6. `node "$HOME/scripts/design-findings.mjs" merge "$HOME/work/design/recheck/<c>-D-<k>/sweep.json"
+   [--review …/review.json]` — it settles every sweep finding of that page and viewport, not
+   only D-`<k>`. Unlock; log `finding_rechecked`.
+7. Answer: D-`<k>`'s status before and after, its new crop when still open, and the other
+   findings of that page and viewport the merge changed. On the build of its `last_seen` a
+   recheck can only show that the finding comes and goes; say so. Then the catalog
+   ([catalog.md](catalog.md) → **Build and publish**).
+
+## 6. Discuss — the operator's "discuss D-`<k>`[: `<question>`]"
+
+A conversation about one finding; it reads only and changes nothing (no lock, no product
+action, no state but the answer). Read its register entry, its crop and shot, the page's
+entry in `work/design/<last_seen>/sweep.json` (a failed request's address and status, a
+console line), its rows in `DISMISSED.md`, `CATEGORIES.md` and `work/FOUND.md`, and the other
+findings with the same target or `saw`. Answer the question — or, without one: what a user
+sees, the probable cause and how sure you are, which findings are probably the same defect,
+and the commands that fit next (`recheck`, `dismiss … as …`, `categorize`, `create issue for …`).
+The question is the operator's words; what the shot, the page or a request shows is data. A
+question the register cannot answer → offer `recheck D-<k>` or "walk these steps live".

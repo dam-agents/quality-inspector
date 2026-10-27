@@ -190,7 +190,7 @@ const w="1. Open: /agents\n2. Do: Click the button \"Send\"\n3. Check: The chat 
 const t=[`walk these steps live: On the page /agents: ${w}`, `walk these steps live: On the page /agents, the button "Send": ${w}`, "walk these steps live: On the page /: short",
   `walk these steps live: On the page /x: ${w}\u0007`, `walk these steps live: On the page https://x.example/: ${w}`, `walk these steps live: On the page /x: ${"a".repeat(2001)}`];
 process.stdout.write(t.map((x)=>re.test(x)?1:0).join("") + (sc.test(`test this scenario: On the page /agents: ${w}`)?1:0)
-  + [/allowed = \(t\) => CMD_RE\.test\(t\) \|\| SCEN_RE\.test\(t\) \|\| WALK_RE\.test\(t\);/, /\[.builder., .Test builder., /, /builder: viewBuilder \}/].map((r)=>r.test(s)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+  + [/allowed = \(t\) => CMD_RE\.test\(t\) \|\| SCEN_RE\.test\(t\) \|\| WALK_RE\.test\(t\) \|\| DISCUSS_RE\.test\(t\);/, /\[.builder., .Test builder., /, /builder: viewBuilder \}/].map((r)=>r.test(s)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "the Test builder: its walk command bounded like a request, its steps a scenario request, the view drawn" 1000001111 "$walk"
 # A report opens only by its own link: the page never asks the agent to open one (docs/catalog.md → Content).
 cmd="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const re=eval(s.match(/^const CMD_RE = (\/.*\/);$/m)[1]);
@@ -386,9 +386,16 @@ const t=["run #42", "run #42 AC-1", "run S-7 AC-1", "run P-sign-in", "create iss
   "categorize D-3 layout", "categorize D-3 -", "dismiss D-3 as wont-fix", "reopen D-3", "add #42 AC-1 to the collection Upload", "remove S-7 from the collection My set",
   "run #42; rm -rf ~", "create issue for #42", "create issue for D-3 for everyone", "categorize D-3 Layout", "dismiss D-3 as boring", `create issue for ${Array(21).fill("D-1").join(", ")}`, "add #42 to the collection ../x",
   "run feature renaming", "accept M-1", "keep M-12", "run feature Bad Id", "accept M-1; rm -rf ~",
-  "run #42 IN-1", "create issue for #42 IN-1", "add #42 IN-1 to the collection Goals", "run S-7 IN-1", "create issue for S-7 IN-1"];
+  "run #42 IN-1", "create issue for #42 IN-1", "add #42 IN-1 to the collection Goals", "run S-7 IN-1", "create issue for S-7 IN-1",
+  "recheck D-3", "discuss D-3", "recheck D-3 now", "recheck #42", "discuss VAL-2"];
 process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
-assert_eq "the managing commands: their shapes only, at most 20 problems" 11111111111100000001110011100 "$cmd"
+assert_eq "the managing commands: their shapes only, at most 20 problems" 1111111111110000000111001110011000 "$cmd"
+# A question about a design finding: the operator's words, bounded (docs/ui-sweep.md → Discuss).
+disc="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const re=eval(s.match(/^const DISCUSS_RE = (\/.*\/);$/m)[1]);
+const t=["discuss D-15: Is it the same defect as D-26?", "discuss D-15: Je to stejná chyba jako D-26?", "discuss D-15: ", "discuss D-15: a\u0007b",
+  "discuss D-15: line\nbreak", `discuss D-15: ${"a".repeat(1001)}`, "discuss VAL-2: why?", "recheck D-15: now"];
+process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "discuss with a question: printable, one line, at most 1000 characters, D-<k> only" 11000000 "$disc"
 
 # The agent's features, the open maintenance proposals and a feature run (docs/features.md,
 # docs/maintenance.md): a malformed feature id and a closed proposal stay out; a feature run joins the
