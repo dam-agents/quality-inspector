@@ -271,6 +271,10 @@ The steps:
    `issue=-`, key `catalog@<hash>`.
 3. Write `<hash>` to `work/catalog/published.hash`. A failure is logged; the next run retries.
 
+A failed item's still shows its mark ([reporting.md](reporting.md) → **The mark**): the test's
+`<id>: the failing check` with a red frame, else the agent's `mark` as an orange frame on the AC
+still; the framed copy is cached as `thumbs/<key>.mark-<hash>.png`.
+
 Images are the AC stills and the UI map's page shots, each twice in `work/catalog/thumbs/`
 (rendered by the suite's `playwright-core`; without it there are none) — backed up, unlike the
 page; one whose item or page is gone is removed:

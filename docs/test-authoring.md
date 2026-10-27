@@ -13,8 +13,8 @@ testable AC:
 
 ```ts
 import { test } from '@e2e-dev/web';
-import { expect, unique } from 'e2e';
-import { criterion } from '../lib/criterion.js';
+import { unique } from 'e2e';
+import { criterion, expect } from '../lib/criterion.js';
 
 test('#42 AC-1: a renamed project keeps its tasks', { session: 'owner', tags: ['issue-42', 'ac-1'] },
   async ({ app, agent, screen }) => {
@@ -39,6 +39,7 @@ test('#42 AC-1: a renamed project keeps its tasks', { session: 'owner', tags: ['
 - **Right before each AC block, `app.screenshot('AC-<k>: <what the Then line looks at>')`.**
   It is the still a reader checks the verdict against; the report captions it with that
   label. `agent.assert` adds its own screenshot. Never screenshot inside the setup test.
+- **Import `expect` from `../lib/criterion.js`, not from `e2e`** (**The mark of a failed check** below).
 - **Every AC block — and an intent test's `IN-<k>` block, which follows every rule here for an
   AC block ([intent.md](intent.md)) — is one `criterion(id, then, ctx, check)` call**
   (`work/suite/lib/criterion.ts`): `then` is the criterion's Then sentence verbatim, the
@@ -83,6 +84,18 @@ EX tagged `issue-<n>-ex`, `ex-<k>`, `from-ac-<j>`, with `// EX-<k> begin` / `end
 and an `EX-<k>:` screenshot written by the rules above. Their blocks are hashed apart
 (`check-asserts.sh --ex-hash`) and are not promoted state; a role session other than `owner`
 comes from the setup test too.
+
+## The mark of a failed check
+
+The `expect` of `../lib/criterion.js` is e2e's own `expect`; it also keeps the locator of each
+check. When a check fails, `criterion()` frames that locator's matches on the screen in one more
+still, `<id>: the failing check [mark x,y,w,h;…]`. The report, the dashboard and a found issue draw
+the box as a red frame and show that still first (`scripts/lib/shot-mark.mjs`).
+
+- A check that finds nothing on the screen (the control is absent) has no box, and gets no still.
+- A negative check (`not.toBeVisible`, `toHaveCount(0)`) frames the control that must not be there.
+- A pass, or a Then sentence that the fallback judged true, has no mark.
+- Where the test left no mark, the agent can add one ([reporting.md](reporting.md) → **The mark**).
 
 ## Tested once
 
