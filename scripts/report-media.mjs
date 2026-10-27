@@ -122,8 +122,8 @@ if (cmd === 'list') {
     // Inline: the order of what matters most, then the page budget.
     const ext = (p) => p.split('.').pop().toLowerCase();
     const kind = (p) => (MIME[ext(p)]?.startsWith('image/') ? 0 : MIME[ext(p)] ? (/-candidate-/.test(p) ? 1 : 2) : 3);
-    // Without media/, a link to a full-size image and a video's poster only repeat bytes: they go.
-    let body = html.replace(/<a href="media\/[^"]+"(?: target="_blank")?>(<img [^>]*>)<\/a>/g, '$1').replace(/ poster="media\/[^"]+"/g, '');
+    // Without media/, a video's poster only repeats bytes: it goes.
+    let body = html.replace(/ poster="media\/[^"]+"/g, '');
     let size = Buffer.byteLength(body);
     const data = new Map(); const leftOut = [];
     for (const p of [...refs].sort((a, b) => kind(a) - kind(b) || refs.indexOf(a) - refs.indexOf(b))) {
