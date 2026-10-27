@@ -79,7 +79,7 @@ Your judgment, the renderer's only input besides the runs:
  "verdict": "partial", "started_utc": "2026-10-12T18:41:07Z", "generated_utc": "2026-10-12T19:20:00Z", "display_name": "<display_name>",
  "acs": [{"id": "AC-1", "name": "…", "quote": "…", "given": "…", "when": "…", "then": "…", "surface": "ui",
           "testable": true, "verdict": "verified", "baseline_blocked_reason": null,
-          "cause": null, "error_at_check": null, "note": "optional, one sentence"}],
+          "cause": null, "error_at_check": null, "mark": null, "note": "optional, one sentence"}],
  "open_questions": [{"id": "Q-1", "ac": "AC-2", "question": "…",
                      "variants": [{"source": "the issue", "quote": "…"}, {"source": "a comment of 2026-10-20", "quote": "…"}]}],
  "notes": ["assertion edits after the first run, blocked reasons, anything a reader needs"]}
@@ -95,6 +95,31 @@ dashboard shows the run's length from it); `cost_usd` only when the platform sta
 cost — never an estimate, else leave it out. Intent tests (`intents`, `intent_verdict`, [intent.md](intent.md) → Verdict), explorations and `noticed` add their own keys, never touching
 `acs` or `verdict` ([explorations.md](explorations.md) → **Reporting**, **Noticed in passing**). Never: credentials,
 internal state, the operator conversation.
+
+**The mark — `mark`.** A screenshot must show the problem, not only the page. A failed check of
+a test marks itself: a red frame on the still `<id>: the failing check`
+([test-authoring.md](test-authoring.md) → **The mark of a failed check**). When an entry
+(`acs`, `intents`, `explorations`) is not a pass and its run has no such still — an
+`agent.assert` check, a test that imports `expect` from `e2e`, a problem on a different control
+than the check's — examine the entry's still (the `<id>:` screenshot, else the screen at
+failure). When the problem shows on it, add:
+
+```json
+"mark": {"box": {"x": 357, "y": 553, "w": 447, "h": 49}, "saw": "The editor sees the Chat control.",
+         "shot": "AC-8: the general page", "side": "candidate"}
+```
+
+- `box` — the area of the problem in pixels of that screenshot file (its own size, not a
+  scaled view); `boxes` — up to 8 such areas instead.
+- `saw` — one sentence: what a user sees in the frame (ASD-STE100, below).
+- `shot` — optional: the start of the caption of a different still of the same test (a step
+  that shows the problem better); `side` — `baseline` only when the baseline decides the verdict.
+
+The report, the dashboard and a found issue draw it as an orange frame, with `saw` in the
+caption. It is the agent's reading of the screen, so it never changes a verdict, and it is not
+drawn where the test's red frame exists. A frame that cannot be drawn (a box off the screenshot)
+is left out with its caption, and the next choice applies. A problem that does not show on a screenshot (an
+absent control, a wrong answer of the API) gets no mark; leave `mark` out.
 
 **The agent's analysis — `analysis`.** Every verdicts file — an issue run's, a scenario run's, a
 night's (`work/regression/<c>/verdicts.json`) — carries your reading of the run for a person, the
@@ -156,7 +181,8 @@ product text and the frozen criteria stay verbatim.
 - `index.html` — the page: the issue verdict, "N of M criteria tested" (an
   AC judged `verified`, `failed` or `inconclusive`; `comment.md` carries it too), a summary table, and per AC
   the frozen criterion, then candidate and baseline side by side, each with the **video
-  of the whole test**, the screenshots captioned by their step (the `AC-<k>` still first),
+  of the whole test**, the screenshots captioned by their step (a marked still first — the
+  test's red frame or the agent's orange one, **The mark** above — then the `AC-<k>` still),
   the step list with durations and replay-cache use, the assertion error, and the trace
   (Playwright `trace.zip`, or the trace page from `e2e` 0.19 on). Each AC names its source issue,
   linked to it when `target_repo` is set, and quotes the source verbatim; an open question

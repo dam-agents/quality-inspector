@@ -38,6 +38,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { controlRe, esc, matchable, pageRe } from './lib/match.mjs';
+import { AGENT_RGB, agentBoxes, drawMarks, splitMark } from './lib/shot-mark.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
@@ -172,7 +173,7 @@ function parseTestFile(src) {
 // --------------------------------------------------------------------- verdicts
 const history = new Map(); // item key -> [{build, run, value, utc}]
 const addHist = (key, h) => { if (!h.value) return; (history.get(key) ?? history.set(key, []).get(key)).push(h); };
-const stillRuns = new Map(); // item key -> [{label, utc}] candidate runs, newest last
+const stillRuns = new Map(); // item key -> [{label, utc, mark}] candidate runs, newest last; mark: the entry's agent mark
 const evidence = new Map(); // origin key -> artifact reference
 const titles = new Map(); // origin key -> title from a verdicts file
 const runs = []; // every run: nights, issue runs, scenario runs (the Runs view)
@@ -238,12 +239,12 @@ function readVerdicts(dir, okey, run, ref) {
     for (const ac of [...(v.acs ?? []), ...(v.intents ?? [])]) {
       const key = `${okey}/${ac.id}`;
       addHist(key, withWhy({ build, run, value: ac.verdict, utc, cause: causeOf(ac) }, whyOf(ac)));
-      if (v.candidate_run) (stillRuns.get(key) ?? stillRuns.set(key, []).get(key)).push({ label: v.candidate_run, utc });
+      if (v.candidate_run) (stillRuns.get(key) ?? stillRuns.set(key, []).get(key)).push({ label: v.candidate_run, utc, mark: ac.mark ?? null });
     }
     for (const ex of v.explorations ?? []) {
       const key = `${okey}/${ex.id}`;
       addHist(key, withWhy({ build, run: 'exploration', value: ex.verdict, utc, cause: causeOf(ex) }, whyOf(ex)));
-      if (v.explorations_run) (stillRuns.get(key) ?? stillRuns.set(key, []).get(key)).push({ label: v.explorations_run, utc });
+      if (v.explorations_run) (stillRuns.get(key) ?? stillRuns.set(key, []).get(key)).push({ label: v.explorations_run, utc, mark: ex.mark ?? null });
     }
   }
   if (artRef(dir)) evidence.set(okey, artRef(dir));
@@ -451,7 +452,7 @@ for (const okey of [...origins].sort((a, b) => a.localeCompare(b, 'en', { numeri
       heals: heals.filter((h) => h.test === file && h.ac === id).map(({ utc, build, basis }) => ({ utc, build, basis })),
       flaky: flaky.filter((f) => f.test === file && f.ac === id).map(({ utc, build, runs, passes }) => ({ utc, build, runs, passes })),
       duration_ms: perfKey ? (perf[perfKey].samples ?? []).map((s) => s.ms).filter(Number.isFinite) : [],
-      still: null, evidence: evidence.get(okey) ?? null, _body: t?.body ?? null,
+      still: null, marked: null, mark_saw: null, evidence: evidence.get(okey) ?? null, _body: t?.body ?? null,
     });
   }
 }
@@ -620,20 +621,47 @@ const areas = [...new Set([...items.map((i) => i.area).filter(Boolean), ...pages
   .filter((a) => /^[A-Za-z0-9][A-Za-z0-9 _./-]{0,39}$/.test(a)).sort();
 
 // ---------------------------------------------------------------------- stills
-// The AC still: the `app.screenshot('<id>: …')` of the item's newest candidate run.
+// The AC still: the `app.screenshot('<id>: …')` of the item's newest candidate run. A still the
+// test marked (`<id>: the failing check [mark …]`, docs/test-authoring.md → The mark of a failed
+// check) wins; else the entry's agent mark (docs/reporting.md → The mark) is drawn on the still its
+// `shot` names, or on the AC still. The framed copy is cached in thumbs/ as <key>.mark-<hash>.png.
+// A frame that cannot be drawn (a box off the still, a PNG the decoder cannot read) gives null, and
+// the next choice is tried; the plain AC still never is the failing check's own still.
+const markCache = new Set();
+function framed(item, src, boxes, by, saw) {
+  const h = createHash('sha256').update(`${src}\n${JSON.stringify(boxes)}\n${by}`).digest('hex').slice(0, 10);
+  const dst = join(thumbsDir, `${slug(item.key)}.mark-${h}.png`);
+  if (mtime(dst) < mtime(src)) {
+    let out = null; try { out = drawMarks(readFileSync(src), boxes, by === 'agent' ? AGENT_RGB : undefined); } catch { /* left unmarked */ }
+    if (!out) return null;
+    mkdirSync(thumbsDir, { recursive: true }); writeFileSync(`${dst}.tmp`, out.png); renameSync(`${dst}.tmp`, dst);
+  }
+  markCache.add(dst); item.marked = by; item.mark_saw = by === 'agent' ? said(saw, 300) : null;
+  return dst;
+}
 function stillSource(item) {
   const [okey] = item.key.split('/');
   const tag = item.kind === 'exploration' ? `${okey}-ex` : okey;
-  for (const { label } of (stillRuns.get(item.key) ?? []).slice().reverse()) {
+  for (const { label, mark } of (stillRuns.get(item.key) ?? []).slice().reverse()) {
     const report = readJson(join(runsRoot, label, 'report.json'));
     const res = (report?.run?.results ?? []).find((r) => (r.tags ?? []).includes(tag) && (r.tags ?? []).includes(item.id.toLowerCase()));
     const att = res?.attempts?.at(-1);
     if (!att) continue;
-    const step = (att.steps ?? []).find((s) => s.api === 'app.screenshot' && String(s.label ?? '').startsWith(`${item.id}:`));
-    const art = (att.artifacts ?? []).find((a) => step?.artifacts?.includes(a.id) && a.kind === 'screenshot' && a.path);
-    if (!art) continue;
-    const src = [join(runsRoot, label, 'artifacts'), join(runsRoot, label, 'results'), join(runsRoot, label)].map((r) => join(r, art.path)).find(existsSync);
-    if (src) return src;
+    const roots = [join(runsRoot, label, 'artifacts'), join(runsRoot, label, 'results'), join(runsRoot, label)];
+    const fileOf = (step) => {
+      const art = (att.artifacts ?? []).find((a) => step?.artifacts?.includes(a.id) && a.kind === 'screenshot' && a.path);
+      return art ? roots.map((r) => join(r, art.path)).find(existsSync) ?? null : null;
+    };
+    const shots = (att.steps ?? []).filter((s) => s.api === 'app.screenshot').map((s) => ({ ...splitMark(s.label), file: fileOf(s) })).filter((s) => s.file);
+    const tested = shots.find((s) => s.label.startsWith(`${item.id}:`) && s.boxes.length);
+    const byTest = tested ? framed(item, tested.file, tested.boxes, 'test') : null;
+    if (byTest) return byTest;
+    const still = shots.find((s) => s.label.startsWith(`${item.id}:`) && !s.boxes.length);
+    const boxes = agentBoxes(mark);
+    const named = boxes.length && mark?.side !== 'baseline' ? (typeof mark.shot === 'string' && mark.shot ? shots.find((s) => s.label.startsWith(mark.shot)) : still) : null;
+    const byAgent = named ? framed(item, named.file, boxes, 'agent', mark.saw) : null;
+    if (byAgent) return byAgent;
+    if (still) return still.file;
   }
   return null;
 }
@@ -694,7 +722,7 @@ const thumbnails = await renderThumbs(jobs);
 
 // Thumbnails of items and pages that no longer exist are a stale cache: removed one by one.
 const wanted = new Set([...items, ...pages].flatMap((x) => [x._thumb, x._sharp]));
-for (const f of ls(thumbsDir).filter((x) => x.endsWith('.jpg') || x.endsWith('.webp'))) if (!wanted.has(join(thumbsDir, f))) { try { rmSync(join(thumbsDir, f)); } catch { /* next run */ } }
+for (const f of ls(thumbsDir).filter((x) => x.endsWith('.jpg') || x.endsWith('.webp') || /\.mark-[0-9a-f]+\.png$/.test(x))) if (!wanted.has(join(thumbsDir, f)) && !markCache.has(join(thumbsDir, f))) { try { rmSync(join(thumbsDir, f)); } catch { /* next run */ } }
 
 // Embed within the budget — what the data leaves of PAGE_MAX, at most IMG_BUDGET: regression
 // items' stills first, then the design crops, then the product map's page shots (pages tests reach first), then the

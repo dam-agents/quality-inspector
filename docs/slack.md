@@ -101,7 +101,8 @@ summary ([regression.md](regression.md) step 9) take the link alone.
   with no link here too, but in a thread's answer under `slack_report_visibility: public`.
 - **The picture.** `node "$HOME/scripts/evidence-sheet.mjs" <report dir>` →
   `{sheet, rows, left_out, reason}`: one PNG of the screenshots that back the verdicts — per
-  criterion its `AC-<k>` still, or the screen at failure, on each side that decides it (a
+  criterion its marked still ([reporting.md](reporting.md) → **The mark**), else its `AC-<k>` still,
+  else the screen at failure, on each side that decides it (a
   `verified` AC: baseline and candidate; a scenario's `regression`: last release and build),
   failures first, at most four (render-report's `proof.json`). It is the reply's `attachment`
   — one file a message, the platform's limit. `sheet: null` → the reply goes without one,

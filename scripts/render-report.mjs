@@ -29,6 +29,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSyn
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { VIEWER_CSS, VIEWER_HTML } from './lib/media-viewer.mjs';
+import { AGENT_RGB, agentBoxes, drawMarks, splitMark } from './lib/shot-mark.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -88,6 +89,15 @@ function copyMedia(run, rel, acId) {
   copyFileSync(src, join(outDir, 'media', name));
   return `media/${name}`;
 }
+// A screenshot with its mark drawn (scripts/lib/shot-mark.mjs): `to` gets the framed copy; a
+// screenshot it cannot draw on stays as it is. -> true when the mark is on it.
+function markFile(from, to, boxes, rgb) {
+  try {
+    const out = boxes.length ? drawMarks(readFileSync(from), boxes, rgb) : null;
+    if (out) writeFileSync(to, out.png);
+    return !!out;
+  } catch { return false; }
+}
 
 // Whose criterion an AC is: an issue (#42, tag issue-42), a scenario (S-7, tag scenario-7) or
 // a profile scenario (P-sign-in, tag profile-sign-in).
@@ -119,11 +129,11 @@ function evidence(run, ac, suffix = '') {
   const arts = att.artifacts ?? [];
   const byId = new Map(arts.map((a) => [a.id, a]));
   const steps = (att.steps ?? []).map((s) => ({
-    api: s.api, label: s.label, status: s.status, durationMs: s.durationMs, cache: s.cache?.mode,
+    api: s.api, label: splitMark(s.label).label, boxes: s.api === 'app.screenshot' ? splitMark(s.label).boxes : [], status: s.status, durationMs: s.durationMs, cache: s.cache?.mode,
     shots: (s.artifacts ?? []).map((id) => byId.get(id)).filter((a) => a?.kind === 'screenshot' && a.path),
   }));
   const shots = [];
-  steps.forEach((s, i) => s.shots.forEach((a) => shots.push({ caption: s.api === 'app.screenshot' ? s.label : `after step ${i + 1}: ${s.api} ${s.label ?? ''}`, a })));
+  steps.forEach((s, i) => s.shots.forEach((a) => shots.push({ caption: s.api === 'app.screenshot' ? s.label : `after step ${i + 1}: ${s.api} ${s.label ?? ''}`, a, boxes: s.boxes })));
   arts.filter((a) => a.kind === 'screenshot' && a.path && a.producer?.kind !== 'step').forEach((a) => shots.push({ caption: 'screen at failure', a }));
   const pick = (kind) => arts.find((a) => a.kind === kind && a.path);
   const video = pick('video');
@@ -136,7 +146,12 @@ function evidence(run, ac, suffix = '') {
     steps,
     video: video ? copyMedia(run, video.path, key(ac)) : null,
     videoSteps: video ? stepMarks(att.steps ?? [], video.startedAt ?? att.startedAt) : null,
-    shots: shots.map(({ caption, a }) => ({ caption, src: copyMedia(run, a.path, key(ac)) })).filter((s) => s.src),
+    // A still the test marked (docs/test-authoring.md → The mark of a failed check) comes first.
+    shots: shots.map(({ caption, a, boxes }) => {
+      const src = copyMedia(run, a.path, key(ac));
+      const marked = !!src && !!boxes?.length && markFile(join(outDir, src), join(outDir, src), boxes);
+      return { caption: marked ? `${caption} — the red frame marks what the check found` : caption, src, ...(marked ? { marked: 'test' } : {}) };
+    }).filter((s) => s.src).sort((x, y) => Number(!x.marked) - Number(!y.marked)),
     trace: trace ? copyMedia(run, trace.path, key(ac)) : null,
     tracePage,
     screenText: screenLog ? readText(resolve(run, screenLog.path)) : null,
@@ -264,17 +279,35 @@ ${VIEWER_CSS}`;
 
 if (v.mode === 'security') { renderSecurity(); process.exit(0); }
 
+// The agent's mark (docs/reporting.md → The mark): where the test left no mark of its own, the
+// boxes of an entry's `mark` are drawn on its still — `mark.shot` names the caption it starts
+// with, else the entry's `<id>:` still, else the screen at failure — of `mark.side` (candidate).
+function agentMark(x) {
+  const boxes = agentBoxes(x.mark);
+  const ev = x.mark?.side === 'baseline' ? x.base : x.cand;
+  if (!boxes.length || !ev?.shots || ev.shots.some((s) => s.marked)) return x;
+  const want = typeof x.mark.shot === 'string' && x.mark.shot ? x.mark.shot : null;
+  const s = want ? ev.shots.find((t) => String(t.caption).startsWith(want))
+    : ev.shots.find((t) => String(t.caption).startsWith(`${x.id}:`)) ?? ev.shots.find((t) => t.caption === 'screen at failure');
+  if (!s) return x;
+  const to = s.src.replace(/(\.png)?$/i, '-agent-mark.png');
+  if (!markFile(join(outDir, s.src), join(outDir, to), boxes, AGENT_RGB)) return x;
+  const saw = typeof x.mark.saw === 'string' && x.mark.saw.trim() ? ` — ${x.mark.saw.trim().slice(0, 300)}` : '';
+  ev.shots.unshift({ caption: `${x.id}: the orange frame is the agent's mark${saw}`, src: to, marked: 'agent' });
+  return x;
+}
+
 const acs = (v.acs ?? []).map((ac) => {
   let before = null;
   if (ac.before_shot && existsSync(ac.before_shot)) {
     before = `media/${slug(key(ac))}-before-${basename(ac.before_shot)}`;
     copyFileSync(ac.before_shot, join(outDir, before));
   }
-  return { ...ac, before, cand: ac.testable === false ? null : evidence(runs.candidate, ac), base: ac.testable === false || regression ? null : evidence(runs.baseline, ac) };
+  return agentMark({ ...ac, before, cand: ac.testable === false ? null : evidence(runs.candidate, ac), base: ac.testable === false || regression ? null : evidence(runs.baseline, ac) });
 });
 
 // Explorations: candidate only, never part of the verdict (docs/explorations.md).
-const exps = (v.explorations ?? []).map((ex) => ({ ...ex, cand: evidence(runs.explore, ex, '-ex') }));
+const exps = (v.explorations ?? []).map((ex) => agentMark({ ...ex, cand: evidence(runs.explore, ex, '-ex') }));
 const observations = exps.filter((ex) => ex.verdict === 'observation').length;
 const exHtml = !exps.length ? '' : `
 <section id="beyond-the-criteria">
@@ -294,7 +327,7 @@ ${exps.map((ex) => `
 // verdict (docs/intent.md). A regression run carries them in "acs", as criteria of the night.
 const INTENT = { met: 'met', 'not-met': 'not met', unclear: 'unclear', none: 'none' };
 const intentVerdict = Object.hasOwn(INTENT, v.intent_verdict) ? v.intent_verdict : null;
-const intents = regression ? [] : (v.intents ?? []).map((x) => ({ ...x,
+const intents = regression ? [] : (v.intents ?? []).map((x) => agentMark({ ...x,
   cand: x.testable === false ? null : evidence(runs.candidate, x), base: x.testable === false ? null : evidence(runs.baseline, x) }));
 const lettersOnly = v.verdict === 'verified' && intentVerdict === 'not-met';
 const inHtml = !intents.length && !intentVerdict ? '' : `
@@ -463,7 +496,8 @@ const PROOF = scenario
   ? { regression: ['baseline', 'candidate'], failed: ['candidate'], 'needs-review': ['candidate'], passed: ['candidate'] }
   : { failed: ['candidate'], verified: ['baseline', 'candidate'], inconclusive: ['candidate'] };
 const PROOF_MAX = 4;
-const proofShot = (ac, ev) => (ev?.shots ?? []).find((s) => String(s.caption).startsWith(`${ac.id}:`))
+const proofShot = (ac, ev) => (ev?.shots ?? []).find((s) => s.marked)
+  ?? (ev?.shots ?? []).find((s) => String(s.caption).startsWith(`${ac.id}:`))
   ?? (ev?.shots ?? []).find((s) => s.caption === 'screen at failure') ?? null;
 const proofRows = regression ? [] : acs.filter((ac) => PROOF[ac.verdict]).map((ac) => ({
   id: ac.id, name: ac.name, verdict: ac.verdict,
