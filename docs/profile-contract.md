@@ -115,6 +115,8 @@ this contract (`--live` also lists its builds).
   or installed into `work/suite`), and `openapi`, the path under `app.url` that serves the
   API description as JSON. Their snapshots are change context
   ([change-awareness.md](change-awareness.md)); absent → no snapshot.
+- `validation` (optional) — `exclude`: page patterns, form names or submit labels, each an
+  exact match, that the validation module never submits ([validation.md](validation.md)).
 - `expected_requests` (optional) — same-origin requests the UI sends that the nested install
   answers with an error on purpose, because it leaves a feature out (no billing provider, no
   chat app). Each names `method`, `path` — the pattern as the UI map records it (ids as `:id`),
