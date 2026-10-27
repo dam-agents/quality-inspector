@@ -86,8 +86,9 @@ export const VIEWER_HTML = `<div id="zoom" role="dialog" aria-modal="true" aria-
     bar.append(now, box); v.after(bar); nowOf.set(v, now);
     let next = 0, timer = 0, shown = '';
     const holdAt = (i) => Math.min(marks[i][1] + AFTER, (v.duration || Infinity) - 0.05);
-    const show = (i, done) => {
-      const text = i < 0 ? '' : 'Step ' + (i + 1) + ' of ' + marks.length + (done ? (items[i] && items[i].classList.contains('failed') ? ' failed' : ' done') : '') + ': ' + name(i) + (done && cb.checked ? ' — the video continues in a moment' : '');
+    // held: the video waits in a hold and continues by itself, so the caption says so.
+    const show = (i, done, held) => {
+      const text = i < 0 ? '' : 'Step ' + (i + 1) + ' of ' + marks.length + (done ? (items[i] && items[i].classList.contains('failed') ? ' failed' : ' done') : '') + ': ' + name(i) + (held ? ' — the video continues in a moment' : '');
       if (text === shown) return;
       shown = text; now.textContent = text; if (el === v) zNow.textContent = text;
       items.forEach((li, k) => li.classList.toggle('now', k === i));
@@ -100,7 +101,7 @@ export const VIEWER_HTML = `<div id="zoom" role="dialog" aria-modal="true" aria-
     const check = () => {
       if (v.paused || v.ended) return false;
       if (cb.checked && next < marks.length && v.currentTime >= holdAt(next)) {
-        const i = next++; v.pause(); show(i, true);
+        const i = next++; v.pause(); show(i, true, true);
         timer = setTimeout(() => { timer = 0; const p = v.play(); if (p && p.catch) p.catch(() => {}); }, HOLD);
         return false;
       }
@@ -113,11 +114,17 @@ export const VIEWER_HTML = `<div id="zoom" role="dialog" aria-modal="true" aria-
     v.addEventListener('seeked', resync);
     v.addEventListener('loadedmetadata', resync);
     v.addEventListener('ended', () => show(marks.length - 1, true));
-    cb.addEventListener('change', () => { if (!cb.checked && timer) { stop(); v.play(); } });
+    // The holds that passed while the box was off do not come back when it is on again.
+    cb.addEventListener('change', () => {
+      if (cb.checked) { resync(); return; }
+      if (timer) { stop(); show(current(), false); const p = v.play(); if (p && p.catch) p.catch(() => {}); }
+    });
     items.forEach((li, i) => {
       if (!marks[i]) return;
       li.dataset.seek = ''; li.title = 'Plays the video from this step.';
-      li.addEventListener('click', () => { v.currentTime = marks[i][0]; const p = v.play(); if (p && p.catch) p.catch(() => {}); });
+      const go = () => { v.currentTime = marks[i][0]; const p = v.play(); if (p && p.catch) p.catch(() => {}); };
+      li.tabIndex = 0; li.addEventListener('click', go);
+      li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
     });
   }
   for (const v of document.querySelectorAll('main video')) {
