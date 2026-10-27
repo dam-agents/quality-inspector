@@ -235,6 +235,11 @@ td.nw{white-space:nowrap}
 .card .then{color:var(--dim);font-size:12.5px}
 .card .open-hint{position:absolute;right:10px;bottom:8px;font-size:12px;color:var(--link);opacity:0;transition:opacity .15s;display:inline-flex;gap:3px;align-items:center}
 .card:hover .open-hint,.card:focus-visible .open-hint{opacity:1}
+.agent{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-left:4px solid var(--link);border-radius:var(--r);background:var(--card)}
+.agent h3{margin:0 0 6px}.agent .sum{margin:0 0 8px;font-size:14px;line-height:1.5}.agent .own{font-size:12px;color:var(--dim);margin:6px 0 0}
+.problem{margin:8px 0 0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.problem h4{margin:0 0 6px;font-size:14px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}.problem dl{margin:6px 0 0}
+.saywhy{flex-basis:100%;margin:2px 0 0;font-size:13px;color:var(--dim)}
 .about{margin:6px 0;padding:6px 10px;border-left:3px solid var(--link);background:var(--card);border-radius:4px}
 .card img,.gal img{width:100%;display:block;border-radius:8px;border:1px solid var(--line);background:#fff}
 .ph{aspect-ratio:16/10;border-radius:8px;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:12px;background:var(--card)}
@@ -526,7 +531,7 @@ const VAL_HELP = {
   observation: 'An exploration found a possible problem. An exploration is a check outside the criteria of the issue. It does not change the verdict.',
   failed: 'The check ran and the result was false. The product does not do what the criterion says. This is possibly a bug.',
   regression: 'The test passed before and fails on the new build. This is possibly a bug.',
-  blocked: 'The test did not get to its check. The cause shows beside it: the environment, or the test (a step the product changed). A test cause has a maintenance proposal or the action "Repair this test".',
+  blocked: 'The agent cannot give a result. The test did not get to its check, the screen showed an error at the check, or the test stopped on the last release for a reason outside the product. The cause shows beside it: the environment, or the test (a step the product changed). A test cause has a maintenance proposal or the action "Repair this test".',
   environment: 'The product did not start for this run. The agent did not test.',
   superseded: 'A newer issue changed this function intentionally. This test does not apply now.',
   'not-testable': 'The agent cannot do this check from outside the product. The check needs the code or an internal state.',
@@ -597,6 +602,61 @@ function causeSummary(att) {
     envNight ? h('div', { class: 'meta', style: 'margin-top:4px' }, causeB('failed', 'environment'), ' The newest nightly regression did not run: the product did not start. ', runLink(envNight, 'Why')) : null);
 }
 const itemCause = (i) => causeB(i.latest, i.verdict && i.verdict.cause);
+// The agent's reading of a run (docs/reporting.md → The agent's analysis): what ran, why the result is
+// what it is, each problem with what happened, where, the probable cause and the repair.
+const CERTAINTY = { high: 'The evidence shows it directly.', medium: 'It agrees with the evidence. Another reason is possible.', low: 'A hypothesis. Examine it before you act on it.' };
+const analysisIn = (a) => (a && typeof a === 'object' ? { summary: str(a.summary), next: str(a.next),
+  problems: arr(a.problems).filter((p) => p && str(p.title)).map((p) => ({ title: str(p.title), cause: own(CAUSE, str(p.cause)) ? str(p.cause) : null, certainty: own(CERTAINTY, str(p.certainty)) ? str(p.certainty) : null,
+    about: arr(p.about).map(str), what: str(p.what), where: str(p.where), why: str(p.why), fix: str(p.fix) })) } : null);
+// "#42 AC-1", "P-slug AC-2", "S-7": the test cases of the catalog that a problem is about.
+const casesOf = (refs) => refs.flatMap((m) => { const [ref, id] = m.trim().split(/\s+/); return ALL.filter((i) => i.ref === ref && (!id || str(i.id) === id)); });
+// A run without the agent's analysis (older runs): the page says why its verdict is what it is, from the data alone.
+function pageWhy(r) {
+  const c = {}; for (const e of r.entries) c[e.value] = (c[e.value] || 0) + 1;
+  const counts = r.counts || c;
+  const n = (k) => +(counts[k] || 0);
+  const sig = r.signals ? Object.values(r.signals).reduce((a, x) => a + (+x || 0), 0) : 0;
+  const list = (k) => r.entries.filter((e) => e.value === k).map((e) => { const i = byKey.get(e.key); return i ? i.label : e.key; }).slice(0, 6).join(', ');
+  if (r.verdict === 'environment') return 'The product did not start on this build, so no test ran.';
+  if (r.verdict === 'regression') return `${n('regression')} test case(s) failed on this build and passed before: ${list('regression')}. Open the report and examine the failed step.`;
+  if (r.verdict === 'failed') return `${n('failed')} test case(s) failed: ${list('failed')}.`;
+  if (r.verdict === 'needs-review') {
+    const parts = [];
+    if (n('needs-review')) parts.push(`${n('needs-review')} test case(s) need a person: ${list('needs-review')}`);
+    if (n('blocked')) parts.push(`${n('blocked')} test case(s) are blocked — the test stopped before its check: ${list('blocked')}`);
+    if (n('flaky')) parts.push(`${n('flaky')} test case(s) are flaky: ${list('flaky')}`);
+    if (sig) parts.push(`${sig} signal(s) that no test covers (new console errors, failed requests, slower pages or tests)`);
+    return parts.length ? `A person must examine this run. ${parts.join('. ')}.` : 'The agent marked this run for a person to examine. The data on this page does not say why. Examine the report of the run.';
+  }
+  if (r.verdict === 'blocked') return `The tests stopped before their checks: ${list('blocked')}. The result does not say if the function works.`;
+  return null;
+}
+// One problem of the analysis: its title and cause, the test cases it is about, then what, where, why and the repair.
+function problemCard(p) {
+  const cs = casesOf(p.about);
+  return h('div', { class: 'problem' },
+    h('h4', {}, p.cause ? causeB('failed', p.cause) : null, p.title),
+    cs.length ? h('div', { class: 'meta', style: 'display:flex;gap:6px;flex-wrap:wrap' }, 'About: ', joinNodes(cs.map((i) => itemLink(i, false)), ' ')) : p.about.length ? h('div', { class: 'meta' }, `About: ${p.about.join(', ')}`) : null,
+    h('dl', { class: 'dl' },
+      p.what ? [h('dt', { title: 'What the test did and what it saw.' }, 'What happened'), h('dd', {}, p.what)] : null,
+      p.where ? [h('dt', { title: 'The page, the control or the step.' }, 'Where'), h('dd', {}, p.where)] : null,
+      p.why ? [h('dt', { title: 'The most probable reason, as far as the evidence shows it. The agent sees the product from the outside only.' }, 'Probable cause'), h('dd', {}, p.why,
+        p.certainty ? h('span', { class: 'badge muted', style: 'margin-left:6px', title: CERTAINTY[p.certainty] }, `certainty: ${p.certainty}`) : null)] : null,
+      p.fix ? [h('dt', { title: 'What repairs it, and whose task it is.' }, 'How to repair it'), h('dd', {}, p.fix)] : null));
+}
+// The top of a run's panel: the agent's analysis, else the page's own sentence on the verdict.
+function agentSec(r) {
+  const a = r.analysis;
+  if (a && (a.summary || a.problems.length || a.next)) return h('section', { class: 'agent' },
+    h('h3', {}, '🧠 What the agent found', tip('The agent\u2019s analysis of this run: what ran, why the result is what it is, each problem with its probable cause and its repair. The agent sees the product from the outside only, so a cause is what the evidence shows.')),
+    a.summary ? h('p', { class: 'sum' }, a.summary) : null,
+    a.problems.map(problemCard),
+    a.next ? h('p', { style: 'margin:10px 0 0' }, h('b', {}, '👉 Next step: '), a.next) : null);
+  const w = pageWhy(r);
+  return w ? h('section', { class: 'agent' }, h('h3', {}, '❓ Why this result', tip('The agent wrote no analysis of this run. This page builds the sentence from the results and the signals of the run.')),
+    h('p', { class: 'sum' }, w), h('p', { class: 'own' }, 'The page wrote this from the data. The agent wrote no analysis of this run.')) : null;
+}
+const sayWhy = (t) => (str(t) ? h('div', { class: 'saywhy', title: 'What the agent wrote about this result.' }, `🧠 ${str(t)}`) : null);
 
 const ALL = arr(D.items).filter((x) => x && typeof x === 'object' && x.key).map((x) => {
   const o = x.origin && typeof x.origin === 'object' ? x.origin : {};
@@ -702,7 +762,7 @@ const RUNTYPE_HELP = { regression: 'Each night, the promoted tests run on the ne
   scenario: 'The agent tests a scenario that a person requested (in Slack, in the chat or on this page) on the newest build.', rerun: 'You started this test. It shows the result only. It is not a verdict and it has no report.',
   feature: 'A person asked for all the recurring tests of one feature. It shows the results only. It is not a verdict and it has no report.' };
 const runs = arr(D.runs).filter((r) => r && typeof r === 'object' && r.utc && own(RUNTYPE, r.type)).map((r) => ({
-  ...r, type: str(r.type), ref: r.ref == null ? '' : str(r.ref), build: str(r.build), utc: str(r.utc), entries: arr(r.entries).filter((e) => e && e.key).map((e) => ({ key: str(e.key), value: str(e.value), cause: e.cause == null ? null : str(e.cause) })),
+  ...r, type: str(r.type), ref: r.ref == null ? '' : str(r.ref), build: str(r.build), utc: str(r.utc), entries: arr(r.entries).filter((e) => e && e.key).map((e) => ({ key: str(e.key), value: str(e.value), cause: e.cause == null ? null : str(e.cause), why: str(e.why) })), analysis: analysisIn(r.analysis),
   issues: arr(r.issues).filter((x) => x && x.number != null), counts: r.counts && typeof r.counts === 'object' ? r.counts : null, signals: r.signals && typeof r.signals === 'object' ? r.signals : null,
   failure: r.failure && typeof r.failure === 'object' ? { ...r.failure, stage: str(r.failure.stage), cause: str(r.failure.cause), repair: str(r.failure.repair), next: str(r.failure.next), evidence: arr(r.failure.evidence).map(str) } : null,
   id: [r.type, r.ref, r.build, r.utc].map(str).join('~') }));
@@ -1931,6 +1991,7 @@ function itemDrawer(i) {
     labelChips(o.labels),
     h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' }, tierB(i.tier), badge(i.latest), itemCause(i), i.kind === 'exploration' ? h('span', { class: 'badge muted', title: ENT.exploration[2] }, 'outside every verdict') : i.kind === 'intent' ? h('span', { class: 'badge muted', title: ENT.intent[2] }, 'outside the issue verdict') : null,
       i.drift ? h('span', { class: 'badge muted', title: VAL_HELP.drift }, 'drift — not run until re-promoted') : null, i.testable === false ? h('span', { class: 'badge muted', title: VAL_HELP['not-testable'] }, 'not testable') : null),
+    i.verdict && str(i.verdict.why) ? h('p', { class: 'about', title: 'What the agent wrote about the latest result of this test case.' }, h('b', {}, '🧠 What the agent found: '), str(i.verdict.why)) : null,
     i.summary ? h('p', {}, str(i.summary)) : null,
     h('div', { class: 'gwt', title: i.kind === 'exploration' ? ENT.exploration[2] : i.kind === 'intent' ? `${ENT.intent[2]} The goal is the sentence of the issue, verbatim.` : 'The frozen acceptance criterion: the start state (Given), the action (When) and the result that the test checks (Then).' },
       i.kind === 'intent' ? h('p', {}, h('b', {}, 'Goal'), str(i.goal) || '–') : null,
@@ -2055,7 +2116,7 @@ function viewRuns() {
       h('td', { class: 'nw', title: r.utc }, `${fmtDate(r.utc)} ${r.utc.slice(11, 16)}`),
       h('td', { class: 'name' }, h('div', {}, r.type === 'regression' ? `🌙 ${RUNTYPE.regression}` : r.type === 'feature' ? `${RUNTYPE.feature} ${ENT.feature[1]} ${featName(r.ref)}` : [`${RUNTYPE[r.type]} `, refLink(r.ref, refTag(r.ref))]), !['regression', 'feature'].includes(r.type) && refTitle(r.ref) ? h('div', { class: 'meta' }, refTitle(r.ref)) : null),
       h('td', { class: 'nw' }, buildLink(r.build), r.baseline ? h('div', { class: 'meta', title: DT_HELP.Baseline }, 'compared with ', buildLink(r.baseline)) : r.previous ? h('div', { class: 'meta', title: DT_HELP.Since }, 'since ', buildLink(r.previous)) : null),
-      h('td', {}, badge(r.verdict)), h('td', {}, outcome(r)),
+      h('td', {}, badge(r.verdict), r.analysis && r.analysis.summary ? h('div', { class: 'meta', style: 'max-width:420px;white-space:normal', title: r.analysis.summary }, `🧠 ${r.analysis.summary.length > 160 ? `${r.analysis.summary.slice(0, 157)}…` : r.analysis.summary}`) : null), h('td', {}, outcome(r)),
       h('td', { class: 'nw' }, fmtDur(r.secs) || h('span', { class: 'muted-t' }, '–')),
       costs ? h('td', { class: 'nw' }, fmtCost(r.cost_usd) || h('span', { class: 'muted-t' }, '–')) : null,
       h('td', { class: 'nw' }, reportBtn(r.report) || h('span', { class: 'muted-t' }, '–')),
@@ -2104,6 +2165,7 @@ function runDrawer(r) {
     h('div', { class: 'meta', style: 'margin-top:6px', title: RUNTYPE_HELP[r.type] }, `${ENT.run[1]} ${ENT.run[0]} · ${RUNTYPE[r.type]}`),
     h('h2', {}, night ? `🌙 Night of ${fmtDate(r.utc)} · ${r.build}` : r.type === 'feature' ? `${ENT.feature[1]} ${featName(r.ref)} · ${ENT.build[1]} ${r.build}` : `${originName(r.ref)} · ${ENT.build[1]} ${r.build}`),
     h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' }, badge(r.verdict)),
+    agentSec(r),
     h('dl', { class: 'dl' },
       dt('Report'), h('dd', {}, artLink(r.report)),
       dt('Build'), h('dd', {}, buildLink(r.build)),
@@ -2130,7 +2192,7 @@ function runDrawer(r) {
       caseGroups([...tested.keys()].map((k) => byKey.get(k)), (i) => tested.get(i.key))) : null,
     h('section', { class: 'sec' }, h('h3', {}, night ? `${ENT.verdict[1]} Results that were not unchanged (${ents.length})` : `${ENT.verdict[1]} Verdicts (${ents.length})`),
       ents.length ? h('ul', { class: 'att' }, ents.map((e) => { const i = byKey.get(e.key); return h('li', {}, badge(e.value), ' ', causeB(e.value, e.cause), ' ',
-        i ? [itemLink(i), ofRef(i)] : h('code', {}, e.key)); })) : null,
+        i ? [itemLink(i), ofRef(i)] : h('code', {}, e.key), sayWhy(e.why)); })) : null,
       night && r.verdict !== 'environment' && !tested.size ? h('p', { class: 'muted-t' }, 'All other nightly test cases were unchanged that night. Test cases with changed checks (drift) did not run.') : null),
     r.signals && Object.values(r.signals).some((n) => +n > 0) ? h('section', { class: 'sec' }, h('h3', {}, '📡 Signals that no test covers', tip('New console errors, slow tests and other changes that the agent saw on this build, outside the checks of the tests.')), h('ul', {}, Object.entries(r.signals).filter(([, n]) => +n > 0).map(([key, n]) => h('li', {}, `${key.replace(/_/g, ' ')}: ${+n}`)))) : null,
     r.issues.length ? h('section', { class: 'sec' }, h('h3', {}, `${ENT.issue[1]} Completed issues in the window (${r.issues.length})`, tip('The issues that were closed between the night before and this night. They tell what changed in the product.')), h('ul', { class: 'att' }, r.issues.map((x) => h('li', {}, issueRef(+x.number),

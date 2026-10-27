@@ -76,6 +76,17 @@ es="$(node "$SCRIPTS/evidence-sheet.mjs" "$SANDBOX/out-es")"
 assert "evidence-sheet: a src outside media/ is never read" '.sheet == null and .rows == 0 and (.reason | startswith("no criterion"))' "$es"
 [ -f "$SANDBOX/out-es/evidence.png" ] && { echo "  a stale evidence.png survived"; FAILED=1; }
 
+# Error at the check (docs/reporting.md): a pass on a screen that shows an error is blocked, the
+# report quotes the message; a baseline that stopped in setup is no red and no longer "inconclusive".
+jq '.verdict = "blocked" | .acs[0] += {verdict: "blocked", baseline_blocked_reason: "setup", cause: "environment",
+  error_at_check: "the VM runner <cannot> be scheduled"}' "$SANDBOX/v.json" > "$SANDBOX/ve.json"
+QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/ve.json" "$SANDBOX/oute" >/dev/null
+he="$(cat "$SANDBOX/oute/index.html")"
+case "$he" in *'Error at the check:</b> “the VM runner &lt;cannot&gt; be scheduled”'*'the pass does not count'*) ;; *) echo "  error at the check not rendered"; FAILED=1;; esac
+case "$he" in *'in the test setup. This is not a red, so the test cannot prove the change.'*) ;; *) echo "  setup baseline reason not rendered"; FAILED=1;; esac
+case "$he" in *'stays inconclusive'*) echo "  a stopped baseline still claims inconclusive"; FAILED=1;; esac
+case "$h" in *'Error at the check'*) echo "  error at the check rendered without error_at_check"; FAILED=1;; esac
+
 # Explorations: their own run, tagged issue-<n>-ex + ex-<k>; candidate only, never in the verdict.
 d="$R/expl/artifacts/web/ex1/default/attempt-0"
 mkdir -p "$d/video" "$d/screenshots"
@@ -168,12 +179,17 @@ cat > "$SANDBOX/r2.json" <<'J'
 {"mode":"regression","candidate":"c2","candidate_run":"cand","verdict":"regression",
  "context":{"previous":"c1","issues":[],"iface_diff":"- removed flag --force of widgets agents rm"},
  "acs":[{"issue":42,"id":"AC-1","name":"renamed","then":"the new name shows","verdict":"regression",
-         "explanation":"passes on c1, fails on c2","regressed_between":{"from":"c1.5","to":"c2","builds_between":0}}]}
+         "explanation":"passes on c1, fails on c2","regressed_between":{"from":"c1.5","to":"c2","builds_between":0}}],
+ "analysis":{"summary":"One <b>regression</b>: the rename does not save.","next":"Send it to the team.","problems":[{"title":"The rename does not save","about":["#42 AC-1"],
+   "cause":"product","what":"The new name shows, then the old name.","where":"/projects","why":"PUT /api/projects answered 500.","fix":"The product team repairs the save.","certainty":"high"}]}}
 J
 QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/r2.json" "$SANDBOX/rout2" >/dev/null
 h="$(cat "$SANDBOX/rout2/index.html")"
 case "$h" in *'Regressed between</b> <code>c1.5</code> (passes) and <code>c2</code> (fails) · adjacent builds'*) ;; *) echo "  regressed_between not rendered"; FAILED=1;; esac
 case "$h" in *'removed flag --force'*) ;; *) echo "  interface diff not rendered"; FAILED=1;; esac
+# The agent's analysis (docs/reporting.md → The agent's analysis): above the table, escaped.
+case "$h" in *'What the agent found'*'One &lt;b&gt;regression'*'Product defect'*'The rename does not save'*'Probable cause</dt><dd>PUT /api/projects answered 500. (certainty: high)'*'How to repair it'*'Next step:</b> Send it to the team.'*'<table>'*) ;; *) echo "  the agent's analysis missing, unescaped or below the table"; FAILED=1;; esac
+grep -q 'What the agent found' "$SANDBOX/rout/index.html" && { echo "  a report without an analysis shows the section"; FAILED=1; }
 
 # Scenario mode: tests tagged scenario-<k>, the judge's reading, the channel reply as comment.md.
 mk_run s-cand failed scenario-7; mk_run s-base passed scenario-7

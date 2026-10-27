@@ -185,10 +185,14 @@ const SEVERITY = { info: 'muted', minor: 'warn', major: 'bad' };
 const sevBadge = (x) => (x ? `<span class="badge ${SEVERITY[x] ?? 'muted'}">${esc(x)}</span>` : '');
 const BLOCKED = {
   absent: 'On the baseline, the test stopped before the check because the function is not there. This is the red of red-green.',
-  environment: 'On the baseline, the test stopped before the check because of a problem in the environment. This is not a red. The criterion stays inconclusive.',
-  model: 'On the baseline, the test stopped before the check because an agent step failed. This is not a red. The criterion stays inconclusive.',
-  setup: 'On the baseline, the test stopped before the check in the test setup. This is not a red. The criterion stays inconclusive.',
+  environment: 'On the baseline, the test stopped before the check because of a problem in the environment. This is not a red, so the test cannot prove the change.',
+  model: 'On the baseline, the test stopped before the check because an agent step failed. This is not a red, so the test cannot prove the change.',
+  setup: 'On the baseline, the test stopped before the check in the test setup. This is not a red, so the test cannot prove the change.',
 };
+// docs/reporting.md → Error at the check: a pass on a screen that shows an error does not count.
+const errorAtCheck = (x) => (x.error_at_check
+  ? `<p class="note"><b>Error at the check:</b> “${esc(x.error_at_check)}”. The screen showed this error when the test made its check, so the pass does not count.</p>`
+  : '');
 const badge = (x) => { const [t, c] = VERDICT[x] ?? [x, 'muted']; return `<span class="badge ${c}">${esc(t)}</span>`; };
 const stateBadge = (s) => {
   const map = { passed: 'ok', pass: 'ok', flaky: 'warn', failed: 'bad', fail: 'bad', 'timed-out': 'bad', interrupted: 'muted', skipped: 'muted' };
@@ -238,6 +242,7 @@ figure{margin:0}img{width:100%;border-radius:6px;border:1px solid var(--line);di
 pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;max-height:420px;overflow:auto}
 pre.error{color:var(--bad)}details{margin:6px 0}summary{cursor:pointer;color:var(--dim)}
 .steps{margin:6px 0;padding-left:22px;font-size:13px}.steps li.failed{color:var(--bad)}.steps code{font-size:12px}
+.agent{margin:16px 0;padding:12px 16px;border:1px solid var(--line);border-left:4px solid var(--link);border-radius:8px;background:var(--card)}.agent h2{margin:0 0 8px;font-size:18px}.problem{margin:10px 0;padding:8px 12px;background:var(--bg);border:1px solid var(--line);border-radius:6px}.problem h3{margin:0 0 4px;font-size:15px}.problem dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:6px 0 0}.problem dt{color:var(--dim)}.problem dd{margin:0}
 .note{font-style:italic;color:var(--dim)}.quote{margin:0 0 12px;padding:6px 10px;border-left:3px solid var(--line);color:var(--dim)}.signals li{margin:0 0 12px}.sigshot{max-width:320px;margin-top:6px}footer{color:var(--dim);font-size:13px;margin-top:32px}
 ${VIEWER_CSS}`;
 
@@ -287,6 +292,7 @@ ${intents.map((x) => `
   <header><h3>${esc(x.id)} — ${esc(x.name)}${(x.covers ?? []).length ? ` <span class="dim">covers ${esc([x.covers].flat().join(', '))}</span>` : ''}</h3>${badge(x.verdict)}</header>
   <blockquote>${x.goal ? `<b>Goal</b> ${esc(x.goal)}<br>` : ''}${x.given ? `<b>Given</b> ${esc(x.given)}<br>` : ''}${x.when ? `<b>When</b> ${esc(x.when)}<br>` : ''}${x.then ? `<b>Then</b> ${esc(x.then)}` : ''}</blockquote>
   ${x.note ? `<p class="note">${esc(x.note)}</p>` : ''}
+  ${errorAtCheck(x)}
   ${x.baseline_blocked_reason ? `<p class="dim">${BLOCKED[x.baseline_blocked_reason] ?? `On the baseline, the test stopped before the check (${esc(x.baseline_blocked_reason)}).`}</p>` : ''}
   ${x.testable === false ? '' : `<div class="sides">${sideHtml(`Candidate ${v.candidate ?? ''}`, x.cand)}${sideHtml(`Baseline ${v.baseline ?? ''}`, x.base)}</div>`}
 </article>`).join('')}
@@ -343,12 +349,29 @@ const acHtml = acs.map((ac) => `
   ${ac.explanation ? `<p><b>Why:</b> ${esc(ac.explanation)}${ac.because_issue ? ` — see #${esc(ac.because_issue)}` : ''}</p>` : ''}
   ${ac.heal ? `<p class="dim">Check repaired: <code>${esc(ac.heal.from)}</code> → <code>${esc(ac.heal.to)}</code></p>` : ''}
   ${ac.judge ? `<p class="dim"><b>Judge:</b> ${ac.judge.agree ? 'agrees' : 'disagrees'}${ac.judge.call && ac.judge.call !== '-' ? ` (${esc(ac.judge.call)})` : ''} — ${esc(ac.judge.reason)}</p>` : ''}
+  ${errorAtCheck(ac)}
   ${ac.baseline_blocked_reason ? `<p class="dim">${BLOCKED[ac.baseline_blocked_reason] ?? `On the baseline, the test stopped before the check (${esc(ac.baseline_blocked_reason)}).`}</p>` : ''}
   ${ac.regressed_between ? `<p><b>Regressed between</b> <code>${esc(ac.regressed_between.from)}</code> (passes) and <code>${esc(ac.regressed_between.to)}</code> (fails)${ac.regressed_between.builds_between == null ? '' : ac.regressed_between.builds_between ? ` · ${esc(ac.regressed_between.builds_between)} untested builds in between` : ' · adjacent builds'}</p>` : ''}
   ${ac.testable === false ? '' : `<div class="sides">${sideHtml(`${regression ? 'Build' : 'Candidate'} ${v.candidate ?? ''}`, ac.cand)}${regression
     ? (ac.before ? `<section class="side"><h4>Previous build ${esc(ctx?.previous ?? '')}</h4><figure><img src="${esc(ac.before)}" alt="previous build"><figcaption>the same page on the previous build</figcaption></figure></section>` : '')
     : sideHtml(`Baseline ${v.baseline ?? ''}`, ac.base)}</div>`}
 </article>`).join('');
+
+// The agent's analysis (docs/reporting.md → The agent's analysis): first on the page, under the verdict —
+// what ran, why the result is what it is, each problem with what happened, where, the cause and the repair.
+const CAUSE_TEXT = { product: '💥 Product defect', test: '🔧 Test defect', environment: '🏗️ Environment problem' };
+const an = v.analysis && typeof v.analysis === 'object' ? v.analysis : null;
+const anProblems = (Array.isArray(an?.problems) ? an.problems : []).filter((p) => p && p.title);
+const anRow = (k, x) => (x ? `<dt>${k}</dt><dd>${esc(x)}</dd>` : '');
+const analysisHtml = !an || !(an.summary || anProblems.length || an.next) ? '' : `
+<section class="agent" id="analysis">
+<h2>What the agent found</h2>
+${an.summary ? `<p>${esc(an.summary)}</p>` : ''}
+${anProblems.map((p) => `<div class="problem"><h3>${CAUSE_TEXT[p.cause] ? `<span class="badge warn">${esc(CAUSE_TEXT[p.cause])}</span> ` : ''}${esc(p.title)}</h3>
+${(p.about ?? []).length ? `<p class="dim">About: ${p.about.map((r) => esc(r)).join(', ')}</p>` : ''}
+<dl>${anRow('What happened', p.what)}${anRow('Where', p.where)}${anRow('Probable cause', p.why ? `${p.why}${p.certainty ? ` (certainty: ${p.certainty})` : ''}` : null)}${anRow('How to repair it', p.fix)}</dl></div>`).join('')}
+${an.next ? `<p><b>Next step:</b> ${esc(an.next)}</p>` : ''}
+</section>`;
 
 // Open questions: the source contradicts itself, the operator decides, and the AC tested is the
 // one the issue states (docs/acceptance-criteria.md → Contradictions).
@@ -373,15 +396,18 @@ ${CSS}
 ${regression ? `<div class="hero"><h1>Regression run — ${esc(v.candidate)}</h1>${badge(v.verdict)}</div>
 <p class="meta">previous build <code>${esc(ctx?.previous ?? '–')}</code> · ${esc(v.generated_utc ?? '')}</p>
 <p class="dim">Each promoted criterion ran again on the new build. When a part of the UI moved or got a new name, the test found the controls again (relearned) or the agent repaired the check (healed). A <b>regression</b> is a criterion that is not true now and that no completed issue explains.</p>
+${analysisHtml}
 <table><thead><tr><th>AC</th><th>Criterion</th><th>Result</th><th>Triage</th></tr></thead><tbody>${summaryRows}</tbody></table>${contextHtml}`
 : scenario ? `<div class="hero"><h1>${esc(v.scenario)} — ${esc(v.title)}</h1>${badge(v.verdict)}</div>
 <p class="meta">build <code>${esc(v.candidate ?? '–')}</code> · last release <code>${esc(v.baseline ?? '–')}</code> · scenario <code>spec=${esc(v.spec_hash)}</code> (source: ${esc(v.source ?? 'request')}) · ${esc(v.generated_utc ?? '')}</p>
 <p class="dim">The agent tested each step of the scenario on the build. When a failure occurred again on a second run, the agent also ran the test on the last release. A failure only on the build is a <b>regression</b>. A failure on both is <b>failed</b>. An independent judge examined the evidence of each criterion. You can examine the videos and screenshots to check the result.</p>
+${analysisHtml}
 <table><thead><tr><th>AC</th><th>Criterion</th><th>Build</th><th>Last release</th><th>Verdict</th></tr></thead><tbody>${summaryRows}</tbody></table>
 ${(() => { const t = requestText(); return t == null ? '' : `<details class="request" open><summary><b>The request, verbatim</b> — the agent froze the criteria below from these words</summary><pre>${esc(t)}</pre></details>`; })()}`
 : `<div class="hero"><h1>#${esc(v.issue)} — ${esc(v.title)}</h1>${badge(v.verdict)}</div>
 <p class="meta">candidate <code>${esc(v.candidate ?? '–')}</code> · baseline <code>${esc(v.baseline ?? '–')}</code> · criteria <code>ac=${esc(v.ac_hash)}</code> (source: ${esc(v.criteria_source ?? 'done-when')}) · ${esc(coverage)} · ${esc(v.generated_utc ?? '')}</p>
 <p class="dim">The agent tested each criterion on the candidate build and on the baseline release. <b>Verified</b> means that the test fails on the baseline and passes on the candidate. You can examine the videos and screenshots to check the result.</p>
+${analysisHtml}
 <table><thead><tr><th>AC</th><th>Criterion</th><th>Candidate</th><th>Baseline</th><th>Verdict</th></tr></thead><tbody>${summaryRows}</tbody></table>`}
 ${qHtml}
 ${acHtml}

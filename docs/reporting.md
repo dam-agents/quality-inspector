@@ -9,15 +9,26 @@ and the failing traces:
 
 | Candidate | Baseline | AC verdict |
 | --- | --- | --- |
+| passed, but the screen at the check shows an error (**Error at the check**) | any | `blocked`, with `error_at_check` |
 | passed | failed — assertion ran and was false | `verified` |
 | passed | blocked, `baseline_blocked_reason: absent` | `verified` |
-| passed | blocked for `environment`, `model` or `setup` | `inconclusive`, with a note naming the reason |
+| passed | blocked for `environment`, `model` or `setup` | `blocked` — no red-green was possible; `cause: environment` for `environment`, else `test` |
 | passed | passed | `inconclusive` — the behaviour predates the change, or the test does not discriminate |
 | passed | not run (`baseline_channel: none`) | `inconclusive` |
 | failed — assertion ran and was false | any | `failed` |
 | could not reach the AC block (step failed, timeout, missing dependency) | any | `blocked` |
 | mixed passes and failures on the confirmation re-run, either side | any | `flaky` |
 | — (criterion `testable: no`) | — | `not-testable` |
+
+**Error at the check.** Examine the candidate's `AC-<k>` still of every AC that passed. If it
+shows an error message that the criterion does not expect — an error toast or banner, an error
+page, a dialog that says something failed — the pass does not count, also when the message is
+about a different area: the check ran on a product in a broken state. The AC is `blocked`,
+`error_at_check` quotes the message as written, and `cause` is what the message shows
+(`environment` for the nested platform or the VM, for example a runner that cannot start;
+`product` for a function of the product). An error that the criterion itself expects (the
+error text that the issue asks for) is not an error at the check. The same message on the
+baseline's still makes its red not count: `baseline_blocked_reason: environment`.
 
 Issue verdict: `failed` if any AC failed; else `verified` if every testable AC is
 verified; else `partial` if at least one is verified; else `inconclusive` / `blocked`
@@ -32,7 +43,8 @@ run did not reach its AC block gets one `baseline_blocked_reason`:
   it, and the failure text (the agent's, or a locator's timeout) says nothing matched.
 - `environment` (the product did not answer), `model` (the agent step failed on its own: a
   model error, a limit, a wrong turn on a screen that has the control), `setup` (the test
-  failed before the issue's area) — not red.
+  failed before the issue's area) — not red, so a candidate pass cannot prove the change:
+  the AC is `blocked` (the table above), to test again when the cause is repaired.
 - `null` — the baseline reached the AC block, or did not run.
 
 Doubt between `absent` and the others is not `absent`: a `verified` needs the proof.
@@ -67,7 +79,7 @@ Your judgment, the renderer's only input besides the runs:
  "verdict": "partial", "started_utc": "2026-10-12T18:41:07Z", "generated_utc": "2026-10-12T19:20:00Z", "display_name": "<display_name>",
  "acs": [{"id": "AC-1", "name": "…", "quote": "…", "given": "…", "when": "…", "then": "…", "surface": "ui",
           "testable": true, "verdict": "verified", "baseline_blocked_reason": null,
-          "cause": null, "note": "optional, one sentence"}],
+          "cause": null, "error_at_check": null, "note": "optional, one sentence"}],
  "open_questions": [{"id": "Q-1", "ac": "AC-2", "question": "…",
                      "variants": [{"source": "the issue", "quote": "…"}, {"source": "a comment of 2026-10-20", "quote": "…"}]}],
  "notes": ["assertion edits after the first run, blocked reasons, anything a reader needs"]}
@@ -84,9 +96,54 @@ cost — never an estimate, else leave it out. Intent tests (`intents`, `intent_
 `acs` or `verdict` ([explorations.md](explorations.md) → **Reporting**, **Noticed in passing**). Never: credentials,
 internal state, the operator conversation.
 
+**The agent's analysis — `analysis`.** Every verdicts file — an issue run's, a scenario run's, a
+night's (`work/regression/<c>/verdicts.json`) — carries your reading of the run for a person, the
+first thing the report and the dashboard show. The badges and the counts say *what*; this says
+*why* and *what to do*:
+
+```json
+"analysis": {
+  "summary": "The night ran 3 test cases of P-agent-files-a-github-issue-asked-in-slack. All 3 are blocked: the product has no GitHub connection in this environment. No product defect is known.",
+  "problems": [{"title": "The agent of the product cannot connect to GitHub",
+                "about": ["P-agent-files-a-github-issue-asked-in-slack AC-1", "P-agent-files-a-github-issue-asked-in-slack AC-2"],
+                "cause": "environment",
+                "what": "The setup step opens the connections page. The GitHub connection shows \"Not connected\". The next steps did not run.",
+                "where": "/settings/connections, the step \"connect the agent to GitHub\"",
+                "why": "The profile gives no GitHub sandbox account, so the nested product has no token for GitHub.",
+                "fix": "Add a GitHub sandbox account to the profile (its repository). The next night then runs the test.",
+                "certainty": "high"}],
+  "next": "Ask the profile's owner for a GitHub sandbox account, or retire the scenario."}
+```
+
+- `summary` — two to four sentences: what ran, the result, and why it needs a person, or that it
+  does not. A `needs-review` night names the result or signal that made it so.
+- `problems[]` — one per problem, not per criterion: three blocked criteria with one reason are one
+  problem whose `about` names all three (`#N AC-k`, `#N IN-k`, `#N EX-k`, `S-k AC-j`, `P-<slug> AC-j`).
+  Each verdict that is not a pass is in one problem. Empty when all passed. Most important first.
+  - `title` — the problem in at most 80 characters, in the user's words ("The upload stops at 99 %"),
+    never a verdict name.
+  - `cause` — `product`, `test` or `environment`, as **Cause of a failure** above; `null` when not known.
+  - `what` — what the test did and what it saw, from the evidence: the step, the screen, the message.
+  - `where` — the page, the control or the step, as the product shows it.
+  - `why` — the most probable reason, as far as the evidence shows it. You see the product from the
+    outside only ([black-box.md](black-box.md)): name what you observed ("the request
+    `POST /api/upload` answered 413"), never a guess about the code. Not known → say what you
+    examined and what is still open.
+  - `fix` — what repairs it and whose task it is: the product's team (a defect: the behaviour that
+    the criterion expects), the operator (a test to heal or retire, an open question to answer, a
+    setting), the profile's owner (an account, an egress rule), or the agent's next run.
+  - `certainty` — `high` (the evidence shows it directly), `medium` (it agrees with the evidence;
+    another reason is possible), `low` (a hypothesis to examine).
+- `next` — the one action a person should do first, or `null` when nothing waits on a person.
+
+Write it last, from the final verdicts, in ASD-STE100 (below). It goes on the dashboard, which the
+operator may share: never a credential (the builder refuses the page), a scenario's request words or
+its requester (the builder drops that field), a security finding, the operator conversation or
+`work/LESSONS.md`.
+
 **Artifact text is ASD-STE100** (Simplified Technical English). Every sentence a reader sees in an
 artifact — a report, the dashboard, an evidence page, a found issue's body — and every text you
-write for one (a verdict's `note`, `notes`, an edit of a found issue): one statement or instruction
+write for one (a verdict's `note`, `notes`, `explanation`, `analysis`, an edit of a found issue): one statement or instruction
 per sentence, at most 20 words for an instruction and 25 for a description, active voice, simple
 tenses, one word for one meaning from the common technical words (`examine`, not "look into";
 `repair`, not "fix up"), no idioms, phrasal verbs or `-ing` nouns. Identifiers, commands, quoted

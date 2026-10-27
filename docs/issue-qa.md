@@ -80,11 +80,13 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    **Judge each AC** from the two summaries, the failing steps and the screenshots, per
    [reporting.md](reporting.md) → Verdicts: a step the test could not perform is
    `blocked`, an assertion that ran and was false is `failed`; a baseline that stopped
-   before the AC block is judged per [reporting.md](reporting.md) → **Baseline blocked**.
+   before the AC block is judged per [reporting.md](reporting.md) → **Baseline blocked**,
+   and a pass whose `AC-<k>` still shows an error per **Error at the check**.
    Judge each IN the same way, into `intents[]` and `intent_verdict`, never into the issue
    verdict ([intent.md](intent.md) → Verdict). Judge each EX per [explorations.md](explorations.md)
    → **Run and judge** — never into an AC verdict. Write
-   `verdicts-<ac_hash>-<candidate>.json` ([reporting.md](reporting.md) → Verdicts file).
+   `verdicts-<ac_hash>-<candidate>.json` ([reporting.md](reporting.md) → Verdicts file), its
+   `analysis` last ([reporting.md](reporting.md) → **The agent's analysis**).
 8. **Report.** Render it — `node "$HOME/scripts/render-report.mjs" <verdicts.json>
    work/issues/<n>/report-<ac_hash>-<candidate>` — open its `index.html` and check
    every tested AC shows a video, set the row to the issue verdict with
@@ -128,7 +130,8 @@ work the same way ([nested-env.md](nested-env.md) → **Budgets**).
 - No IN changed the issue verdict; an issue `verified` with intent `not-met` leads the chat summary.
 - No observation or `noticed` item changed an AC or issue verdict.
 - No AC is `verified` without a candidate pass and a baseline failure or
-  `baseline_blocked_reason: absent`.
+  `baseline_blocked_reason: absent`. No AC whose baseline stopped for `environment`,
+  `model` or `setup` is `inconclusive`, and no pass with an error on its `AC-<k>` still counts.
 - Every `promotable` row written qualifies; no file was newly promoted unless
   `auto_promote: verified`. Each of their criteria is in a feature (`features.mjs list`).
 - Each `spec.injection_suspect` issue: its listed sentences are `testable: no —

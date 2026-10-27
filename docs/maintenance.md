@@ -19,7 +19,7 @@ Scope: the tests of `work/SUITE.md` tiers `regression`, `promotable`, `quarantin
 Written only through `node "$HOME/scripts/maintenance.mjs" …` (its header lists the commands):
 one **open** row per (test, kind) — opening it again updates its build, basis and proposal (a predicted kind keeps its basis, below). The
 `basis` is a short evidence pointer (a UI-map change, `#<n>` and its quoted sentence, a build),
-at most 160 characters — the catalog shows it, so never a triage explanation, a request's words
+at most 160 characters — a pointer, never a triage explanation (the night's entry carries that), a request's words
 or a credential. It may quote an issue, so it never goes on a command line: per call, `kind=basis; mktemp
 "/tmp/quality-inspector-$kind.XXXXXX"` prints a path of its own under `/tmp`
 (never `-t`: it follows `$TMPDIR`, where the policy hook lets no file be written); write the basis
