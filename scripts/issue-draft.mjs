@@ -22,6 +22,7 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { VIEWER_CSS, VIEWER_HTML } from './lib/media-viewer.mjs';
+import { AGENT_RGB, agentBoxes, drawMarks, splitMark } from './lib/shot-mark.mjs';
 
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 const runsRoot = process.env.QI_RUNS_ROOT ?? join(work, 'suite', '.e2e', 'runs');
@@ -102,7 +103,9 @@ function testSteps(src, id) {
 }
 
 // The evidence of one test in one run: the error, the screenshots by their step, the video.
-function runEvidence(label, tags) {
+// The newest bad result's still carries its mark (scripts/lib/shot-mark.mjs): the test's own,
+// else the verdicts entry's agent mark (`agentMark`) on the `<id>:` still or the shot it names.
+function runEvidence(label, tags, id = null, agentMark = null) {
   const dir = join(runsRoot, label);
   const report = readJson(join(dir, 'report.json'));
   if (!report) return null;
@@ -115,12 +118,23 @@ function runEvidence(label, tags) {
   const byId = new Map(arts.map((a) => [a.id, a]));
   const shots = [];
   (att.steps ?? []).forEach((s, i) => (s.artifacts ?? []).map((x) => byId.get(x)).filter((a) => a?.kind === 'screenshot' && a.path)
-    .forEach((a) => shots.push({ caption: s.api === 'app.screenshot' ? one(s.label, 120) : `after step ${i + 1}: ${s.api} ${one(s.label, 100)}`, path: at(a.path), still: s.api === 'app.screenshot', failed: s.status === 'failed' })));
+    .forEach((a) => {
+      const m = s.api === 'app.screenshot' ? splitMark(s.label) : { label: s.label, boxes: [] };
+      shots.push({ caption: s.api === 'app.screenshot' ? one(m.label, 120) : `after step ${i + 1}: ${s.api} ${one(s.label, 100)}`, path: at(a.path), still: s.api === 'app.screenshot', failed: s.status === 'failed', boxes: m.boxes });
+    }));
   arts.filter((a) => a.kind === 'screenshot' && a.path && a.producer?.kind !== 'step').forEach((a) => shots.push({ caption: 'the screen at the failure', path: at(a.path), failed: true }));
   const video = arts.find((a) => a.kind === 'video' && a.path);
   // The criterion's still, the failing moments, then the last steps — at most MAX_SHOTS.
   const ok = shots.filter((s) => s.path);
-  const pick = [...ok.filter((s) => s.still), ...ok.filter((s) => s.failed), ...ok.slice(-3)];
+  for (const s of ok) if (s.boxes?.length) { s.mark = { boxes: s.boxes }; s.caption = `${s.caption} — the red frame shows what the check found`; }
+  const boxes = agentBoxes(agentMark);
+  if (boxes.length && agentMark?.side !== 'baseline' && !ok.some((s) => s.mark)) {
+    const want = typeof agentMark.shot === 'string' && agentMark.shot ? agentMark.shot : `${id}:`;
+    const s = ok.find((x) => x.still && x.caption.startsWith(want));
+    const saw = one(agentMark.saw, 200);
+    if (s) { s.mark = { boxes, rgb: AGENT_RGB }; s.caption = `${s.caption} — the orange frame is the agent's mark${saw ? `: ${saw}` : ''}`; }
+  }
+  const pick = [...ok.filter((s) => s.mark), ...ok.filter((s) => s.still), ...ok.filter((s) => s.failed), ...ok.slice(-3)];
   return {
     status: res.status, error: att.error ? one(`${att.error.message ?? ''}`, 600) : null,
     failedStep: (att.steps ?? []).find((s) => s.status === 'failed') ?? null,
@@ -153,12 +167,12 @@ function testProblem(ref) {
     const v = readJson(join(dir, f)); if (!v) continue;
     const e = [...(v.acs ?? []), ...(v.intents ?? []), ...(v.explorations ?? [])].find((x) => x?.id === id);
     if (e?.verdict) results.push({ value: e.verdict, build: v.candidate ?? v.build ?? null, baseline: v.baseline ?? null,
-      utc: v.generated_utc ?? iso(mtime(join(dir, f))), label: ex ? v.explorations_run : v.candidate_run, run: isIssue ? 'issue run' : 'scenario run', title: v.title });
+      utc: v.generated_utc ?? iso(mtime(join(dir, f))), label: ex ? v.explorations_run : v.candidate_run, run: isIssue ? 'issue run' : 'scenario run', title: v.title, mark: e.mark ?? null });
   }
   for (const c of ls(join(work, 'regression'))) {
     const v = readJson(join(work, 'regression', c, 'verdicts.json')); if (!v) continue;
     const e = (v.acs ?? v.entries ?? []).find((x) => x?.id === id && (isIssue ? String(x.issue) === num : x.scenario === owner));
-    if (e?.verdict) results.push({ value: e.verdict, build: c, utc: v.generated_utc ?? iso(mtime(join(work, 'regression', c, 'verdicts.json'))), label: `regression-${c}`, run: 'nightly regression' });
+    if (e?.verdict) results.push({ value: e.verdict, build: c, utc: v.generated_utc ?? iso(mtime(join(work, 'regression', c, 'verdicts.json'))), label: `regression-${c}`, run: 'nightly regression', mark: e.mark ?? null });
   }
   for (const f of ls(join(work, 'reruns', okey)).filter((x) => x.endsWith('.json'))) {
     const v = readJson(join(work, 'reruns', okey, f)); const e = v?.results?.[id];
@@ -168,7 +182,7 @@ function testProblem(ref) {
   if (!results.length && !crit.then) return null;
   const bad = results.filter((r) => BAD.has(r.value)).at(-1) ?? results.at(-1) ?? null;
   const lastOk = bad ? results.filter((r) => OK.has(r.value) && String(r.utc) < String(bad.utc)).at(-1) ?? null : null;
-  const ev = bad?.label ? runEvidence(bad.label, [ex ? `${okey}-ex` : okey, id.toLowerCase()]) : null;
+  const ev = bad?.label ? runEvidence(bad.label, [ex ? `${okey}-ex` : okey, id.toLowerCase()], id, bad.mark) : null;
   if (bad?.label && !ev) notes.push(`${ref}: no evidence in run ${bad.label} (its report.json or the test's result is gone)`);
   const file = `tests/${okey}.e2e.ts`;
   const t = testSteps(read(join(work, 'suite', file)), id);
@@ -198,7 +212,7 @@ function testProblem(ref) {
     done: crit.then ? { given: crit.given, when: crit.when, then: crit.then } : null,
     repro, lastOk: lastOk ? `The test passed last on build \`${lastOk.build}\` (${lastOk.run}, ${String(lastOk.utc).slice(0, 10)}).` : null,
     meta: [`test \`${file}\``, bad?.label ? `run \`${bad.label}\`` : null, existsSync(join(dir, 'artifact.id')) ? 'the full report is the agent\'s private artifact of this issue run' : null].filter(Boolean),
-    shots: (ev?.shots ?? []).map((s) => ({ path: s.path, caption: s.caption })), video: ev?.video ?? null,
+    shots: (ev?.shots ?? []).map((s) => ({ path: s.path, caption: s.caption, mark: s.mark ?? null })), video: ev?.video ?? null,
   };
 }
 
@@ -318,7 +332,11 @@ for (const p of problems) {
   for (const [k, s] of p.shots.entries()) {
     const ext = extname(s.path) || '.png';
     const dst = `media/${slug(p.ref)}-${k + 1}${ext}`;
-    try { copyFileSync(s.path, join(dir, 'evidence', dst)); p.media.push({ src: dst, caption: s.caption, kind: 'image' }); images++; } catch { notes.push(`${p.ref}: could not copy ${basename(s.path)}`); }
+    try {
+      const out = s.mark && ext === '.png' ? drawMarks(readFileSync(s.path), s.mark.boxes, s.mark.rgb) : null;
+      if (out) writeFileSync(join(dir, 'evidence', dst), out.png); else copyFileSync(s.path, join(dir, 'evidence', dst));
+      p.media.push({ src: dst, caption: s.caption, kind: 'image' }); images++;
+    } catch { notes.push(`${p.ref}: could not copy ${basename(s.path)}`); }
   }
   if (p.video) {
     if (size(p.video) > VIDEO_MAX) notes.push(`${p.ref}: the video exceeds ${VIDEO_MAX >> 20} MiB — left out`);

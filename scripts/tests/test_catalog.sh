@@ -470,4 +470,25 @@ done
 assert "the agent's text that quotes a request is dropped, the rest kept, a note says so" '[.runs[] | select(.type == "regression" and .build == "c2" and .verdict != "environment")][0]
   | (.analysis.summary == null and .analysis.problems[0].why == "The new build moved it." and ([.entries[] | select(.key == "issue-42/AC-1")][0] | has("why") | not))' "$data"
 assert "a note counts the dropped texts" '.notes | any(test("^2 text\\(s\\) of the agent.s analysis left out"))' "$out"
+# The mark on a still (docs/reporting.md → The mark): the test's marked still wins and is framed in a
+# cached copy; else the agent's `mark` frames the AC still; with neither, the plain still and no copy.
+mkdir -p "$W/suite/.e2e/runs/cand/artifacts/a"
+for f in s1 s2; do node --input-type=module -e "import { encodePng } from '$SCRIPTS/lib/shot-mark.mjs'; import { writeFileSync } from 'node:fs';
+writeFileSync('$W/suite/.e2e/runs/cand/artifacts/a/$f.png', encodePng({ w: 20, h: 20, bpp: 3, color: 2, px: Buffer.alloc(1200, 255) }));"; done
+cat > "$W/suite/.e2e/runs/cand/report.json" <<'J'
+{"run":{"results":[{"tags":["issue-42","ac-1"],"status":"failed","attempts":[{"artifacts":[{"id":"1","kind":"screenshot","path":"a/s1.png"},{"id":"2","kind":"screenshot","path":"a/s2.png"}],
+ "steps":[{"api":"app.screenshot","label":"AC-1: the page","artifacts":["1"]},{"api":"app.screenshot","label":"AC-1: the failing check [mark 2,2,5,5]","artifacts":["2"]}]}]}]}}
+J
+node "$SCRIPTS/catalog.mjs" >/dev/null; data="$(page_data)"
+assert "the test's mark wins" '(.items[] | select(.key == "issue-42/AC-1") | .marked == "test" and .mark_saw == null)' "$data"
+[ "$(ls "$W/catalog/thumbs" | grep -c '^issue-42-ac-1\.mark-[0-9a-f]*\.png$')" = 1 ] || { echo "  the framed copy of the still is not cached"; FAILED=1; }
+jq '.run.results[0].attempts[0].steps |= .[:1]' "$W/suite/.e2e/runs/cand/report.json" > "$W/r.tmp" && mv "$W/r.tmp" "$W/suite/.e2e/runs/cand/report.json"
+jq '.acs[0].mark = {box: {x: 1, y: 1, w: 4, h: 4}, saw: "The <b>Chat</b> control shows."}' "$W/issues/42/verdicts-abc-c1.json" > "$W/v.tmp" && mv "$W/v.tmp" "$W/issues/42/verdicts-abc-c1.json"
+node "$SCRIPTS/catalog.mjs" >/dev/null; data="$(page_data)"
+assert "else the agent's mark, with its sentence" '(.items[] | select(.key == "issue-42/AC-1") | .marked == "agent" and .mark_saw == "The <b>Chat</b> control shows.")' "$data"
+[ "$(ls "$W/catalog/thumbs" | grep -c '^issue-42-ac-1\.mark-')" = 1 ] || { echo "  the stale framed copy was kept"; FAILED=1; }
+jq 'del(.acs[0].mark)' "$W/issues/42/verdicts-abc-c1.json" > "$W/v.tmp" && mv "$W/v.tmp" "$W/issues/42/verdicts-abc-c1.json"
+node "$SCRIPTS/catalog.mjs" >/dev/null; data="$(page_data)"
+assert "no mark: the plain still" '(.items[] | select(.key == "issue-42/AC-1") | .marked == null)' "$data"
+ls "$W/catalog/thumbs" | grep -q '\.mark-' && { echo "  a framed copy without its mark was kept"; FAILED=1; }
 exit $FAILED

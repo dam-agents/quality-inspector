@@ -507,6 +507,11 @@ function zoom(src, alt) {
   document.addEventListener('keydown', esc, true);
   document.body.append(box); box.focus();
 }
+// The still's caption names its mark (docs/test-authoring.md → The mark of a failed check;
+// docs/reporting.md → The mark): red from the failed check, orange from the agent.
+const stillCaption = (i) => (i.marked === 'test' ? `📷 The screen when the check of ${i.id} failed. The red frame shows what the check found.`
+  : i.marked === 'agent' ? `📷 The screen that ${i.id} checks. The orange frame is the agent's mark${str(i.mark_saw) ? `: ${str(i.mark_saw)}` : '.'}`
+  : `📷 The screen right before the check of ${i.id}.`);
 const zoomBtn = (src, alt) => (src ? h('button', { class: 'btn', type: 'button', 'data-kind': 'local', title: 'Shows the screenshot at its full size over the page. Esc closes it.', onclick: (e) => { e.stopPropagation(); zoom(src, alt); } }, '🔍 Full size') : null);
 
 const VAL = {
@@ -1999,7 +2004,7 @@ function itemDrawer(i) {
       i.quote ? h('p', { class: 'quote', title: 'The words of the source that state this criterion, verbatim.' }, h('b', {}, 'From the source'), `“${str(i.quote)}”`) : null),
     i.kind === 'criterion' ? h('div', { style: 'margin-top:6px' }, gherkinBtn(o.title || i.ref, ALL.filter((x) => x.ref === i.ref))) : null,
     src ? h('figure', { style: 'margin:10px 0' }, h('img', { src, alt: `The screen that ${i.id} checks`, class: 'zoomable', title: 'Click to see it at its full size.', onclick: () => zoom(src, `The screen that ${i.label} checks`), style: 'width:100%;border-radius:10px;border:1px solid var(--line);background:#fff' }),
-      h('figcaption', { class: 'meta', style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px' }, `📷 The screen right before the check of ${i.id}.`, zoomBtn(src, `The screen that ${i.label} checks`), i.evidence ? [' The video and all screenshots:', reportBtn(i.evidence)] : null)) : null,
+      h('figcaption', { class: 'meta', style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px' }, stillCaption(i), zoomBtn(src, `The screen that ${i.label} checks`), i.evidence ? [' The video and all screenshots:', reportBtn(i.evidence)] : null)) : null,
     h('dl', { class: 'dl' },
       dt('Report'), h('dd', {}, artLink(i.evidence)),
       dt('Test file'), h('dd', {}, i.file ? h('code', {}, `${ENT.file[1]} ${str(i.file)}`) : '– (no test)'),

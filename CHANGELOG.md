@@ -7,6 +7,21 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.39.0 — 2026-10-27
+
+**Upgrade:**
+1. `cp "$HOME/scripts/suite-skeleton/lib/criterion.ts" "$HOME/work/suite/lib/criterion.ts"` —
+   `suite.sh init` copies missing files only. The new `criterion()` puts a red frame on the
+   control of a failed check ([docs/test-authoring.md](docs/test-authoring.md) → **The mark of a
+   failed check**).
+2. In each `work/suite/tests/*.e2e.ts` that imports `criterion`, import `expect` from
+   `../lib/criterion.js` and remove it from the `from 'e2e'` import. Change only the import
+   lines; no AC block changes, so `check-asserts.sh` stays clean. A test not yet changed works
+   as before, without the red frame.
+3. Nothing else to run: the report, the dashboard and the found-issue draft draw the frames on
+   the next run, and a verdicts entry can now carry the agent's `mark`
+   ([docs/reporting.md](docs/reporting.md) → **The mark**).
+
 ## 3.38.2 — 2026-10-27
 
 **Upgrade:**

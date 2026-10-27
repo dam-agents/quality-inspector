@@ -132,4 +132,28 @@ case "$b" in *'intent test IN-1'*'the search lists the renamed project'*) ;; *) 
 case "$b" in *'search lists nothing'*) ;; *) echo "  the draft cites the intent test's failure"; FAILED=1;; esac
 cp "$R/issue-42-candidate/report.json" "$R/rerun-issue-42-c3-1200/report.json"
 assert "rerun: an intent test by its id" '.results == {"IN-1":{"status":"failed","error":"search lists nothing"}}' "$(node "$SCRIPTS/rerun.mjs" rerun-issue-42-c3-1200 '#42 IN-1' --build c3)"
+# The mark (docs/reporting.md → The mark): the newest failure's still with the test's red frame comes
+# first; else the verdicts entry's agent mark frames the AC still in orange; the run keeps its files.
+png() { node --input-type=module -e "import { encodePng } from '$SCRIPTS/lib/shot-mark.mjs'; import { writeFileSync } from 'node:fs';
+writeFileSync('$1', encodePng({ w: 20, h: 20, bpp: 3, color: 2, px: Buffer.alloc(1200, 255) }));"; }
+pix() { node --input-type=module -e "import { decodePng } from '$SCRIPTS/lib/shot-mark.mjs'; import { readFileSync } from 'node:fs';
+const i = decodePng(readFileSync('$1')); process.stdout.write([...i.px.subarray(0, 3)].join(','));"; }
+M="$R/issue-42-mark"; mkdir -p "$M/artifacts/a"; png "$M/artifacts/a/s1.png"; png "$M/artifacts/a/s2.png"
+cat > "$M/report.json" <<'J'
+{"run":{"results":[{"tags":["issue-42","ac-1"],"status":"failed","attempts":[{"error":{"message":"expected hidden"},"artifacts":[{"id":"1","kind":"screenshot","path":"a/s1.png"},{"id":"2","kind":"screenshot","path":"a/s2.png"}],
+ "steps":[{"api":"app.screenshot","label":"AC-1: the page","status":"passed","artifacts":["1"]},{"api":"app.screenshot","label":"AC-1: the failing check [mark 1,1,4,4]","status":"passed","artifacts":["2"]}]}]}]}}
+J
+echo '{"issue":42,"title":"Rename projects","candidate":"c9","baseline":"b1","candidate_run":"issue-42-mark","verdict":"failed","generated_utc":"2026-10-20T14:00:00Z",
+ "acs":[{"id":"AC-1","verdict":"failed","mark":{"box":{"x":2,"y":2,"w":4,"h":4},"saw":"The Chat control shows."}}]}' > "$W/issues/42/verdicts-abc-c9.json"
+dir="$(node "$D" '#42 AC-1' | jq -r .dir)"
+first="$(jq -r '.problems[0].media[0].caption' "$dir/draft.json")"
+case "$first" in ('AC-1: the failing check — the red frame shows what the check found') ;; (*) echo "  the test's marked still is not first: $first"; FAILED=1;; esac
+assert_eq "the copy beside the evidence page is framed in red" "230,0,0" "$(pix "$dir/evidence/$(jq -r '.problems[0].media[0].src' "$dir/draft.json")")"
+grep -q '\[mark ' "$dir/body.md" "$dir/evidence/index.html" && { echo "  the mark's geometry reached the draft"; FAILED=1; }
+jq '.run.results[0].attempts[0].steps |= .[:1]' "$M/report.json" > "$M/r.tmp" && mv "$M/r.tmp" "$M/report.json"
+dir="$(node "$D" '#42 AC-1' | jq -r .dir)"
+first="$(jq -r '.problems[0].media[0].caption' "$dir/draft.json")"
+case "$first" in ("AC-1: the page — the orange frame is the agent's mark: The Chat control shows.") ;; (*) echo "  the agent's mark is missing: $first"; FAILED=1;; esac
+assert_eq "the agent's frame is orange" "245,158,11" "$(pix "$dir/evidence/$(jq -r '.problems[0].media[0].src' "$dir/draft.json")")"
+assert_eq "the run's own screenshot stays unmarked" "255,255,255" "$(pix "$M/artifacts/a/s1.png")"
 exit $FAILED
