@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.36.0 — 2026-10-27
+## 3.37.0 — 2026-10-27
 
 **Upgrade:**
 Nothing to run — docs are re-read per run, and the dashboard and the reports rebuild themselves on
@@ -20,6 +20,27 @@ the next run. New:
    `explanation`, a criterion's `note`). A verdicts file's `notes` stay off the page.
 3. A run written before this version has no `analysis`: its panel shows a sentence that the page
    builds from the results ("Why this result"), until the next run of that kind.
+
+## 3.36.0 — 2026-10-27
+
+**Upgrade:**
+Nothing to run — docs are re-read per run, and the reports and the dashboard rebuild themselves on
+the next run. Changed:
+1. A criterion that passes on the candidate while its baseline stopped for `environment`, `model`
+   or `setup` is now `blocked` (with its `cause`), not `inconclusive`. A report written before this
+   version keeps its verdict until the issue is tested again.
+2. A pass whose `AC-<k>` screenshot shows an error message that the criterion does not expect does
+   not count: the criterion is `blocked`, and the new verdicts-file field `error_at_check` quotes
+   the message in the report.
+
+## 3.35.1 — 2026-10-27
+
+**Upgrade:**
+Nothing to run — the reports and the evidence pages of found issues rebuild themselves on the next run.
+A click on a screenshot, or "Enlarge" under a video, shows it larger over the page, with zoom in
+and out, fit and 1:1. A screenshot no longer links its file, which opened an empty page in a
+strict viewer and downloaded the file after a reload. A report made before this version keeps the
+old behavior.
 
 ## 3.35.0 — 2026-10-26
 

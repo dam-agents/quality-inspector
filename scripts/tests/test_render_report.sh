@@ -40,7 +40,8 @@ out="$(QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/v.json" "$S
 assert "two videos, two screenshots" '.videos == 2 and .screenshots == 2' "$out"
 h="$(cat "$SANDBOX/out/index.html")"
 case "$h" in *'<a href="https://github.com/acme/widgets/issues/42"'*'#42</a> AC-1 — renamed'*) ;; *) echo "  an AC does not link its source issue"; FAILED=1;; esac
-case "$h" in *'id="zoom"'*'Click the image to fit it to the window'*) ;; *) echo "  the full-size image viewer is missing"; FAILED=1;; esac
+case "$h" in *'id="zoom"'*'data-z="in"'*'Enlarge the video'*) ;; *) echo "  the in-page viewer of screenshots and videos is missing"; FAILED=1;; esac
+case "$h" in *'target="_blank"'*|*'<a href="media/'*'<img'*) echo "  a screenshot links its file (a strict viewer opens an empty page, the file downloads)"; FAILED=1;; esac
 case "$h" in *'From the source</b> “A renamed project keeps its tasks.”'*) ;; *) echo "  an AC does not quote its source"; FAILED=1;; esac
 case "$h" in *'Open questions (1)'*'Q-1'*'Does an editor rename a project?'*'the owner renames it'*'an editor renames it'*) ;; *) echo "  the open questions are missing"; FAILED=1;; esac
 case "$h" in *'<video controls'*'poster="media/'*) ;; *) echo "  no video with a poster"; FAILED=1;; esac
@@ -74,6 +75,17 @@ jq '.rows[0].shots |= map(.src = "../../outside.png")' "$SANDBOX/out/proof.json"
 es="$(node "$SCRIPTS/evidence-sheet.mjs" "$SANDBOX/out-es")"
 assert "evidence-sheet: a src outside media/ is never read" '.sheet == null and .rows == 0 and (.reason | startswith("no criterion"))' "$es"
 [ -f "$SANDBOX/out-es/evidence.png" ] && { echo "  a stale evidence.png survived"; FAILED=1; }
+
+# Error at the check (docs/reporting.md): a pass on a screen that shows an error is blocked, the
+# report quotes the message; a baseline that stopped in setup is no red and no longer "inconclusive".
+jq '.verdict = "blocked" | .acs[0] += {verdict: "blocked", baseline_blocked_reason: "setup", cause: "environment",
+  error_at_check: "the VM runner <cannot> be scheduled"}' "$SANDBOX/v.json" > "$SANDBOX/ve.json"
+QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/ve.json" "$SANDBOX/oute" >/dev/null
+he="$(cat "$SANDBOX/oute/index.html")"
+case "$he" in *'Error at the check:</b> “the VM runner &lt;cannot&gt; be scheduled”'*'the pass does not count'*) ;; *) echo "  error at the check not rendered"; FAILED=1;; esac
+case "$he" in *'in the test setup. This is not a red, so the test cannot prove the change.'*) ;; *) echo "  setup baseline reason not rendered"; FAILED=1;; esac
+case "$he" in *'stays inconclusive'*) echo "  a stopped baseline still claims inconclusive"; FAILED=1;; esac
+case "$h" in *'Error at the check'*) echo "  error at the check rendered without error_at_check"; FAILED=1;; esac
 
 # Explorations: their own run, tagged issue-<n>-ex + ex-<k>; candidate only, never in the verdict.
 d="$R/expl/artifacts/web/ex1/default/attempt-0"

@@ -530,7 +530,7 @@ const VAL_HELP = {
   observation: 'An exploration found a possible problem. An exploration is a check outside the criteria of the issue. It does not change the verdict.',
   failed: 'The check ran and the result was false. The product does not do what the criterion says. This is possibly a bug.',
   regression: 'The test passed before and fails on the new build. This is possibly a bug.',
-  blocked: 'The test did not get to its check. Possible causes: a missing page or control, a timeout, a problem in the environment.',
+  blocked: 'The agent cannot give a result. The test did not get to its check, the screen showed an error at the check, or the test stopped on the last release for a reason outside the product. Possible causes: a missing page or control, a timeout, a problem in the environment.',
   environment: 'The product did not start for this run. The agent did not test.',
   superseded: 'A newer issue changed this function intentionally. This test does not apply now.',
   'not-testable': 'The agent cannot do this check from outside the product. The check needs the code or an internal state.',

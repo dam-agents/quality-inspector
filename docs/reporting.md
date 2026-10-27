@@ -9,15 +9,26 @@ and the failing traces:
 
 | Candidate | Baseline | AC verdict |
 | --- | --- | --- |
+| passed, but the screen at the check shows an error (**Error at the check**) | any | `blocked`, with `error_at_check` |
 | passed | failed — assertion ran and was false | `verified` |
 | passed | blocked, `baseline_blocked_reason: absent` | `verified` |
-| passed | blocked for `environment`, `model` or `setup` | `inconclusive`, with a note naming the reason |
+| passed | blocked for `environment`, `model` or `setup` | `blocked` — no red-green was possible; `cause: environment` for `environment`, else `test` |
 | passed | passed | `inconclusive` — the behaviour predates the change, or the test does not discriminate |
 | passed | not run (`baseline_channel: none`) | `inconclusive` |
 | failed — assertion ran and was false | any | `failed` |
 | could not reach the AC block (step failed, timeout, missing dependency) | any | `blocked` |
 | mixed passes and failures on the confirmation re-run, either side | any | `flaky` |
 | — (criterion `testable: no`) | — | `not-testable` |
+
+**Error at the check.** Examine the candidate's `AC-<k>` still of every AC that passed. If it
+shows an error message that the criterion does not expect — an error toast or banner, an error
+page, a dialog that says something failed — the pass does not count, also when the message is
+about a different area: the check ran on a product in a broken state. The AC is `blocked`,
+`error_at_check` quotes the message as written, and `cause` is what the message shows
+(`environment` for the nested platform or the VM, for example a runner that cannot start;
+`product` for a function of the product). An error that the criterion itself expects (the
+error text that the issue asks for) is not an error at the check. The same message on the
+baseline's still makes its red not count: `baseline_blocked_reason: environment`.
 
 Issue verdict: `failed` if any AC failed; else `verified` if every testable AC is
 verified; else `partial` if at least one is verified; else `inconclusive` / `blocked`
@@ -32,7 +43,8 @@ run did not reach its AC block gets one `baseline_blocked_reason`:
   it, and the failure text (the agent's, or a locator's timeout) says nothing matched.
 - `environment` (the product did not answer), `model` (the agent step failed on its own: a
   model error, a limit, a wrong turn on a screen that has the control), `setup` (the test
-  failed before the issue's area) — not red.
+  failed before the issue's area) — not red, so a candidate pass cannot prove the change:
+  the AC is `blocked` (the table above), to test again when the cause is repaired.
 - `null` — the baseline reached the AC block, or did not run.
 
 Doubt between `absent` and the others is not `absent`: a `verified` needs the proof.
@@ -67,7 +79,7 @@ Your judgment, the renderer's only input besides the runs:
  "verdict": "partial", "started_utc": "2026-10-12T18:41:07Z", "generated_utc": "2026-10-12T19:20:00Z", "display_name": "<display_name>",
  "acs": [{"id": "AC-1", "name": "…", "quote": "…", "given": "…", "when": "…", "then": "…", "surface": "ui",
           "testable": true, "verdict": "verified", "baseline_blocked_reason": null,
-          "cause": null, "note": "optional, one sentence"}],
+          "cause": null, "error_at_check": null, "note": "optional, one sentence"}],
  "open_questions": [{"id": "Q-1", "ac": "AC-2", "question": "…",
                      "variants": [{"source": "the issue", "quote": "…"}, {"source": "a comment of 2026-10-20", "quote": "…"}]}],
  "notes": ["assertion edits after the first run, blocked reasons, anything a reader needs"]}
@@ -148,8 +160,10 @@ product text and the frozen criteria stay verbatim.
   the step list with durations and replay-cache use, the assertion error, and the trace
   (Playwright `trace.zip`, or the trace page from `e2e` 0.19 on). Each AC names its source issue,
   linked to it when `target_repo` is set, and quotes the source verbatim; an open question
-  (`open_questions`) has its own section above the criteria. A click on a screenshot shows it at
-  its full size over the page, never the browser's own viewer, which downloads a media file.
+  (`open_questions`) has its own section above the criteria. A click on a screenshot, or "Enlarge"
+  under a video, shows it larger over the page (`scripts/lib/media-viewer.mjs`: zoom in and out,
+  fit, 1:1; the video keeps playing). No screenshot links its file: a strict viewer opens an empty
+  page for it, and the browser downloads the published file.
 - `media/` — the copied videos, screenshots and traces it links to by relative paths, which
   only `report-media.mjs` turns into the published file `publish.html` (**Delivery** step 1).
 - `comment.md` — the short issue comment, with the literal `EVIDENCE_LINK` to replace.
