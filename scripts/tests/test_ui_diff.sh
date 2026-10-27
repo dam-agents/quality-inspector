@@ -55,6 +55,12 @@ assert "slower page needs factor and floor (/ under 2x, /usage under +1000 ms)" 
 assert "--perf-factor raises the bar" '.slower_pages == [] and .unchanged == true' "$(node "$SCRIPTS/ui-diff.mjs" --perf-factor 4 "$SANDBOX/m1/inventory.json" "$SANDBOX/m2/inventory.json")"
 assert "identical maps: no signals" '.console_errors_new == [] and .failed_requests_new == [] and .slower_pages == []' "$(node "$SCRIPTS/ui-diff.mjs" "$SANDBOX/m2/inventory.json" "$SANDBOX/m2/inventory.json")"
 assert "old map without signals vs a new one: none reported" '.console_errors_new == [] and .slower_pages == []' "$(node "$SCRIPTS/ui-diff.mjs" "$SANDBOX/old.json" "$SANDBOX/m2/inventory.json")"
+# A failed request the profile declares expected is never new; a near miss (other status) still is.
+mkdir -p "$SANDBOX/xp"
+echo '{"expected_requests":[{"method":"POST","path":"/api/keys/:id","status":500,"why":"no key store in the QA install"}]}' > "$SANDBOX/xp/profile.json"
+assert "expected request: not new" '.failed_requests_new == []' "$(QI_PROFILE_DIR="$SANDBOX/xp" node "$SCRIPTS/ui-diff.mjs" "$SANDBOX/m1/inventory.json" "$SANDBOX/m2/inventory.json")"
+echo '{"expected_requests":[{"method":"POST","path":"/api/keys/:id","status":404,"why":"x"},{"method":"POST","path":"/api/keys/*","status":500,"why":"wildcards are not patterns"}]}' > "$SANDBOX/xp/profile.json"
+assert "other status or a wildcard: still new" '.failed_requests_new | length == 1' "$(QI_PROFILE_DIR="$SANDBOX/xp" node "$SCRIPTS/ui-diff.mjs" "$SANDBOX/m1/inventory.json" "$SANDBOX/m2/inventory.json")"
 m="$(node "$SCRIPTS/ui-diff.mjs" "$SANDBOX/m1/inventory.json" "$SANDBOX/m2/inventory.json" --md)"
 case "$m" in *'**New console errors:**'*'`/settings`: Error: <script>boom</script> N'*'**New failed requests:**'*'POST /api/keys/:id → 500'*'**Slower pages**'*'900 ms → 2950 ms'*) ;; *) echo "  --md lacks the signals: $m"; FAILED=1;; esac
 exit $FAILED

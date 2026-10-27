@@ -17,6 +17,42 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    ("create issue for …", "module … set", "dismiss D-k") now goes to a fresh session of its own
    ([docs/persistence.md](docs/persistence.md) → **Handoff**); look for its answer there.
 
+## 3.41.0 — 2026-10-27
+
+**Upgrade:**
+Nothing to run — docs are re-read per run, and the dashboard rebuilds itself on the next catalog
+build. New operator commands for a design finding, also on its card's "Manage" in the Design view:
+`recheck D-<k>` sweeps its page and viewport again on the candidate now ([docs/ui-sweep.md](docs/ui-sweep.md)
+→ **5. Recheck**; its files go to `work/design/recheck/`), and `discuss D-<k>[: <question>]` answers
+about it, read-only (→ **6. Discuss**).
+
+## 3.40.0 — 2026-10-27
+
+**Upgrade:**
+Nothing to run — the reports rebuild themselves on the next run. A report's video now pauses after
+each step and names it, and a click on a step plays the video from there
+([docs/reporting.md](docs/reporting.md) → **The report**). A report rendered before 3.35.1 opens a
+screenshot as a page of its own; render it again to get the in-page viewer.
+
+## 3.39.0 — 2026-10-27
+
+**Upgrade:**
+Nothing to run. A profile may now list `expected_requests` in its `profile.json`
+([docs/profile-contract.md](docs/profile-contract.md)): requests the nested install answers with an
+error on purpose. The UI sweep records no `failed-request` finding for them and the UI diff never
+reports them as new. Open design findings of such a request resolve on the next sweep; to close them
+now, dismiss them (`dismiss D-<k> as by-design`). Without the key nothing changes.
+
+## 3.38.3 — 2026-10-27
+
+**Upgrade:**
+Nothing to run — docs are re-read per run. A public report no longer uploads its videos: the
+platform's `/raw` link serves only images inline, so the page carries the videos as data
+([docs/reporting.md](docs/reporting.md) → **Delivery** step 1). A refused served type no longer
+stops the report: `media-urls.json` records it under `refused`, and the page carries its files. A
+report stopped by 3.33.1 (`blocked`) is delivered by the next run with no `unblock`. The rejected
+public video artifacts stay: delete them in the app.
+
 ## 3.38.2 — 2026-10-27
 
 **Upgrade:**

@@ -9,7 +9,13 @@
 //   node design-findings.mjs merge <sweep.json> [--review <review.json>] [--no-render]
 //   node design-findings.mjs merge --noticed-only [--no-render]
 //       -> {findings, open, resolved, dismissed, new, crops, notes}
+//   node design-findings.mjs recheck-plan D-<k>
+//       -> {id, status, source, check, severity, pattern, viewport, last_seen, sweep: {pattern, viewports} | null, review, note}
 //
+// recheck-plan reads the register only: what the operator's "recheck D-<k>" sweeps (docs/ui-sweep.md
+// → Recheck). `sweep` is ui-sweep.mjs's --pattern and --viewports for its page and viewport (null for
+// a noticed item, which no sweep resolves); `review` — a review finding: its one shot is reviewed
+// again before the merge. Exit 2: usage, or no such id.
 // --max defaults to config `ui_sweep_review_pages` (10; 0 = none). A review file is
 // [{pattern, viewport, check: review:<alignment|spacing|typography|layout|truncation|legibility|other>,
 // severity: major|minor, saw, box: {x,y,w,h}|null, confidence: 0..1}] about this sweep's pages;
@@ -46,7 +52,7 @@ for (let i = 2; i < process.argv.length; i++) {
   else if (a.startsWith('--')) flags[a.slice(2)] = process.argv[++i];
   else pos.push(a);
 }
-const usage = 'usage: design-findings.mjs review-plan <sweep.json> [--max N] | merge <sweep.json> [--review FILE] [--no-render] | merge --noticed-only [--no-render]';
+const usage = 'usage: design-findings.mjs review-plan <sweep.json> [--max N] | merge <sweep.json> [--review FILE] [--no-render] | merge --noticed-only [--no-render] | recheck-plan D-<k>';
 const die = (m) => { console.error(m ? `design-findings: ${m}` : usage); process.exit(2); };
 const regValue = (k) => { // a registry key through lib/config.sh → reg: out of range reads as its default
   try {
@@ -67,7 +73,25 @@ const BUILD = /^(?!\.)[A-Za-z0-9._+-]+$/;
 const str = (s, n) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 
 const [cmd, sweepPath] = pos;
-if (!['review-plan', 'merge'].includes(cmd)) die();
+if (!['review-plan', 'merge', 'recheck-plan'].includes(cmd)) die();
+
+// ------------------------------------------------------------------ recheck-plan ----
+if (cmd === 'recheck-plan') {
+  const id = pos[1];
+  if (!/^D-\d{1,6}$/.test(String(id ?? ''))) die();
+  const f = (readJson(REGISTER)?.findings ?? []).find((x) => x?.id === id);
+  if (!f) die(`no finding ${id} in ${REGISTER}`);
+  const vp = /^\d{3,4}x\d{3,4}$/.test(String(f.viewport ?? '')) ? f.viewport : null;
+  const sweepable = f.source !== 'noticed' && vp && typeof f.pattern === 'string' && f.pattern.startsWith('/');
+  console.log(JSON.stringify({
+    id, status: f.status, source: f.source, check: f.check, severity: f.severity, pattern: f.pattern, viewport: f.viewport, last_seen: f.last_seen,
+    sweep: sweepable ? { pattern: f.pattern, viewports: vp } : null, review: f.source === 'review',
+    note: f.source === 'noticed' ? 'noticed in passing: no sweep resolves it — look at the page and say what you see'
+      : !sweepable ? `page '${str(f.pattern, 80)}' @ '${str(f.viewport, 20)}' is not one a sweep can repeat`
+      : f.status === 'dismissed' ? 'dismissed: the merge keeps it dismissed until "reopen"' : null,
+  }, null, 2));
+  process.exit(0);
+}
 if (!sweepPath && !(cmd === 'merge' && flags['noticed-only'])) die();
 const sweep = sweepPath ? readJson(sweepPath) : null;
 if (sweepPath && (!sweep || !Array.isArray(sweep.pages) || !BUILD.test(String(sweep.build ?? '')))) die(`${sweepPath} is not a sweep.json`);

@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 // ui-sweep.mjs — a read-only walk of every page of the UI map at a few viewports, hunting UI
 // and visual defects: the deterministic checks of lib/ui-checks.mjs, layout shift, console
-// errors, failed same-origin requests, axe-core's WCAG 2 A/AA rules (when the suite has it),
+// errors, failed same-origin requests (but the profile's expected_requests), axe-core's WCAG 2 A/AA rules (when the suite has it),
 // a full-page screenshot per page and viewport, and whether that shot changed since the
 // previous sweep. The design findings register is built from it (design-findings.mjs).
 // Rationale: docs/ui-sweep.md.
 //
 //   node ui-sweep.mjs <inventory.json> --build <c> [--out <dir>] [--previous <dir>]
-//        [--viewports 1440x900,768x1024,390x844] [--base URL] [--max-pages 60] [--dry-run]
+//        [--viewports 1440x900,768x1024,390x844] [--base URL] [--max-pages 60] [--pattern P] [--dry-run]
 //
+// --pattern sweeps only that page of the UI map (a design finding's recheck, docs/ui-sweep.md →
+// Recheck); a pattern the map does not have, or that the map skips (no example, an error, a
+// redirect), is exit 2.
 // --dry-run prints the plan (pages × viewports, out paths) with no browser and no network.
 // Default --out: work/design/<build>; --viewports: config `ui_sweep_viewports`, else the above
 // (WxH, at most 4; a viewport under 600 px wide is a touch phone). Writes <out>/sweep.json
@@ -28,6 +31,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseExpected, isExpected } from './lib/expected-requests.mjs';
 import { pattern } from './lib/url-pattern.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -38,7 +42,7 @@ for (let i = 2; i < process.argv.length; i++) {
   else if (a.startsWith('--')) flags[a.slice(2)] = process.argv[++i];
   else pos.push(a);
 }
-const usage = 'usage: ui-sweep.mjs <inventory.json> --build B [--out DIR] [--previous DIR] [--viewports WxH,…] [--base URL] [--max-pages N] [--dry-run]';
+const usage = 'usage: ui-sweep.mjs <inventory.json> --build B [--out DIR] [--previous DIR] [--viewports WxH,…] [--base URL] [--max-pages N] [--pattern P] [--dry-run]';
 const die = (m) => { console.error(`ui-sweep: ${m}`); process.exit(2); };
 if (!pos[0]) { console.error(usage); process.exit(2); }
 
@@ -72,6 +76,10 @@ if (!Number.isInteger(maxPages) || maxPages < 1) die(`--max-pages '${flags['max-
 let inv;
 try { inv = JSON.parse(readFileSync(pos[0], 'utf8')); } catch (e) { die(`cannot read the UI map ${pos[0]}: ${String(e.message).split('\n')[0]}`); }
 const profile = (() => { try { return JSON.parse(readFileSync(join(sh('profile_dir'), 'profile.json'), 'utf8')); } catch { return {}; } })();
+// A failed request the profile declares expected is no finding (lib/expected-requests.mjs).
+const expected = parseExpected(profile);
+notes.push(...expected.notes);
+const expectedSeen = new Set();
 let base;
 try { base = new URL(flags.base ?? process.env.APP_URL ?? inv.base ?? profile.app?.url ?? 'http://localhost'); } catch { die('the base is not a URL'); }
 if (!['localhost', '127.0.0.1'].includes(base.hostname)) { console.error(`refusing ${base.origin}: only the nested product on localhost`); process.exit(2); }
@@ -81,17 +89,19 @@ const out = resolve(flags.out ?? join(WORK, 'design', build));
 const previous = flags.previous ? resolve(flags.previous) : null;
 
 const slug = (p) => (p === '/' ? 'root' : p.replace(/^\//, '').replace(/[^A-Za-z0-9]+/g, '_')).slice(0, 80);
-const routes = Object.entries(inv.routes ?? {});
+const routes = Object.entries(inv.routes ?? {}).filter(([p]) => flags.pattern === undefined || p === flags.pattern);
+if (flags.pattern !== undefined && !routes.length) die(`--pattern '${flags.pattern}' is not a page of the UI map ${pos[0]}`);
 const skipped = routes.filter(([, r]) => !r?.example || r.error || r.redirected)
   .map(([p, r]) => ({ pattern: p, reason: !r?.example ? 'no example path' : r.error ? `errored in the UI map: ${String(r.error).slice(0, 80)}` : `redirected to ${r.redirected}` }));
 const pages = routes.filter(([, r]) => r?.example && !r.error && !r.redirected).slice(0, maxPages);
+if (flags.pattern !== undefined && !pages.length) die(`--pattern '${flags.pattern}' cannot be swept: ${skipped[0].reason}`);
 if (routes.length - skipped.length > maxPages) notes.push(`${routes.length - skipped.length - maxPages} pages over --max-pages ${maxPages} not swept`);
 const shotOf = (p, v) => `shots/${slug(p)}@${v.id}.png`;
 const visits = viewports.flatMap((v) => pages.map(([p, r]) => ({ pattern: p, example: r.example, vp: v, shot: shotOf(p, v) })));
 
 if (flags.dry) {
   console.log(JSON.stringify({
-    build, base: base.origin, out, previous, viewports: viewports.map((v) => v.id), max_pages: maxPages,
+    build, base: base.origin, out, previous, viewports: viewports.map((v) => v.id), max_pages: maxPages, expected_requests: expected.list,
     pages: visits.map((x) => ({ pattern: x.pattern, example: x.example, viewport: x.vp.id, shot: join(out, x.shot),
       previous_shot: previous && existsSync(join(previous, x.shot)) ? join(previous, x.shot) : null })),
     skipped, notes,
@@ -226,7 +236,13 @@ for (const vp of viewports) {
   let sig = null;
   page.on('console', (m) => { if (sig && m.type() === 'error' && !/^Failed to load resource/.test(m.text())) sig.errors.add(vol(m.text())); });
   page.on('pageerror', (e) => { if (sig) sig.errors.add(vol(`${e?.name || 'Error'}: ${String(e?.message ?? e).split('\n')[0]}`)); });
-  page.on('response', (r) => { if (sig && r.status() >= 400 && sameOrigin(r.url())) sig.requests.set(`${r.request().method()} ${pattern(new URL(r.url()))} → ${r.status()}`, String(r.status())); });
+  page.on('response', (r) => {
+    if (!sig || r.status() < 400 || !sameOrigin(r.url())) return;
+    const method = r.request().method(); const path = pattern(new URL(r.url()));
+    const k = `${method} ${path} → ${r.status()}`;
+    if (isExpected(expected.list, method, path, r.status())) expectedSeen.add(k);
+    else sig.requests.set(k, String(r.status()));
+  });
   page.on('requestfailed', (r) => {
     const err = r.failure()?.errorText ?? 'failed';
     if (sig && sameOrigin(r.url()) && !/ERR_ABORTED/.test(err)) sig.requests.set(`${r.method()} ${pattern(new URL(r.url()))} → failed`, err);
@@ -264,6 +280,7 @@ await browser.close();
 const all = results.flatMap((p) => p.findings);
 const counts = { major: all.filter((f) => f.severity === 'major').length, minor: all.filter((f) => f.severity === 'minor').length, pages: results.length };
 for (const p of results.filter((x) => x.error)) notes.push(`${p.pattern} @${p.viewport}: ${p.error}`);
+for (const k of [...expectedSeen].sort()) notes.push(`${k}: expected by the profile (expected_requests) — no finding`);
 const sweep = { build, generated_utc: new Date().toISOString().replace(/\.\d+Z$/, 'Z'), base: base.origin, viewports: viewports.map((v) => v.id),
   axe: !!axeSource, pages: results, counts, notes };
 const file = join(out, 'sweep.json');
