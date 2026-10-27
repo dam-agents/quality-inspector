@@ -65,7 +65,8 @@ The operator may share the page beyond themselves, so it carries only what conce
   security run only its counts by severity and its report's reference.
 - **Never:** a scenario's request text, requester or thread; a verdicts file's `notes` (the agent's
   `analysis`, `explanation` and a criterion's `note` are written for the page, [reporting.md](reporting.md)
-  → **The agent's analysis**); a run by hand's error text; `work/LESSONS.md`; the operator conversation; a security finding or anything else
+  → **The agent's analysis** — the builder drops a field of them that names a requester or thread, or
+  repeats 6 words in a row of a request or a profile scenario's source, and a `notes` entry counts them); a run by hand's error text; `work/LESSONS.md`; the operator conversation; a security finding or anything else
   of `work/security/`; anything of `work/env/`; a credential value or a token (the builder refuses the page). A new field follows
   the same rule; `scripts/tests/test_catalog.sh` holds it.
 

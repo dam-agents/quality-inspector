@@ -73,6 +73,22 @@ const suite = new Map(rows(join(work, 'SUITE.md')).map(([test, owner, tier, hash
   [test, { owner, tier, hash, promoted: promoted && promoted !== '-' ? promoted : null }]));
 const qa = new Map(rows(join(work, 'QA.md')).map(([n, acHash]) => [n, { acHash }]));
 const scen = new Map(rows(join(work, 'SCENARIOS.md')).map(([id, source, , , specHash]) => [id, { source, specHash }]));
+// What a scenario's requester said stays off the page (docs/catalog.md → Never), also inside the agent's
+// own text: a field that names a requester or thread, or repeats 6 words in a row of a request
+// (request.md, a profile scenario's source-*), is dropped — whatever the agent wrote.
+const QUOTE_RUN = 6;
+const words = (t) => String(t).toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+const runsOf = (ws) => (ws.length < QUOTE_RUN ? (ws.length >= 3 ? [ws.join(' ')] : []) : ws.slice(0, ws.length - QUOTE_RUN + 1).map((_, k) => ws.slice(k, k + QUOTE_RUN).join(' ')));
+const requestRuns = new Set(ls(join(work, 'scenarios')).flatMap((d) => ls(join(work, 'scenarios', d))
+  .filter((f) => f === 'request.md' || /^source-.*\.(md|feature)$/.test(f)).flatMap((f) => runsOf(words(read(join(work, 'scenarios', d, f)) ?? '')))));
+const requesters = [...new Set(rows(join(work, 'SCENARIOS.md')).flatMap(([, , who, thread]) => [who, thread])
+  .map((x) => String(x ?? '').trim()).filter((x) => x.length >= 3 && x !== '-'))];
+const quoted = new Set(); // the dropped texts: one note names their count
+const quotesRequest = (t) => {
+  const hit = requesters.some((r) => t.includes(r)) || runsOf(words(t)).some((r) => requestRuns.has(r));
+  if (hit) quoted.add(t);
+  return hit;
+};
 // A scenario's test key: S-7 -> scenario-7, a profile scenario P-sign-in -> profile-sign-in.
 const scenKey = (id) => (String(id).startsWith('P-') ? `profile-${String(id).slice(2)}` : `scenario-${String(id).replace(/^S-/i, '')}`);
 const heals = rows(join(work, 'HEALS.md')).map(([utc, test, ac, build, , , basis]) => ({ utc, test, ac, build, basis }));
@@ -190,18 +206,19 @@ const causeOf = (e, judged = true) => (!CAUSE_OF.has(e?.verdict ?? e?.status) ? 
 // The agent's reading of a run (docs/reporting.md → The agent's analysis) and its one sentence on a
 // result that is not a pass: text only, each field capped.
 const txt = (x, n = 600) => (typeof x === 'string' && x.trim() ? x.trim().slice(0, n) : null);
+const said = (x, n) => { const t = txt(x, n); return t && !quotesRequest(t) ? t : null; }; // the agent's own text
 const CERTAINTY = new Set(['high', 'medium', 'low']);
 const analysisOf = (v) => {
   const a = v?.analysis;
   if (!a || typeof a !== 'object') return null;
-  const problems = (Array.isArray(a.problems) ? a.problems : []).filter((p) => p && typeof p === 'object' && txt(p.title, 120)).slice(0, 20).map((p) => ({
-    title: txt(p.title, 120), cause: CAUSES.includes(p.cause) ? p.cause : null, certainty: CERTAINTY.has(p.certainty) ? p.certainty : null,
+  const problems = (Array.isArray(a.problems) ? a.problems : []).filter((p) => p && typeof p === 'object' && said(p.title, 120)).slice(0, 20).map((p) => ({
+    title: said(p.title, 120), cause: CAUSES.includes(p.cause) ? p.cause : null, certainty: CERTAINTY.has(p.certainty) ? p.certainty : null,
     about: (Array.isArray(p.about) ? p.about : []).map((r) => txt(r, 80)).filter((r) => r && /^(#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)( (AC|IN|EX)-\d+)?$/.test(r)).slice(0, 30),
-    what: txt(p.what), where: txt(p.where), why: txt(p.why), fix: txt(p.fix) }));
-  const out = { summary: txt(a.summary, 1200), problems, next: txt(a.next) };
+    what: said(p.what), where: said(p.where), why: said(p.why), fix: said(p.fix) }));
+  const out = { summary: said(a.summary, 1200), problems, next: said(a.next) };
   return out.summary || problems.length || out.next ? out : null;
 };
-const whyOf = (e) => (CAUSE_OF.has(e?.verdict) || e?.verdict === 'inconclusive' || e?.verdict === 'healed' || e?.verdict === 'superseded' ? txt(e.explanation) ?? txt(e.note) : null);
+const whyOf = (e) => (CAUSE_OF.has(e?.verdict) || e?.verdict === 'inconclusive' || e?.verdict === 'healed' || e?.verdict === 'superseded' ? said(e.explanation) ?? said(e.note) : null);
 const withWhy = (o, w) => (w ? { ...o, why: w } : o); // only a result the agent explained carries `why`
 const WORST = ['regression', 'failed', 'needs-review', 'flaky', 'inconclusive', 'partial', 'blocked', 'not-testable', 'passed', 'verified'];
 const rank = (v) => (WORST.includes(v) ? WORST.indexOf(v) : WORST.length);
@@ -689,6 +706,7 @@ let used = 0; let dropped = 0; let seq = 0; let sharpN = 0; let sharpDropped = 0
 const base = Buffer.byteLength(JSON.stringify({ items, pages, nights, runs, modules, design, findings, found, features, maintenance }, (k, v) => (k.startsWith('_') ? undefined : v)))
   + Buffer.byteLength(read(join(HERE, 'catalog', 'viewer.html')) ?? '');
 const budget = Math.max(0, Math.min(IMG_BUDGET, PAGE_MAX - base));
+if (quoted.size) notes.push(`${quoted.size} text(s) of the agent's analysis left out: they repeat a scenario request or name its requester`);
 if (budget < IMG_BUDGET) notes.push(`image budget cut to ${Math.round(budget / 1024)} KiB by the size of the data`);
 const embed = (path, sharp = false) => {
   if (!path || !existsSync(path)) return null;

@@ -449,4 +449,15 @@ assert "causes: given, by default, none" '([.runs[] | select(.type == "issue" an
 jq '.acs += [{issue:42,id:"IN-1",verdict:"needs-review"}]' "$W/regression/c2/verdicts.json" > "$W/v.tmp" && mv "$W/v.tmp" "$W/regression/c2/verdicts.json"
 node "$SCRIPTS/catalog.mjs" >/dev/null; data="$(page_data)"
 assert "a night's causes" '([.runs[] | select(.type == "regression" and .build == "c2" and .verdict != "environment")][0].entries | map(.key + ":" + (.cause // "-")) | sort) == ["issue-42/AC-1:-","issue-42/IN-1:test"]' "$data"
+# The agent's text never carries a scenario's request or its requester (docs/catalog.md → Never): a field
+# that repeats 6 words in a row of a request, or names a requester or thread, is dropped, and a note says so.
+jq '.acs[0].explanation = "The requester asked: please test the upload, my boss asked. EXPLAIN-QUOTE-CANARY"
+  | .analysis.summary = "Asked by U0SECRETUSER. EXPLAIN-WHO-CANARY" | .analysis.problems[0].why = "The new build moved it."' "$W/regression/c2/verdicts.json" > "$W/v.tmp" && mv "$W/v.tmp" "$W/regression/c2/verdicts.json"
+out="$(node "$SCRIPTS/catalog.mjs")"; data="$(page_data)"; html="$(cat "$W/catalog/index.html")"
+for secret in EXPLAIN-QUOTE-CANARY EXPLAIN-WHO-CANARY U0SECRETUSER "my boss asked"; do
+  case "$html" in (*"$secret"*) echo "  a request's words or its requester reached the page in the agent's text: $secret"; FAILED=1;; esac
+done
+assert "the agent's text that quotes a request is dropped, the rest kept, a note says so" '[.runs[] | select(.type == "regression" and .build == "c2" and .verdict != "environment")][0]
+  | (.analysis.summary == null and .analysis.problems[0].why == "The new build moved it." and ([.entries[] | select(.key == "issue-42/AC-1")][0] | has("why") | not))' "$data"
+assert "a note counts the dropped texts" '.notes | any(test("^2 text\\(s\\) of the agent.s analysis left out"))' "$out"
 exit $FAILED

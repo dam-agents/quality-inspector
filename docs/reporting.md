@@ -103,9 +103,8 @@ first thing the report and the dashboard show. The badges and the counts say *wh
   "next": "Ask the profile's owner for a GitHub sandbox account, or retire the scenario."}
 ```
 
-- `summary` — two to four sentences: what ran, the result, and why it needs a person — or that it
-  does not ("All 12 test cases are unchanged."). It names the top verdict's reason: a night that is
-  `needs-review` says which result or signal made it so.
+- `summary` — two to four sentences: what ran, the result, and why it needs a person, or that it
+  does not. A `needs-review` night names the result or signal that made it so.
 - `problems[]` — one per problem, not per criterion: three blocked criteria with one reason are one
   problem whose `about` names all three (`#N AC-k`, `#N IN-k`, `#N EX-k`, `S-k AC-j`, `P-<slug> AC-j`).
   Each verdict that is not a pass is in one problem. Empty when all passed. Most important first.
@@ -125,10 +124,10 @@ first thing the report and the dashboard show. The badges and the counts say *wh
     another reason is possible), `low` (a hypothesis to examine).
 - `next` — the one action a person should do first, or `null` when nothing waits on a person.
 
-Write it last, from the final verdicts, in ASD-STE100 (below), each field at most 600 characters.
-It goes on the dashboard, which the operator may share: never a credential or a token (the builder
-refuses the page), a scenario's request words or its requester, a security finding, the operator
-conversation, or the contents of `work/LESSONS.md`. Product text you quote stays verbatim.
+Write it last, from the final verdicts, in ASD-STE100 (below). It goes on the dashboard, which the
+operator may share: never a credential (the builder refuses the page), a scenario's request words or
+its requester (the builder drops that field), a security finding, the operator conversation or
+`work/LESSONS.md`.
 
 **Artifact text is ASD-STE100** (Simplified Technical English). Every sentence a reader sees in an
 artifact — a report, the dashboard, an evidence page, a found issue's body — and every text you
