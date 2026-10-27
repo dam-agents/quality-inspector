@@ -22,7 +22,7 @@ confirmed before writing files.
 | 7 | Further accounts, by the contract's role names: `member`, `viewer` (only a truly read-only user), `outsider` (The owner account, below); whether the product must change to create them | more `credentials.users` / `E2E_USER_<ROLE>_*` |
 | 8 | First-run screens (terms, a setup wizard, a tour) and how to skip them | values, or a `SKILL.md` note |
 | 9 | Where product data lives — what `reset` must wipe | the engine (release + PVCs), or `bin/env reset` |
-| 10 | Every outside service the product calls, and whether a stand-in exists (a model provider: a mock, or the agent's lent model) | `SKILL.md` → cannot do; a `config` key with a working default |
+| 10 | Every outside service the product calls, and whether a stand-in exists (a model provider: a mock, or the agent's lent model) | `SKILL.md` → cannot do; a `config` key with a working default; `expected_requests` for a request the UI still sends and the install answers with an error (method, path pattern, status) |
 | 11 | Every host `up` and `versions` download from | `egress` |
 | 12 | Extra surfaces that would expose the implementation; the product's npm scopes or package names | `boundary`, `boundary.packages` |
 | 13 | Root, commands, memory a fresh install with two builds' images needs | `requires` |

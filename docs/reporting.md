@@ -188,7 +188,11 @@ product text and the frozen criteria stay verbatim.
   (`open_questions`) has its own section above the criteria. A click on a screenshot, or "Enlarge"
   under a video, shows it larger over the page (`scripts/lib/media-viewer.mjs`: zoom in and out,
   fit, 1:1; the video keeps playing). No screenshot links its file: a strict viewer opens an empty
-  page for it, and the browser downloads the published file.
+  page for it, and the browser downloads the published file. When `report.json` gives the video's
+  start and each step's start and duration, the video pauses for 1.5 s after each step and names
+  the step under it (and in the viewer's bar), so a reader sees the result of a short step; a
+  checkbox turns the pauses off, and a click on a step in the step list plays the video from that
+  step. Without these times the video plays as recorded.
 - `media/` — the copied videos, screenshots and traces it links to by relative paths, which
   only `report-media.mjs` turns into the published file `publish.html` (**Delivery** step 1).
 - `comment.md` — the short issue comment, with the literal `EVIDENCE_LINK` to replace.
