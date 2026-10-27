@@ -254,15 +254,20 @@ re-run. Never retry within the same run.
      "evidence kept by the agent") with that marker and one
      machine copy next to it:
      `<!-- <marker_prefix>-data {"issue":42,"ac":"…","build":"…","verdicts":{"AC-1":"verified"}} -->`.
-   - When the worklist entry had `retest_label_present`, remove that label after a
-     successful post (`github.sh unlabel <n>`).
 3. **Spec feedback comment** (`spec_feedback: enabled`, independent of
    `issue_comments`): when `spec-feedback-<ac_hash>.md` exists, post it (`github.sh comment`) once per
    `ac_hash` with the marker `<!-- <marker_prefix>-spec issue=<n> ac=<ac_hash> -->`,
    checked the same way right before posting. Tone: a short, specific suggestion to the
    author; no verdict language.
-4. Both artifact and comments disabled → the report stays in `work/` and is summarized in
-   the chat UI; still set `reported`.
+4. **Retest label** (always, independent of `issue_comments`): when the worklist entry has
+   `retest_label_present` (an `issues_due` or a `reports_due` entry), remove that label
+   with `github.sh unlabel <n>` after the steps above. The pre-flight checks the label
+   before the row's `ac_hash`, so a label left on the issue re-tests it on every run. A
+   failed removal is a failed delivery: the row stays `report_pending`, and the next run
+   delivers again (the pre-flight puts a `report_pending` row in `reports_due` before it
+   looks at the label).
+5. Both artifact and comments disabled → the report stays in `work/` and is summarized in
+   the chat UI; still remove the retest label (step 4) and set `reported`.
 
 Every delivery outcome is one event (`report_delivered` / `report_failed`, with
 `issue=<n>` and the surface), beside the ledger pair of each send — [logging.md](logging.md).

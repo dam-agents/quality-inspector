@@ -231,8 +231,9 @@ file → keep its values, show them once, and ask only for the keys it lacks. As
 2. **`target_repo`** — ask, write it, and validate with `bash "$HOME/scripts/github.sh" check`.
    Tick item 3.
 3. **`issue_comments`** — ask, default `disabled`. State the consequence: comments are
-   posted publicly on the target's issues as the connection's account, and the
-   connection then needs write access to issues. Tick item 5.
+   posted publicly on the target's issues as the connection's account. The connection
+   needs write access to issues either way: every finished test removes the retest label.
+   Tick item 5.
 4. **`spec_feedback`** — ask, default `disabled`: when an issue has nothing testable, the
    agent comments a suggested observable "Done when" on it (public, as the connection's
    account).
