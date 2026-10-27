@@ -21,6 +21,7 @@
 
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
+import { VIEWER_CSS, VIEWER_HTML } from './lib/media-viewer.mjs';
 
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 const runsRoot = process.env.QI_RUNS_ROOT ?? join(work, 'suite', '.e2e', 'runs');
@@ -360,16 +361,17 @@ const page = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta n
 <style>:root{--bg:#fff;--fg:#1b1f24;--dim:#57606a;--line:#d0d7de;--card:#f6f8fa}@media (prefers-color-scheme:dark){:root{--bg:#0d1117;--fg:#e6edf3;--dim:#8d96a0;--line:#30363d;--card:#161b22}}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}main{max-width:1000px;margin:0 auto;padding:16px}
 section{border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin:16px 0;background:var(--card)}figure{margin:12px 0}img,video{max-width:100%;border:1px solid var(--line);border-radius:6px;background:#fff}
-figcaption,.dim{color:var(--dim);font-size:13px}code{font-size:13px;overflow-wrap:anywhere}</style></head><body><main>
+figcaption,.dim{color:var(--dim);font-size:13px}code{font-size:13px;overflow-wrap:anywhere}
+${VIEWER_CSS}</style></head><body><main>
 <h1>${esc(title)}</h1><p class="dim">Build ${esc(build)}. A black-box test of the running product found ${many ? 'these problems' : 'this problem'}.</p>
 ${problems.map((p) => `<section><h2>${esc(p.ref)} — ${esc(p.title)}</h2>
 <p>${p.what.map((x) => esc(x.replace(/\\(.)/g, '$1'))).join('<br>')}</p>
 <p><b>The correct function</b> — source: ${esc(String(p.expected.source).replace(/\\(.)/g, '$1'))}.<br>${gwt(p.expected).map((x) => esc(x.replace(/\*\*/g, ''))).join('<br>')}</p>
 <p><b>Steps to reproduce</b></p><ol>${p.repro.map((s) => `<li>${esc(s.replace(/\\(.)/g, '$1'))}</li>`).join('')}</ol>${p.lastOk ? `<p class="dim">${esc(p.lastOk)}</p>` : ''}
 ${p.media.map((m) => (m.kind === 'video' ? `<figure><video controls preload="metadata" src="${esc(m.src)}"></video><figcaption>${esc(m.caption)}</figcaption></figure>`
-    : `<figure><a href="${esc(m.src)}"><img src="${esc(m.src)}" alt="${esc(m.caption)}" loading="lazy"></a><figcaption>${esc(m.caption)}</figcaption></figure>`)).join('\n')}
+    : `<figure><img src="${esc(m.src)}" alt="${esc(m.caption)}" loading="lazy"><figcaption>${esc(m.caption)}</figcaption></figure>`)).join('\n')}
 </section>`).join('\n')}
-</main></body></html>
+</main>${VIEWER_HTML}</body></html>
 `;
 writeFileSync(join(dir, 'evidence', 'index.html'), page);
 

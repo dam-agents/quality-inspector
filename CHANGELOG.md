@@ -7,6 +7,15 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.35.1 — 2026-10-27
+
+**Upgrade:**
+Nothing to run — the reports and the evidence pages of found issues rebuild themselves on the next run.
+A click on a screenshot, or "Enlarge" under a video, shows it larger over the page, with zoom in
+and out, fit and 1:1. A screenshot no longer links its file, which opened an empty page in a
+strict viewer and downloaded the file after a reload. A report made before this version keeps the
+old behavior.
+
 ## 3.35.0 — 2026-10-26
 
 **Upgrade:**
