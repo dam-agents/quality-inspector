@@ -2,9 +2,16 @@
 // issue-draft.mjs). A click on a screenshot, or "Enlarge" under a video, shows it larger over the
 // page, with zoom in and out, "fit" and "1:1". Never a link to the media file: a strict viewer
 // opens an empty page for it, and the published file downloads (docs/reporting.md → Delivery).
-// The video moves into the viewer and back, so it keeps playing where it was.
+// The video moves into the viewer and back, so it keeps playing where it was. A video whose steps
+// have times (render-report.mjs, data-steps: [start, end] seconds per step) pauses for a moment
+// after each step and names the step it shows, so a short step is not missed; a checkbox turns
+// the pauses off, and a click on a step in the step list plays the video from that step.
 
 export const VIEWER_CSS = `main figure img{cursor:zoom-in}
+.vbar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:6px 0 0;font-size:13px}
+.vbar .enlarge{margin:0}.vbar label{display:inline-flex;gap:6px;align-items:center;cursor:pointer;color:var(--dim,#666)}
+.stepnow{flex:1 1 100%;margin:0;min-height:1.5em;font-weight:600;overflow-wrap:anywhere}
+.steps li[data-seek]{cursor:pointer}.steps li[data-seek]:hover{text-decoration:underline}.steps li.now{font-weight:700;background:var(--card,#f3f3f3);outline:1px solid var(--line,#ccc);border-radius:4px}
 .enlarge{margin:6px 0 0;font:600 13px/1.2 system-ui,sans-serif;padding:5px 12px;border-radius:999px;border:1px solid var(--line,#ccc);background:transparent;color:inherit;cursor:pointer}
 #zoom{position:fixed;inset:0;z-index:100;overflow:auto;background:rgba(8,10,14,.94);color:#fff;font:13px/1.4 system-ui,sans-serif}
 #zoom[hidden]{display:none}
@@ -12,6 +19,8 @@ export const VIEWER_CSS = `main figure img{cursor:zoom-in}
 #zoom .bar button{font:600 13px/1.2 system-ui,sans-serif;min-width:34px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;cursor:pointer}
 #zoom .bar button:hover{background:rgba(255,255,255,.18)}
 #zoom .bar .pct{min-width:48px;text-align:center}
+#zoom .bar .now{flex:1 1 260px;font-weight:600;overflow-wrap:anywhere}
+#zoom .bar .now:empty{display:none}
 #zoom .bar .hint{opacity:.7;margin-left:auto}
 #zoom .bar .close{margin-left:8px}
 #zoom .stage{padding:16px}
@@ -20,12 +29,13 @@ export const VIEWER_CSS = `main figure img{cursor:zoom-in}
 #zoom.real .stage>img{cursor:zoom-out}`;
 
 export const VIEWER_HTML = `<div id="zoom" role="dialog" aria-modal="true" aria-label="Larger view" tabindex="-1" hidden>
-<div class="bar"><button type="button" data-z="out" title="Zoom out (−)" aria-label="Zoom out">−</button><span class="pct">100%</span><button type="button" data-z="in" title="Zoom in (+)" aria-label="Zoom in">+</button><button type="button" data-z="fit" title="Fit to the window (0)">Fit</button><button type="button" data-z="real" title="Real size (1)">1:1</button><span class="hint">+ and − zoom. Ctrl and the wheel zoom too. Esc closes.</span><button type="button" class="close" data-z="close">Close ✕</button></div>
+<div class="bar"><button type="button" data-z="out" title="Zoom out (−)" aria-label="Zoom out">−</button><span class="pct">100%</span><button type="button" data-z="in" title="Zoom in (+)" aria-label="Zoom in">+</button><button type="button" data-z="fit" title="Fit to the window (0)">Fit</button><button type="button" data-z="real" title="Real size (1)">1:1</button><span class="now" aria-live="polite"></span><span class="hint">+ and − zoom. Ctrl and the wheel zoom too. Esc closes.</span><button type="button" class="close" data-z="close">Close ✕</button></div>
 <div class="stage"></div></div>
 <script>
 (() => {
-  const z = document.getElementById('zoom'), stage = z.querySelector('.stage'), pct = z.querySelector('.pct');
+  const z = document.getElementById('zoom'), stage = z.querySelector('.stage'), pct = z.querySelector('.pct'), zNow = z.querySelector('.now');
   let el = null, home = null, opener = null, scale = 1, fit = true;
+  const nowOf = new Map();
   const size = () => (el.tagName === 'VIDEO' ? [el.videoWidth || 1280, el.videoHeight || 720] : [el.naturalWidth || 800, el.naturalHeight || 600]);
   const draw = () => {
     if (!el) return;
@@ -45,18 +55,84 @@ export const VIEWER_HTML = `<div id="zoom" role="dialog" aria-modal="true" aria-
     } else {
       el = new Image(); el.alt = src.alt || ''; el.addEventListener('load', draw); el.src = src.currentSrc || src.src;
     }
+    zNow.textContent = nowOf.has(el) ? nowOf.get(el).textContent : '';
     stage.append(el); z.hidden = false; fit = true; draw(); z.focus();
   };
   const close = () => {
     if (!el) return;
     if (home) { el.style.width = ''; home.replaceWith(el); home = null; } else el.remove();
-    el = null; z.hidden = true; z.classList.remove('real');
+    el = null; z.hidden = true; z.classList.remove('real'); zNow.textContent = '';
     if (opener && opener.focus) opener.focus();
   };
+  // A pause after each step: held HOLD ms, AFTER s past the step's end, so its result is on screen.
+  const HOLD = 1500, AFTER = 0.3;
+  for (const v of document.querySelectorAll('main video[data-steps]')) {
+    let marks = null;
+    try { marks = JSON.parse(v.dataset.steps); } catch { /* plays as recorded */ }
+    if (!Array.isArray(marks) || !marks.length) continue;
+    const side = v.closest('.side');
+    const items = side ? [...side.querySelectorAll('ol.steps > li')] : [];
+    // A step's name is its line in the step list, without its duration (span.dim).
+    const name = (i) => {
+      if (!items[i]) return '';
+      const li = items[i].cloneNode(true); li.querySelectorAll('.dim').forEach((d) => d.remove());
+      return li.textContent.replace(/\\s+/g, ' ').trim();
+    };
+    const bar = document.createElement('div'); bar.className = 'vbar';
+    const now = document.createElement('p'); now.className = 'stepnow'; now.setAttribute('aria-live', 'polite');
+    const box = document.createElement('label'); const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = true; box.title = 'The video stops for a moment after each step, so you can see its result.';
+    box.append(cb, 'Pause after each step');
+    bar.append(now, box); v.after(bar); nowOf.set(v, now);
+    let next = 0, timer = 0, shown = '';
+    const holdAt = (i) => Math.min(marks[i][1] + AFTER, (v.duration || Infinity) - 0.05);
+    // held: the video waits in a hold and continues by itself, so the caption says so.
+    const show = (i, done, held) => {
+      const text = i < 0 ? '' : 'Step ' + (i + 1) + ' of ' + marks.length + (done ? (items[i] && items[i].classList.contains('failed') ? ' failed' : ' done') : '') + ': ' + name(i) + (held ? ' — the video continues in a moment' : '');
+      if (text === shown) return;
+      shown = text; now.textContent = text; if (el === v) zNow.textContent = text;
+      items.forEach((li, k) => li.classList.toggle('now', k === i));
+    };
+    const current = () => { const t = v.currentTime; let i = -1; marks.forEach((m, k) => { if (m[0] <= t) i = k; }); return i; };
+    const stop = () => { if (timer) { clearTimeout(timer); timer = 0; } };
+    // After a jump, the next hold is the end of the first step that has not ended yet.
+    const resync = () => { stop(); next = marks.findIndex((m) => m[1] > v.currentTime + 0.01); if (next < 0) next = marks.length; show(current(), false); };
+    // True while the video plays on; a held step pauses it and plays it again after HOLD.
+    const check = () => {
+      if (v.paused || v.ended) return false;
+      if (cb.checked && next < marks.length && v.currentTime >= holdAt(next)) {
+        const i = next++; v.pause(); show(i, true, true);
+        timer = setTimeout(() => { timer = 0; const p = v.play(); if (p && p.catch) p.catch(() => {}); }, HOLD);
+        return false;
+      }
+      show(current(), false);
+      return true;
+    };
+    const tick = () => { if (check()) requestAnimationFrame(tick); };
+    v.addEventListener('play', () => { stop(); requestAnimationFrame(tick); });
+    v.addEventListener('timeupdate', check);
+    v.addEventListener('seeked', resync);
+    v.addEventListener('loadedmetadata', resync);
+    v.addEventListener('ended', () => show(marks.length - 1, true));
+    // The holds that passed while the box was off do not come back when it is on again.
+    cb.addEventListener('change', () => {
+      if (cb.checked) { resync(); return; }
+      if (timer) { stop(); show(current(), false); const p = v.play(); if (p && p.catch) p.catch(() => {}); }
+    });
+    items.forEach((li, i) => {
+      if (!marks[i]) return;
+      li.dataset.seek = ''; li.title = 'Plays the video from this step.';
+      const go = () => { v.currentTime = marks[i][0]; const p = v.play(); if (p && p.catch) p.catch(() => {}); };
+      li.tabIndex = 0; li.addEventListener('click', go);
+      li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+    });
+  }
   for (const v of document.querySelectorAll('main video')) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'enlarge'; b.textContent = '⤢ Enlarge the video';
-    b.addEventListener('click', () => open(v)); v.after(b);
+    b.addEventListener('click', () => open(v));
+    const bar = v.nextElementSibling && v.nextElementSibling.classList.contains('vbar') ? v.nextElementSibling : null;
+    if (bar) bar.insertBefore(b, bar.children[1]); else v.after(b);
     v.addEventListener('dblclick', (e) => { e.preventDefault(); if (!el) open(v); });
   }
   document.addEventListener('click', (e) => {

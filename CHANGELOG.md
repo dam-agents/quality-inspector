@@ -7,6 +7,14 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.40.0 — 2026-10-27
+
+**Upgrade:**
+Nothing to run — the reports rebuild themselves on the next run. A report's video now pauses after
+each step and names it, and a click on a step plays the video from there
+([docs/reporting.md](docs/reporting.md) → **The report**). A report rendered before 3.35.1 opens a
+screenshot as a page of its own; render it again to get the in-page viewer.
+
 ## 3.39.0 — 2026-10-27
 
 **Upgrade:**

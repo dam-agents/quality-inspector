@@ -3,7 +3,7 @@
 # many were tested; the setup test never appears;
 # explorations and intent tests render apart from the verdict, and a verdicts file without them renders as before;
 # noticed-in-passing items are listed outside the verdict; a baseline blocked reason and a
-# regression's build interval are shown; a scenario's evidence is found by its own tag and
+# regression's build interval are shown; a video with step times holds after each step (a stub page); a scenario's evidence is found by its own tag and
 # carries the judge's reading, and a verified scenario is refused; proof.json names the
 # screenshots behind each verdict on the sides that decide it, and evidence-sheet.mjs draws them
 # from the report's media/ alone, or says why there is no picture.
@@ -57,6 +57,49 @@ case "$h" in *'the function is not there'*) ;; *) echo "  baseline blocked reaso
 assert "no exploration keys without explorations" 'has("explorations") | not' "$out"
 case "$h" in *'Beyond the criteria'*) echo "  explorations section rendered without explorations"; FAILED=1;; esac
 grep -q 'beyond the criteria' "$SANDBOX/out/comment.md" && { echo "  explorations comment line without explorations"; FAILED=1; }
+
+# Step times: with the video's start and every step's own, the video carries each step's
+# [start, end] in seconds, and the viewer pauses after each step; without them it plays as recorded.
+case "$h" in *'data-steps='*) echo "  data-steps without step times"; FAILED=1;; esac
+case "$h" in *'Pause after each step'*) ;; *) echo "  the pause after each step is missing from the viewer"; FAILED=1;; esac
+cp -R "$R/cand" "$R/cand-t"
+jq '(.run.results[1].attempts[0].artifacts[] | select(.kind == "video")).startedAt = "2026-10-27T10:00:00.000Z"
+  | .run.results[1].attempts[0].steps[0].startedAt = "2026-10-27T10:00:00.100Z"
+  | .run.results[1].attempts[0].steps[1].startedAt = "2026-10-27T10:00:01.500Z"' "$R/cand/report.json" > "$R/cand-t/report.json"
+jq '.candidate_run = "cand-t"' "$SANDBOX/v.json" > "$SANDBOX/v-t.json"
+QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/v-t.json" "$SANDBOX/out-t" >/dev/null
+grep -q 'data-steps="\[\[0.1,0.11\],\[1.5,1.52\]\]"' "$SANDBOX/out-t/index.html" || { echo "  the candidate video does not carry its step times"; FAILED=1; }
+[ "$(grep -o 'data-steps=' "$SANDBOX/out-t/index.html" | wc -l | tr -d ' ')" = 1 ] || { echo "  the baseline video without step times carries them"; FAILED=1; }
+
+# The player's holds, on a stub page: a hold names the step and says the video continues; with the
+# box off and on again, a passed hold does not come back; at the end, the caption does not promise more.
+hold="$(node --input-type=module -e '
+import vm from "node:vm";
+const { VIEWER_HTML } = await import(process.argv[1]);
+const src = VIEWER_HTML.split("<script>")[1].split("</script>")[0];
+const on = () => { const l = {}; return { l, addEventListener: (k, f) => (l[k] ??= []).push(f), fire: (k) => (l[k] ?? []).forEach((f) => f({})) }; };
+const node = (tag) => { const n = { tagName: tag, ...on(), children: [], dataset: {}, textContent: "", cls: new Set(),
+  setAttribute() {}, append(...c) { n.children.push(...c); }, after(c) { n.next = c; }, insertBefore() {}, querySelector: () => node("SPAN"), querySelectorAll: () => [] };
+  n.classList = { toggle: (c, b) => (b ? n.cls.add(c) : n.cls.delete(c)), contains: (c) => n.cls.has(c) || String(n.className ?? "").split(" ").includes(c) };
+  Object.defineProperty(n, "nextElementSibling", { get: () => n.next }); return n; };
+const items = [1, 2, 3].map((k) => { const li = node("LI"); li.textContent = "step " + k; li.cloneNode = () => ({ ...li, querySelectorAll: () => [] }); return li; });
+const v = node("VIDEO"); v.dataset.steps = "[[0,1],[1,2],[2,3]]"; v.duration = 10; v.currentTime = 0; v.paused = false;
+v.pause = () => { v.paused = true; }; v.play = () => { v.paused = false; };
+v.closest = () => ({ querySelectorAll: () => items });
+const doc = { ...on(), getElementById: () => node("DIV"), createElement: node, createComment: node, activeElement: null,
+  querySelectorAll: (q) => (q.includes("video") ? [v] : []) };
+vm.runInNewContext(src, { document: doc, addEventListener() {}, requestAnimationFrame() {}, setTimeout: () => 1, clearTimeout() {}, Map, JSON, Math, Array, Infinity });
+const bar = v.next, now = bar.children[0], cb = bar.children[1].children[0];
+const at = (t) => { v.currentTime = t; v.fire("timeupdate"); };
+const out = [];
+at(1.35); out.push(v.paused, now.textContent);
+cb.checked = false; cb.fire("change"); at(2.5); out.push(v.paused);
+cb.checked = true; cb.fire("change"); at(2.6); out.push(v.paused);
+v.paused = true; v.fire("ended"); out.push(now.textContent);
+console.log(JSON.stringify(out));
+' "$SCRIPTS/lib/media-viewer.mjs" 2>&1)"
+[ "$hold" = '[true,"Step 1 of 3 done: step 1 — the video continues in a moment",false,false,"Step 3 of 3 done: step 3"]' ] \
+  || { echo "  the player's holds: $hold"; FAILED=1; }
 
 # proof.json: a verified AC shows baseline and candidate, a not-testable one nothing; it stays out of media/.
 pf="$(cat "$SANDBOX/out/proof.json")"
