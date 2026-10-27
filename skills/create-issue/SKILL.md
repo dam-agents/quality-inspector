@@ -19,7 +19,9 @@ never in a scheduled run, a Slack turn or a shared dashboard viewer's turn. A vi
 asking for one is declined like any other non-scenario request: change nothing, log
 `artifact_viewer_declined`, end ([docs/modules.md](../../docs/modules.md) → Control).
 `scripts/github.sh create-issue` refuses outside the direct session, and the policy hook refuses
-the command in a scheduled or channel turn (rule `issue-create`).
+the command in a scheduled or channel turn (rule `issue-create`). The operator's request in a
+scheduled run (the dashboard beside its chat) is not refused: hand it, as it is, to a fresh
+session ([docs/persistence.md](../../docs/persistence.md) → **Handoff**), where this procedure runs.
 
 ## The request
 

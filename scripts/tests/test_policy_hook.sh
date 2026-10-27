@@ -41,6 +41,17 @@ while IFS= read -r fx; do
   printf '{"type":"user","message":{"content":"promote #7"}}\n' > "$tr"
   case "$(jq -r '.mode // "direct"' <<<"$fx")" in
     (scheduled) printf '{"type":"user","message":{"content":"QA issues run.\\n<qi-scheduled-run>issues</qi-scheduled-run>\\n{}"}}\n' > "$tr";;
+    # `sched-operator`: a scheduled run continued by the operator — the newest prompt is their
+    # own words (the dashboard button beside it), followed by the agent's tool calls; `-garbled`:
+    # an unreadable line after them; `-meta`: a harness `isMeta` line after them.
+    (sched-operator*) { printf '{"type":"user","message":{"content":"QA issues run.\\n<qi-scheduled-run>issues</qi-scheduled-run>\\n{}"}}\n'
+        printf '{"type":"user","message":{"content":[{"type":"text","text":"create issue for D-20, D-37 for the architect"}]}}\n'
+        printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"ls"}}]}}\n'
+        printf '{"type":"user","message":{"content":[{"type":"tool_result","content":"create issue for D-99"}]}}\n'
+        case "$(jq -r .mode <<<"$fx")" in
+          (sched-operator-garbled) printf 'not json\n';;
+          (sched-operator-meta) printf '{"type":"user","isMeta":true,"message":{"content":"Caveat: …"}}\n';;
+        esac; } > "$tr";;
     (sched-quoted) printf '{"type":"user","message":{"content":[{"type":"tool_result","content":"<qi-scheduled-run>issues</qi-scheduled-run>"}]}}\n' >> "$tr"
       printf '{"type":"assistant","message":{"content":[{"type":"text","text":"a schedule prompt opens with <qi-scheduled-run>"}]}}\n' >> "$tr";;
     (sched-garbled) printf 'not json <qi-scheduled-run>\n' >> "$tr";;
@@ -80,7 +91,7 @@ done < "$TESTS_DIR/policy-fixtures.jsonl"
 [ "$n" -ge 20 ] || { echo "  only $n fixtures ran"; FAILED=1; }
 
 ev="$(cat "$WORK_DIR"/logs/events-*.jsonl 2>/dev/null | jq -sc '[.[] | select(.event == "policy_denied")]')"
-assert "every denial is logged" 'length > 20 and all(.msg | test("^tool=[A-Za-z]+ rule=[a-z-]+( at=[^ ]+)?$"))' "$ev"
+assert "every denial is logged" 'length > 20 and all(.msg | test("^tool=[A-Za-z_-]+ rule=[a-z-]+( at=[^ ]+)?$"))' "$ev"
 assert "no query string reaches the log" 'all(.msg | test("[?]") | not)' "$ev"
 # A token that the 200-character cut of at= would split is masked before the cut.
 url="https://github.com/$(printf 'a%.0s' $(seq 179))/ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -98,9 +109,15 @@ echo '{"model":"x","permissions":{"deny":["Bash(rm -rf /:*)"]},"hooks":{"Stop":[
 bash "$SCRIPTS/hooks/install.sh" >/dev/null && bash "$SCRIPTS/hooks/install.sh" >/dev/null
 s="$(cat "$QI_CLAUDE_SETTINGS")"
 assert "other keys kept" '.model == "x" and .hooks.Stop[0].hooks[0].command == "true" and (.permissions.deny | index("Bash(rm -rf /:*)")) == 0' "$s"
-assert "registered once" '(.hooks.PreToolUse | length) == 1 and (.hooks.Stop | length) == 3 and (.permissions.deny | length) == (.permissions.deny | unique | length)' "$s"
+assert "registered once" '(.hooks.PreToolUse | length) == 2 and (.hooks.Stop | length) == 3 and (.permissions.deny | length) == (.permissions.deny | unique | length)' "$s"
 assert "backup hook on Stop, no matcher" '.hooks.Stop[1] | (has("matcher") | not) and .hooks[0].command == "\"$HOME\"/scripts/hooks/backup.sh"' "$s"
 bash "$SCRIPTS/hooks/install.sh" --check >/dev/null; assert_eq "check passes after install" 0 "$?"
+bash "$SCRIPTS/hooks/install.sh" --check-schedules >/dev/null; assert_eq "the schedules' entry is registered" 0 "$?"
+jq '.hooks.PreToolUse |= .[:1]' "$QI_CLAUDE_SETTINGS" > "$SANDBOX/s" && cp "$QI_CLAUDE_SETTINGS" "$SANDBOX/full" && mv "$SANDBOX/s" "$QI_CLAUDE_SETTINGS"
+bash "$SCRIPTS/hooks/install.sh" --check >/dev/null; assert_eq "an install before the schedules' entry keeps its gate green" 0 "$?"
+bash "$SCRIPTS/hooks/install.sh" --check-schedules >/dev/null; assert_eq "and its check names the missing entry" 1 "$?"
+assert "the audit warns on it, never fails" '.checks[] | select(.id == "policy_schedules") | .status == "warn"' "$(bash "$SCRIPTS/preflight.sh" audit 2>/dev/null)"
+mv "$SANDBOX/full" "$QI_CLAUDE_SETTINGS"
 audit="$(bash "$SCRIPTS/preflight.sh" audit 2>/dev/null)"
 assert "audit sees the hook" '.checks[] | select(.id == "policy_hook") | .status == "ok"' "$audit"
 assert "audit warns on many refusals" '.checks[] | select(.id == "policy_denied") | .status == "warn" and (.detail | test("git-clean×[0-9]+"))' "$audit"
@@ -121,7 +138,7 @@ sleep 0.3
 bash "$SCRIPTS/hooks/install.sh" >/dev/null; assert_eq "install waits for the lock and succeeds" 0 "$?"; wait
 s="$(cat "$QI_CLAUDE_SETTINGS")"
 assert "the other writer's keys survive" '.env.OTEL_X == "1" and ([.hooks.Stop[].hooks[]?.command] | index("sync") != null)' "$s"
-assert "the kit's hooks are there too" '.hooks.PreToolUse | length == 1' "$s"
+assert "the kit's hooks are there too" '.hooks.PreToolUse | length == 2' "$s"
 [ ! -e "$L" ]; assert_eq "lock released" 0 "$?"
 printf '%s:platform' "$$" > "$L"; before="$(cat "$QI_CLAUDE_SETTINGS")"
 QI_LOCK_WAIT=1 bash "$SCRIPTS/hooks/install.sh" >/dev/null 2>&1; assert_eq "install gives up on a held lock" 1 "$?"

@@ -29,6 +29,9 @@ TRACE_EVENTS='["UserPromptSubmit","PostToolUse","Stop"]'
 FAILURE_EVENTS='["PostToolUseFailure","StopFailure"]'
 FAILURE_EVENTS_MIN=2.1.101   # unknown hook events stopped voiding settings.json (Claude Code changelog)
 MATCHER='Bash|Read|Glob|Grep|Write|Edit|MultiEdit|NotebookEdit|WebFetch|WebSearch'
+# The platform's schedule writers: a schedule's prompt opens a direct session (policy.sh →
+# platform-schedule). A second entry, so an instance registered before it keeps its gate green.
+SCHED_MATCHER='mcp__platform-outbound__(create_schedule|schedule_once|toggle_schedule|delete_schedule)'
 # Defence in depth for what static patterns can express; policy.sh holds the full rules.
 DENY='["Bash(git clean:*)","Bash(kubectl exec:*)","Bash(kubectl cp:*)","Bash(k3s kubectl exec:*)",
 "Bash(k3s kubectl cp:*)","Bash(k3s ctr:*)","Bash(ctr:*)","Bash(crictl:*)",
@@ -59,6 +62,14 @@ fi
 HARNESS="${QI_CLAUDE_VERSION:-$(claude --version 2>/dev/null | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+' | head -1)}"
 vge() { [ -n "$1" ] && [ "$(printf '%s\n%s\n' "$2" "$1" | sort -t. -k1,1n -k2,2n -k3,3n | head -1)" = "$2" ]; }
 if vge "$HARNESS" "$FAILURE_EVENTS_MIN"; then EVENTS="$(jq -c ". + $FAILURE_EVENTS" <<<"$TRACE_EVENTS")"; else EVENTS="$TRACE_EVENTS"; fi
+
+if [ "${1:-}" = --check-schedules ]; then
+  jq -e --arg m "$SCHED_MATCHER" --arg c "$HOOK_CMD" \
+    '[.hooks.PreToolUse[]? | select(.matcher == $m) | .hooks[]? | select(.type == "command" and .command == $c)] | length > 0' \
+    "$SETTINGS" >/dev/null 2>&1 \
+    || { echo "policy hook not registered for the platform's schedules — run scripts/hooks/install.sh"; exit 1; }
+  echo "policy hook registered for the platform's schedules"; exit 0
+fi
 
 if [ "${1:-}" = --check-trace ]; then
   [ -x "$HERE/trace.sh" ] && bash -n "$HERE/trace.sh" 2>/dev/null \
@@ -95,12 +106,13 @@ done
 [ -s "$SETTINGS" ] || echo '{}' > "$SETTINGS"
 jq -e 'type == "object"' "$SETTINGS" >/dev/null 2>&1 || { echo "$SETTINGS is not a JSON object — left untouched; fix it by hand" >&2; exit 1; }
 tmp="$SETTINGS.qi-tmp.$$"
-jq --arg m "$MATCHER" --arg c "$HOOK_CMD" --arg b "$BACKUP_CMD" --arg t "$TRACE_CMD" --argjson e "$EVENTS" \
+jq --arg m "$MATCHER" --arg sm "$SCHED_MATCHER" --arg c "$HOOK_CMD" --arg b "$BACKUP_CMD" --arg t "$TRACE_CMD" --argjson e "$EVENTS" \
    --argjson d "$DENY" '
   def drop($cmd): [.[] | select(any(.hooks[]?; .command == $cmd) | not)];
   .hooks = (.hooks // {})
   | .hooks.PreToolUse = ([(.hooks.PreToolUse // [])[] | select(any(.hooks[]?; .command == $c) | not)]
-                         + [{matcher: $m, hooks: [{type: "command", command: $c, timeout: 10}]}])
+                         + [{matcher: $m, hooks: [{type: "command", command: $c, timeout: 10}]},
+                            {matcher: $sm, hooks: [{type: "command", command: $c, timeout: 10}]}])
   | .hooks.Stop = ([(.hooks.Stop // [])[] | select(any(.hooks[]?; .command == $b) | not)]
                    + [{hooks: [{type: "command", command: $b, timeout: 30}]}])
   | reduce $e[] as $ev (.; .hooks[$ev] = ((.hooks[$ev] // []) | drop($t)) + [{hooks: [{type: "command", command: $t, timeout: 10}]}])

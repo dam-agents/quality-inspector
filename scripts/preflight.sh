@@ -450,6 +450,8 @@ mode_audit() {
   local ph denied n
   ph="$(bash "$SCRIPT_DIR/hooks/install.sh" --check 2>&1)" && check policy_hook ok "$ph" \
     || check policy_hook fail "$ph — run scripts/hooks/install.sh (ONBOARDING.md Step 2e)"
+  ph="$(bash "$SCRIPT_DIR/hooks/install.sh" --check-schedules 2>&1)" && check policy_schedules ok "$ph" \
+    || check policy_schedules warn "$ph (docs/persistence.md → Handoff)"
   # the work backup (docs/persistence.md → Backup & restore): the destination, and nothing left unpushed
   local wb; wb="$(bash "$SCRIPT_DIR/work-backup.sh" check 2>/dev/null)"
   if ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$wb"; then check work_backup warn "not measured"

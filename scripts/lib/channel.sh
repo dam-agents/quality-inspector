@@ -47,6 +47,31 @@ transcript_is_channel() { transcript_prompt_has "${1:-}" '<how-to-respond>' "$AR
 # Precheck's frame).
 transcript_is_scheduled() { transcript_prompt_has "${1:-}" "$SCHEDULED_FRAME"; }
 
+# transcript_operator_words <transcript.jsonl>: prints the text of the session's newest prompt
+# when the operator wrote it — a prompt that holds no frame (a scheduled run continued from the
+# UI, or the operator's own dashboard button beside it) — or fails. A prompt is the same closed
+# set of line shapes as above, `isMeta` lines left out; a line that does not parse is a prompt
+# nobody can read, so after it there are no words (docs/persistence.md → Handoff).
+transcript_operator_words() {
+  local f="${1:-}" out
+  [ -n "$f" ] && [ -r "$f" ] || return 1
+  out="$(jq -Rr --arg s "$SCHEDULED_FRAME" --arg v "$ARTIFACT_VIEWER_FRAME" '
+    (fromjson? // "unparsable") as $l
+    | if ($l | type) != "object" then {bad: true}
+      elif $l.type == "user" and $l.isCompactSummary != true and $l.isMeta != true then
+        ($l.message.content
+         | if type == "string" then {text: .}
+           elif type == "array" and all(.[]; .type != "tool_result") then {text: (map(select(.type == "text") | .text) | join("\n"))}
+           else empty end)
+      elif $l.type == "attachment" and $l.attachment.type == "queued_command" then {text: ($l.attachment.prompt | tostring)}
+      else empty end
+    | tojson' "$f" 2>/dev/null | tail -1 | jq -r --arg s "$SCHEDULED_FRAME" --arg v "$ARTIFACT_VIEWER_FRAME" '
+      select(.bad != true and (.text | type) == "string")
+      | .text | select(contains($s) or contains("<how-to-respond>") or contains($v) | not)' 2>/dev/null)" || return 1
+  [ -n "$out" ] || return 1
+  printf '%s\n' "$out"
+}
+
 # session_transcript: prints the transcript of the session this shell runs in — the
 # CLAUDE_CODE_SESSION_ID file under the Claude config's projects/ — or fails.
 session_transcript() {
