@@ -117,7 +117,8 @@ failure). When the problem shows on it, add:
 
 The report, the dashboard and a found issue draw it as an orange frame, with `saw` in the
 caption. It is the agent's reading of the screen, so it never changes a verdict, and it is not
-drawn where the test's red frame exists. A problem that does not show on a screenshot (an
+drawn where the test's red frame exists. A frame that cannot be drawn (a box off the screenshot)
+is left out with its caption, and the next choice applies. A problem that does not show on a screenshot (an
 absent control, a wrong answer of the API) gets no mark; leave `mark` out.
 
 **The agent's analysis — `analysis`.** Every verdicts file — an issue run's, a scenario run's, a

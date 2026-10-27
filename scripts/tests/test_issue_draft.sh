@@ -150,6 +150,12 @@ first="$(jq -r '.problems[0].media[0].caption' "$dir/draft.json")"
 case "$first" in ('AC-1: the failing check — the red frame shows what the check found') ;; (*) echo "  the test's marked still is not first: $first"; FAILED=1;; esac
 assert_eq "the copy beside the evidence page is framed in red" "230,0,0" "$(pix "$dir/evidence/$(jq -r '.problems[0].media[0].src' "$dir/draft.json")")"
 grep -q '\[mark ' "$dir/body.md" "$dir/evidence/index.html" && { echo "  the mark's geometry reached the draft"; FAILED=1; }
+# A test's frame that cannot be drawn (its box is off the still) claims nothing; the agent's mark is drawn.
+sed 's/\[mark 1,1,4,4\]/[mark 50,50,2,2]/' "$M/report.json" > "$M/r.tmp" && mv "$M/r.tmp" "$M/report.json"
+dir="$(node "$D" '#42 AC-1' | jq -r .dir)"
+jq -r '.problems[0].media[].caption' "$dir/draft.json" | grep -q 'red frame' && { echo "  an undrawn test frame is named in a caption"; FAILED=1; }
+first="$(jq -r '.problems[0].media[0].caption' "$dir/draft.json")"
+case "$first" in ("AC-1: the page — the orange frame is the agent's mark: The Chat control shows.") ;; (*) echo "  an undrawn test frame blocks the agent's mark: $first"; FAILED=1;; esac
 jq '.run.results[0].attempts[0].steps |= .[:1]' "$M/report.json" > "$M/r.tmp" && mv "$M/r.tmp" "$M/report.json"
 dir="$(node "$D" '#42 AC-1' | jq -r .dir)"
 first="$(jq -r '.problems[0].media[0].caption' "$dir/draft.json")"

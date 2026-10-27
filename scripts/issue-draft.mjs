@@ -105,6 +105,15 @@ function testSteps(src, id) {
 // The evidence of one test in one run: the error, the screenshots by their step, the video.
 // The newest bad result's still carries its mark (scripts/lib/shot-mark.mjs): the test's own,
 // else the verdicts entry's agent mark (`agentMark`) on the `<id>:` still or the shot it names.
+// The framed copy of a PNG still in s.mark.png; false (and s unmarked) when nothing was drawn.
+function frame(s, boxes, rgb) {
+  if (extname(s.path).toLowerCase() !== '.png') return false;
+  let out = null;
+  try { out = drawMarks(readFileSync(s.path), boxes, rgb); } catch { out = null; }
+  if (!out) return false;
+  s.mark = { png: out.png };
+  return true;
+}
 function runEvidence(label, tags, id = null, agentMark = null) {
   const dir = join(runsRoot, label);
   const report = readJson(join(dir, 'report.json'));
@@ -126,13 +135,15 @@ function runEvidence(label, tags, id = null, agentMark = null) {
   const video = arts.find((a) => a.kind === 'video' && a.path);
   // The criterion's still, the failing moments, then the last steps — at most MAX_SHOTS.
   const ok = shots.filter((s) => s.path);
-  for (const s of ok) if (s.boxes?.length) { s.mark = { boxes: s.boxes }; s.caption = `${s.caption} — the red frame shows what the check found`; }
+  // A still is marked, and its caption names the frame, only when the frame was drawn: a box off
+  // the screenshot or a PNG the decoder cannot read leaves it plain, and the agent's mark is tried.
+  for (const s of ok) if (s.boxes?.length && frame(s, s.boxes)) s.caption = `${s.caption} — the red frame shows what the check found`;
   const boxes = agentBoxes(agentMark);
   if (boxes.length && agentMark?.side !== 'baseline' && !ok.some((s) => s.mark)) {
     const want = typeof agentMark.shot === 'string' && agentMark.shot ? agentMark.shot : `${id}:`;
     const s = ok.find((x) => x.still && x.caption.startsWith(want));
     const saw = one(agentMark.saw, 200);
-    if (s) { s.mark = { boxes, rgb: AGENT_RGB }; s.caption = `${s.caption} — the orange frame is the agent's mark${saw ? `: ${saw}` : ''}`; }
+    if (s && frame(s, boxes, AGENT_RGB)) s.caption = `${s.caption} — the orange frame is the agent's mark${saw ? `: ${saw}` : ''}`;
   }
   const pick = [...ok.filter((s) => s.mark), ...ok.filter((s) => s.still), ...ok.filter((s) => s.failed), ...ok.slice(-3)];
   return {
@@ -333,8 +344,7 @@ for (const p of problems) {
     const ext = extname(s.path) || '.png';
     const dst = `media/${slug(p.ref)}-${k + 1}${ext}`;
     try {
-      const out = s.mark && ext === '.png' ? drawMarks(readFileSync(s.path), s.mark.boxes, s.mark.rgb) : null;
-      if (out) writeFileSync(join(dir, 'evidence', dst), out.png); else copyFileSync(s.path, join(dir, 'evidence', dst));
+      if (s.mark?.png) writeFileSync(join(dir, 'evidence', dst), s.mark.png); else copyFileSync(s.path, join(dir, 'evidence', dst));
       p.media.push({ src: dst, caption: s.caption, kind: 'image' }); images++;
     } catch { notes.push(`${p.ref}: could not copy ${basename(s.path)}`); }
   }

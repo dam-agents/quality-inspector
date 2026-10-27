@@ -625,13 +625,15 @@ const areas = [...new Set([...items.map((i) => i.area).filter(Boolean), ...pages
 // test marked (`<id>: the failing check [mark …]`, docs/test-authoring.md → The mark of a failed
 // check) wins; else the entry's agent mark (docs/reporting.md → The mark) is drawn on the still its
 // `shot` names, or on the AC still. The framed copy is cached in thumbs/ as <key>.mark-<hash>.png.
+// A frame that cannot be drawn (a box off the still, a PNG the decoder cannot read) gives null, and
+// the next choice is tried; the plain AC still never is the failing check's own still.
 const markCache = new Set();
 function framed(item, src, boxes, by, saw) {
   const h = createHash('sha256').update(`${src}\n${JSON.stringify(boxes)}\n${by}`).digest('hex').slice(0, 10);
   const dst = join(thumbsDir, `${slug(item.key)}.mark-${h}.png`);
   if (mtime(dst) < mtime(src)) {
     let out = null; try { out = drawMarks(readFileSync(src), boxes, by === 'agent' ? AGENT_RGB : undefined); } catch { /* left unmarked */ }
-    if (!out) return src;
+    if (!out) return null;
     mkdirSync(thumbsDir, { recursive: true }); writeFileSync(`${dst}.tmp`, out.png); renameSync(`${dst}.tmp`, dst);
   }
   markCache.add(dst); item.marked = by; item.mark_saw = by === 'agent' ? said(saw, 300) : null;
@@ -652,11 +654,13 @@ function stillSource(item) {
     };
     const shots = (att.steps ?? []).filter((s) => s.api === 'app.screenshot').map((s) => ({ ...splitMark(s.label), file: fileOf(s) })).filter((s) => s.file);
     const tested = shots.find((s) => s.label.startsWith(`${item.id}:`) && s.boxes.length);
-    if (tested) return framed(item, tested.file, tested.boxes, 'test');
-    const still = shots.find((s) => s.label.startsWith(`${item.id}:`));
+    const byTest = tested ? framed(item, tested.file, tested.boxes, 'test') : null;
+    if (byTest) return byTest;
+    const still = shots.find((s) => s.label.startsWith(`${item.id}:`) && !s.boxes.length);
     const boxes = agentBoxes(mark);
     const named = boxes.length && mark?.side !== 'baseline' ? (typeof mark.shot === 'string' && mark.shot ? shots.find((s) => s.label.startsWith(mark.shot)) : still) : null;
-    if (named) return framed(item, named.file, boxes, 'agent', mark.saw);
+    const byAgent = named ? framed(item, named.file, boxes, 'agent', mark.saw) : null;
+    if (byAgent) return byAgent;
     if (still) return still.file;
   }
   return null;

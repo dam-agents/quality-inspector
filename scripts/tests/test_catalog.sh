@@ -491,4 +491,14 @@ jq 'del(.acs[0].mark)' "$W/issues/42/verdicts-abc-c1.json" > "$W/v.tmp" && mv "$
 node "$SCRIPTS/catalog.mjs" >/dev/null; data="$(page_data)"
 assert "no mark: the plain still" '(.items[] | select(.key == "issue-42/AC-1") | .marked == null)' "$data"
 ls "$W/catalog/thumbs" | grep -q '\.mark-' && { echo "  a framed copy without its mark was kept"; FAILED=1; }
+# A test's frame that cannot be drawn (its box is off the still): the agent's mark, else the plain still.
+cat > "$W/suite/.e2e/runs/cand/report.json" <<'J'
+{"run":{"results":[{"tags":["issue-42","ac-1"],"status":"failed","attempts":[{"artifacts":[{"id":"1","kind":"screenshot","path":"a/s1.png"},{"id":"2","kind":"screenshot","path":"a/s2.png"}],
+ "steps":[{"api":"app.screenshot","label":"AC-1: the page","artifacts":["1"]},{"api":"app.screenshot","label":"AC-1: the failing check [mark 50,50,2,2]","artifacts":["2"]}]}]}]}}
+J
+node "$SCRIPTS/catalog.mjs" >/dev/null; data="$(page_data)"
+assert "an undrawn test frame: the plain still, not marked" '(.items[] | select(.key == "issue-42/AC-1") | .marked == null)' "$data"
+jq '.acs[0].mark = {box: {x: 1, y: 1, w: 4, h: 4}, saw: "The Chat control shows."}' "$W/issues/42/verdicts-abc-c1.json" > "$W/v.tmp" && mv "$W/v.tmp" "$W/issues/42/verdicts-abc-c1.json"
+node "$SCRIPTS/catalog.mjs" >/dev/null; data="$(page_data)"
+assert "an undrawn test frame: the agent's mark is tried" '(.items[] | select(.key == "issue-42/AC-1") | .marked == "agent")' "$data"
 exit $FAILED
