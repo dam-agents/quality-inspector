@@ -169,6 +169,11 @@ case "$h" in *'<img onerror'*) echo "  signal text not escaped"; FAILED=1;; esac
 [ -f "$SANDBOX/rout/media/signal-1-settings.png" ] || { echo "  signal screenshot not copied"; FAILED=1; }
 [ -f "$SANDBOX/rout/proof.json" ] && { echo "  a regression run's report wrote proof.json"; FAILED=1; }
 
+# Regression mode: a reworked criterion has its own badge.
+echo '{"mode":"regression","candidate":"c2","candidate_run":"cand","verdict":"unchanged","context":{"previous":"c1","issues":[]},"acs":[{"issue":42,"id":"AC-1","name":"n","then":"t","verdict":"reworked","explanation":"#3810 replaces the channel ID field"}]}' > "$SANDBOX/rw.json"
+QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/rw.json" "$SANDBOX/rwout" >/dev/null
+grep -q 'UI changed · steps rewritten' "$SANDBOX/rwout/index.html" || { echo "  the reworked badge is missing"; FAILED=1; }
+
 # Regression mode: a confirmed regression's build interval and the interface diff.
 cat > "$SANDBOX/r2.json" <<'J'
 {"mode":"regression","candidate":"c2","candidate_run":"cand","verdict":"regression",

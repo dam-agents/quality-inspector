@@ -448,6 +448,16 @@ assert "causes: given, by default, none" '([.runs[] | select(.type == "issue" an
 # A night's entry: its own cause, else a regression is product and a needs-review test.
 jq '.acs += [{issue:42,id:"IN-1",verdict:"needs-review"}]' "$W/regression/c2/verdicts.json" > "$W/v.tmp" && mv "$W/v.tmp" "$W/regression/c2/verdicts.json"
 node "$SCRIPTS/catalog.mjs" >/dev/null; data="$(page_data)"
+# A night of only reworked tests: its counts and its top verdict.
+printf '2026-10-14T03:00:00Z ran candidate=c5 unchanged=0 relearned=0 healed=0 reworked=1 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n' >> "$W/REGRESSION.log"
+node "$SCRIPTS/catalog.mjs" >/dev/null; rdata="$(page_data)"
+assert "a reworked night: its count and top verdict" '[.runs[] | select(.type == "regression" and .build == "c5")][0] | .counts.reworked == 1 and .verdict == "reworked"' "$rdata"
+# The repair rule of the viewer: a test cause repairs and does not highlight a bug issue; product and
+# environment causes, or an open proposal, give no repair.
+rp="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const f=(s.match(/^function repairOf\([\s\S]*?^}$/m)||[""])[0];eval(f);
+const r=(...a)=>{const x=repairOf(...a);return (x.repair?"R":"-")+(x.hotBug?"B":"-")};
+process.stdout.write([r(true,"test",true,false),r(true,"unknown",true,false),r(true,"product",true,false),r(true,"environment",true,false),r(true,"test",true,true),r(true,"test",false,false),r(false,"test",true,false)].join(" "))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "repair rule: test, unknown, product, environment, open proposal, no file, passing" "R- RB -B -- -- -- --" "$rp"
 assert "a night's causes" '([.runs[] | select(.type == "regression" and .build == "c2" and .verdict != "environment")][0].entries | map(.key + ":" + (.cause // "-")) | sort) == ["issue-42/AC-1:-","issue-42/IN-1:test"]' "$data"
 # The agent's text never carries a scenario's request or its requester (docs/catalog.md → Never): a field
 # that repeats 6 words in a row of a request, or names a requester or thread, is dropped, and a note says so.

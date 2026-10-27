@@ -79,6 +79,14 @@ out="$(M sweep)"
 assert "sweep: the drift that is gone is resolved, the one that stays is not" ".resolved == [\"$d61\"]" "$out"
 assert "the drifting test's row stays open" "[.proposals[] | select(.state == \"open\") | .id] | index(\"$d62\") != null" "$(M list)"
 
+# A rework row (a step before the block the agent could not rewrite alone): the night that absorbs the
+# test (reworked) resolves it, a test only named elsewhere does not.
+r61="$(M open '#61 AC-1' --kind rework --build c5 --proposal review --basis-file "$(B '#3810: the channel is bound in the chat client')" | jq -r .id)"
+r62="$(M open '#62 AC-1' --kind rework --build c5 --proposal rewrite --basis-file "$(B '#3810: the Channel ID field is gone')" | jq -r .id)"
+out="$(M sweep --absorbed '#61 AC-1')"
+assert "sweep: an absorbed test resolves its rework row only" ".resolved == [\"$r61\"]" "$out"
+assert "sweep: a passed-unchanged test resolves its rework row" ".resolved == [\"$r62\"]" "$(M sweep --unchanged '#62')"
+
 printf '| M-1 | #42 AC-1 | drift | c4 | x | heal | open | 2026-10-25T00:00:00Z | - |\n' >> "$W/MAINTENANCE.md"
 assert "check: a duplicate id is a problem" '.ok == false' "$(M check)"
 exit $FAILED

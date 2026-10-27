@@ -94,6 +94,12 @@ assert "--fix with fix_label; an earlier issue named" '.labels == ["qa:found","a
 
 # A run by hand: each criterion's raw result, written under work/reruns/<test>/.
 mkdir -p "$R/rerun-issue-42-c3-1200"
+# A reworked night counts as the last pass before the failure.
+mkdir -p "$W/regression/c2r"
+echo '{"mode":"regression","candidate":"c2r","generated_utc":"2026-10-08T03:00:00Z","acs":[{"issue":42,"id":"AC-1","verdict":"reworked"}]}' > "$W/regression/c2r/verdicts.json"
+rdir="$(node "$D" '#42 AC-1' | jq -r .dir)"
+grep -q 'The test passed last on build `c2r`' "$rdir/body.md" || { echo "  a reworked night is the last pass"; FAILED=1; }
+rm -rf "$W/regression/c2r"
 cp "$R/issue-42-candidate/report.json" "$R/rerun-issue-42-c3-1200/report.json"
 node "$SCRIPTS/rerun.mjs" rerun-issue-42-c3-1200 '#42' >/dev/null 2>&1; assert_eq "rerun: --build is required" 2 "$?"
 out="$(node "$SCRIPTS/rerun.mjs" rerun-issue-42-c3-1200 '#42 AC-1' --build c3)"

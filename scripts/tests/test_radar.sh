@@ -94,6 +94,15 @@ assert "no match: no candidate" '.due[2].candidates == []' "$out"
 assert "an alias and a control together; a quarantined test counts; shared chrome (Save) does not" \
   '.due[3].candidates | map(.test) == ["#42 AC-1","S-7"] and .[0].score == 0.9 and .[1].score == 0.75 and .[1].tier == "quarantined"' "$out"
 assert "a new entry carries its text and lint, never more" '.due[0] | has("title") and has("body") and (.injection_suspect == false) and (has("url") | not)' "$out"
+# A test's own step string the map does not show: named by a completed issue (radar.mjs issues).
+printf "await app.open('/settings');\nawait screen.getByLabel('Channel ID').fill(x);\n// AC-1 begin\nawait expect(screen.getByText('Connected')).toBeVisible();\n// AC-1 end\n" > "$W/suite/tests/issue-60.e2e.ts"
+jq -nc '{issues:[{number:3810,title:"Slack: link accounts instead of a channel ID",spec:"The Channel ID field is gone; run /dam bind."},{number:3811,title:"Bump a dependency",spec:""},{title:"no number"}]}' > "$SANDBOX/changes.json"
+iout="$(R issues "$SANDBOX/changes.json")"
+assert "issues: a step string names the test, outside its blocks; no candidate, no entry" \
+  '[.issues[] | .issue] == [3810] and .issues[0].candidates[0] == {"test":"#60","tier":"regression","score":0.5,"reasons":[{"via":"step","term":"Channel ID"}]}' "$iout"
+echo '{"error":"x"}' > "$SANDBOX/changes-err.json"
+R issues "$SANDBOX/changes-err.json" >/dev/null 2>&1; assert_eq "issues: a failed changes.sh is exit 2" 2 "$?"
+rm -f "$W/suite/tests/issue-60.e2e.ts"
 assert "since: 14 days back with no ledger" '.since | test("^20[0-9-]{8}T[0-9:]{8}Z$")' "$(R since)"
 assert "the cap: the first over it and every later one wait" '[.due[].pr] == [101] and .deferred == 4' "$(QI_RADAR_MAX=1 R scan "$SANDBOX/prs.json")"
 R scan "$SANDBOX/nothing.json" >/dev/null 2>&1; assert_eq "scan of no listing: exit 2" 2 "$?"

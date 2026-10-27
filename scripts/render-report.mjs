@@ -176,7 +176,7 @@ if (runs.explore) runs.explore.side = 'explore';
 const VERDICT = {
   verified: ['Verified', 'ok'], failed: ['Failed', 'bad'], partial: ['Partial', 'warn'],
   inconclusive: ['Inconclusive', 'warn'], blocked: ['Blocked', 'muted'], 'not-testable': ['Not testable', 'muted'],
-  unchanged: ['Unchanged', 'ok'], relearned: ['UI changed · steps re-learned', 'ok'], healed: ['UI changed · check repaired', 'warn'],
+  unchanged: ['Unchanged', 'ok'], relearned: ['UI changed · steps re-learned', 'ok'], healed: ['UI changed · check repaired', 'warn'], reworked: ['UI changed · steps rewritten', 'warn'],
   superseded: ['Superseded by a change', 'muted'], regression: ['Regression', 'bad'], 'needs-review': ['Needs review', 'warn'],
   flaky: ['Flaky', 'warn'], 'observed-ok': ['Observed OK', 'ok'], observation: ['Observation', 'warn'], passed: ['Passed', 'ok'],
   critical: ['Critical', 'bad'], high: ['High', 'bad'], medium: ['Medium', 'warn'], low: ['Low', 'muted'], info: ['Info', 'muted'],

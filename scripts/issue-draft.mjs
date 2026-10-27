@@ -61,10 +61,10 @@ const notes = [];
 const VERDICT = {
   failed: 'the check failed', regression: 'a regression: the test passed before and fails now', 'needs-review': 'the nightly test failed, and a person must examine it',
   flaky: 'the test passes and fails on the same build', observation: 'the exploration found a possible problem', blocked: 'the test did not get to its check',
-  inconclusive: 'inconclusive', partial: 'partial', verified: 'verified', passed: 'passed', unchanged: 'unchanged', healed: 'repaired after a UI change',
+  inconclusive: 'inconclusive', partial: 'partial', verified: 'verified', passed: 'passed', unchanged: 'unchanged', healed: 'repaired after a UI change', reworked: 'steps rewritten after a product change',
 };
 const BAD = new Set(['failed', 'regression', 'needs-review', 'flaky', 'observation', 'blocked']);
-const OK = new Set(['verified', 'passed', 'unchanged', 'relearned', 'healed', 'observed-ok']);
+const OK = new Set(['verified', 'passed', 'unchanged', 'relearned', 'healed', 'reworked', 'observed-ok']);
 
 function parseCriteria(text, id) {
   if (!text) return null;

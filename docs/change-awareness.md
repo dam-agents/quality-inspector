@@ -52,6 +52,7 @@ node "$HOME/scripts/iface-snapshot.mjs" <candidate> "$HOME/work/inventory/<candi
 node "$HOME/scripts/iface-diff.mjs" work/inventory/<previous>/iface.json work/inventory/<candidate>/iface.json > <ctx>/iface.json
 bash "$HOME/scripts/changes.sh" <previous> <candidate> > <ctx>/changes.json
 node "$HOME/scripts/impact.mjs" <ctx>/diff.json --iface <ctx>/iface.json work/suite/tests/{issue,scenario,profile}-*.e2e.ts > <ctx>/impact.json
+node "$HOME/scripts/radar.mjs" issues <ctx>/changes.json > <ctx>/issue-hits.json
 ```
 
 (Source `work/env/credentials.env` for the map's sign-in.) `<ctx>` is one run's own: a nightly run
@@ -59,13 +60,19 @@ and an operator's "what changed since <build>?" never share a file (never `-t`: 
 `$TMPDIR`). `rm -rf <ctx>` when the run ends. `impact.mjs` names, per test,
 every changed page or control it opens or mentions — and every removed command, flag,
 endpoint or response field it names — and whether the hit is inside an AC or IN block (frozen, [intent.md](intent.md));
-`maintenance.mjs predict` turns it into proposals ([maintenance.md](maintenance.md) → **Predicted from the change context**). With no
+`maintenance.mjs predict` turns it into proposals ([maintenance.md](maintenance.md) → **Predicted from the change context**).
+`radar.mjs issues` pairs each completed issue with the recurring tests its text names — a feature,
+a page, a control, or a quoted string of a test's own steps (a field label, a dialog title) — by the
+Change radar's matching ([radar.md](radar.md) → Matching): `{"issues": [{issue, title, candidates}]}`.
+A candidate is a lead, never a verdict: it names the issue a failing step's rework rests on
+([triage.md](triage.md) → **Reworking the steps before a block**). With no
 map of `<previous>` (first run, lost volume), the UI diff is skipped (pass `none` in its
 place) and the run says so — the triage then leans on the issues alone.
 
 Then, before replaying, read it once as a whole and write down — in the run's notes — a
-one-line expectation per impacted test: *"#101 AC-1 checks the API keys tab, which the
-map shows renamed to Access tokens; #4552 says the analytics report gets a share link"*.
+one-line expectation per impacted or issue-named test: *"#101 AC-1 checks the API keys tab, which the
+map shows renamed to Access tokens; #4552 says the analytics report gets a share link; #3810
+replaces the channel ID field that P-slack-bind fills before AC-1"*.
 The triage ([triage.md](triage.md)) compares outcomes against these expectations.
 
 ## Coverage

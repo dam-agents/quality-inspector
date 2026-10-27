@@ -97,13 +97,14 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
    (`issue-<n>-ex`) are never replayed in this version ([explorations.md](explorations.md)).
 6. **Triage** every result that is not plain `unchanged` per [triage.md](triage.md):
    re-run without cache, look, check the context, decide, heal or retire where the rules
-   allow. Re-run every healed file strictly. Every `needs-review`, `superseded`, quarantine and
-   third heal in a month is a proposal ([maintenance.md](maintenance.md) → What opens a proposal).
+   allow, rework the steps before a block ([triage.md](triage.md) → **Reworking the steps before a
+   block**). Re-run every healed or reworked file strictly. Every `needs-review`, `superseded`, quarantine,
+   failed rework and third heal in a month is a proposal ([maintenance.md](maintenance.md) → What opens a proposal).
 7. **Report**: write `work/regression/<candidate>/verdicts.json` with `"mode": "regression"`
    — one entry per criterion that was not `unchanged`, each with `issue`, `id`, `name`,
    `quote` (from the criteria file), `then`, `verdict` (the category), `cause` for a `regression`, `needs-review`, `flaky` or
    `blocked` ([triage.md](triage.md) → **Cause**), `explanation`, `because_issue` when an issue explains
-   it, `heal` `{from, to}` for a repair, `regressed_between` `{from, to, builds_between}`
+   it, `heal` `{from, to}` for a repair (a `reworked` one: the replaced and the new step), `regressed_between` `{from, to, builds_between}`
    for a confirmed regression, and `before_shot` (the previous map's screenshot of the
    page). Add `context` `{previous, window, issues[{number,title}], ui_diff, iface_diff, signals}`
    (`ui_diff`, `iface_diff`: the diffs' `--md` text; `signals`: `{console_errors_new,
@@ -117,10 +118,10 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
    [reporting.md](reporting.md) → Delivery (artifact only, its reference in
    `work/regression/<candidate>/artifact.id`; regression runs never comment).
    The run's top verdict is `regression` if any criterion is, else `needs-review` if any
-   criterion or signal is, else `healed`, `relearned` or `unchanged`. Then
-   `maintenance.mjs sweep` with the night's `unchanged`, `relearned` and `healed` tests and `--built`
+   criterion or signal is, else `healed`, `reworked`, `relearned` or `unchanged`. Then
+   `maintenance.mjs sweep` with the night's `unchanged`, `relearned`, `healed` and `reworked` tests and `--built`
    ([maintenance.md](maintenance.md) → Closing by itself).
-8. Append `<ISO> ran candidate=<c> unchanged=<n> relearned=<n> healed=<n> needs_review=<n> superseded=<n> flaky=<n> regression=<n> blocked=<n> drift=<n>`
+8. Append `<ISO> ran candidate=<c> unchanged=<n> relearned=<n> healed=<n> reworked=<n> needs_review=<n> superseded=<n> flaky=<n> regression=<n> blocked=<n> drift=<n>`
    to `work/REGRESSION.log` — the pre-flight keys "already tested" and
    `previous_candidate` on `ran candidate=`.
 9. `env.sh unlock regression`. Summary in the chat UI: regressions first, each with its
