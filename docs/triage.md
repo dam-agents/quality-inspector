@@ -34,9 +34,10 @@ Each `regression`, `needs-review`, `flaky` or `blocked` entry also names its `ca
 always `product`), `test` (a `needs-review` that fails on the previous build too, a check the UI
 moved away from, a `flaky` wait), `environment` (the product as a whole did not work on this
 night: a `blocked` with no answer, a smoke failure after the start). A night whose environment
-failed before any test ran is no entry. A `test` cause that stops a test before its frozen block is
-never left as `blocked`: it goes to **Reworking the steps before a block** (below): its `environment.json` stands for all
-([regression.md](regression.md) step 2). Without the evidence for a cause, leave it out.
+failed before any test ran is no entry: its `environment.json` stands for all
+([regression.md](regression.md) step 2). A `test` cause that stops a test before its frozen block
+is never left as `blocked`: it goes to **Reworking the steps before a block** (below). Without the
+evidence for a cause, leave it out.
 
 ## Order of work per failing or judged test
 
@@ -125,11 +126,10 @@ Then save the file and append a `work/HEALS.md` row with `old_hash` = `new_hash`
 `rework: #<n> "<quoted sentence>"` (or the UI-map line). A rework counts as a heal for the
 three-heals rule above. Its verdicts entry: `reworked`, `cause: null`, `because_issue`.
 
-Any rule fails → the verdict stays honest — `needs-review` (`cause` `test`), or `blocked` (`cause`
-`environment`) when the environment stopped the strict run — and the agent opens a `rework`
-proposal ([maintenance.md](maintenance.md)): `rewrite` with the rewritten file as its diff when one
-is ready, else `review`, the basis naming what is missing (*"#3810: the channel is bound in the
-chat client — no product surface"*). For a profile scenario (`P-<slug>`) the report also tells the
+Any rule fails → `needs-review` (`cause` `test`), or `blocked` (`cause` `environment`) when the
+environment stopped the strict run, and a `rework` proposal ([maintenance.md](maintenance.md) →
+What opens a proposal), its basis naming what is missing (*"#3810: the channel is bound in the chat
+client — no product surface"*). For a profile scenario (`P-<slug>`) the report also tells the
 product team what its profile must give the test.
 
 ## Flaky tests and quarantine

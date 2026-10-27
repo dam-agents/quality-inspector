@@ -1279,6 +1279,13 @@ function renderTray() {
       h('div', { class: 'row' }, copyBox(cmd, 'Report them as one bug issue…', `${ENT.bug[1]} Report ${picked.length} problem${picked.length === 1 ? '' : 's'} as one bug issue`)),
       FIX_LABEL ? h('div', { class: 'row' }, copyBox(`${cmd} for the architect`, '… and give it to the software architect…', `${ENT.bug[1]} Report them as one bug issue for the software architect (label "${FIX_LABEL}")`)) : null]));
 }
+// A failing test case's repair and bug actions (docs/catalog.md → Maintenance): "Repair this test"
+// unless the cause is the product or the environment or a proposal is open; the bug issue is the
+// highlighted action unless the cause is the test or the environment.
+function repairOf(bad, cause, testable, proposals) {
+  return { repair: testable && bad && cause !== 'product' && cause !== 'environment' && !proposals,
+    hotBug: bad && cause !== 'test' && cause !== 'environment' };
+}
 // Manage a test case: run it, retest its issue, promote or demote it, report it, put it in a collection.
 function itemActions(i) {
   const out = [];
@@ -1290,9 +1297,10 @@ function itemActions(i) {
   if (i.kind !== 'exploration' && i.origin.kind !== 'scenario') out.push(action(`${ENT.issue[1]} Test the full issue again`, 'A full issue run: the agent tests each acceptance criterion on the new build and on the last release, and makes a new report with video and screenshots.', `test ${r}`));
   if (i.kind !== 'exploration' && ['promotable', 'exploratory', 'quarantined'].includes(i.tier)) out.push(action('🌙 Promote it into the nightly regression', 'After this, the test runs each night on the newest build. Before the agent does this, it shows you the test and its criteria.', `promote ${r}`));
   const cause = causeKey(i.latest, i.verdict && i.verdict.cause);
-  if (i.file && i.kind !== 'exploration' && bad && cause !== 'product' && cause !== 'environment' && !maintOf(i).length) out.push(action('🔧 Repair this test', 'The agent finds the step that does not work on the current build and the change that explains it. It writes the steps again; the check stays as it is. If it cannot, it opens a maintenance proposal. It shows you the result.', `repair ${r} ${str(i.id)}`, cause === 'test'));
+  const rp = repairOf(bad, cause, !!i.file && i.kind !== 'exploration', maintOf(i).length > 0);
+  if (rp.repair) out.push(action('🔧 Repair this test', 'The agent finds the step that does not work on the current build and the change that explains it. It writes the steps again; the check stays as it is. If it cannot, it opens a maintenance proposal. It shows you the result.', `repair ${r} ${str(i.id)}`, cause === 'test'));
   if (i.kind !== 'exploration' && i.tier === 'regression') out.push(action('Demote it', 'This removes the test from the nightly regression. The catalog keeps the test case and its history.', `demote ${r}`));
-  out.push(...issueActions(problemRef(i), bad && cause !== 'test' && cause !== 'environment'));
+  out.push(...issueActions(problemRef(i), rp.hotBug));
   const member = i.kind !== 'exploration' ? `${r} ${str(i.id)}` : r;
   const inp = h('input', { type: 'text', list: 'qi-colls', placeholder: 'collection name, for example Upload', 'aria-label': 'Collection name' });
   inp.addEventListener('input', () => inp.setCustomValidity(''));
