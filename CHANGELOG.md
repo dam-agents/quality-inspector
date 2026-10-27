@@ -19,6 +19,15 @@ the next run. Changed:
    not count: the criterion is `blocked`, and the new verdicts-file field `error_at_check` quotes
    the message in the report.
 
+## 3.35.1 — 2026-10-27
+
+**Upgrade:**
+Nothing to run — the reports and the evidence pages of found issues rebuild themselves on the next run.
+A click on a screenshot, or "Enlarge" under a video, shows it larger over the page, with zoom in
+and out, fit and 1:1. A screenshot no longer links its file, which opened an empty page in a
+strict viewer and downloaded the file after a reload. A report made before this version keeps the
+old behavior.
+
 ## 3.35.0 — 2026-10-26
 
 **Upgrade:**

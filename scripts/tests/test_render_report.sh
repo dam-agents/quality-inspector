@@ -40,7 +40,8 @@ out="$(QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/v.json" "$S
 assert "two videos, two screenshots" '.videos == 2 and .screenshots == 2' "$out"
 h="$(cat "$SANDBOX/out/index.html")"
 case "$h" in *'<a href="https://github.com/acme/widgets/issues/42"'*'#42</a> AC-1 — renamed'*) ;; *) echo "  an AC does not link its source issue"; FAILED=1;; esac
-case "$h" in *'id="zoom"'*'Click the image to fit it to the window'*) ;; *) echo "  the full-size image viewer is missing"; FAILED=1;; esac
+case "$h" in *'id="zoom"'*'data-z="in"'*'Enlarge the video'*) ;; *) echo "  the in-page viewer of screenshots and videos is missing"; FAILED=1;; esac
+case "$h" in *'target="_blank"'*|*'<a href="media/'*'<img'*) echo "  a screenshot links its file (a strict viewer opens an empty page, the file downloads)"; FAILED=1;; esac
 case "$h" in *'From the source</b> “A renamed project keeps its tasks.”'*) ;; *) echo "  an AC does not quote its source"; FAILED=1;; esac
 case "$h" in *'Open questions (1)'*'Q-1'*'Does an editor rename a project?'*'the owner renames it'*'an editor renames it'*) ;; *) echo "  the open questions are missing"; FAILED=1;; esac
 case "$h" in *'<video controls'*'poster="media/'*) ;; *) echo "  no video with a poster"; FAILED=1;; esac
