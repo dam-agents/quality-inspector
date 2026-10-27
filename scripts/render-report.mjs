@@ -185,10 +185,14 @@ const SEVERITY = { info: 'muted', minor: 'warn', major: 'bad' };
 const sevBadge = (x) => (x ? `<span class="badge ${SEVERITY[x] ?? 'muted'}">${esc(x)}</span>` : '');
 const BLOCKED = {
   absent: 'On the baseline, the test stopped before the check because the function is not there. This is the red of red-green.',
-  environment: 'On the baseline, the test stopped before the check because of a problem in the environment. This is not a red. The criterion stays inconclusive.',
-  model: 'On the baseline, the test stopped before the check because an agent step failed. This is not a red. The criterion stays inconclusive.',
-  setup: 'On the baseline, the test stopped before the check in the test setup. This is not a red. The criterion stays inconclusive.',
+  environment: 'On the baseline, the test stopped before the check because of a problem in the environment. This is not a red, so the test cannot prove the change.',
+  model: 'On the baseline, the test stopped before the check because an agent step failed. This is not a red, so the test cannot prove the change.',
+  setup: 'On the baseline, the test stopped before the check in the test setup. This is not a red, so the test cannot prove the change.',
 };
+// docs/reporting.md → Error at the check: a pass on a screen that shows an error does not count.
+const errorAtCheck = (x) => (x.error_at_check
+  ? `<p class="note"><b>Error at the check:</b> “${esc(x.error_at_check)}”. The screen showed this error when the test made its check, so the pass does not count.</p>`
+  : '');
 const badge = (x) => { const [t, c] = VERDICT[x] ?? [x, 'muted']; return `<span class="badge ${c}">${esc(t)}</span>`; };
 const stateBadge = (s) => {
   const map = { passed: 'ok', pass: 'ok', flaky: 'warn', failed: 'bad', fail: 'bad', 'timed-out': 'bad', interrupted: 'muted', skipped: 'muted' };
@@ -287,6 +291,7 @@ ${intents.map((x) => `
   <header><h3>${esc(x.id)} — ${esc(x.name)}${(x.covers ?? []).length ? ` <span class="dim">covers ${esc([x.covers].flat().join(', '))}</span>` : ''}</h3>${badge(x.verdict)}</header>
   <blockquote>${x.goal ? `<b>Goal</b> ${esc(x.goal)}<br>` : ''}${x.given ? `<b>Given</b> ${esc(x.given)}<br>` : ''}${x.when ? `<b>When</b> ${esc(x.when)}<br>` : ''}${x.then ? `<b>Then</b> ${esc(x.then)}` : ''}</blockquote>
   ${x.note ? `<p class="note">${esc(x.note)}</p>` : ''}
+  ${errorAtCheck(x)}
   ${x.baseline_blocked_reason ? `<p class="dim">${BLOCKED[x.baseline_blocked_reason] ?? `On the baseline, the test stopped before the check (${esc(x.baseline_blocked_reason)}).`}</p>` : ''}
   ${x.testable === false ? '' : `<div class="sides">${sideHtml(`Candidate ${v.candidate ?? ''}`, x.cand)}${sideHtml(`Baseline ${v.baseline ?? ''}`, x.base)}</div>`}
 </article>`).join('')}
@@ -343,6 +348,7 @@ const acHtml = acs.map((ac) => `
   ${ac.explanation ? `<p><b>Why:</b> ${esc(ac.explanation)}${ac.because_issue ? ` — see #${esc(ac.because_issue)}` : ''}</p>` : ''}
   ${ac.heal ? `<p class="dim">Check repaired: <code>${esc(ac.heal.from)}</code> → <code>${esc(ac.heal.to)}</code></p>` : ''}
   ${ac.judge ? `<p class="dim"><b>Judge:</b> ${ac.judge.agree ? 'agrees' : 'disagrees'}${ac.judge.call && ac.judge.call !== '-' ? ` (${esc(ac.judge.call)})` : ''} — ${esc(ac.judge.reason)}</p>` : ''}
+  ${errorAtCheck(ac)}
   ${ac.baseline_blocked_reason ? `<p class="dim">${BLOCKED[ac.baseline_blocked_reason] ?? `On the baseline, the test stopped before the check (${esc(ac.baseline_blocked_reason)}).`}</p>` : ''}
   ${ac.regressed_between ? `<p><b>Regressed between</b> <code>${esc(ac.regressed_between.from)}</code> (passes) and <code>${esc(ac.regressed_between.to)}</code> (fails)${ac.regressed_between.builds_between == null ? '' : ac.regressed_between.builds_between ? ` · ${esc(ac.regressed_between.builds_between)} untested builds in between` : ' · adjacent builds'}</p>` : ''}
   ${ac.testable === false ? '' : `<div class="sides">${sideHtml(`${regression ? 'Build' : 'Candidate'} ${v.candidate ?? ''}`, ac.cand)}${regression
