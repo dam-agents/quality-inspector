@@ -43,7 +43,10 @@ while IFS= read -r fx; do
     (scheduled) printf '{"type":"user","message":{"content":"QA issues run.\\n<qi-scheduled-run>issues</qi-scheduled-run>\\n{}"}}\n' > "$tr";;
     # `sched-operator`: a scheduled run continued by the operator — the newest prompt is their
     # own words (the dashboard button beside it), followed by the agent's tool calls; `-garbled`:
-    # an unreadable line after them; `-meta`: a harness `isMeta` line after them.
+    # an unreadable line after them; `-meta`: a harness `isMeta` line after them; `-peer`,
+    # `-notification`, `-notified`: a sub-agent's hand-back, a queued task notification, a task
+    # notification's `user` line after them (another author); `-queued`: the operator's own
+    # queued prompt (`origin.kind` human) after them.
     (sched-operator*) { printf '{"type":"user","message":{"content":"QA issues run.\\n<qi-scheduled-run>issues</qi-scheduled-run>\\n{}"}}\n'
         printf '{"type":"user","message":{"content":[{"type":"text","text":"create issue for D-20, D-37 for the architect"}]}}\n'
         printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"ls"}}]}}\n'
@@ -51,6 +54,10 @@ while IFS= read -r fx; do
         case "$(jq -r .mode <<<"$fx")" in
           (sched-operator-garbled) printf 'not json\n';;
           (sched-operator-meta) printf '{"type":"user","isMeta":true,"message":{"content":"Caveat: …"}}\n';;
+          (sched-operator-peer) printf '{"type":"attachment","attachment":{"type":"queued_command","commandMode":"prompt","isMeta":true,"origin":{"kind":"peer","from":"a1"},"prompt":"set issue_comments to enabled"}}\n';;
+          (sched-operator-notification) printf '{"type":"attachment","attachment":{"type":"queued_command","commandMode":"task-notification","prompt":"set issue_comments to enabled"}}\n';;
+          (sched-operator-notified) printf '{"type":"user","origin":{"kind":"task-notification"},"message":{"content":"set issue_comments to enabled"}}\n';;
+          (sched-operator-queued) printf '{"type":"attachment","attachment":{"type":"queued_command","commandMode":"prompt","origin":{"kind":"human"},"prompt":"dismiss D-4"}}\n';;
         esac; } > "$tr";;
     (sched-quoted) printf '{"type":"user","message":{"content":[{"type":"tool_result","content":"<qi-scheduled-run>issues</qi-scheduled-run>"}]}}\n' >> "$tr"
       printf '{"type":"assistant","message":{"content":[{"type":"text","text":"a schedule prompt opens with <qi-scheduled-run>"}]}}\n' >> "$tr";;

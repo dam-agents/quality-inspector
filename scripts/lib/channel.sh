@@ -50,21 +50,31 @@ transcript_is_scheduled() { transcript_prompt_has "${1:-}" "$SCHEDULED_FRAME"; }
 # transcript_operator_words <transcript.jsonl>: prints the text of the session's newest prompt
 # when the operator wrote it — a prompt that holds no frame (a scheduled run continued from the
 # UI, or the operator's own dashboard button beside it) — or fails. A prompt is the same closed
-# set of line shapes as above, `isMeta` lines left out; a line that does not parse is a prompt
-# nobody can read, so after it there are no words (docs/persistence.md → Handoff).
+# set of line shapes as above, a harness `isMeta` line with no origin left out. Only a closed
+# set of prompts is the operator's: a `user` line whose `origin` is absent or of kind `human`,
+# and a `queued_command` with `commandMode` `prompt`, no `isMeta` and such an origin. Any other
+# prompt — a sub-agent's hand-back (`peer`), a task notification — has another author, and so
+# has a line that does not parse or does not have the shape: after one there are no words
+# (docs/persistence.md → Handoff).
 transcript_operator_words() {
   local f="${1:-}" out
   [ -n "$f" ] && [ -r "$f" ] || return 1
-  out="$(jq -Rr --arg s "$SCHEDULED_FRAME" --arg v "$ARTIFACT_VIEWER_FRAME" '
+  out="$(jq -Rr '
+    def human: .origin == null or ((.origin | type) == "object" and .origin.kind == "human");
     (fromjson? // "unparsable") as $l
-    | if ($l | type) != "object" then {bad: true}
-      elif $l.type == "user" and $l.isCompactSummary != true and $l.isMeta != true then
-        ($l.message.content
-         | if type == "string" then {text: .}
-           elif type == "array" and all(.[]; .type != "tool_result") then {text: (map(select(.type == "text") | .text) | join("\n"))}
-           else empty end)
-      elif $l.type == "attachment" and $l.attachment.type == "queued_command" then {text: ($l.attachment.prompt | tostring)}
-      else empty end
+    | try (
+        if ($l | type) != "object" then {bad: true}
+        elif $l.type == "user" and $l.isCompactSummary != true then
+          ($l.message.content
+           | if type == "string" then {text: .}
+             elif type == "array" and all(.[]; .type != "tool_result") then {text: (map(select(.type == "text") | .text) | join("\n"))}
+             else empty end)
+          | if ($l | human | not) then {bad: true} elif $l.isMeta == true then empty else . end
+        elif $l.type == "attachment" and $l.attachment.type == "queued_command" then
+          if $l.isMeta != true and ($l.attachment | .commandMode == "prompt" and .isMeta != true and human)
+          then {text: ($l.attachment.prompt | tostring)} else {bad: true} end
+        else empty end
+      ) catch {bad: true}
     | tojson' "$f" 2>/dev/null | tail -1 | jq -r --arg s "$SCHEDULED_FRAME" --arg v "$ARTIFACT_VIEWER_FRAME" '
       select(.bad != true and (.text | type) == "string")
       | .text | select(contains($s) or contains("<how-to-respond>") or contains($v) | not)' 2>/dev/null)" || return 1
