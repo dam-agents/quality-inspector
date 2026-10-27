@@ -73,6 +73,25 @@ if [ "${1:-}" = --check-trace ]; then
 fi
 
 mkdir -p "$(dirname "$SETTINGS")" || { echo "cannot create $(dirname "$SETTINGS")" >&2; exit 1; }
+
+# The platform writes this file too: take $SETTINGS.lock (text `<pid>:<word>`, an exclusive create)
+# for the whole read-modify-write, the `{}` bootstrap included, and read only after it is held
+# (dam docs/architecture/starter-kits.md → Kit Writes Into the Agent's Home). Wait up to
+# QI_LOCK_WAIT seconds; break a lock older than 30 s whose holder is gone; release only our own.
+LOCK="$SETTINGS.lock"; LOCK_TEXT="$$:quality-inspector"; tmp=""
+lock_age() { local m; m="$(stat -c %Y "$LOCK" 2>/dev/null || stat -f %m "$LOCK" 2>/dev/null)" || return 1; echo $(( $(date +%s) - m )); }
+release() { [ -z "$tmp" ] || rm -f "$tmp"; [ "$(cat "$LOCK" 2>/dev/null)" = "$LOCK_TEXT" ] && rm -f "$LOCK"; return 0; }
+trap release EXIT
+deadline=$(( $(date +%s) + ${QI_LOCK_WAIT:-10} ))
+until ( set -o noclobber; printf '%s' "$LOCK_TEXT" > "$LOCK" ) 2>/dev/null; do
+  held="$(cat "$LOCK" 2>/dev/null)"; age="$(lock_age)" || continue   # gone between the create and the read: retry
+  hpid="${held%%:*}"
+  if [ "${age:-0}" -gt 30 ] && ! { [ -n "$hpid" ] && [ "$hpid" -eq "$hpid" ] 2>/dev/null && kill -0 "$hpid" 2>/dev/null; }; then
+    [ "$(cat "$LOCK" 2>/dev/null)" = "$held" ] && rm -f "$LOCK"; continue
+  fi
+  [ "$(date +%s)" -lt "$deadline" ] || { echo "$LOCK is held by '$held' — $SETTINGS left untouched; run again" >&2; exit 1; }
+  sleep 0.2
+done
 [ -s "$SETTINGS" ] || echo '{}' > "$SETTINGS"
 jq -e 'type == "object"' "$SETTINGS" >/dev/null 2>&1 || { echo "$SETTINGS is not a JSON object — left untouched; fix it by hand" >&2; exit 1; }
 tmp="$SETTINGS.qi-tmp.$$"
@@ -88,6 +107,7 @@ jq --arg m "$MATCHER" --arg c "$HOOK_CMD" --arg b "$BACKUP_CMD" --arg t "$TRACE_
   | if ($e | index("StopFailure")) then .hooks.StopFailure = ((.hooks.StopFailure // [] | drop($b)) + [{hooks: [{type: "command", command: $b, timeout: 30}]}]) else . end
   | .permissions = (.permissions // {})
   | .permissions.deny = ((.permissions.deny // []) as $have | $have + ($d - $have))' "$SETTINGS" > "$tmp" \
-  && mv -f "$tmp" "$SETTINGS" || { rm -f "$tmp"; echo "merge into $SETTINGS failed" >&2; exit 1; }
+  && mv -f "$tmp" "$SETTINGS" || { echo "merge into $SETTINGS failed" >&2; exit 1; }
+tmp=""; release
 chmod +x "$HERE/policy.sh" "$HERE/backup.sh" "$HERE/trace.sh" 2>/dev/null || true
 echo "policy, backup and trace hooks registered in $SETTINGS (trace: $(jq -r 'join(", ")' <<<"$EVENTS"))"
