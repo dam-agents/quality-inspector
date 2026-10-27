@@ -58,6 +58,19 @@ assert "no exploration keys without explorations" 'has("explorations") | not' "$
 case "$h" in *'Beyond the criteria'*) echo "  explorations section rendered without explorations"; FAILED=1;; esac
 grep -q 'beyond the criteria' "$SANDBOX/out/comment.md" && { echo "  explorations comment line without explorations"; FAILED=1; }
 
+# Step times: with the video's start and every step's own, the video carries each step's
+# [start, end] in seconds, and the viewer pauses after each step; without them it plays as recorded.
+case "$h" in *'data-steps='*) echo "  data-steps without step times"; FAILED=1;; esac
+case "$h" in *'Pause after each step'*) ;; *) echo "  the pause after each step is missing from the viewer"; FAILED=1;; esac
+cp -R "$R/cand" "$R/cand-t"
+jq '(.run.results[1].attempts[0].artifacts[] | select(.kind == "video")).startedAt = "2026-10-27T10:00:00.000Z"
+  | .run.results[1].attempts[0].steps[0].startedAt = "2026-10-27T10:00:00.100Z"
+  | .run.results[1].attempts[0].steps[1].startedAt = "2026-10-27T10:00:01.500Z"' "$R/cand/report.json" > "$R/cand-t/report.json"
+jq '.candidate_run = "cand-t"' "$SANDBOX/v.json" > "$SANDBOX/v-t.json"
+QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/v-t.json" "$SANDBOX/out-t" >/dev/null
+grep -q 'data-steps="\[\[0.1,0.11\],\[1.5,1.52\]\]"' "$SANDBOX/out-t/index.html" || { echo "  the candidate video does not carry its step times"; FAILED=1; }
+[ "$(grep -o 'data-steps=' "$SANDBOX/out-t/index.html" | wc -l | tr -d ' ')" = 1 ] || { echo "  the baseline video without step times carries them"; FAILED=1; }
+
 # proof.json: a verified AC shows baseline and candidate, a not-testable one nothing; it stays out of media/.
 pf="$(cat "$SANDBOX/out/proof.json")"
 assert "proof: the verified AC on both sides, from media/" '.mode == "issue" and .subject == "#42" and (.rows | length) == 1 and .rows[0].id == "AC-1"
