@@ -16,6 +16,16 @@ build. New operator commands for a design finding, also on its card's "Manage" i
 → **5. Recheck**; its files go to `work/design/recheck/`), and `discuss D-<k>[: <question>]` answers
 about it, read-only (→ **6. Discuss**).
 
+## 3.38.3 — 2026-10-27
+
+**Upgrade:**
+Nothing to run — docs are re-read per run. A public report no longer uploads its videos: the
+platform's `/raw` link serves only images inline, so the page carries the videos as data
+([docs/reporting.md](docs/reporting.md) → **Delivery** step 1). A refused served type no longer
+stops the report: `media-urls.json` records it under `refused`, and the page carries its files. A
+report stopped by 3.33.1 (`blocked`) is delivered by the next run with no `unblock`. The rejected
+public video artifacts stay: delete them in the app.
+
 ## 3.38.2 — 2026-10-27
 
 **Upgrade:**
