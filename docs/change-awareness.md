@@ -26,7 +26,8 @@ pull request input is the Change radar's sanitized text, before the build ([rada
    turns two maps into pages added/removed and controls renamed, moved, removed or added —
    including a **likely rename** when one control left and one arrived in exactly the same
    places with unlike text — and the signals new on this build (`console_errors_new`,
-   `failed_requests_new`, `slower_pages`: load above `--perf-factor`, default 2×, and
+   `failed_requests_new` — never one the profile's `expected_requests` names
+   ([profile-contract.md](profile-contract.md)) —, `slower_pages`: load above `--perf-factor`, default 2×, and
    +1000 ms; triage: [triage.md](triage.md) → **Signals no test covers**). Two maps of one
    build diff to nothing; anything it reports is a real change.
 3. **What the product publishes — its CLI and API.** When the profile's `profile.json`

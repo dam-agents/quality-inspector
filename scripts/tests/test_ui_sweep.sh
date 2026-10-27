@@ -20,6 +20,14 @@ assert "default viewports, out under work/design/<build>" '.viewports == ["1440x
 assert "pages × viewports, errored and redirected skipped" '(.pages | length) == 6 and ([.pages[].pattern] | unique) == ["/","/projects/:id"] and ([.skipped[].pattern] == ["/broken","/sso"])' "$p"
 assert "shot per page and viewport" '[.pages[] | select(.viewport=="390x844") | .shot | split("/") | last] == ["root@390x844.png","projects_id@390x844.png"]' "$p"
 assert "base from the map" '.base == "http://localhost:8080"' "$p"
+assert "no expected requests by default" '.expected_requests == []' "$p"
+PJ="$QI_PROFILE_DIR/profile.json"; cp "$PJ" "$SANDBOX/profile.json.orig"
+jq '.expected_requests = [{"method":"GET","path":"/api/slack/install/status","status":404,"why":"the QA install sets no Slack app"},
+  {"method":"GET","path":"/api/*","status":404,"why":"a wildcard"},{"method":"GET","path":"/api/x","status":302,"why":"not an error"},
+  {"method":"GET","path":"/api/y","status":404}]' "$SANDBOX/profile.json.orig" > "$PJ"
+p="$(node "$SCRIPTS/ui-sweep.mjs" "$SANDBOX/inv.json" --build c2 --dry-run)"
+assert "expected requests from the profile; invalid ones left out with a note" '.expected_requests == [{"method":"GET","path":"/api/slack/install/status","status":404}] and ([.notes[] | select(test("expected_requests\\[[123]\\] is invalid"))] | length) == 3' "$p"
+cp "$SANDBOX/profile.json.orig" "$PJ"
 printf -- '- ui_sweep_viewports: 1280x800, 375x667\n' >> "$WORK_DIR/CONFIG.md"
 p="$(node "$SCRIPTS/ui-sweep.mjs" "$SANDBOX/inv.json" --build c2 --dry-run --max-pages 1)"
 assert "viewports from the config, --max-pages" '.viewports == ["1280x800","375x667"] and (.pages | length) == 2 and (.notes | length) == 1' "$p"

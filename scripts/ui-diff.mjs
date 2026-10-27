@@ -3,8 +3,9 @@
 // removed, and per control (heading, nav item, button, tab, field, link) whether it was
 // added, removed, renamed on the same page, or moved to another page; and the page signals
 // that are new: console errors, failed requests, and pages whose load grew more than
-// --perf-factor (default 2.0) and by at least 1000 ms. Deterministic; the agent judges
-// what a change means (docs/change-awareness.md).
+// --perf-factor (default 2.0) and by at least 1000 ms. A failed request the installed profile
+// declares expected (profile.json → expected_requests, lib/expected-requests.mjs) is never new.
+// Deterministic; the agent judges what a change means (docs/change-awareness.md).
 //
 //   node ui-diff.mjs <old-inventory.json> <new-inventory.json> [--md] [--perf-factor 2.0]
 //
@@ -13,6 +14,7 @@
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { isExpected, profileExpected } from './lib/expected-requests.mjs';
 
 const argv = process.argv.slice(2);
 const fi = argv.indexOf('--perf-factor');
@@ -128,6 +130,7 @@ for (const r of [...removed]) {
 const hasSignals = (routes) => Object.values(routes).some((r) => Array.isArray(r.console_errors));
 const signals = hasSignals(oldR) && hasSignals(newR);
 const reqKey = (q) => `${q.method} ${q.path} ${q.status}`;
+const expected = signals ? profileExpected().list : [];
 const shot = (r) => (newR[r]?.shot ? join(dirname(b), newR[r].shot) : null);
 const consoleNew = [];
 const requestsNew = [];
@@ -137,7 +140,7 @@ for (const [route, r] of signals ? Object.entries(newR) : []) {
   const errors = (r.console_errors ?? []).filter((e) => !(o.console_errors ?? []).includes(e));
   if (errors.length) consoleNew.push({ route, errors, shot: shot(route) });
   const was = new Set((o.failed_requests ?? []).map(reqKey));
-  const requests = (r.failed_requests ?? []).filter((q) => !was.has(reqKey(q)));
+  const requests = (r.failed_requests ?? []).filter((q) => !was.has(reqKey(q)) && !isExpected(expected, q.method, q.path, q.status));
   if (requests.length) requestsNew.push({ route, requests, shot: shot(route) });
   const t0 = o.timing?.load_ms; const t1 = r.timing?.load_ms;
   if (typeof t0 === 'number' && typeof t1 === 'number' && t0 > 0 && t1 > t0 * FACTOR && t1 - t0 >= FLOOR_MS) {
