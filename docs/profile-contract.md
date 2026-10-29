@@ -177,7 +177,8 @@ Every executable runs with cwd `$HOME/work`, and with:
   `app.url`; idempotent; exit 0 only when the UI answers. A forward-only upgrade is fine.
 - `bin/env reset` — wipe product data so the next `up` starts clean (fresh users, no
   content). Needed before every downgrade.
-- `bin/env status` → stdout `{"running": bool, "build": "<build>"|null, "ui_http": "<code>"}`.
+- `bin/env status` → stdout `{"running": bool, "build": "<build>"|null, "ui_http": "<code>"}`;
+  an engine may add keys of its own (helm-k3s: `kvm`), which the profile's `SKILL.md` reads.
 - `bin/env down` — stop it; state may stay on disk.
 - `bin/sandbox check` — optional, read-only toward the product; see **`sandbox`** below.
 
