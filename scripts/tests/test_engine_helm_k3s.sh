@@ -164,6 +164,13 @@ PATH="$G:$PATH" HOME="$SANDBOX/home" QI_ENV_DIR="$SANDBOX/envg" QI_PROFILE_CONFI
   bash "$ENG/bin/env" reset >/dev/null 2>"$SANDBOX/reseterr"
 grep -qx "crictl rmi --prune" "$SANDBOX/k3s-ok.log" || { echo "  reset: unused images must be removed: $(cat "$SANDBOX/reseterr")"; FAILED=1; }
 
+# status: `kvm` appears only when the profile asks for it, as whether this VM has the device.
+st() { PATH="$G:$PATH" HOME="$SANDBOX/home" QI_ENV_DIR="$SANDBOX/envg" QI_PROFILE_CONFIG='{"img":"x","mock":""}' \
+  QI_ENGINE_CONFIG="$1" bash "$ENG/bin/env" status 2>/dev/null; }
+assert "status: no kvm key without kvm" 'has("kvm") | not' "$(st "$(cfg oci)")"
+kv=false; [ -e /dev/kvm ] && kv=true
+assert "status: kvm is whether /dev/kvm exists" ".kvm == $kv" "$(st "$(cfg oci | jq -c '.kvm = true')")"
+
 # bin/check: offline validation of engine_config (README → Check).
 mkdir -p "$SANDBOX/pd" && echo '{"app":{"url":"http://localhost:8080"}}' > "$SANDBOX/pd/profile.json"
 PCFG='{"img":"x","mock":""}'
@@ -204,6 +211,14 @@ c "$(cfg oci | jq -c '.channels.main.order = "time"')" | grep -q "^FAIL channel 
   || { echo "  check: order time needs quay"; FAILED=1; }
 c "$(cfg oci | jq -c '.credentials.users = {}')" | grep -q '^FAIL credentials.users.owner' \
   || { echo "  check: the owner account is required"; FAILED=1; }
+out="$(c "$(cfg oci | jq -c '.kvm = true | .host_dirs = ["/var/lib/vm-images"]')")"; rc=$?
+assert_eq "check: kvm and host_dirs are known keys" "0 " "$rc $(grep -E '^FAIL|unknown key' <<<"$out")"
+c "$(cfg oci | jq -c '.kvm = "yes"')" | grep -q '^FAIL kvm must be true or false' \
+  || { echo "  check: a kvm that is no boolean must fail"; FAILED=1; }
+for bad in '"/var/lib/x"' '["var/lib/x"]' '["/var/lib/../etc"]' '["/var/lib"]' '["/"]'; do
+  c "$(cfg oci | jq -c --argjson h "$bad" '.host_dirs = $h')" | grep -q '^FAIL host_dirs' \
+    || { echo "  check: host_dirs $bad must fail"; FAILED=1; }
+done
 touch "$SANDBOX/pd/marker.yaml"
 mf() { cfg oci | jq -c --argjson m "$1" '.prerequisites = [{kind:"manifest", name:"m"} + $m]'; }
 out="$(c "$(mf '{"file":"marker.yaml"}')")"; rc=$?

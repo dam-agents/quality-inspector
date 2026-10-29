@@ -7,6 +7,15 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.44.0 — 2026-10-29
+
+**Upgrade:**
+1. Nothing — the engine is re-read per run. A helm-k3s profile that sets `kvm: true` (and
+   `host_dirs`) gets VMs in its nested product on the next `env.sh up`, where the platform gives
+   this agent's VM `/dev/kvm` ([engines/helm-k3s/README.md](engines/helm-k3s/README.md) → **KVM**).
+   The first such `up` on a running cluster stops k3s once and starts it again, to move the
+   kubelet's root off the overlay root.
+
 ## 3.43.0 — 2026-10-27
 
 **Upgrade:**

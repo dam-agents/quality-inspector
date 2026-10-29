@@ -23,7 +23,7 @@ const NAME = /^[a-z0-9_]+$/;
 const K8S = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 const KNOWN = ['chart', 'registry_api', 'release', 'namespace', 'app_port', 'traefik_port', 'apply_chart_crds',
   'channels', 'default_candidate', 'default_baseline', 'helm_version', 'credentials', 'prerequisites', 'values',
-  'overlays', 'max_pages', 'prune_below_gi'];
+  'overlays', 'max_pages', 'prune_below_gi', 'kvm', 'host_dirs'];
 
 const json = (s, what) => { try { return JSON.parse(s || '{}'); } catch { fail(`${what} is not JSON`); return null; } };
 const raw = json(process.env.QI_ENGINE_CONFIG, 'QI_ENGINE_CONFIG');
@@ -82,7 +82,7 @@ for (const k of ['release', 'namespace']) {
 }
 const port = Number(cfg.app_port);
 if (!Number.isInteger(port) || port < 1 || port > 65535) fail(`app_port '${cfg.app_port ?? ''}' is not a port number`);
-for (const k of ['traefik_port', 'apply_chart_crds']) {
+for (const k of ['traefik_port', 'apply_chart_crds', 'kvm']) {
   if (cfg[k] !== undefined && typeof cfg[k] !== 'boolean') fail(`${k} must be true or false`);
 }
 if (process.env.QI_PROFILE_DIR && Number.isInteger(port)) {
@@ -97,6 +97,12 @@ if (cfg.helm_version !== undefined && !/^v\d+\.\d+\.\d+$/.test(String(cfg.helm_v
 }
 if (cfg.prune_below_gi !== undefined && !(Number.isInteger(cfg.prune_below_gi) && cfg.prune_below_gi >= 0)) {
   fail(`prune_below_gi '${cfg.prune_below_gi}' is not a whole number of Gi (0 or more)`);
+}
+const hd = cfg.host_dirs ?? [];
+if (!Array.isArray(hd)) fail('host_dirs must be a list of absolute paths');
+else for (const d of hd) {
+  if (!str(d) || !d.startsWith('/') || d.split('/').includes('..') || /\s/.test(d)) fail(`host_dirs entry '${d}' is not an absolute path`);
+  else if (['/', '/etc', '/home', '/root', '/var', '/var/lib', '/usr', '/dev', '/proc', '/sys', '/run', '/tmp'].includes(d.replace(/\/+$/, '') || '/')) fail(`host_dirs entry '${d}' is a system directory`);
 }
 
 // Channels and their defaults.

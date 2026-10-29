@@ -57,6 +57,125 @@ ensure_helm() {
 }
 
 k3s_running() { kc get --raw=/readyz >/dev/null 2>&1; }
+
+# ---------------------------------------------------------------- kvm ----
+# `kvm: true` — the product's pods open /dev/kvm (a VM runner) from inside a user namespace
+# (hostUsers: false). The device comes from the platform that hosts this VM (nested
+# virtualization), never from the engine: without it the install still runs and `status`
+# says `kvm: false`. In a user namespace the device keeps its host owner unmapped, so a
+# 0660 root:kvm device opens for nobody: it is opened to all, at every `up` (a restart
+# resets its mode). And runc cannot idmap a volume whose source is on an overlay, which
+# this VM's root is: the kubelet's root (the pods' emptyDirs) and every `host_dirs` entry
+# go to the home disk instead.
+SHARE="$HOME_DIR/.local/share"
+KUBELET_DROPIN=/etc/rancher/k3s/config.yaml.d/60-kubelet-root.yaml
+on_overlay() { # <path>: it, or its nearest parent that exists, is on an overlay
+  local p="$1"; while [ ! -e "$p" ]; do p="$(dirname "$p")"; done
+  [ "$(stat -f -c %T "$p" 2>/dev/null)" = overlayfs ]
+}
+kvm_wanted() { [ "$(cfgv .kvm)" = true ]; }
+kvm_open() {
+  kvm_wanted || return 0
+  if [ ! -e /dev/kvm ]; then
+    say "no /dev/kvm in this VM: the product's VMs will not start (the platform that hosts this agent gives no nested virtualization)"
+    return 0
+  fi
+  chmod 0666 /dev/kvm 2>/dev/null || say "could not open /dev/kvm to all — the product's VMs may not start"
+}
+kvm_state() { # true | false | null (not asked for)
+  kvm_wanted || { echo null; return; }
+  [ -e /dev/kvm ] && echo true || echo false
+}
+# The kubelet's root moves when it is on an overlay and no drop-in moves it yet. A
+# kubelet that already runs keeps its root, so k3s stops first; the drop-in is written
+# only once it has, so a stop that fails leaves none and the next `up` tries again.
+kubelet_root_needed() {
+  kvm_wanted && on_overlay /var/lib/kubelet || return 1
+  if on_overlay "$SHARE"; then say "/var/lib/kubelet and $SHARE are both on an overlay — the product's VMs will not start"; return 1; fi
+  ! grep -qF "root-dir=$SHARE/kubelet" "$KUBELET_DROPIN" 2>/dev/null
+}
+kubelet_root_write() {
+  mkdir -p "$(dirname "$KUBELET_DROPIN")" "$SHARE/kubelet"
+  printf '%s\n' "# The machine root is an overlay, where runc cannot idmap a user-namespace pod's" \
+    "# volumes: the kubelet keeps them on the home disk (quality-inspector, helm-k3s)." \
+    "kubelet-arg+:" "  - \"root-dir=$SHARE/kubelet\"" > "$KUBELET_DROPIN"
+}
+# `host_dirs`: the node directories the chart hands such pods. Each one on an overlay and
+# not yet a mount point gets $SHARE/host-<name> bind-mounted over it, at every `up` (a
+# bind mount does not outlive the VM); what it held before is copied over first. Prints
+# the directories it mounted.
+host_dirs_mount() {
+  local dir src
+  while IFS= read -r dir; do
+    [ -n "$dir" ] || continue
+    ! mountpoint -q "$dir" 2>/dev/null || continue
+    on_overlay "$dir" || continue
+    if on_overlay "$SHARE"; then say "$dir and $SHARE are both on an overlay — a user-namespace pod cannot mount it"; continue; fi
+    src="$SHARE/host-$(basename "$dir")"
+    mkdir -p "$src" "$dir"
+    [ -z "$(ls -A "$dir")" ] || [ -n "$(ls -A "$src")" ] || cp -a "$dir/." "$src/"
+    mount --bind "$src" "$dir" || { say "could not mount $src over $dir"; continue; }
+    printf '%s\n' "$dir"
+  done < <(jq -r '.host_dirs // [] | .[] | sub("/+$"; "")' <<<"$CFG")
+}
+# A pod that started before its directory was mounted keeps the overlay one (the chart may
+# hand a subdirectory of it): delete it, and its controller starts it again on the mount.
+restart_pods_on() { # <dir>...
+  [ $# -gt 0 ] || return 0
+  local dirs; dirs="$(printf '%s\n' "$@" | jq -R . | jq -sc .)"
+  kc get pods -A -o json 2>/dev/null \
+    | jq -r --argjson d "$dirs" '.items[]
+        | select(any(.spec.volumes[]?.hostPath.path // empty; . as $p | any($d[]; . as $x | $p == $x or ($p | startswith($x + "/")))))
+        | "\(.metadata.namespace) \(.metadata.name)"' \
+    | while read -r ns pod; do kc -n "$ns" delete pod "$pod" --wait=false >/dev/null 2>&1 || true; done
+}
+# What k3s-killall.sh does for a plain k3s process: pods outlive it in their shims, with
+# their mounts and their iptables rules — so a kubelet started on a new root would find
+# the old pods' mounts and a stale hostport rule.
+stop_k3s() {
+  pkill -f 'k3s server' 2>/dev/null || true
+  local i; for i in $(seq 1 30); do pgrep -f 'k3s server' >/dev/null || break; sleep 1; done
+  pgrep -f 'k3s server' >/dev/null && return 1
+  pkill -9 -f '/k3s/data/[^ ]*/containerd-shim' 2>/dev/null || true
+  for i in 1 2 3; do
+    mount | awk '{print $3}' | grep -E -e '^/(run/k3s|var/lib/kubelet|var/lib/rancher/k3s|run/netns|var/run/netns)' -e "^$SHARE/kubelet/" \
+      | sort -r | xargs -r -n1 umount -l 2>/dev/null || true
+  done
+  local b; for b in iptables iptables-legacy; do
+    command -v "$b-save" >/dev/null 2>&1 || continue
+    "$b-save" 2>/dev/null | grep -v -e KUBE- -e CNI- -e FLANNEL -e flannel | "$b-restore" 2>/dev/null || true
+  done
+  rm -rf /var/lib/cni
+}
+# The node side of `kvm` and `host_dirs`, before k3s starts where it can.
+node_prepare() {
+  local mounted=() was=0 d
+  k3s_running && was=1
+  kvm_open
+  while IFS= read -r d; do mounted+=("$d"); done < <(host_dirs_mount)
+  if kubelet_root_needed; then
+    if [ "$was" = 1 ]; then
+      say "stopping k3s, to start it on the kubelet's new root on the home disk"
+      stop_k3s || die "k3s did not stop, so its kubelet cannot move to the home disk"
+      was=0
+    fi
+    kubelet_root_write
+  fi
+  [ "$was" = 1 ] && RESTART_ON=(${mounted[@]+"${mounted[@]}"})
+  return 0
+}
+RESTART_ON=()
+
+# k3s listens on its config's port, unless its data dir holds a cluster made on another:
+# k3s never rewrites the kubeconfigs it keeps there, which name its API server on the port
+# after its own, and exits when they disagree. So a cluster keeps the port it was made on.
+k3s_port_args() {
+  local data api
+  data="$(sed -n 's/^data-dir: *//p' /etc/rancher/k3s/config.yaml 2>/dev/null)"
+  api="$(sed -n 's#^ *server: https://127.0.0.1:\([0-9]*\)$#\1#p' "${data:-/var/lib/rancher/k3s}/server/cred/admin.kubeconfig" 2>/dev/null | head -n 1)"
+  [ -z "$api" ] || printf -- '--https-listen-port\n%s\n' "$((api - 1))"
+}
+
 start_k3s() {
   k3s_running && return 0
   # The VM reaches the outside only through the paired gateway, so containerd and helm
@@ -67,7 +186,8 @@ start_k3s() {
   [ -n "${HTTPS_PROXY:-${https_proxy:-}}" ] && export CONTAINERD_HTTPS_PROXY="${HTTPS_PROXY:-$https_proxy}" CONTAINERD_NO_PROXY="$np"
   [ -n "${HTTP_PROXY:-${http_proxy:-}}" ] && export CONTAINERD_HTTP_PROXY="${HTTP_PROXY:-$http_proxy}"
   say "starting k3s"
-  (umask 022; low k3s server >/var/log/k3s.log 2>&1 &)
+  local port=() a; while IFS= read -r a; do port+=("$a"); done < <(k3s_port_args)
+  (umask 022; low k3s server ${port[@]+"${port[@]}"} >/var/log/k3s.log 2>&1 &)
   local i; for i in $(seq 1 60); do k3s_running && break; sleep 5; done
   k3s_running || die "k3s did not become ready in 5 minutes (see /var/log/k3s.log)"
   kc wait --for=condition=Ready node --all --timeout=180s >/dev/null || die "node not Ready"
@@ -160,7 +280,9 @@ cmd_up() {
   QI_GATEWAY_IP="$(getent ahostsv4 github.com 2>/dev/null | awk 'NR == 1 {print $1}')"; export QI_GATEWAY_IP
   ( umask 077; node "$ENGINE_DIR/lib/render.mjs" values "$CRED" <<<"$CFG" > "$ENVD/values.json" ) || die "values rendering failed"
   vhash="$( (sha256sum || shasum -a 256) < "$ENVD/values.json" 2>/dev/null | cut -c1-12)"
+  node_prepare
   start_k3s
+  restart_pods_on ${RESTART_ON[@]+"${RESTART_ON[@]}"}
   # Already this build with these values (a takeover, the next run on the same candidate, a
   # restarted VM whose cluster comes back from disk): nothing to install once the UI answers.
   if [ "$(jq -r '"\(.build // "")@\(.values // "")"' "$ENVD/STATE.json" 2>/dev/null)" = "$tag@$vhash" ] && ui_answers 30; then
@@ -217,7 +339,8 @@ cmd_status() {
   k3s_running && running=true
   [ -f "$ENVD/STATE.json" ] && build="$(jq -r .build "$ENVD/STATE.json" 2>/dev/null)"
   [ "$running" = true ] && ui="$(curl -s -o /dev/null -w '%{http_code}' --noproxy '*' --max-time 10 "$(app_url)" 2>/dev/null)"
-  jq -nc --argjson r "$running" --arg b "$build" --arg u "$ui" '{running:$r, build:(if $b=="" then null else $b end), ui_http:$u}'
+  jq -nc --argjson r "$running" --arg b "$build" --arg u "$ui" --argjson k "$(kvm_state)" \
+    '{running:$r, build:(if $b=="" then null else $b end), ui_http:$u} + (if $k == null then {} else {kvm:$k} end)'
 }
 
 cmd_down() { pkill -f 'k3s server' 2>/dev/null || true; }
