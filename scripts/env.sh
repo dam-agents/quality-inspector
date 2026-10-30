@@ -275,13 +275,17 @@ cmd_resume_run() { # <build>
     || logev error env_failed "resume of build $1 exited $rc (output: work/env/last-resume.log)"
   printf 'done %s %s %s\n' "$1" "$(now)" "$rc" > "$RESF"
 }
-# An `up`, `reset` or `down` waits for a resume to end (at most 15 minutes, then stops it).
+# An `up`, `reset` or `down` waits for a resume to end (at most 15 minutes — QI_RESUME_WAIT_S,
+# tests —, then stops it and records exit 143).
 resume_wait() {
-  local st b ts x _ end=$(( $(date -u +%s) + 900 ))
+  local st b ts x _ max="${QI_RESUME_WAIT_S:-900}" end
+  case "$max" in (''|*[!0-9]*) max=900;; esac
+  end=$(( $(date -u +%s) + max ))
   while resume_running; do
     if [ "$(date -u +%s)" -ge "$end" ]; then
       read -r st b ts x _ < "$RESF"; kill -- -"$x" 2>/dev/null || kill "$x" 2>/dev/null
-      logev warn env_resume "resume of build $b stopped after 15 minutes"; break
+      printf 'done %s %s 143\n' "$b" "$(now)" > "$RESF"
+      logev warn env_resume "resume of build $b stopped after $((max / 60)) minutes"; break
     fi
     sleep 5
   done

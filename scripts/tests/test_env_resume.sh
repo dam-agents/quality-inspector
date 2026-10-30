@@ -9,7 +9,7 @@ E="$WORK_DIR/env"; mkdir -p "$E"
 cat > "$QI_PROFILE_DIR/bin/env" <<'S'
 #!/usr/bin/env bash
 echo "$1 ${2:-} start $(date +%s.%N)" >> "$STUB_DIR/calls"
-[ "$1" = up ] && { echo "installing $2"; sleep "${STUB_UP_SLEEP:-0}"; }
+[ "$1" = up ] && { echo "installing $2"; sleep "${STUB_UP_SLEEP:-0}"; [ -n "${STUB_UP_FAIL:-}" ] && exit "$STUB_UP_FAIL"; }
 echo "$1 ${2:-} end $(date +%s.%N)" >> "$STUB_DIR/calls"
 [ "$1" = status ] && echo '{"running":true,"build":"1.0.0","ui_http":"200"}'
 exit 0
@@ -65,6 +65,26 @@ bash "$SCRIPTS/env.sh" up 2.0.0 >/dev/null 2>&1; assert_eq "the run's up succeed
 r_end="$(awk '$1 == "up" && $2 == "1.0.0" && $3 == "end" {print $4}' "$STUB_DIR/calls")"
 u_start="$(awk '$1 == "up" && $2 == "2.0.0" && $3 == "start" {print $4}' "$STUB_DIR/calls")"
 assert_eq "the run's up starts after the resume ended" 1 "$(awk -v a="$r_end" -v b="$u_start" 'BEGIN {print (a != "" && b != "" && b >= a) ? 1 : 0}')"
+
+# A failing resume: env_failed names its log, RESUME records the exit, the next up is not blocked.
+printf 'done 1.0.0 %s 0 -\n' "$(iso $((NOW - 3600)))" > "$E/UP"; rm -f "$E/RESUME"
+boot=$(( $(date -u +%s) - 1 ))
+STUB_UP_FAIL=7 resume "$boot" >/dev/null; settle
+read -r st b _ rc _ < "$E/RESUME"
+assert_eq "a failed resume records its exit" "done 1.0.0 7" "$st $b $rc"
+assert_eq "a failed resume logs env_failed" 1 "$(cat "$WORK_DIR"/logs/events-*.jsonl | jq -sc '[.[] | select(.event == "env_failed" and (.msg | test("resume of build 1.0.0 exited 7 .*last-resume.log")))] | length')"
+assert_eq "no second resume in that boot" "" "$(resume "$boot")"; settle
+
+# A resume past the limit: the next up stops it, records 143, logs it, and then runs.
+printf 'done 1.0.0 %s 0 -\n' "$(iso $((NOW - 3600)))" > "$E/UP"; rm -f "$E/RESUME"; : > "$STUB_DIR/calls"
+STUB_UP_SLEEP=60 resume $((later + 50)) >/dev/null
+read -r _ _ _ rpid _ < "$E/RESUME"
+QI_RESUME_WAIT_S=1 bash "$SCRIPTS/env.sh" up 2.0.0 >/dev/null 2>&1; assert_eq "the up after a stopped resume succeeds" 0 "$?"
+kill -0 "$rpid" 2>/dev/null && { echo "  the resume still runs"; FAILED=1; kill "$rpid" 2>/dev/null; }
+read -r st b _ rc _ < "$E/RESUME"
+assert_eq "a stopped resume records 143" "done 1.0.0 143" "$st $b $rc"
+assert_eq "the stop is logged" 1 "$(cat "$WORK_DIR"/logs/events-*.jsonl | jq -sc '[.[] | select(.event == "env_resume" and (.msg | test("stopped after")))] | length')"
+assert_eq "the run's up ran" 1 "$(ups 2.0.0)"
 
 # The hook: input discarded, the line on stdout, exit 0; registered once by install.sh.
 printf 'done 1.0.0 %s 0 -\n' "$(iso $((NOW - 3600)))" > "$E/UP"; rm -f "$E/RESUME"
