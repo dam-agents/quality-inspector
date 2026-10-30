@@ -75,12 +75,14 @@
 #                                          (docs/persistence.md → Backup & restore)
 #   platform-schedule  the platform's create_schedule, schedule_once, toggle_schedule, delete_schedule
 #                    (scheduled)           every call: a schedule's prompt starts a session with no frame,
-#                                          which is direct — unless it is the handoff, in a scheduled run
-#                                          and not a channel turn: schedule_once with name `qi-handoff`, at
-#                                          most inSession `fresh`, no other key, and a task of the line
-#                                          `<qi-handoff>` and then, as they are, the words of the newest
-#                                          prompt when the operator wrote it (lib/channel.sh →
-#                                          transcript_operator_words; docs/persistence.md → Handoff)
+#                                          which is direct — unless it is the handoff: schedule_once with
+#                                          name `qi-handoff`, at most inSession `fresh`, no other key, and a
+#                                          task of the line `<qi-handoff>` and then, as they are, the words of
+#                                          the newest prompt when the operator wrote it, in a scheduled run
+#                                          and not a channel turn (lib/channel.sh → transcript_operator_words);
+#                                          or, in a channel turn, of the line `<qi-viewer-handoff>` and then
+#                                          the dashboard command a shared viewer's newest prompt holds
+#                                          (transcript_viewer_command; docs/persistence.md → Handoff)
 #
 # Every denial logs one `policy_denied` event (scripts/log.sh): `tool=<name> rule=<id>`
 # plus `at=<host/path or file>` — never a full command or a query string.
@@ -509,25 +511,28 @@ check_write() {
 
 # -------------------------------------------------------- platform schedules ----
 # A schedule's prompt opens a session with no frame — a direct one. So a scheduled run or a
-# channel turn starts, changes and removes no schedule; the one exception is the handoff of the
-# operator's own words, as they are, to a fresh session (docs/persistence.md → Handoff).
+# channel turn starts, changes and removes no schedule; the one exception is the handoff to a
+# fresh session of the operator's own words, as they are, or of the one dashboard command a
+# shared viewer sent (docs/persistence.md → Handoff).
 HANDOFF_LEAD='<qi-handoff>'
+VIEWER_HANDOFF_LEAD='<qi-viewer-handoff>'
 check_schedule() {
   scheduled || return 0
-  local words said
+  local words said lead
   case "$TOOL" in (*__schedule_once)
-    if ! channel_turn \
-       && words="$(jq -er --arg lead "$HANDOFF_LEAD" '
+    if channel_turn; then lead="$VIEWER_HANDOFF_LEAD"; said="$(transcript_viewer_command "$TRANSCRIPT")"
+    else lead="$HANDOFF_LEAD"; said="$(transcript_operator_words "$TRANSCRIPT")"; fi
+    if [ -n "$said" ] \
+       && words="$(jq -er --arg lead "$lead" '
             select(type == "object" and (keys - ["name", "task", "inSession"]) == []
                    and .name == "qi-handoff" and ((.inSession // "fresh") == "fresh")
                    and (.task | type) == "string" and (.task | startswith($lead + "\n")))
             | .task | ltrimstr($lead + "\n")' <<<"$TINPUT" 2>/dev/null)" \
-       && said="$(transcript_operator_words "$TRANSCRIPT")" \
        && [ -n "$words" ] && [ "$words" = "$said" ]; then
       return 0
     fi;;
   esac
-  deny platform-schedule "${TOOL##*__}" "a scheduled run or a channel turn starts, changes or removes no schedule; it only hands the operator's newest words, as they are, to a fresh session (docs/persistence.md → Handoff)"
+  deny platform-schedule "${TOOL##*__}" "a scheduled run or a channel turn starts, changes or removes no schedule; it only hands the operator's newest words, as they are, or a shared viewer's dashboard command to a fresh session (docs/persistence.md → Handoff)"
 }
 
 # ------------------------------------------------------------------ dispatch ----

@@ -90,8 +90,9 @@ line) — their words like any other: what a Check states is the oracle, a Do is
 - **The operator's own press** is their chat message: source `operator`, answered here.
 - **A person the operator shared the page with** — the platform frames the prompt
   `<viewer> sent this from a button on the interactive artifact "…"`, a channel turn
-  ([modules.md](modules.md) → Control): only this one message shape is taken, anything else
-  is declined (`artifact_viewer_declined`). **The pipeline** as for Slack, with source
+  ([modules.md](modules.md) → Control): this message shape runs here; another command of the
+  page goes to a fresh session by the viewer's handoff, anything else is declined
+  (`artifact_viewer_declined`). **The pipeline** as for Slack, with source
   `dashboard`, `requester` and `thread` `-`, the viewer as the frame names them in
   `request.md` only, and the same daily cap. The viewer never sees a reply, so no step
   replies: not steps 1, 3, 4, 5, 6 or 12, and a `report` entry of **Waiting scenarios** only

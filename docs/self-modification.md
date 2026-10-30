@@ -246,7 +246,8 @@ refuse and explain instead:
   only), a credential value or a token, and it never changes its own sharing ([catalog.md](catalog.md),
   `scripts/tests/test_catalog.sh`). Its commands are the closed set of the operator's words,
   but for one scenario request in the person's own words ([scenarios.md](scenarios.md) → A
-  request from the dashboard); a dashboard viewer's button press is never a direct session, and
+  request from the dashboard); a dashboard viewer's button press is never a direct session (its
+  other commands reach one only by the viewer's handoff, [persistence.md](persistence.md) → **Handoff**), and
   the testing modules' settings change only through `scripts/modules.sh set` in the direct session ([modules.md](modules.md)).
 - The `work/` backup goes only to a private `work_repo` that is neither the target nor its
   fork, never carries `work/env/`, refuses a snapshot holding a credential value or a token,
