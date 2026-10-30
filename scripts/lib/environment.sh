@@ -6,8 +6,9 @@
 #
 # The choice (nested_target: auto | vm | environment, default auto) is made at `env.sh up`:
 # an Environment when the profile declares one (`environment` in profile.json), the agent does
-# not lend its model (an Environment holds no connection), and the platform's Environment tools
-# answer; else this VM, with the reason logged (with `environment`, env.sh up fails instead).
+# not lend its model (an Environment holds no connection), the profile does not set
+# `engine_config.kvm` (an Environment does not promise /dev/kvm), and the platform's Environment
+# tools answer; else this VM, with the reason logged (with `environment`, env.sh up fails instead).
 # In an Environment the profile's `bin/env` runs over the Environment Link (`ssh env-<name>`),
 # from a copy of the profile and the engines in ~/qi there, and one `ssh -L` keeps the product
 # at the profile's app.url on this VM — so every test, CLI and API call addresses localhost in
@@ -46,6 +47,7 @@ target_choose() {
   [ "$(profile_field '.environment.endpoints | length')" -gt 0 ] 2>/dev/null \
     || { echo "vm the profile declares no environment"; return; }
   [ "$(cfg lend_model)" = enabled ] && { echo "vm lend_model is enabled, and an Environment holds no connection"; return; }
+  [ "$(profile_field '.engine_config.kvm')" = true ] && { echo "vm the profile sets kvm, and an Environment does not promise /dev/kvm"; return; }
   command -v ssh >/dev/null 2>&1 || { echo "vm no ssh client"; return; }
   local why; why="$(penv available 2>&1 >/dev/null)" || { echo "vm the platform's Environments do not answer: ${why#platform-env: }"; return; }
   echo environment

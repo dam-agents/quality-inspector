@@ -12,7 +12,8 @@ recovery path; how one product is installed is the profile's.
 `environment`), and says which on its first line; `env.sh where` tells it any time.
 
 - **An Environment** when the profile declares one (`environment` in `profile.json`), the
-  agent does not lend its model (`lend_model`: an Environment holds no connection), and the
+  agent does not lend its model (`lend_model`: an Environment holds no connection), the
+  profile does not set `engine_config.kvm` (an Environment does not promise `/dev/kvm`), and the
   platform's Environment tools answer (the owner's `environments` feature). The active
   Environment is reused from run to run while it lives (each `up` extends it two days);
   otherwise `up` makes a new one, `qi-<date>`, and moving to it stops the product in this VM.

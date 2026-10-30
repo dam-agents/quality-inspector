@@ -87,6 +87,14 @@ E up 1.0.0 2>"$SANDBOX/err" >/dev/null
 grep -q "lend_model is enabled" "$SANDBOX/err" || { echo "  lend_model: stays in this VM: $(cat "$SANDBOX/err")"; FAILED=1; }
 sed -i.bak '/^- lend_model:/d' "$WORK_DIR/CONFIG.md"
 
+# auto, the profile sets kvm → this VM, with the reason: an Environment does not promise /dev/kvm.
+jq '.engine_config = ((.engine_config // {}) + {kvm: true})' "$pd/profile.json" > "$pd/p.tmp" && mv "$pd/p.tmp" "$pd/profile.json"
+E up 1.0.0 2>"$SANDBOX/err" >/dev/null; assert_eq "kvm: up succeeds" 0 "$?"
+grep -q "runs in this VM (the profile sets kvm, and an Environment does not promise /dev/kvm)" "$SANDBOX/err" \
+  || { echo "  kvm: stays in this VM: $(cat "$SANDBOX/err")"; FAILED=1; }
+assert "kvm: where" '.target == "vm"' "$(E where)"
+jq 'del(.engine_config.kvm)' "$pd/profile.json" > "$pd/p.tmp" && mv "$pd/p.tmp" "$pd/profile.json"
+
 # auto → a new Environment: bin/env runs there with its addresses, never the lent model; a forward.
 : > "$WORK_DIR/env/calls"
 E up 1.0.0 2>"$SANDBOX/err" >/dev/null; assert_eq "environment: up succeeds" 0 "$?"
@@ -162,5 +170,12 @@ E up 3.0.4 2>"$SANDBOX/err" >/dev/null; assert_eq "environment: no Environment �
 grep -q "nested_target is environment, and no Environment runs the product: the platform's Environments do not answer" "$SANDBOX/err" \
   || { echo "  environment: the reason is said: $(cat "$SANDBOX/err")"; FAILED=1; }
 grep -q "^up 3.0.4" "$WORK_DIR/env/calls" && { echo "  environment: nothing runs in this VM"; FAILED=1; }
+# … nor when the profile sets kvm: up fails with that reason.
+mv "$H/.platform/off.json" "$H/.platform/platform-mcp-entry.json"
+jq '.engine_config = ((.engine_config // {}) + {kvm: true})' "$pd/profile.json" > "$pd/p.tmp" && mv "$pd/p.tmp" "$pd/profile.json"
+E up 3.0.5 2>"$SANDBOX/err" >/dev/null; assert_eq "environment, kvm: up fails" 1 "$?"
+grep -q "nested_target is environment, and no Environment runs the product: the profile sets kvm" "$SANDBOX/err" \
+  || { echo "  environment, kvm: the reason is said: $(cat "$SANDBOX/err")"; FAILED=1; }
+grep -q "^up 3.0.5" "$WORK_DIR/env/calls" && { echo "  environment, kvm: nothing runs in this VM"; FAILED=1; }
 
 exit $FAILED

@@ -1,7 +1,8 @@
 # Engine `helm-k3s`
 
-Runs a product that ships as a **Helm chart in an OCI registry** inside the inspector's VM:
-k3s, the profile's prerequisites, then the chart at the build under test. A profile uses
+Runs a product that ships as a **Helm chart in an OCI registry** on its node (the inspector's
+VM, or a platform Environment that runs the product): k3s, the profile's prerequisites, then
+the chart at the build under test. A profile uses
 it with `"engine": "helm-k3s"` and describes its product in `engine_config` — no scripts
 of its own ([docs/profile-contract.md](../../docs/profile-contract.md) → Engines).
 
@@ -59,23 +60,26 @@ any other `url` does.
 
 ## KVM
 
-The device comes from the platform that hosts this VM (nested virtualization), never from
+The device comes from the platform that hosts the node (nested virtualization), never from
 the engine; the profile ships the cluster's device plugin as a `manifest` prerequisite and
-names its resource in `values`. With `kvm: true`, `up`:
+names its resource in `values`. The node is this VM or the platform Environment that runs the
+product. An Environment does not promise the device: with `kvm: true` the product stays in
+this VM under `nested_target: auto`, and `env.sh up` fails under `environment`
+([docs/nested-env.md](../../docs/nested-env.md) → **Where the product runs**). With `kvm: true`, `up`:
 
 - opens `/dev/kvm` to all (`0666`) every time: in a user namespace the device keeps its
   host owner unmapped, so a `0660 root:kvm` device opens for nobody. No `/dev/kvm` is a
   warning, not a failure: the product installs, its VMs do not start, and `status` says
   `"kvm": false` (`true` when the device is there; absent without `kvm`).
 - moves the kubelet's root to `~/.local/share/kubelet` when `/var/lib/kubelet` is on an
-  overlay (this VM's root is one): runc cannot idmap a volume whose source is on an overlay,
+  overlay (an agent VM's root is one): runc cannot idmap a volume whose source is on an overlay,
   so a user-namespace pod's emptyDirs fail to mount. A drop-in in
   `/etc/rancher/k3s/config.yaml.d/` does it; a k3s already running on the old root is
   stopped once (with its pods' shims, mounts and iptables rules) and started again.
 
 Each `host_dirs` entry on an overlay, and not yet a mount point, gets
 `~/.local/share/host<path>` bind-mounted over it at every `up` (a bind mount does not
-outlive the VM) — `<path>` the whole path with `-` doubled and `/` made `-`
+outlive a boot of the node) — `<path>` the whole path with `-` doubled and `/` made `-`
 (`/var/lib/vm-images` → `host-var-lib-vm--images`), so no two entries share a source; what
 it held before is copied over first, and a pod that started on the overlay directory is
 deleted, so its controller starts it again on the mount. `bin/check` refuses an entry listed

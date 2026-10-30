@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# bin/env — a Helm-charted product inside this VM: k3s, the profile's prerequisites, then
-# the chart at the build under test (README → Configuration, docs/profile-contract.md).
+# bin/env — a Helm-charted product on its node (this VM, or a platform Environment): k3s, the
+# profile's prerequisites, then the chart at the build under test (README → Configuration,
+# docs/profile-contract.md).
 #
 #   init | up <tag> | reset | status | down
 #
@@ -73,7 +74,7 @@ kvm_wanted() { [ "$(cfgv .kvm)" = true ]; }
 kvm_open() {
   kvm_wanted || return 0
   if [ ! -e "$NODE/dev/kvm" ]; then
-    say "no /dev/kvm in this VM: the product's VMs will not start (the platform that hosts this agent gives no nested virtualization)"
+    say "no /dev/kvm on the node: the product's VMs will not start (the platform that hosts the node gives no nested virtualization)"
     return 0
   fi
   chmod 0666 "$NODE/dev/kvm" 2>/dev/null || say "could not open /dev/kvm to all — the product's VMs may not start"
@@ -98,7 +99,7 @@ kubelet_root_write() {
 }
 # `host_dirs`: the node directories the chart hands such pods. Each one on an overlay and
 # not yet a mount point gets $SHARE/host<path> bind-mounted over it, at every `up` (a bind
-# mount does not outlive the VM); what it held before is copied over first. <path> is the
+# mount does not outlive a boot of the node); what it held before is copied over first. <path> is the
 # whole path, `-` doubled and `/` made `-` (/var/lib/vm-images → host-var-lib-vm--images),
 # so two directories never share a source. Prints the directories it mounted.
 host_dirs_mount() {
