@@ -7,13 +7,22 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.47.0 — 2026-10-30
+## 3.48.0 — 2026-10-30
 
 **Upgrade:**
 1. Nothing to run — docs are re-read per run, the dashboard is rebuilt by the next catalog
    publish. Its new "Run it again" buttons send `run <ref>, <ref>…` (up to 20 test cases),
    `recheck VAL-<k>` and `test scenario <slug>` ([docs/on-demand.md](docs/on-demand.md),
    [docs/validation.md](docs/validation.md) → **Recheck**); "Repair this test" now shows.
+
+## 3.47.0 — 2026-10-30
+
+**Upgrade:**
+1. Nothing to run. Under `nested_target: auto` a profile that sets `engine_config.kvm` now runs
+   in a platform Environment too, when this VM has `/dev/kvm` and the new Environment has it as
+   well; an Environment without the device is deleted and the product runs in this VM, as before
+   ([docs/nested-env.md](docs/nested-env.md) → **Where the product runs**). To keep it in this
+   VM, set `- nested_target: vm` in `work/CONFIG.md`.
 
 ## 3.46.0 — 2026-10-30
 

@@ -45,13 +45,18 @@ echo "ssh $*" >> "$SANDBOX/ssh.log"
 fwd=0
 while [ $# -gt 0 ]; do case "$1" in (-o|-L) shift 2;; (-N) fwd=1; shift;; (-*) shift;; (*) break;; esac; done
 host="$1"; shift
+[ -e "$SANDBOX/ssh-down" ] && exit 255
+[ -e "$SANDBOX/ssh-hang" ] && [ "$fwd" = 0 ] && exec sleep 300
 [ "$fwd" = 1 ] && exec -a "$SANDBOX/fwd-sleep" sleep 300
 mkdir -p "$SANDBOX/envs/${host#env-}"; cd "$SANDBOX/envs/${host#env-}" || exit 1
-HOME="$PWD" bash -c "$*"
+# /dev/kvm there is $SANDBOX/env-kvm, for every Environment.
+cmd="$*"; HOME="$PWD" bash -c "${cmd//\/dev\/kvm/$SANDBOX/env-kvm}"
 S
 printf '#!/usr/bin/env bash\nexit 0\n' > "$B/curl"
 chmod +x "$B"/*
 export SANDBOX
+# This VM's /dev/kvm (environment.sh → KVM_DEV): absent until a test makes it.
+export QI_KVM_DEVICE="$SANDBOX/vm-kvm"
 
 # A profile whose bin/env records where it ran and with what.
 pd="$QI_PROFILE_DIR"
@@ -87,12 +92,44 @@ E up 1.0.0 2>"$SANDBOX/err" >/dev/null
 grep -q "lend_model is enabled" "$SANDBOX/err" || { echo "  lend_model: stays in this VM: $(cat "$SANDBOX/err")"; FAILED=1; }
 sed -i.bak '/^- lend_model:/d' "$WORK_DIR/CONFIG.md"
 
-# auto, the profile sets kvm → this VM, with the reason: an Environment does not promise /dev/kvm.
+# auto, the profile sets kvm, this VM has no /dev/kvm → this VM, with the reason (an
+# Environment gets the device only where this VM has it).
 jq '.engine_config = ((.engine_config // {}) + {kvm: true})' "$pd/profile.json" > "$pd/p.tmp" && mv "$pd/p.tmp" "$pd/profile.json"
-E up 1.0.0 2>"$SANDBOX/err" >/dev/null; assert_eq "kvm: up succeeds" 0 "$?"
-grep -q "runs in this VM (the profile sets kvm, and an Environment does not promise /dev/kvm)" "$SANDBOX/err" \
-  || { echo "  kvm: stays in this VM: $(cat "$SANDBOX/err")"; FAILED=1; }
-assert "kvm: where" '.target == "vm"' "$(E where)"
+E up 1.0.0 2>"$SANDBOX/err" >/dev/null; assert_eq "kvm, none here: up succeeds" 0 "$?"
+grep -q "runs in this VM (the profile sets kvm, and this VM has no /dev/kvm" "$SANDBOX/err" \
+  || { echo "  kvm, none here: stays in this VM: $(cat "$SANDBOX/err")"; FAILED=1; }
+assert "kvm, none here: where" '.target == "vm"' "$(E where)"
+assert "kvm, none here: no Environment made" 'length == 0' "$(cat "$ST")"
+# … this VM has it, the Environment not → the Environment is deleted, this VM runs the product.
+touch "$QI_KVM_DEVICE"; : > "$WORK_DIR/env/calls"
+E up 1.0.0 2>"$SANDBOX/err" >/dev/null; assert_eq "kvm, none there: up succeeds" 0 "$?"
+grep -q "runs in this VM (the profile sets kvm, and Environment qi-[0-9-]* has no /dev/kvm)" "$SANDBOX/err" \
+  || { echo "  kvm, none there: back to this VM: $(cat "$SANDBOX/err")"; FAILED=1; }
+assert "kvm, none there: where" '.target == "vm"' "$(E where)"
+assert "kvm, none there: the Environment is deleted" 'length == 0' "$(cat "$ST")"
+grep -q "^up 1.0.0 target=vm" "$WORK_DIR/env/calls" || { echo "  kvm, none there: bin/env ran here"; FAILED=1; }
+# … the link does not answer the check → up fails, and the Environment stays (no delete on doubt).
+touch "$SANDBOX/ssh-down"; : > "$WORK_DIR/env/calls"
+E up 1.0.0 2>"$SANDBOX/err" >/dev/null; assert_eq "kvm, no answer: up fails" 1 "$?"
+grep -q "did not answer the /dev/kvm check (3 tries)" "$SANDBOX/err" || { echo "  kvm, no answer: the reason is said: $(cat "$SANDBOX/err")"; FAILED=1; }
+assert "kvm, no answer: the Environment stays" 'length == 1' "$(cat "$ST")"
+assert "kvm, no answer: it stays the active one" '.target == "environment"' "$(E where)"
+grep -q "^up 1.0.0" "$WORK_DIR/env/calls" && { echo "  kvm, no answer: nothing runs in this VM"; FAILED=1; }
+rm -f "$SANDBOX/ssh-down"
+# … a link that hangs: each try is cut at its time bound, and the same no-answer path follows.
+touch "$SANDBOX/ssh-hang"; t0=$(date +%s)
+QI_KVM_PROBE_S=1 E up 1.0.0 2>"$SANDBOX/err" >/dev/null; assert_eq "kvm, hung link: up fails" 1 "$?"
+[ $(( $(date +%s) - t0 )) -lt 60 ] || { echo "  kvm, hung link: the tries are time-bound"; FAILED=1; }
+grep -q "did not answer the /dev/kvm check (3 tries)" "$SANDBOX/err" || { echo "  kvm, hung link: the reason is said: $(cat "$SANDBOX/err")"; FAILED=1; }
+assert "kvm, hung link: the Environment stays" 'length == 1' "$(cat "$ST")"
+rm -f "$SANDBOX/ssh-hang"
+# … both have it → that Environment.
+touch "$SANDBOX/env-kvm"
+E up 1.0.0 2>"$SANDBOX/err" >/dev/null; assert_eq "kvm in both: up succeeds" 0 "$?"
+w="$(E where)"; assert "kvm in both: an Environment" '.target == "environment" and (.name | startswith("qi-"))' "$w"
+grep -q "runs in Environment" "$SANDBOX/err" || { echo "  kvm in both: the Environment is said: $(cat "$SANDBOX/err")"; FAILED=1; }
+E release "$(jq -r .name <<<"$w")" >/dev/null 2>&1
+rm -f "$SANDBOX/env-kvm"
 jq 'del(.engine_config.kvm)' "$pd/profile.json" > "$pd/p.tmp" && mv "$pd/p.tmp" "$pd/profile.json"
 
 # auto → a new Environment: bin/env runs there with its addresses, never the lent model; a forward.
@@ -170,12 +207,21 @@ E up 3.0.4 2>"$SANDBOX/err" >/dev/null; assert_eq "environment: no Environment �
 grep -q "nested_target is environment, and no Environment runs the product: the platform's Environments do not answer" "$SANDBOX/err" \
   || { echo "  environment: the reason is said: $(cat "$SANDBOX/err")"; FAILED=1; }
 grep -q "^up 3.0.4" "$WORK_DIR/env/calls" && { echo "  environment: nothing runs in this VM"; FAILED=1; }
-# … nor when the profile sets kvm: up fails with that reason.
+# … nor when the profile sets kvm and this VM has no /dev/kvm: up fails with that reason.
 mv "$H/.platform/off.json" "$H/.platform/platform-mcp-entry.json"
 jq '.engine_config = ((.engine_config // {}) + {kvm: true})' "$pd/profile.json" > "$pd/p.tmp" && mv "$pd/p.tmp" "$pd/profile.json"
-E up 3.0.5 2>"$SANDBOX/err" >/dev/null; assert_eq "environment, kvm: up fails" 1 "$?"
-grep -q "nested_target is environment, and no Environment runs the product: the profile sets kvm" "$SANDBOX/err" \
-  || { echo "  environment, kvm: the reason is said: $(cat "$SANDBOX/err")"; FAILED=1; }
-grep -q "^up 3.0.5" "$WORK_DIR/env/calls" && { echo "  environment, kvm: nothing runs in this VM"; FAILED=1; }
+rm -f "$QI_KVM_DEVICE"
+E up 3.0.5 2>"$SANDBOX/err" >/dev/null; assert_eq "environment, kvm, none here: up fails" 1 "$?"
+grep -q "nested_target is environment, and no Environment runs the product: the profile sets kvm, and this VM has no /dev/kvm" "$SANDBOX/err" \
+  || { echo "  environment, kvm, none here: the reason is said: $(cat "$SANDBOX/err")"; FAILED=1; }
+grep -q "^up 3.0.5" "$WORK_DIR/env/calls" && { echo "  environment, kvm, none here: nothing runs in this VM"; FAILED=1; }
+# … nor when the Environment has no /dev/kvm: it is deleted, and up fails with that reason.
+touch "$QI_KVM_DEVICE"
+E up 3.0.6 2>"$SANDBOX/err" >/dev/null; assert_eq "environment, kvm, none there: up fails" 1 "$?"
+grep -q "nested_target is environment, and no Environment runs the product: the profile sets kvm, and Environment qi-[0-9-]* has no /dev/kvm" "$SANDBOX/err" \
+  || { echo "  environment, kvm, none there: the reason is said: $(cat "$SANDBOX/err")"; FAILED=1; }
+grep -q "^up 3.0.6" "$WORK_DIR/env/calls" && { echo "  environment, kvm, none there: nothing runs in this VM"; FAILED=1; }
+assert "environment, kvm, none there: the Environment is deleted" 'length == 0' "$(cat "$ST")"
+assert "environment, kvm, none there: where" '.target == "vm"' "$(E where)"
 
 exit $FAILED
