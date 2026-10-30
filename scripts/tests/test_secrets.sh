@@ -7,10 +7,11 @@ export HOME="$SANDBOX/home"; mkdir -p "$HOME" "$WORK_DIR/env" "$SANDBOX/bin"
 PW='p@ss.w*rd[1]$x\y'   # regex metacharacters and a backslash (JSON-escaped in report.json)
 SEC='adm1n-s3cret-Value'
 LK='cb-LiteLLM-key-Value-77'   # an operator-filled *_KEY line: masked like any credential
-printf "E2E_USER_OWNER_USERNAME=owner-name\nE2E_USER_OWNER_PASSWORD='%s'\nQI_SECRET_ADMIN=%s\nE2E_LITELLM_CURVE_BENDER_KEY=%s\n" \
-  "$PW" "$SEC" "$LK" > "$WORK_DIR/env/credentials.env"
+TS='svc-Tokens-Value-42'       # a *_TOKENS name: the prefix match is open-ended
+printf "E2E_USER_OWNER_USERNAME=owner-name\nE2E_USER_OWNER_PASSWORD='%s'\nQI_SECRET_ADMIN=%s\nE2E_LITELLM_CURVE_BENDER_KEY=%s\nE2E_SERVICE_TOKENS=%s\n" \
+  "$PW" "$SEC" "$LK" "$TS" > "$WORK_DIR/env/credentials.env"
 RUNS="$WORK_DIR/suite/.e2e/runs"
-leaks() { grep -rlF -e "$PW" -e "$SEC" -e "$LK" -e 'p@ss.w*rd[1]$x\\y' "$RUNS" 2>/dev/null; }
+leaks() { grep -rlF -e "$PW" -e "$SEC" -e "$LK" -e "$TS" -e 'p@ss.w*rd[1]$x\\y' "$RUNS" 2>/dev/null; }
 audit() { bash "$SCRIPTS/preflight.sh" audit 2>/dev/null | jq -c '.checks[] | select(.id == "secrets_in_runs")'; }
 
 # A raw run as e2e leaves it: the password in run.log, an agent.act param and a trace file.
@@ -21,11 +22,12 @@ plant() { # <dir>
     attempts:[{steps:[{api:"agent.act",label:"sign in",params:{password:$p},status:"passed"}]}]}]}}' > "$1/report.json"
   printf '# actions\nsecret %s\n' "$SEC" > "$1/trace/actions.md"
   printf 'model key %s\n' "$LK" > "$1/trace/key.md"
+  printf 'service tokens %s\n' "$TS" > "$1/trace/tokens.md"
   printf 'webm %s' "$PW" > "$1/video.webm"
 }
 plant "$RUNS/raw"
 c="$(audit)"
-assert "unmasked run fails the audit" '.status == "fail" and (.detail | test("raw/run.log")) and (.detail | test("4 file"))' "$c"
+assert "unmasked run fails the audit" '.status == "fail" and (.detail | test("raw/run.log")) and (.detail | test("5 file"))' "$c"
 case "$c" in *"$SEC"*|*'p@ss'*) echo "  audit detail prints a credential value"; FAILED=1;; esac
 
 node "$SCRIPTS/lib/secrets.mjs" mask "$WORK_DIR/env/credentials.env" "$RUNS/raw"
@@ -34,6 +36,7 @@ jq -e '.run.results[0].attempts[0].steps[0].params.password == "***"' "$RUNS/raw
   || { echo "  report.json not masked or no longer valid JSON"; FAILED=1; }
 grep -q 'owner-name' "$RUNS/raw/run.log" || { echo "  a non-secret value was masked"; FAILED=1; }
 grep -q 'model key \*\*\*' "$RUNS/raw/trace/key.md" || { echo "  a *_KEY value was not masked"; FAILED=1; }
+grep -q 'service tokens \*\*\*' "$RUNS/raw/trace/tokens.md" || { echo "  a *_TOKENS value was not masked"; FAILED=1; }
 grep -qF "$PW" "$RUNS/raw/video.webm" || { echo "  a binary file was rewritten"; FAILED=1; }
 rm -f "$RUNS/raw/video.webm"
 assert "masked run passes the audit" '.status == "ok"' "$(audit)"

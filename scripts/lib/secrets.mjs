@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // secrets.mjs — nested credential values (work/env/credentials.env) out of run artefacts.
-// A secret is the value of every key matching (^|_)(PASSWORD|TOKEN|SECRET|KEY)(_|$),
-// case-insensitive (E2E_USER_<NAME>_PASSWORD, QI_SECRET_<NAME>, E2E_<NAME>_KEY …).
+// A secret is the value of every key matching (^|_)(PASSWORD|TOKEN|SECRET|KEY), open-ended,
+// case-insensitive (E2E_USER_<NAME>_PASSWORD, QI_SECRET_<NAME>, E2E_<NAME>_KEY, E2E_TOKENS …).
 // Replacement is literal, never a regex:
 // the raw value, its JSON-escaped and its URL-encoded form all become ***.
 //
@@ -21,7 +21,7 @@ import { extname, join } from 'node:path';
 
 const MIN = 4;
 // Every value of a sandbox account (docs/profile-contract.md → `sandbox`) counts, whatever its name.
-const KEY = /(^|_)(PASSWORD|TOKEN|SECRET|KEY)(_|$)|^E2E_SANDBOX_/i;
+const KEY = /(^|_)(PASSWORD|TOKEN|SECRET|KEY)|^E2E_SANDBOX_/i;
 const TEXT = new Set(['.log', '.txt', '.md', '.json', '.jsonl', '.html']);
 const MASK = '***';
 
