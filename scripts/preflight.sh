@@ -140,7 +140,8 @@ mode_issues() {
   printf '%s' "$listing" > "$tmp"
   # A labelled pull request stands for the issues it closes (docs/issue-qa.md → The deploy gate):
   # the ones the listing lacks are read one by one, at most MAX_LINKED a run.
-  missing="$(node "$SCRIPT_DIR/lib/scan-issues.mjs" --missing "$tmp" 2>/dev/null)" || missing='[]'
+  missing="$(node "$SCRIPT_DIR/lib/scan-issues.mjs" --missing "$tmp" 2>/dev/null)" \
+    || { missing='[]'; log "the issues labelled pull requests close could not be listed (scan-issues.mjs --missing) — labelled issues only"; }
   for n in $(printf '%s' "$missing" | jq -r '.[]' 2>/dev/null | head -"$MAX_LINKED"); do
     if one="$(gh api ${GH_HOST_ARGS[@]+"${GH_HOST_ARGS[@]}"} "repos/$REPO_PATH/issues/$n" 2>/dev/null)" \
        && printf '%s' "$one" | jq -e 'type == "object" and (has("pull_request") | not)' >/dev/null 2>&1; then
