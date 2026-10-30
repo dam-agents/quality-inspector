@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.45.0 — 2026-10-29
+## 3.45.0 — 2026-10-30
 
 **Upgrade:**
 1. Nothing to run. From the next `env.sh up` the product runs in a platform Environment of this
@@ -19,7 +19,7 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    `work/ENVIRONMENTS.json` (**Kept for a person**); "keep #N for <d> days" and "release #N" in the
    direct session change that.
 
-## 3.44.0 — 2026-10-29
+## 3.44.0 — 2026-10-30
 
 **Upgrade:**
 1. Nothing — the engine is re-read per run. A helm-k3s profile that sets `kvm: true` (and
