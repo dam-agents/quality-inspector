@@ -47,16 +47,14 @@ transcript_is_channel() { transcript_prompt_has "${1:-}" '<how-to-respond>' "$AR
 # Precheck's frame).
 transcript_is_scheduled() { transcript_prompt_has "${1:-}" "$SCHEDULED_FRAME"; }
 
-# transcript_operator_words <transcript.jsonl>: prints the text of the session's newest prompt
-# when the operator wrote it — a prompt that holds no frame (a scheduled run continued from the
-# UI, or the operator's own dashboard button beside it) — or fails. A prompt is the same closed
-# set of line shapes as above, a harness `isMeta` line with no origin left out. Only a closed
-# set of prompts is the operator's: a `user` line whose `origin` is absent or of kind `human`,
-# and a `queued_command` with `commandMode` `prompt`, no `isMeta` and such an origin. Any other
-# prompt — a sub-agent's hand-back (`peer`), a task notification — has another author, and so
-# has a line that does not parse or does not have the shape: after one there are no words
-# (docs/persistence.md → Handoff).
-transcript_operator_words() {
+# transcript_newest_prompt <transcript.jsonl>: prints the text of the session's newest prompt
+# when a person wrote it, or fails. A prompt is the same closed set of line shapes as above, a
+# harness `isMeta` line with no origin left out. Only a closed set of prompts has a person as its
+# author: a `user` line whose `origin` is absent or of kind `human`, and a `queued_command` with
+# `commandMode` `prompt`, no `isMeta` and such an origin. Any other prompt — a sub-agent's
+# hand-back (`peer`), a task notification — has another author, and so has a line that does not
+# parse or does not have the shape: after one there are no words (docs/persistence.md → Handoff).
+transcript_newest_prompt() {
   local f="${1:-}" out
   [ -n "$f" ] && [ -r "$f" ] || return 1
   out="$(jq -Rr '
@@ -75,9 +73,49 @@ transcript_operator_words() {
           then {text: ($l.attachment.prompt | tostring)} else {bad: true} end
         else empty end
       ) catch {bad: true}
-    | tojson' "$f" 2>/dev/null | tail -1 | jq -r --arg s "$SCHEDULED_FRAME" --arg v "$ARTIFACT_VIEWER_FRAME" '
-      select(.bad != true and (.text | type) == "string")
-      | .text | select(contains($s) or contains("<how-to-respond>") or contains($v) | not)' 2>/dev/null)" || return 1
+    | tojson' "$f" 2>/dev/null | tail -1 | jq -r 'select(.bad != true and (.text | type) == "string") | .text' 2>/dev/null)" || return 1
+  [ -n "$out" ] || return 1
+  printf '%s\n' "$out"
+}
+
+# transcript_operator_words <transcript.jsonl>: prints the newest prompt's text when the operator
+# wrote it — a prompt that holds no frame (a scheduled run continued from the UI, or the
+# operator's own dashboard button beside it) — or fails.
+transcript_operator_words() {
+  local out
+  out="$(transcript_newest_prompt "${1:-}")" || return 1
+  case "$out" in (*"$SCHEDULED_FRAME"*|*'<how-to-respond>'*|*"$ARTIFACT_VIEWER_FRAME"*) return 1;; esac
+  printf '%s\n' "$out"
+}
+
+# catalog_command_res: the dashboard's commands as jq regexes, one a line — the page's own
+# CMD_RE, DISCUSS_RE and WALK_RE (scripts/catalog/viewer.html: the operator's words of
+# docs/on-demand.md and docs/modules.md, each a closed shape), read from the page so the two
+# never differ. jq reads `^` `$` as a line's ends, `\d` as any script's digit and no `\uHHHH`,
+# so they become `\A` `\z`, `[0-9]` and `\x{HHHH}`. A regex not found fails.
+catalog_command_res() {
+  local page="${BASH_SOURCE[0]%/*}/../catalog/viewer.html" n re
+  for n in CMD_RE DISCUSS_RE WALK_RE; do
+    re="$(grep -m1 -E "^const $n = /\^.*\\$/;\$" "$page" 2>/dev/null)" || return 1
+    re="${re#"const $n = /^"}"; re="${re%'$/;'}"
+    printf '\\A%s\\z\n' "$(printf '%s' "$re" | sed -E 's#\\d#[0-9]#g; s#\\u([0-9a-fA-F]{4})#\\x{\1}#g')"
+  done
+}
+
+# transcript_viewer_command <transcript.jsonl>: prints the command of the session's newest
+# prompt when a shared viewer of the dashboard sent it — the platform's frame line
+# (`<viewer> sent this from a button on the interactive artifact "…" (id …).`), then
+# `Message: ` and, as the whole rest, one of the page's commands (catalog_command_res) — or
+# fails. Words that only look like the page's, or anything around them, are no command
+# (docs/modules.md → Control).
+transcript_viewer_command() {
+  local out res
+  out="$(transcript_newest_prompt "${1:-}")" || return 1
+  res="$(catalog_command_res)" || return 1
+  out="$(jq -nr --arg t "$out" --arg r "$res" '
+    $t | capture("\\A[^\\n]+ sent this from a button on the interactive artifact \"[^\\n]*\" \\(id [^\\n]*\\)\\.\\nMessage: (?<c>[\\s\\S]*)\\z").c
+    | sub("\\s+\\z"; "")
+    | select(. as $c | $r | split("\n") | map(select(. != "")) | any(. as $re | $c | test($re)))' 2>/dev/null)" || return 1
   [ -n "$out" ] || return 1
   printf '%s\n' "$out"
 }

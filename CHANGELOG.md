@@ -7,6 +7,17 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.51.0 — 2026-10-30
+
+**Upgrade:**
+1. Nothing to run — docs are re-read per run and the policy hook runs from the checkout. A
+   person the operator shared the interactive dashboard with may now use every control of the
+   page: a scenario request runs in their turn, as before; every other command of the page goes
+   to a fresh session by the viewer's handoff, where each confirmation waits for the operator
+   ([docs/persistence.md](docs/persistence.md) → **Handoff**). Tell the operator once: share the
+   dashboard only with people trusted to open issues, switch modules and promote tests
+   ([docs/modules.md](docs/modules.md) → **Control**).
+
 ## 3.50.0 — 2026-10-30
 
 **Upgrade:**

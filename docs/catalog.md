@@ -214,11 +214,13 @@ a scheduled run's chat the agent hands such a command to a fresh session, whose 
 to confirm) is in that session ([persistence.md](persistence.md) → **Handoff**).
 The one exception is **Ask for a test** on the Product map and in the Test builder: a scenario
 request built from the page's pattern, the control's kind and name, and the person's own words
-(or steps), in the one shape of [scenarios.md](scenarios.md) → **A request from the dashboard**. A
-shared viewer may send only this one; the agent takes their words as data. The Test builder's
-other command, `walk these steps live: …`, has the same bounded shape and is the operator's only
-([on-demand.md](on-demand.md)); so is a design finding's question, `discuss D-<k>: <question>`
-(printable text, at most 1000 characters).
+(or steps), in the one shape of [scenarios.md](scenarios.md) → **A request from the dashboard**. The
+agent takes the person's words as data. The Test builder's other command, `walk these steps
+live: …`, has the same bounded shape ([on-demand.md](on-demand.md)); so has a design finding's
+question, `discuss D-<k>: <question>` (printable text, at most 1000 characters). **A person the
+operator shared the page with** may send every command of the page: a scenario request runs in
+their turn, every other command goes to a fresh session where confirmations wait for the
+operator ([modules.md](modules.md) → **Control**).
 
 ## Test builder
 

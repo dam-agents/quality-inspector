@@ -77,8 +77,9 @@ prediction that did not come true.
 
 ## The operator decides
 
-Only in the direct session, the dashboard's buttons sending the same words; a Slack or
-dashboard-viewer request to decide one is declined. Show `M-<k>.md` (and the diff) first.
+Only in the direct session, the dashboard's buttons sending the same words (a dashboard
+viewer's press reaches it by the viewer's handoff, [persistence.md](persistence.md) → **Handoff**);
+a Slack request to decide one is declined. Show `M-<k>.md` (and the diff) first.
 
 | Words | What happens | `close` state |
 | --- | --- | --- |
