@@ -98,11 +98,22 @@ if (cfg.helm_version !== undefined && !/^v\d+\.\d+\.\d+$/.test(String(cfg.helm_v
 if (cfg.prune_below_gi !== undefined && !(Number.isInteger(cfg.prune_below_gi) && cfg.prune_below_gi >= 0)) {
   fail(`prune_below_gi '${cfg.prune_below_gi}' is not a whole number of Gi (0 or more)`);
 }
+// host_dirs: a directory the engine bind-mounts over (README → KVM), never one the system or
+// the engine itself owns — k3s' data, the kubelet's root, the home the sources live in.
+const SYSTEM = ['/var', '/var/lib'];
+const OWNED = ['/etc', '/usr', '/bin', '/sbin', '/lib', '/lib64', '/boot', '/dev', '/proc', '/sys', '/run', '/tmp',
+  '/home', '/root', '/var/run', '/var/lib/rancher', '/var/lib/kubelet', '/var/lib/cni'];
 const hd = cfg.host_dirs ?? [];
 if (!Array.isArray(hd)) fail('host_dirs must be a list of absolute paths');
-else for (const d of hd) {
-  if (!str(d) || !d.startsWith('/') || d.split('/').includes('..') || /\s/.test(d)) fail(`host_dirs entry '${d}' is not an absolute path`);
-  else if (['/', '/etc', '/home', '/root', '/var', '/var/lib', '/usr', '/dev', '/proc', '/sys', '/run', '/tmp'].includes(d.replace(/\/+$/, '') || '/')) fail(`host_dirs entry '${d}' is a system directory`);
+else {
+  const seenDirs = new Set();
+  for (const d of hd) {
+    const n = str(d) ? d.replace(/\/+$/, '') || '/' : '';
+    if (!str(d) || !d.startsWith('/') || d.split('/').includes('..') || d.split('/').includes('.') || /\s/.test(d)) fail(`host_dirs entry '${d}' is not an absolute path`);
+    else if (n === '/' || SYSTEM.includes(n) || OWNED.some((o) => n === o || n.startsWith(`${o}/`))) fail(`host_dirs entry '${d}' is or lies under a directory the system or the engine owns`);
+    else if (seenDirs.has(n)) fail(`host_dirs entry '${d}' is listed twice`);
+    else seenDirs.add(n);
+  }
 }
 
 // Channels and their defaults.

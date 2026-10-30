@@ -215,7 +215,8 @@ out="$(c "$(cfg oci | jq -c '.kvm = true | .host_dirs = ["/var/lib/vm-images"]')
 assert_eq "check: kvm and host_dirs are known keys" "0 " "$rc $(grep -E '^FAIL|unknown key' <<<"$out")"
 c "$(cfg oci | jq -c '.kvm = "yes"')" | grep -q '^FAIL kvm must be true or false' \
   || { echo "  check: a kvm that is no boolean must fail"; FAILED=1; }
-for bad in '"/var/lib/x"' '["var/lib/x"]' '["/var/lib/../etc"]' '["/var/lib"]' '["/"]'; do
+for bad in '"/var/lib/x"' '["var/lib/x"]' '["/var/lib/../etc"]' '["/var/lib"]' '["/"]' '["/var/lib/rancher/k3s"]' \
+           '["/var/lib/kubelet/pods"]' '["/home/agent/x"]' '["/etc"]' '["/x", "/x/"]'; do
   c "$(cfg oci | jq -c --argjson h "$bad" '.host_dirs = $h')" | grep -q '^FAIL host_dirs' \
     || { echo "  check: host_dirs $bad must fail"; FAILED=1; }
 done

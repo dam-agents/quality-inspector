@@ -73,9 +73,14 @@ names its resource in `values`. With `kvm: true`, `up`:
   stopped once (with its pods' shims, mounts and iptables rules) and started again.
 
 Each `host_dirs` entry on an overlay, and not yet a mount point, gets
-`~/.local/share/host-<name>` bind-mounted over it at every `up` (a bind mount does not
-outlive the VM); what it held before is copied over first, and a pod that started on the
-overlay directory is deleted, so its controller starts it again on the mount.
+`~/.local/share/host<path>` bind-mounted over it at every `up` (a bind mount does not
+outlive the VM) — `<path>` the whole path with `-` doubled and `/` made `-`
+(`/var/lib/vm-images` → `host-var-lib-vm--images`), so no two entries share a source; what
+it held before is copied over first, and a pod that started on the overlay directory is
+deleted, so its controller starts it again on the mount. `bin/check` refuses an entry listed
+twice, and one that is or lies under a directory the system or the engine owns (`/`, `/var`,
+`/var/lib`, `/etc`, `/usr`, `/home`, `/root`, `/dev`, `/run`, `/tmp`, `/var/lib/rancher`,
+`/var/lib/kubelet`, `/var/lib/cni`, …).
 
 k3s listens on its config's port, unless its data dir holds a cluster made on another port
 (its stored kubeconfigs name it): then on that one, as k3s exits when they disagree.
