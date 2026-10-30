@@ -235,7 +235,14 @@ cmd_down() { if target_name >/dev/null; then fwd_stop; else delegate down; fi; }
 RESF="$ENVD/RESUME"
 iso_epoch() { date -u -d "$1" +%s 2>/dev/null || date -u -j -f %Y-%m-%dT%H:%M:%SZ "$1" +%s 2>/dev/null; }
 boot_epoch() { [ -n "${QI_BOOT_EPOCH:-}" ] && { echo "$QI_BOOT_EPOCH"; return; }; awk '$1 == "btime" {print $2}' /proc/stat 2>/dev/null; }
-resume_running() { local st b ts x _; [ -f "$RESF" ] && read -r st b ts x _ < "$RESF" && [ "$st" = running ] && kill -0 "$x" 2>/dev/null; }
+# A `running` record from before this boot is dead: after a restart its pid can be another process's.
+resume_running() {
+  local st b ts x _ boot
+  [ -f "$RESF" ] && read -r st b ts x _ < "$RESF" && [ "$st" = running ] || return 1
+  boot="$(boot_epoch)"; ts="$(iso_epoch "$ts")"
+  [ -n "$boot" ] && [ -n "$ts" ] && [ "$ts" -lt "$boot" ] && return 1
+  kill -0 "$x" 2>/dev/null
+}
 resume_off() { mkdir -p "$ENVD" && printf 'off - %s -\n' "$(now)" > "$RESF"; }
 # The build to bring back, or nothing (exit 1).
 resume_due() {

@@ -86,6 +86,15 @@ assert_eq "a stopped resume records 143" "done 1.0.0 143" "$st $b $rc"
 assert_eq "the stop is logged" 1 "$(cat "$WORK_DIR"/logs/events-*.jsonl | jq -sc '[.[] | select(.event == "env_resume" and (.msg | test("stopped after")))] | length')"
 assert_eq "the run's up ran" 1 "$(ups 2.0.0)"
 
+# A running record from before this boot is dead, even when its pid is alive (reused after a restart).
+sleep 30 & alive=$!
+printf 'running 1.0.0 %s %s\n' "$(iso $((NOW - 3600)))" "$alive" > "$E/RESUME"; : > "$STUB_DIR/calls"
+t0=$(date -u +%s)
+QI_BOOT_EPOCH=$((NOW - 60)) bash "$SCRIPTS/env.sh" up 2.1.0 >/dev/null 2>&1; assert_eq "the up after an old running record succeeds" 0 "$?"
+assert_eq "it does not wait for the old pid" 1 "$(( $(date -u +%s) - t0 < 5 ? 1 : 0 ))"
+kill -0 "$alive" 2>/dev/null; assert_eq "the old pid's process is not signalled" 0 "$?"
+kill "$alive" 2>/dev/null
+
 # The hook: input discarded, the line on stdout, exit 0; registered once by install.sh.
 printf 'done 1.0.0 %s 0 -\n' "$(iso $((NOW - 3600)))" > "$E/UP"; rm -f "$E/RESUME"
 out="$(echo '{"hook_event_name":"SessionStart","source":"resume"}' | QI_BOOT_EPOCH=$((later + 30)) bash "$SCRIPTS/hooks/resume.sh")"
