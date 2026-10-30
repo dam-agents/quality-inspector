@@ -252,6 +252,18 @@ if [ -f "$CONFIG" ]; then
     else
       fail sandbox "$sb" "fix the profile's sandbox section (docs/profile-contract.md → sandbox)"
     fi
+    # The operator-filled credentials the profile declares (docs/profile-contract.md →
+    # operator_credentials): the line is there, and its value is set when the profile requires it.
+    while IFS="$(printf '\t')" read -r n what req; do
+      printf '%s' "$n" | grep -qE '^[A-Z][A-Z0-9_]{0,31}$' || continue
+      if grep -qE "^(export[[:space:]]+)?E2E_$n=." "$WORK/env/credentials.env" 2>/dev/null; then
+        ok "operator_credential:$n" "set"
+      elif [ "$req" = true ]; then
+        fail "operator_credential:$n" "not set — $what" "the operator fills E2E_$n in work/env/credentials.env (ONBOARDING.md Step 3a) — never in chat"
+      else
+        warn "operator_credential:$n" "not set — $what (optional)"
+      fi
+    done < <(operator_credentials 2>/dev/null)
   else
     fail profile "profile '$(cfg profile)' is not installed" "install it with the skill tools (ONBOARDING.md Step 3)"
     PKEYS=""

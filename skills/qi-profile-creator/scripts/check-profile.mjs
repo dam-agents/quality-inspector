@@ -124,7 +124,7 @@ else {
 if (m !== null && !obj(m)) { fail('profile.json: not an object'); m = null; }
 
 if (m) {
-  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'security', 'canary', 'interfaces', 'validation', 'expected_requests', 'environment', 'config', 'sandbox'];
+  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'security', 'canary', 'interfaces', 'validation', 'expected_requests', 'environment', 'config', 'sandbox', 'operator_credentials'];
   for (const k of Object.keys(m)) if (!TOP.includes(k)) warn(`profile.json: unknown key '${k}' — the core ignores it`);
   m.schema === 'qi-profile/v1' ? pass('schema qi-profile/v1') : fail(`schema '${m.schema ?? ''}' is not qi-profile/v1`);
   str(m.product) ? pass(`product: ${m.product}`) : fail('product: missing');
@@ -245,6 +245,25 @@ if (m) {
       if (!existsSync(own)) warn('sandbox: no bin/sandbox — nothing checks the accounts at onboarding');
       else if (!ownBin('sandbox')) ok = false;
       if (ok) pass(`sandbox: ${acc.length} account(s) — ${acc.map((a) => a.id).join(', ')}`);
+    }
+  }
+  // operator_credentials — values the operator supplies once, seeded as empty E2E_<NAME> lines
+  // by scripts/env.sh init (docs/profile-contract.md → `operator_credentials`).
+  if (m.operator_credentials !== undefined) {
+    const list = m.operator_credentials;
+    if (!Array.isArray(list) || !list.length) fail('operator_credentials: must be a non-empty list');
+    else {
+      let ok = true; const names = new Set();
+      for (const [i, c] of list.entries()) {
+        const idx = `operator_credentials[${i}]`;
+        const name = obj(c) ? String(c.name ?? '') : '';
+        if (!/^[A-Z][A-Z0-9_]{0,31}$/.test(name)) { fail(`${idx}: name must be [A-Z][A-Z0-9_]{0,31}`); ok = false; continue; }
+        if (names.has(name)) { fail(`operator credential ${name}: declared twice`); ok = false; } names.add(name);
+        const id = name;
+        if (!str(c.what)) { fail(`operator credential ${id}: no what — the operator is told what to fill`); ok = false; }
+        if (c.required !== undefined && typeof c.required !== 'boolean') { fail(`operator credential ${id}: required must be true or false`); ok = false; }
+      }
+      if (ok) pass(`operator_credentials: ${list.length} — ${list.map((c) => 'E2E_' + c.name).join(', ')}`);
     }
   }
   // egress placeholders name profile keys that exist.

@@ -202,6 +202,9 @@ third-party page (its labels and button names are assumptions until then).
    - with sandbox accounts: each guide in `sandbox/`, and that the operator writes the
      credentials straight into the instance's `work/env/credentials.env` (the lines
      `scripts/sandbox.sh template` adds) — never into chat;
+   - with `operator_credentials`: what each value is for, and that `env.sh init` seeds its
+     empty `E2E_<NAME>` line for the operator to fill in `work/env/credentials.env` — never
+     into chat;
    - the minimum quality-inspector version, and the order to merge in when a core change
      or a product change must land first.
 3. Say in three lines what the QA agent will treat as untestable (the "cannot do" list),

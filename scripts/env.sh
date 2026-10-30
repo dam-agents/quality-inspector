@@ -106,6 +106,23 @@ run_bin() { # <cmd> [args]
     profile_run env "$@"
   fi
 }
+# The profile's operator-filled credentials (docs/profile-contract.md → `operator_credentials`):
+# add each missing `E2E_<NAME>=` line once — empty, mode 600 — and say what to fill. Idempotent; an
+# existing line is never touched and no value is ever printed.
+seed_operator_credentials() {
+  local f="$ENVD/credentials.env" n what req
+  [ -f "$f" ] || return 0
+  while IFS=$'\t' read -r n what req; do
+    printf '%s' "$n" | grep -qE '^[A-Z][A-Z0-9_]{0,31}$' || continue
+    grep -qE "^(export[[:space:]]+)?E2E_$n=" "$f" && continue
+    if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi
+    ( umask 077; printf 'E2E_%s=\n' "$n" >> "$f" ) || { echo "env: cannot write work/env/credentials.env" >&2; return 1; }
+    chmod 600 "$f"
+    echo "env: fill E2E_$n in work/env/credentials.env — $what (never in chat)" >&2
+  done < <(operator_credentials 2>/dev/null)
+  return 0
+}
+
 delegate() { # <cmd> [args]
   mkdir -p "$ENVD" && chmod 700 "$ENVD"
   local t0 rc; t0="$(date -u +%s)"
@@ -116,7 +133,8 @@ delegate() { # <cmd> [args]
   esac
   case "$rc" in
     (0) [ "$1" = up ] && logev info env_up "product at build ${2:-?} took_s=$(( $(date -u +%s) - t0 ))"
-        [ "$1" = reset ] && logev info env_reset "product data wiped" ;;
+        [ "$1" = reset ] && logev info env_reset "product data wiped"
+        [ "$1" = init ] && { seed_operator_credentials || rc=1; } ;;
     (*) logev error env_failed "profile bin/env $1 exited $rc (output: work/env/last-$1.log)" ;;
   esac
   return "$rc"

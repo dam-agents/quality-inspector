@@ -258,6 +258,33 @@ company workspace.
 The sandbox is opt-in per instance: missing credentials fail `verify-onboarding.sh`, and an
 operator who declines leaves the account's lines empty; its criteria are then `testable: no`.
 
+## `operator_credentials` — values the operator fills
+
+Some tests need one real value the product's operator supplies and the profile cannot make
+up: an API key for a model proxy, a token for a service the criteria call. That is neither an
+engine `secret` (generated at install, `{{secret:<name>}}`) nor a sandbox account (a throwaway
+account to create): it is one value a person pastes. The profile declares it at the top level:
+
+```json
+"operator_credentials": [
+  { "name": "LITELLM_CURVE_BENDER_TOKEN",
+    "what": "a CurveBender (LiteLLM) API key, so the tests can use a real model",
+    "required": false }
+]
+```
+
+- `name` — `[A-Z][A-Z0-9_]{0,31}`, unique; it is the variable without its `E2E_` prefix.
+- `what` — one sentence the operator is told, so they know what to paste and why.
+- `required` — `true` fails `verify-onboarding.sh` while the line is empty; `false` (default)
+  only warns, and the criteria that need it stay `testable: no`.
+
+Each lands in `work/env/credentials.env` as **`E2E_<NAME>`**: `scripts/env.sh init` adds a
+missing line empty (mode 600) and never touches one that is there; the operator fills it in the
+agent's files — never in chat. Every such value is masked in run artefacts whatever its name
+(`scripts/lib/secrets.mjs` masks `PASSWORD`, `TOKEN`, `SECRET`, `KEY` and every `E2E_SANDBOX_`
+value), and `work/env/` is never in the `work_repo` backup, so a restore asks again. A test
+reads it from its environment (`process.env.E2E_<NAME>`) and never hard-codes a key.
+
 ## `SKILL.md` — what a tester should know
 
 Read at the AC freeze and when writing tests. It holds **user-facing** knowledge only:
