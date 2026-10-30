@@ -91,8 +91,9 @@ A direct session's first request names it ([logging.md](logging.md) → **Sessio
   **"run <ref>, <ref>…"** (2 to 20 of these refs, the dashboard's "Run it again" for a selection,
   a filter or a run's failed test cases) is the same under one lock: per ref in its order one
   `suite.sh run` (its label ends in `-<position>`, so two refs of one file never share a run dir)
-  and one `rerun.mjs`; a ref whose test file is gone is skipped and named. One answer for all, one
-  catalog at the end.
+  and one `rerun.mjs`; a ref whose test file is gone, or whose run fails before its tests, is
+  named with its reason and the next ref runs. From the lock on, every end runs
+  `env.sh unlock operator` first. One answer for all, one catalog at the end.
 - **"walk these steps live: On the page <pattern>: <steps>"** — the dashboard's Test builder
   ([catalog.md](catalog.md) → Test builder): do the steps on the product that is up, live in the
   Browser Panel, so the operator sees them. Never from a dashboard viewer: that press is declined
