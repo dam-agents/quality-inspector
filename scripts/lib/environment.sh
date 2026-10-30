@@ -30,6 +30,7 @@ KEPT_F="$WORK/ENVIRONMENTS.json"
 KEEP_DAYS_DEFAULT=3
 ACTIVE_EXPIRES=2d
 KVM_DEV="${QI_KVM_DEVICE:-/dev/kvm}"   # this VM's device; the tests point it at a file
+KVM_PROBE_S="${QI_KVM_PROBE_S:-30}"    # one /dev/kvm check in an Environment, at most; the tests shorten it
 
 penv() { node "$SCRIPT_DIR/lib/platform-env.mjs" "$@"; }
 # One SSH master per Environment for the commands (not the forward), so each call after the
@@ -59,8 +60,12 @@ target_choose() {
 }
 
 profile_kvm() { [ "$(profile_field '.engine_config.kvm')" = true ]; }
-# Whether the Environment has /dev/kvm: `yes` or `no`; anything else (empty) — its link did not answer.
-env_has_kvm() { essh "$1" 'if test -e /dev/kvm; then echo yes; else echo no; fi' 2>/dev/null; }
+# Whether the Environment has /dev/kvm: `yes` or `no`; anything else (empty) — its link did not
+# answer. Time-bound (10 s to connect, KVM_PROBE_S in all), so a link that hangs is a no-answer try.
+env_has_kvm() {
+  timeout "$KVM_PROBE_S" ssh -o ConnectTimeout=10 -o ControlMaster=auto -o "ControlPath=$ENVD/ssh-%C" -o ControlPersist=10m \
+    -o BatchMode=yes "env-$1" 'if test -e /dev/kvm; then echo yes; else echo no; fi' 2>/dev/null
+}
 
 env_exists() { penv list 2>/dev/null | jq -e --arg n "$1" 'any(.[]; .name == $n)' >/dev/null; }
 env_url() { penv list 2>/dev/null | jq -r --arg n "$1" --arg e "${2:-app}" '.[] | select(.name == $n) | .endpoints[]? | select(.name == $e) | .url // empty' | head -1; }

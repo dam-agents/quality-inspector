@@ -46,6 +46,7 @@ fwd=0
 while [ $# -gt 0 ]; do case "$1" in (-o|-L) shift 2;; (-N) fwd=1; shift;; (-*) shift;; (*) break;; esac; done
 host="$1"; shift
 [ -e "$SANDBOX/ssh-down" ] && exit 255
+[ -e "$SANDBOX/ssh-hang" ] && [ "$fwd" = 0 ] && exec sleep 300
 [ "$fwd" = 1 ] && exec -a "$SANDBOX/fwd-sleep" sleep 300
 mkdir -p "$SANDBOX/envs/${host#env-}"; cd "$SANDBOX/envs/${host#env-}" || exit 1
 # /dev/kvm there is $SANDBOX/env-kvm, for every Environment.
@@ -115,6 +116,13 @@ assert "kvm, no answer: the Environment stays" 'length == 1' "$(cat "$ST")"
 assert "kvm, no answer: it stays the active one" '.target == "environment"' "$(E where)"
 grep -q "^up 1.0.0" "$WORK_DIR/env/calls" && { echo "  kvm, no answer: nothing runs in this VM"; FAILED=1; }
 rm -f "$SANDBOX/ssh-down"
+# … a link that hangs: each try is cut at its time bound, and the same no-answer path follows.
+touch "$SANDBOX/ssh-hang"; t0=$(date +%s)
+QI_KVM_PROBE_S=1 E up 1.0.0 2>"$SANDBOX/err" >/dev/null; assert_eq "kvm, hung link: up fails" 1 "$?"
+[ $(( $(date +%s) - t0 )) -lt 60 ] || { echo "  kvm, hung link: the tries are time-bound"; FAILED=1; }
+grep -q "did not answer the /dev/kvm check (3 tries)" "$SANDBOX/err" || { echo "  kvm, hung link: the reason is said: $(cat "$SANDBOX/err")"; FAILED=1; }
+assert "kvm, hung link: the Environment stays" 'length == 1' "$(cat "$ST")"
+rm -f "$SANDBOX/ssh-hang"
 # … both have it → that Environment.
 touch "$SANDBOX/env-kvm"
 E up 1.0.0 2>"$SANDBOX/err" >/dev/null; assert_eq "kvm in both: up succeeds" 0 "$?"
