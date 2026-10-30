@@ -43,10 +43,12 @@ S
   echo '{"candidate":"0.0.0-main.bbb2222","baseline":"0.2.19"}' > "$STUB_DIR/versions.json"
 }
 
+# The deploy gate is off here: the fixtures' issues are open and unmerged. test_issues.sh turns it on.
 seed_work() {
   cat > "$WORK_DIR/CONFIG.md" <<CFG
 - target_repo: acme/widgets
 - max_issues_per_run: ${1:-5}
+- deploy_gate: disabled
 CFG
   printf '| issue | ac_hash | candidate | baseline | verdict | status | updated_utc |\n| --- | --- | --- | --- | --- | --- | --- |\n' > "$WORK_DIR/QA.md"
   printf '| test | issue | tier | assert_hash | promoted_utc |\n| --- | --- | --- | --- | --- |\n' > "$WORK_DIR/SUITE.md"

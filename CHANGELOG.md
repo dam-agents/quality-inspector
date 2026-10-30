@@ -7,6 +7,16 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.46.0 — 2026-10-30
+
+**Upgrade:**
+1. Nothing to run — docs are re-read per run. The deploy gate is on by default: an issue carrying
+   `qa_label` is tested only once the candidate build was published after its change merged — the
+   issue closed as completed, or a pull request with `qa_label` that closes it merged
+   ([docs/issue-qa.md](docs/issue-qa.md) → **The deploy gate**). An open issue with no such pull
+   request now waits; the logs and `issues_waiting[]` say why. Put the label on the fixing pull
+   request too, or add `- deploy_gate: disabled` to `work/CONFIG.md` for the old behavior.
+
 ## 3.45.0 — 2026-10-30
 
 **Upgrade:**

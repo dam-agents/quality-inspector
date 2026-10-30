@@ -117,6 +117,46 @@ out="$(bash "$SCRIPTS/preflight.sh" issues)"
 assert "missing target is an error" '(.error | test("target_repo"))' "$out"
 grep -q 'ERROR:' "$WORK_DIR/ISSUES.log" || { echo "  ISSUES.log has no ERROR line"; FAILED=1; }
 
+# The deploy gate (docs/issue-qa.md → The deploy gate): the candidate stub was published 2026-10-01.
+seed_work 9
+sed -i.bak '/^- deploy_gate:/d' "$WORK_DIR/CONFIG.md" && rm -f "$WORK_DIR/CONFIG.md.bak"
+cat > "$STUB_DIR/issues.json" <<'J'
+[{"number":20,"title":"Open, no PR","body":"## Done when\n- a","state":"open","labels":[{"name":"qa:ready"}]},
+ {"number":21,"title":"Closed before the build","body":"## Done when\n- a","state":"closed","state_reason":"completed","closed_at":"2026-09-30T10:00:00Z","labels":[{"name":"qa:ready"}]},
+ {"number":22,"title":"Closed after the build","body":"## Done when\n- a","state":"closed","state_reason":"completed","closed_at":"2026-10-02T10:00:00Z","labels":[{"name":"qa:ready"}]},
+ {"number":23,"title":"Not planned","body":"## Done when\n- a","state":"closed","state_reason":"not_planned","closed_at":"2026-09-01T10:00:00Z","labels":[{"name":"qa:ready"}]},
+ {"number":24,"title":"Open, PR merged","body":"## Done when\n- a","state":"open","labels":[{"name":"qa:ready"}]},
+ {"number":25,"title":"Open, PR open","body":"## Done when\n- a","state":"open","labels":[{"name":"qa:ready"}]},
+ {"number":40,"title":"Fix the list","body":"This fixes #24 and closes #26.\n\n```\nfixes #27\n```","state":"closed","labels":[{"name":"qa:ready"}],"pull_request":{"merged_at":"2026-09-29T08:00:00Z"}},
+ {"number":41,"title":"Resolves #25","body":"wip","state":"open","draft":true,"labels":[{"name":"qa:ready"}],"pull_request":{"merged_at":null}},
+ {"number":42,"title":"Cleanup","body":"Refs #20","state":"closed","labels":[{"name":"qa:ready"}],"pull_request":{"merged_at":"2026-09-29T08:00:00Z"}}]
+J
+echo '{"number":26,"title":"Unlabelled, closed by #40","body":"## Done when\n- b","state":"open","labels":[]}' > "$STUB_DIR/issue-26.json"
+out="$(bash "$SCRIPTS/preflight.sh" issues)"
+assert "gate: the candidate's publish time is reported" '.candidate_built == "2026-10-01T00:00:00Z"' "$out"
+assert "gate: issues merged before the build are due" '[.issues_due[].issue] == [21,24,26]' "$out"
+assert "gate: a merged labelled PR stands for the issue it closes" '.issues_due[] | select(.issue==24) | .via_pr == [40] and .merged_at == "2026-09-29T08:00:00Z"' "$out"
+assert "gate: an unlabelled issue a labelled PR closes is read and due" '.issues_due[] | select(.issue==26) | .via_pr == [40] and .kind == "first"' "$out"
+assert "gate: a closed issue carries its closed_at" '.issues_due[] | select(.issue==21) | .via_pr == [] and .merged_at == "2026-09-30T10:00:00Z"' "$out"
+assert "gate: an open issue with no merged PR waits" '.issues_waiting[] | select(.issue==20) | .reason | test("open and no merged pull request")' "$out"
+assert "gate: a merge after the build waits for a newer one" '.issues_waiting[] | select(.issue==22) | .reason | test("before it")' "$out"
+assert "gate: closed as not planned waits" '.issues_waiting[] | select(.issue==23) | .reason | test("not_planned")' "$out"
+assert "gate: an open labelled PR waits for its merge" '.issues_waiting[] | select(.issue==25) | .reason | test("#41 not merged")' "$out"
+assert "gate: a fenced closing keyword is not a reference" '[.issues_due[].issue, .issues_waiting[].issue] | index(27) == null' "$out"
+assert "gate: a PR that closes nothing is logged" '.logs | map(select(test("PR #42: carries the QA label but closes no issue"))) | length == 1' "$out"
+grep -q '/issues/26' "$STUB_DIR/gh.calls" || { echo "  the unlabelled issue #26 was not read"; FAILED=1; }
+# An unknown publish time holds every issue back; disabled lets every one through.
+cat > "$QI_PROFILE_DIR/bin/build-time" <<'S'
+#!/usr/bin/env bash
+exit 1
+S
+out="$(bash "$SCRIPTS/preflight.sh" issues)"
+assert "gate: unknown publish time waits" '.issues_due == [] and .candidate_built == null and .nothing_to_do == true
+  and (.issues_waiting | length) == 7 and (.logs | map(select(test("publish time unknown"))) | length) >= 1' "$out"
+echo '- deploy_gate: disabled' >> "$WORK_DIR/CONFIG.md"
+out="$(bash "$SCRIPTS/preflight.sh" issues)"
+assert "gate disabled: every issue is due" '(.issues_due | length) == 7 and .issues_waiting == []' "$out"
+
 # The black-box gate: a probe that reaches source stops the run; the first finding wakes the
 # agent, the same one again declines, a Slack turn always hears it, a passing probe clears it.
 seed_work 5

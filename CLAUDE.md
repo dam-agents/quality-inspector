@@ -39,7 +39,7 @@ Otherwise → **you perform every action** of the worklist per its `docs/`, re-c
 Worklist keys → procedure:
 
 - `issues_due[]` (`issue`, `ac_hash`, `kind` first|retest|ac_changed|takeover, `has_done_when`,
-  `author_association`, `spec` lint incl. `injection_suspect` and `gherkin`), plus `candidate` / `baseline` → [docs/issue-qa.md](docs/issue-qa.md).
+  `author_association`, `spec` lint incl. `injection_suspect` and `gherkin`, `via_pr`, `merged_at`), plus `candidate` / `baseline`; `issues_waiting[]` (not deployed yet: nothing to do) → [docs/issue-qa.md](docs/issue-qa.md).
 - `reports_due[]` (`issue`, `retest_label_present`) — a finished report whose delivery failed → [docs/reporting.md](docs/reporting.md).
 - `regression` mode: `tests[]`, `assert_drift[]`, `candidate`, `previous_candidate`, `replay`, `profile_scenarios` (the profile's `scenarios/` to adopt, retire or defer), `channel`, `confirm_regressions`, `bisect_max_steps` → [docs/regression.md](docs/regression.md).
 - `audit`: `checks[]`, `failures[]`, `stats` → [docs/audit.md](docs/audit.md); `benchmark`: `cases` → [docs/benchmark.md](docs/benchmark.md);
@@ -62,7 +62,7 @@ stripped. Every script reads it through `scripts/lib/config.sh`, so the verifier
 - `target_repo` — `[<host>/]<owner>/<repo>` whose issues are tested; required, no default (missing → every mode fails).
   `QI_TARGET_REPO` wins. `github_login` — the agent's own login when the token cannot tell (a GitHub App: `<slug>[bot]`).
 - `marker_prefix` (`quality-inspector`) — **immutable once a comment exists** (it would orphan past verdicts). `issue_comments` opt-in (`disabled`), `artifact_reports` (`enabled`), `report_visibility` (`private` | `public`: a link anyone holding it opens, for the dashboard; [docs/reporting.md](docs/reporting.md) → Delivery), `test_catalog` (`enabled`; [docs/catalog.md](docs/catalog.md)).
-- `qa_label` (`qa:ready`), `retest_label` (`qa:retest`) — the gates; `found_label` (`qa:found`), `fix_label` (none; the software
+- `qa_label` (`qa:ready`, on an issue or the pull request closing it), `retest_label` (`qa:retest`) — the gates; `deploy_gate` (`enabled`: only a build published after the merge — [docs/issue-qa.md](docs/issue-qa.md)); `found_label` (`qa:found`), `fix_label` (none; the software
   architect's) — a found issue's ([skills/create-issue](skills/create-issue/SKILL.md)); `candidate_channel`, `baseline_channel`
   — passed to the profile (empty = its defaults); `baseline_channel: none` turns red-green off.
 - `include_comments` (`enabled`), `spec_feedback` (`disabled`): the issue's comments join the
