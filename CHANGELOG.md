@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.47.0 — 2026-10-30
+## 3.48.0 — 2026-10-30
 
 **Upgrade:**
 1. Nothing to run for an instance whose profile declares no `operator_credentials` — the key is
@@ -22,6 +22,15 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 2. Nothing to run — `scripts/lib/secrets.mjs` masks a value whose name ends in `KEY` too, in
    every run artefact and in the `work_repo` snapshot, so a line an operator filled as
    `..._KEY` no longer has to be renamed to `..._TOKEN` to stay out of them.
+
+## 3.47.0 — 2026-10-30
+
+**Upgrade:**
+1. Nothing to run. Under `nested_target: auto` a profile that sets `engine_config.kvm` now runs
+   in a platform Environment too, when this VM has `/dev/kvm` and the new Environment has it as
+   well; an Environment without the device is deleted and the product runs in this VM, as before
+   ([docs/nested-env.md](docs/nested-env.md) → **Where the product runs**). To keep it in this
+   VM, set `- nested_target: vm` in `work/CONFIG.md`.
 
 ## 3.46.0 — 2026-10-30
 

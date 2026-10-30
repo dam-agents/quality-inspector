@@ -12,9 +12,13 @@ recovery path; how one product is installed is the profile's.
 `environment`), and says which on its first line; `env.sh where` tells it any time.
 
 - **An Environment** when the profile declares one (`environment` in `profile.json`), the
-  agent does not lend its model (`lend_model`: an Environment holds no connection), the
-  profile does not set `engine_config.kvm` (an Environment does not promise `/dev/kvm`), and the
-  platform's Environment tools answer (the owner's `environments` feature). The active
+  agent does not lend its model (`lend_model`: an Environment holds no connection), this VM
+  has `/dev/kvm` when the profile sets `engine_config.kvm` (the platform gives an Environment
+  the device on the same terms as this VM, and its tools do not say it), and the platform's
+  Environment tools answer (the owner's `environments` feature). With `kvm`, `up` then looks for
+  `/dev/kvm` in the Environment itself (`ssh env-<name>`): when it is not there, `up` deletes that
+  Environment and the product runs in this VM. When the link does not answer that check (three
+  tries), `up` fails as an environment failure and the Environment stays. The active
   Environment is reused from run to run while it lives (each `up` extends it two days);
   otherwise `up` makes a new one, `qi-<date>`, and moving to it stops the product in this VM.
 - **This VM** otherwise, and whenever the platform does not make the Environment — with the

@@ -63,8 +63,9 @@ any other `url` does.
 The device comes from the platform that hosts the node (nested virtualization), never from
 the engine; the profile ships the cluster's device plugin as a `manifest` prerequisite and
 names its resource in `values`. The node is this VM or the platform Environment that runs the
-product. An Environment does not promise the device: with `kvm: true` the product stays in
-this VM under `nested_target: auto`, and `env.sh up` fails under `environment`
+product. An Environment gets the device on the same terms as this VM: with `kvm: true`, `env.sh up`
+uses an Environment only when this VM has `/dev/kvm` and the Environment has it too; else the
+product stays in this VM under `nested_target: auto`, and `up` fails under `environment`
 ([docs/nested-env.md](../../docs/nested-env.md) → **Where the product runs**). With `kvm: true`, `up`:
 
 - opens `/dev/kvm` to all (`0666`) every time: in a user namespace the device keeps its
