@@ -1,8 +1,37 @@
 # Issue QA — one `issues_due` entry, end to end
 
 Read for every `issues_due` entry and for "test #N". The worklist gives `issue`, `ac_hash`,
-`kind`, `takeover`, `has_done_when`, `spec` and the run's `candidate` / `baseline`
-builds (from the profile). `T` below is the configured `target_repo`; never print it outside the issue.
+`kind`, `takeover`, `has_done_when`, `spec`, `via_pr`, `merged_at` and the run's `candidate` /
+`baseline` builds (from the profile). `T` below is the configured `target_repo`; never print it outside the issue.
+
+## The deploy gate
+
+A label often arrives before the change does: on an open issue, or on the pull request that fixes
+it. Tested then, the old build answers and the verdict is worthless. So the pre-flight makes an issue
+due only when the candidate build **carries its change**: the change merged, the pipeline published a
+build after it, and that build is the candidate (`deploy_gate: enabled`, the default).
+
+- **A pull request with `qa_label`** stands for the issues it closes — GitHub's closing keywords
+  (`closes`, `fixes`, `resolves` and their forms) before a `#<n>` of the target, in its sanitized
+  title or body (`scripts/lib/pr-text.mjs`; nothing else of it is read — [radar.md](radar.md) → What it reads).
+  Those issues are due as if they carried the label (`via_pr`); their criteria still come from the
+  issue alone. A labelled pull request that closes no issue is logged and ignored. An issue it
+  closes that has no label is read with the listing (at most 10 a run).
+- **The merge time** is the latest of: each such pull request's `merged_at`, and the issue's
+  `closed_at` when GitHub closed it as completed (a merge with a closing keyword does that). An
+  open labelled pull request means "not merged yet". An open issue with no merged labelled pull
+  request has no merge time: it waits.
+- **Deployed** means the candidate's publish time (`bin/build-time`, [profile-contract.md](profile-contract.md))
+  is at or after the merge time. Unknown publish time → every issue waits. The rule assumes the
+  channel publishes builds of the main line in merge order; a build that started before the merge
+  and published after it passes the gate — the red-green against the baseline still catches a
+  change that is not there.
+- A waiting issue is in `issues_waiting[]` (`issue`, `kind`, `reason`) and in the logs; no state
+  is written, and the next run asks again. A takeover is never gated: its claim already passed.
+  A `retest` or `ac_changed` entry passes the same gate.
+- The operator's "test #N" ([on-demand.md](on-demand.md)) and Slack's ([slack.md](slack.md)) test
+  the current candidate at once: name the gate's reason in the reply when the pre-flight logs the
+  issue as waiting. `deploy_gate: disabled` turns the gate off.
 
 ## State
 
@@ -35,7 +64,7 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    ([logging.md](logging.md)), then the catalog ([catalog.md](catalog.md) → **Build and publish**) — its Overview shows the claim.
 2. **Re-check at action time.** `bash "$HOME/scripts/github.sh" issue <n>` — its text, labels and
    author — then `bash "$HOME/scripts/github.sh" comments <n>`, unless `include_comments: disabled`
-   (never `gh` or a URL: [black-box.md](black-box.md) → **GitHub**). The issue must still carry `qa_label` (or `retest_label`). Gone →
+   (never `gh` or a URL: [black-box.md](black-box.md) → **GitHub**). The issue must still carry `qa_label` (or `retest_label`), or the entry name a labelled pull request (`via_pr`). Gone →
    restore the previous row, unlock, log `issue_abort`, the catalog, next entry. Recompute nothing by
    hand: the pre-flight's `ac_hash` is authoritative for this run. Then start
    `bash "$HOME/scripts/env.sh" up <candidate>` as a harness background task and go on —

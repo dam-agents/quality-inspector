@@ -4,13 +4,17 @@
 // A shell loop forked a dozen tools per issue; this keeps the Precheck far inside its two
 // minutes. Byte-for-byte the same spec text and hash as lib/state.sh (test_scan_parity.sh).
 //
-//   scan-issues.mjs <listing.json> <QA.md> <events-dir>   -> {"due":[…],"reports":[…],"logs":[…],"deferred":n}
-// Env: QI_OPERATOR_FILE (work/OPERATOR.md), QI_RETEST_LABEL, QI_MAX_ISSUES, QI_LOCK_TTL_MIN, QI_NOW_EPOCH, QI_ENV_LOCK (lib/lock.sh state).
+//   scan-issues.mjs <listing.json> <QA.md> <events-dir>   -> {"due":[…],"reports":[…],"waiting":[…],"logs":[…],"deferred":n}
+//   scan-issues.mjs --missing <listing.json>               -> the issues the listing's pull requests close but
+//                                                             the listing lacks, as one JSON array of numbers
+// Env: QI_OPERATOR_FILE (work/OPERATOR.md), QI_RETEST_LABEL, QI_MAX_ISSUES, QI_LOCK_TTL_MIN, QI_NOW_EPOCH, QI_ENV_LOCK (lib/lock.sh state),
+// QI_DEPLOY_GATE (enabled | disabled), QI_CANDIDATE, QI_CANDIDATE_BUILT (the candidate's publish time, bin/build-time; empty = unknown).
 
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gherkinBlocks, isPureGherkin, parseAll } from './gherkin.mjs';
+import { prOf } from './pr-text.mjs';
 
 export const VAGUE = /\b(better|faster|improve[sd]?|properly|correctly|nicer|cleaner|robust|seamless|intuitive|as expected|should work|works? well|user-friendly|etc\.?)\b/gi;
 const DONE = /^#{1,6}[ \t]+[Dd]one[ \t]+[Ww]hen[ \t]*$/;
@@ -99,7 +103,43 @@ export function specLint(title, body) {
     ...injectionLint(`${title}\n${spec}`) };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// The deploy gate (docs/issue-qa.md → The deploy gate): an issue is tested only on a build
+// published after its change merged. A pull request carrying the QA label stands for the issues it
+// closes — GitHub's closing keywords before a `#<n>` of the same repository, read from its sanitized
+// text (lib/pr-text.mjs) and nothing else of it.
+const CLOSES = /(?:^|[^\w/#-])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)[ \t]*:?[ \t]+#(\d{1,7})\b/gi;
+export function closingRefs(pr) {
+  const p = prOf(pr); const out = new Set();
+  for (const t of [p.title, p.body]) for (const m of t.matchAll(CLOSES)) out.add(Number(m[1]));
+  return [...out].filter((n) => n > 0 && n !== p.number).sort((a, b) => a - b);
+}
+// The labelled pull requests of a listing, each with the issues it closes.
+export function labelledPrs(listing) {
+  return listing.filter((x) => x && x.pull_request && Number.isInteger(x.number))
+    .map((x) => ({ ...prOf(x), closes: closingRefs(x) }));
+}
+// issue: a listing item; prs: the labelled pull requests that close it; built: the candidate's
+// publish time (ISO) or ''. The merge time is the latest of the merged pull requests' merged_at and,
+// for an issue closed as completed, its closed_at: every change must be in the build.
+export function deployGate(issue, prs, built, candidate = 'the candidate') {
+  const open = prs.filter((p) => p.state === 'open');
+  if (open.length) return { ok: false, reason: `pull request ${open.map((p) => `#${p.number}`).join(', ')} not merged yet` };
+  const times = prs.filter((p) => p.state === 'merged' && p.merged_at).map((p) => p.merged_at);
+  if (issue.state === 'closed' && (issue.state_reason ?? 'completed') === 'completed' && issue.closed_at) times.push(issue.closed_at);
+  const merged = times.filter((t) => Number.isFinite(Date.parse(t))).sort((a, b) => Date.parse(a) - Date.parse(b)).pop();
+  if (!merged) return { ok: false, reason: issue.state === 'closed'
+    ? `closed as ${issue.state_reason ?? 'not completed'} and no merged pull request with the QA label closes it`
+    : 'the issue is open and no merged pull request with the QA label closes it' };
+  if (!built || !Number.isFinite(Date.parse(built))) return { ok: false, reason: `merged ${merged}; the publish time of ${candidate} is unknown (profile bin/build-time)` };
+  if (Date.parse(built) < Date.parse(merged)) return { ok: false, reason: `merged ${merged}; ${candidate} was published ${built}, before it — waiting for a newer build` };
+  return { ok: true, merged_at: merged };
+}
+
+if (import.meta.url === `file://${process.argv[1]}` && process.argv[2] === '--missing') {
+  const listing = JSON.parse(readFileSync(process.argv[3], 'utf8'));
+  const have = new Set(listing.filter((x) => !x.pull_request).map((x) => x.number));
+  console.log(JSON.stringify([...new Set(labelledPrs(listing).flatMap((p) => p.closes))].filter((n) => !have.has(n)).sort((a, b) => a - b)));
+} else if (import.meta.url === `file://${process.argv[1]}`) {
   const [listingPath, qaPath, eventsDir] = process.argv.slice(2);
   const retest = process.env.QI_RETEST_LABEL ?? 'qa:retest';
   const max = Number(process.env.QI_MAX_ISSUES ?? 1);
@@ -132,7 +172,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   }
   const mins = (iso) => Math.floor((now - (Date.parse(iso) / 1000 || 0)) / 60);
 
-  const due = []; const reports = []; const logs = []; let deferred = 0;
+  const gate = process.env.QI_DEPLOY_GATE !== 'disabled';
+  const built = process.env.QI_CANDIDATE_BUILT ?? ''; const candidate = process.env.QI_CANDIDATE || 'the candidate';
+  const prs = labelledPrs(listing);
+  const due = []; const reports = []; const waiting = []; const logs = []; let deferred = 0;
+  for (const p of prs) logs.push(p.closes.length ? `PR #${p.number} (${p.state}): closes ${p.closes.map((n) => `#${n}`).join(', ')}`
+    : `PR #${p.number}: carries the QA label but closes no issue — ignored`);
   for (const it of listing.filter((x) => !x.pull_request).sort((a, b) => a.number - b.number)) {
     const n = it.number; const title = it.title ?? ''; const body = it.body ?? '';
     const answers = operatorAnswers(operator, n);
@@ -150,10 +195,17 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     else if (isRetest) kind = 'retest';
     else if (row.hash !== hash) kind = 'ac_changed';
     else { logs.push(`issue #${n}: done at ac=${hash} — skip`); continue; }
+    const via = prs.filter((p) => p.closes.includes(n));
+    let merged = null;
+    if (gate && !takeover) {
+      const g = deployGate(it, via, built, candidate);
+      if (!g.ok) { waiting.push({ issue: n, kind, reason: g.reason }); logs.push(`issue #${n}: ${kind} — waiting for the deploy: ${g.reason}`); continue; }
+      merged = g.merged_at;
+    }
     if (due.length >= max) { deferred++; logs.push(`issue #${n}: ${kind} — deferred (max_issues_per_run)`); continue; }
     due.push({ issue: n, ac_hash: hash, kind, takeover, has_done_when: hasDoneWhen(body), retest_label_present: isRetest,
-      author_association: it.author_association ?? null, spec: specLint(title, body) });
+      author_association: it.author_association ?? null, via_pr: via.map((p) => p.number), merged_at: merged, spec: specLint(title, body) });
     logs.push(`issue #${n}: ${kind} (ac=${hash}) — due`);
   }
-  console.log(JSON.stringify({ due, reports, logs, deferred }));
+  console.log(JSON.stringify({ due, reports, waiting, logs, deferred }));
 }
