@@ -7,6 +7,15 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.47.0 — 2026-10-30
+
+**Upgrade:**
+1. Run `bash "$HOME/scripts/hooks/install.sh"` once in the direct session: it registers the
+   SessionStart hook `scripts/hooks/resume.sh`. From the next session after a VM restart (the
+   platform hibernates an idle VM), the product comes back at the build it ran, in the background
+   ([docs/nested-env.md](docs/nested-env.md) → **After a VM restart**). Do not install a boot
+   service for this. The audit's `resume_hook` check warns until the hook is registered.
+
 ## 3.46.0 — 2026-10-30
 
 **Upgrade:**

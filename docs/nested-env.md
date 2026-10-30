@@ -95,6 +95,26 @@ step — so a person signs in and looks, beyond the video and screenshots.
   email, a single user…) is in the profile's `SKILL.md`; it decides `testable: no`
   ([acceptance-criteria.md](acceptance-criteria.md)).
 
+## After a VM restart
+
+The platform hibernates an idle agent VM and boots it again at the next session. A boot stops
+k3s and the product with it (and the forward to an Environment); nothing in the VM starts them
+again, and a boot service of the agent's own is not allowed. So the **SessionStart hook**
+(`scripts/hooks/resume.sh`, registered by `scripts/hooks/install.sh`) runs `env.sh resume` in
+the first session after a boot: when the last `up` succeeded before this boot and no `down` or
+`reset` came after it, it brings **that build** back in the background — no reset, no other
+build, the data as it was; the engine finds the cluster on disk and only waits for the UI. Its
+output is `work/env/last-resume.log`, its state `work/env/RESUME`, its events `env_resume` (and
+`env_failed` when it fails — the next `up` then installs as usual; never a verdict).
+
+- The hook gives the session one line when it starts a resume. The product answers again
+  in a few minutes: `env.sh status`. A run's `up`, `reset` or `down` waits for a resume to end
+  first (at most 15 minutes, then stops it), so they never install at the same time.
+- A Browser Panel tab that was open before the restart is empty after it: when a person
+  watches, give the `env.sh watch` button again.
+- `env.sh down` (and `reset`) turn the resume off until the next `up`. The audit's
+  `resume_hook` check warns while the hook is not registered.
+
 ## Network
 
 The VM reaches the outside only through the paired gateway, by the agent's egress rules.

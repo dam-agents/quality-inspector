@@ -213,7 +213,8 @@ then re-run this block. Write
 scripts find the profile through it.
 
 **2e — the hooks:** `bash "$HOME/scripts/hooks/install.sh"` merges the PreToolUse policy
-hook, the Stop backup hook, the trace hook ([docs/logging.md](docs/logging.md) → **Harness trace**) and the deny list into `$HOME/.claude/settings.json` (other keys
+hook, the Stop backup hook, the trace hook ([docs/logging.md](docs/logging.md) → **Harness trace**), the SessionStart
+resume hook ([docs/nested-env.md](docs/nested-env.md) → **After a VM restart**) and the deny list into `$HOME/.claude/settings.json` (other keys
 kept; re-running changes nothing); they apply from the next session ([docs/black-box.md](docs/black-box.md)
 → **Enforcement layers**).
 
