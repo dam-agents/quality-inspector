@@ -273,16 +273,18 @@ account to create): it is one value a person pastes. The profile declares it at 
 ]
 ```
 
-- `name` — `[A-Z][A-Z0-9_]{0,31}`, unique; it is the variable without its `E2E_` prefix.
+- `name` — `[A-Z][A-Z0-9_]{0,31}`, unique, with a `PASSWORD`, `TOKEN`, `SECRET` or `KEY`
+  segment (`…_TOKEN`, `…_API_KEY`); it is the variable without its `E2E_` prefix. A name
+  without one is not seeded and fails `verify-onboarding.sh`.
 - `what` — one sentence the operator is told, so they know what to paste and why.
 - `required` — `true` fails `verify-onboarding.sh` while the line is empty; `false` (default)
   only warns, and the criteria that need it stay `testable: no`.
 
 Each lands in `work/env/credentials.env` as **`E2E_<NAME>`**: `scripts/env.sh init` adds a
 missing line empty (mode 600) and never touches one that is there; the operator fills it in the
-agent's files — never in chat. Every such value is masked in run artefacts whatever its name
-(`scripts/lib/secrets.mjs` masks `PASSWORD`, `TOKEN`, `SECRET`, `KEY` and every `E2E_SANDBOX_`
-value), and `work/env/` is never in the `work_repo` backup, so a restore asks again. A test
+agent's files — never in chat. Its name's segment makes `scripts/lib/secrets.mjs` mask the
+value in every run artefact (it masks `PASSWORD`, `TOKEN`, `SECRET`, `KEY` and every
+`E2E_SANDBOX_` value), and `work/env/` is never in the `work_repo` backup, so a restore asks again. A test
 reads it from its environment (`process.env.E2E_<NAME>`) and never hard-codes a key.
 
 ## `SKILL.md` — what a tester should know

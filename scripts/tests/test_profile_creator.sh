@@ -86,11 +86,12 @@ out="$(check "$P")"
 grep -q '^PASS  operator_credentials: 1 — E2E_LITELLM_CURVE_BENDER_TOKEN' <<<"$out" || { echo "  operator_credentials not reported"; FAILED=1; }
 grep -q "unknown key 'operator_credentials'" <<<"$out" && { echo "  operator_credentials is a contract key"; FAILED=1; }
 P="$(helm_profile opcreds-bad)"
-edit "$P" '.operator_credentials = [{"name":"lower-case","what":"x"},{"name":"DUP","what":"x"},{"name":"DUP","what":"y"},{"name":"REQ","what":"z","required":"yes"}]'
+edit "$P" '.operator_credentials = [{"name":"lower-case","what":"x"},{"name":"DUP","what":"x"},{"name":"DUP","what":"y"},{"name":"REQ_TOKEN","what":"z","required":"yes"},{"name":"MODEL_PROXY","what":"w"}]'
 out="$(check "$P")"
 grep -q '^FAIL  operator_credentials\[0\]: name must be' <<<"$out" || { echo "  a bad operator_credentials name must fail"; FAILED=1; }
 grep -q '^FAIL  operator credential DUP: declared twice' <<<"$out" || { echo "  a duplicate operator credential must fail"; FAILED=1; }
-grep -q '^FAIL  operator credential REQ: required must be' <<<"$out" || { echo "  a non-boolean required must fail"; FAILED=1; }
+grep -q '^FAIL  operator credential REQ_TOKEN: required must be' <<<"$out" || { echo "  a non-boolean required must fail"; FAILED=1; }
+grep -q '^FAIL  operator credential MODEL_PROXY: name needs a PASSWORD, TOKEN, SECRET or KEY segment' <<<"$out" || { echo "  a name secrets.mjs would not mask must fail"; FAILED=1; }
 P="$(helm_profile validation)"; edit "$P" '.validation = {"exclude":["/admin"]}'
 check "$P" | grep -q "unknown key 'validation'" && { echo "  validation is a contract key"; FAILED=1; }
 P="$(helm_profile canary-none)"; edit "$P" '.canary = {"none":"nothing a user names"}'

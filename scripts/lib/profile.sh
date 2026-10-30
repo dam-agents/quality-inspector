@@ -175,6 +175,12 @@ operator_credentials() {
   jq -r '.operator_credentials // [] | .[]? | [(.name // ""), (.what // ""), ((.required // false) | tostring)] | @tsv' \
     "$dir/profile.json" 2>/dev/null
 }
+# A valid operator credential name: [A-Z][A-Z0-9_]{0,31} with a PASSWORD, TOKEN, SECRET or KEY
+# segment, so lib/secrets.mjs masks its value in every run artefact.
+operator_credential_name_ok() { # <name>
+  printf '%s' "$1" | grep -qE '^[A-Z][A-Z0-9_]{0,31}$' \
+    && printf '%s' "$1" | grep -qE '(^|_)(PASSWORD|TOKEN|SECRET|KEY)(_|$)'
+}
 
 # The product team's scenarios (docs/profile-contract.md → `scenarios/`): one line
 # `<slug>\t<spec_hash>\t<path>` per `scenarios/<slug>.md` or `scenarios/<slug>.feature` (Gherkin)

@@ -10,7 +10,8 @@ cat > "$QI_PROFILE_DIR/profile.json" <<'J'
 {"schema":"qi-profile/v1","product":"Stub","app":{"url":"http://localhost:8080"},
  "operator_credentials":[
    {"name":"LITELLM_CURVE_BENDER_TOKEN","what":"a CurveBender API key"},
-   {"name":"EXTRA_SERVICE_KEY","what":"a second value","required":true}]}
+   {"name":"EXTRA_SERVICE_KEY","what":"a second value","required":true},
+   {"name":"MODEL_PROXY","what":"a name secrets.mjs would not mask"}]}
 J
 # The profile's bin/env init writes the credential file, as the contract says.
 cat > "$QI_PROFILE_DIR/bin/env" <<'S'
@@ -26,6 +27,7 @@ out="$(bash "$SCRIPTS/env.sh" init 2>&1)"
 case "$out" in *"fill E2E_LITELLM_CURVE_BENDER_TOKEN"*) :;; *) echo "  init does not name the seeded line: $out"; FAILED=1;; esac
 assert_eq "seeds one empty line per credential" "1 1" \
   "$(grep -c '^E2E_LITELLM_CURVE_BENDER_TOKEN=$' "$CRED") $(grep -c '^E2E_EXTRA_SERVICE_KEY=$' "$CRED")"
+assert_eq "a name with no secret segment is not seeded" 0 "$(grep -c '^E2E_MODEL_PROXY=' "$CRED")"
 assert_eq "the file stays mode 600" 600 "$(stat -c %a "$CRED" 2>/dev/null || stat -f %Lp "$CRED")"
 assert_eq "the profile's own lines are kept" 1 "$(grep -c '^E2E_USER_OWNER_PASSWORD=pw-owner-1234$' "$CRED")"
 
@@ -39,6 +41,7 @@ assert_eq "init is idempotent" "1 1" \
 o="$(bash "$SCRIPTS/verify-onboarding.sh" --config 2>&1)"
 case "$o" in *"ok   operator_credential:EXTRA_SERVICE_KEY"*) :;; *) echo "  a set credential is not reported: $(printf '%s' "$o" | grep operator_credential)"; FAILED=1;; esac
 case "$o" in *"warn operator_credential:LITELLM_CURVE_BENDER_TOKEN"*) :;; *) echo "  a missing optional credential is not a warn"; FAILED=1;; esac
+case "$o" in *"FAIL operator_credential:MODEL_PROXY — not a valid name"*) :;; *) echo "  a name with no secret segment is not a FAIL"; FAILED=1;; esac
 
 # Clear both: the required one FAILs, the optional one still only warns.
 sed -i.bak 's/^E2E_EXTRA_SERVICE_KEY=.*/E2E_EXTRA_SERVICE_KEY=/' "$CRED"; rm -f "$CRED.bak"; chmod 600 "$CRED"

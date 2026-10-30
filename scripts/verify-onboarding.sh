@@ -255,7 +255,7 @@ if [ -f "$CONFIG" ]; then
     # The operator-filled credentials the profile declares (docs/profile-contract.md →
     # operator_credentials): the line is there, and its value is set when the profile requires it.
     while IFS="$(printf '\t')" read -r n what req; do
-      printf '%s' "$n" | grep -qE '^[A-Z][A-Z0-9_]{0,31}$' || continue
+      operator_credential_name_ok "$n" || { fail "operator_credential:${n:-?}" "not a valid name — it is not seeded" "the profile names it [A-Z][A-Z0-9_]{0,31} with a PASSWORD, TOKEN, SECRET or KEY segment (docs/profile-contract.md → operator_credentials)"; continue; }
       if grep -qE "^(export[[:space:]]+)?E2E_$n=." "$WORK/env/credentials.env" 2>/dev/null; then
         ok "operator_credential:$n" "set"
       elif [ "$req" = true ]; then

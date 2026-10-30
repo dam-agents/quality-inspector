@@ -17,7 +17,8 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    `bash "$HOME/scripts/verify-onboarding.sh" --config`. Each value then has an `E2E_<NAME>`
    line in `work/env/credentials.env`, reported as set, missing (required) or missing
    (optional) ([docs/profile-contract.md](docs/profile-contract.md) → `operator_credentials`).
-   The operator fills it in the agent's files, never in chat.
+   The operator fills it in the agent's files, never in chat. A name needs a `PASSWORD`,
+   `TOKEN`, `SECRET` or `KEY` segment, so its value is masked; one without is not seeded.
 2. Nothing to run — `scripts/lib/secrets.mjs` masks a value whose name ends in `KEY` too, in
    every run artefact and in the `work_repo` snapshot, so a line an operator filled as
    `..._KEY` no longer has to be renamed to `..._TOKEN` to stay out of them.

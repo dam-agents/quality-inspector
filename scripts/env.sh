@@ -113,7 +113,7 @@ seed_operator_credentials() {
   local f="$ENVD/credentials.env" n what req
   [ -f "$f" ] || return 0
   while IFS=$'\t' read -r n what req; do
-    printf '%s' "$n" | grep -qE '^[A-Z][A-Z0-9_]{0,31}$' || continue
+    operator_credential_name_ok "$n" || continue
     grep -qE "^(export[[:space:]]+)?E2E_$n=" "$f" && continue
     if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi
     ( umask 077; printf 'E2E_%s=\n' "$n" >> "$f" ) || { echo "env: cannot write work/env/credentials.env" >&2; return 1; }

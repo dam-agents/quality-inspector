@@ -258,6 +258,7 @@ if (m) {
         const idx = `operator_credentials[${i}]`;
         const name = obj(c) ? String(c.name ?? '') : '';
         if (!/^[A-Z][A-Z0-9_]{0,31}$/.test(name)) { fail(`${idx}: name must be [A-Z][A-Z0-9_]{0,31}`); ok = false; continue; }
+        if (!/(^|_)(PASSWORD|TOKEN|SECRET|KEY)(_|$)/.test(name)) { fail(`operator credential ${name}: name needs a PASSWORD, TOKEN, SECRET or KEY segment, so its value is masked`); ok = false; }
         if (names.has(name)) { fail(`operator credential ${name}: declared twice`); ok = false; } names.add(name);
         const id = name;
         if (!str(c.what)) { fail(`operator credential ${id}: no what — the operator is told what to fill`); ok = false; }
