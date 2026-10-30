@@ -19,7 +19,8 @@ const srv = createServer((req, res) => {
     let envs = load(), out, err;
     if (name === 'list_environments') out = envs;
     else if (name === 'create_environment') {
-      if (envs.length >= 2) err = 'an agent holds at most 2 Environments';
+      if (a.name.endsWith('-full')) err = 'the storage pool is at its limit, maximum capacity reached';
+      else if (envs.length >= 2) err = `this agent already holds ${envs.length} Environments, the most it may; delete one first`;
       else { envs.push({ name: a.name, endpoints: a.endpoints.map((e) => ({ ...e, url: `https://${e.name}-${a.name}.env.test` })), expires: a.expires, start: a.start }); out = envs.at(-1); }
     } else if (name === 'update_environment') { const e = envs.find((x) => x.name === a.name); if (e) { e.expires = a.expires; out = e; } else err = 'no such Environment'; }
     else if (name === 'delete_environment') { envs = envs.filter((x) => x.name !== a.name); out = { deleted: a.name }; }
@@ -122,6 +123,7 @@ assert "extend: the platform's expiry" 'any(.[]; .name == "'"$n"'" and .expires 
 E up 2.0.0 2>/dev/null >/dev/null; n2="$(E where | jq -r .name)"
 E keep issue-9 >/dev/null 2>&1
 sleep 1
+EH create qi-x-full '{"endpoints":[{"name":"app","port":4400}]}' 2>/dev/null; assert_eq "another refusal that names a limit is no cap" 1 "$?"
 E up 3.0.0 2>"$SANDBOX/err" >/dev/null; assert_eq "at the cap: up succeeds" 0 "$?"
 grep -q "releasing the oldest kept one, $n" "$SANDBOX/err" || { echo "  at the cap the oldest kept goes: $(cat "$SANDBOX/err")"; FAILED=1; }
 assert "kept: the oldest is gone" 'map(.name) == ["'"$n2"'"] and .[0].exists' "$(E kept)"

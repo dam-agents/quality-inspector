@@ -12,8 +12,8 @@
 //   platform-env.mjs extend <name> <expires>    "48h", "3d" or an ISO date-time
 //   platform-env.mjs delete <name>
 //
-// A refusal prints the platform's message on stderr and exits 1; a cap reached (too many
-// Environments) exits 4, so a caller can free one and try again. Names this script makes start
+// A refusal prints the platform's message on stderr and exits 1; the cap reached (the
+// platform's own message for it, exactly) exits 4, so a caller can free one and try again. Names this script makes start
 // with `qi-` (env.sh), and it acts on no other.
 
 import { readFileSync } from 'node:fs';
@@ -21,6 +21,9 @@ import { join } from 'node:path';
 
 const ENTRY = join(process.env.HOME ?? '/home/agent', '.platform', 'platform-mcp-entry.json');
 const NAME = /^qi-[a-z0-9][a-z0-9-]{0,40}$/;
+// The platform's refusal at its cap (api-server environments-service, create), word for word:
+// any other refusal — storage, a rate limit, a name taken — is exit 1, never 4.
+const CAP = /^this agent already holds \d+ Environments, the most it may; delete one first$/;
 const die = (msg, code = 1) => { process.stderr.write(`platform-env: ${msg}\n`); process.exit(code); };
 
 async function call(tool, args) {
@@ -42,7 +45,7 @@ async function call(tool, args) {
   try { reply = JSON.parse(line ? line.slice(5) : text); } catch { die(`the platform answered ${res.status} with no JSON-RPC reply`); }
   if (reply.error) die(reply.error.message ?? 'the platform refused');
   const content = reply.result?.content?.[0]?.text ?? 'null';
-  if (reply.result?.isError) die(content, /at most|limit|maximum|cap/i.test(content) ? 4 : 1);
+  if (reply.result?.isError) die(content, CAP.test(content) ? 4 : 1);
   try { return JSON.parse(content); } catch { return content; }
 }
 
