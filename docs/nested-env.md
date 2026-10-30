@@ -18,7 +18,8 @@ recovery path; how one product is installed is the profile's.
   otherwise `up` makes a new one, `qi-<date>`, and moving to it stops the product in this VM.
 - **This VM** otherwise, and whenever the platform does not make the Environment — with the
   reason in the output and the `env_target` log line. Moving back deletes the active
-  Environment.
+  Environment. With `nested_target: environment` this VM is never the fallback: `up` fails
+  with the reason, an environment failure.
 
 In an Environment, `bin/env` runs over the Environment Link (`ssh env-<name>`) from a copy
 of the profile and the engines in `~/qi` there; `init` and the credentials stay here and are
@@ -27,7 +28,8 @@ VM, so tests, the CLI and the API address `localhost` in both places and nothing
 changes. `env.sh status` adds `target` (and `environment`, `forward`) and brings a dropped
 forward back; `env.sh down` there only closes the forward, and the Environment sleeps. A
 lost link mid-run is an environment failure, never a verdict. The profile's diagnosis
-commands run there as `ssh env-<name> '<command>'`, under the same read-only rule.
+commands run there as `ssh env-<name> '<command>'`, under the same read-only rule;
+`k3s kubectl` as `ssh env-<name> bash qi/kubectl.sh …`, as a plain ssh shell can miss `k3s`.
 
 ## Kept for a person
 

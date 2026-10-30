@@ -7,11 +7,12 @@
 # The choice (nested_target: auto | vm | environment, default auto) is made at `env.sh up`:
 # an Environment when the profile declares one (`environment` in profile.json), the agent does
 # not lend its model (an Environment holds no connection), and the platform's Environment tools
-# answer; else this VM, with the reason logged. In an Environment the profile's `bin/env` runs
-# over the Environment Link (`ssh env-<name>`), from a copy of the profile and the engines in
-# ~/qi there, and one `ssh -L` keeps the product at the profile's app.url on this VM — so
-# every test, CLI and API call addresses localhost in both. Credentials are made here by
-# `init` and copied over at every call; nothing else of work/ leaves this VM.
+# answer; else this VM, with the reason logged (with `environment`, env.sh up fails instead).
+# In an Environment the profile's `bin/env` runs over the Environment Link (`ssh env-<name>`),
+# from a copy of the profile and the engines in ~/qi there, and one `ssh -L` keeps the product
+# at the profile's app.url on this VM — so every test, CLI and API call addresses localhost in
+# both. Credentials are made here by `init` and copied over at every call; nothing else of
+# work/ leaves this VM.
 #
 # State: work/env/TARGET (`vm` or `environment <name>`), work/env/FORWARD (`<pid> <name>
 # <port>`), work/ENVIRONMENTS.json (the kept ones: [{name, label, build, url, account,
@@ -71,9 +72,12 @@ env_create() { # <name>
   return 0
 }
 
-# Copy the profile, the engines, the credentials and the two wrappers into ~/qi on the
-# Environment: run.sh runs a profile command with the contract's environment, boot.sh brings
-# the recorded build back up at every boot (the Environment's `start`).
+# Copy the profile, the engines, the credentials and the three wrappers into ~/qi on the
+# Environment: run.sh runs a profile command with the contract's environment, kubectl.sh is
+# `k3s kubectl` for read-only diagnosis, boot.sh brings the recorded build back up at every
+# boot (the Environment's `start`). A plain ssh shell there can miss k3s on its PATH: both
+# run.sh and kubectl.sh set it first (ENV_PATH_SETUP).
+ENV_PATH_SETUP='command -v k3s >/dev/null 2>&1 || eval "$(MISE_SYSTEM_DATA_DIR=/usr/share/mise /usr/local/bin/mise env -s bash 2>/dev/null)"'
 env_sync() { # <name>
   local n="$1" dir core stage eps exe rel first
   local -a run
@@ -96,10 +100,15 @@ env_sync() { # <name>
       "$(profile_config)" "$(jq -c '.engine_config // {}' "$dir/profile.json")" "$eps"
     printf 'export QI_CANDIDATE_CHANNEL=%q QI_BASELINE_CHANNEL=%q\n' "$(cfg candidate_channel)" "${QI_BASELINE_OVERRIDE:-$(cfg baseline_channel)}"
     echo 'export QI_MODEL_KEY= QI_MODEL_KIND= QI_MODEL_BASE_URL='
-    echo 'command -v k3s >/dev/null 2>&1 || eval "$(MISE_SYSTEM_DATA_DIR=/usr/share/mise /usr/local/bin/mise env -s bash 2>/dev/null)"'
+    printf '%s\n' "$ENV_PATH_SETUP"
     echo 'cd "$QI_WORK" || exit 1'
     printf 'exec %s "$HOME/qi/%s" "$@"\n' "$(printf '%q ' "${run[@]}")" "$rel"
   } > "$stage/run.sh"
+  { echo '#!/usr/bin/env bash'
+    echo '# Read-only diagnosis there: k3s kubectl with the PATH of run.sh (security-checks.mjs, the docs).'
+    printf '%s\n' "$ENV_PATH_SETUP"
+    echo 'exec k3s kubectl "$@"'
+  } > "$stage/kubectl.sh"
   cat > "$stage/boot.sh" <<'SH'
 #!/usr/bin/env bash
 # The Environment's start command: the build recorded last comes back up after a boot.

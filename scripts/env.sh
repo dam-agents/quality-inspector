@@ -168,7 +168,8 @@ cmd_up() {
 # Where this `up` runs (lib/environment.sh → target_choose): the active Environment when it
 # still exists, else a new one; this VM when an Environment is not possible — the reason in the
 # output and the log. Moving from this VM stops the product here (its port is the forward's);
-# moving back deletes the active Environment (a kept one is never active).
+# moving back deletes the active Environment (a kept one is never active). With nested_target
+# environment there is no fallback: `up` fails with the reason.
 up_where() { # <build>
   local choice reason cur n
   read -r choice reason <<<"$(target_choose)"
@@ -192,6 +193,11 @@ up_where() { # <build>
     delegate up "$1" || return 1
     fwd_start "$n"
     return
+  fi
+  if [ "$(cfg nested_target)" = environment ]; then
+    echo "env: nested_target is environment, and no Environment runs the product: $reason" | tee -a "$(outlog up)" >&2
+    logev error env_target "no Environment for nested_target environment: $reason"
+    return 1
   fi
   if [ -n "$cur" ]; then fwd_stop; penv delete "$cur" >/dev/null 2>&1 || true; fi
   target_set vm

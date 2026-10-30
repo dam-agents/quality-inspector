@@ -137,4 +137,5 @@ other than `app_port`, the port of every `environment.endpoints` entry.
 
 `k3s kubectl get pods -A`, `k3s kubectl -n <ns> describe pod <p>`, `k3s kubectl -n <ns>
 logs <p>`, `helm -n <ns> status <release>`, `/var/log/k3s.log` — in a platform Environment
-each as `ssh env-<name> '<command>'`.
+each as `ssh env-<name> '<command>'`, and `k3s kubectl …` as `ssh env-<name> bash qi/kubectl.sh …`
+(a plain ssh shell there can miss `k3s` on its PATH).

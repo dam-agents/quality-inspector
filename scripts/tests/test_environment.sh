@@ -105,6 +105,14 @@ assert "status: from the Environment, with target" '.running and .target == "env
 # boot.sh brings the recorded build back.
 ( cd "$SANDBOX/envs/$n" && HOME="$PWD" bash qi/boot.sh ) && grep -q "^up 1.0.0 target=environment" "$SANDBOX/envs/$n/qi/env/calls" \
   || { echo "  boot.sh brings the recorded build up"; FAILED=1; }
+# kubectl.sh: `k3s kubectl` there with run.sh's PATH set-up (a plain ssh shell can miss k3s),
+# which the security run's deployment checks use, the namespace quoted.
+grep -qF '/usr/local/bin/mise env -s bash' "$SANDBOX/envs/$n/qi/kubectl.sh" || { echo "  kubectl.sh sets the PATH first"; FAILED=1; }
+mkdir -p "$SANDBOX/k3s"; printf '#!/usr/bin/env bash\necho "k3s $*"\n' > "$SANDBOX/k3s/k3s"; chmod +x "$SANDBOX/k3s/k3s"
+assert_eq "kubectl.sh runs k3s kubectl there" "k3s kubectl get pods -n a b -o json" \
+  "$(PATH="$B:$SANDBOX/k3s:$PATH" ssh -o BatchMode=yes "env-$n" bash qi/kubectl.sh get pods -n "'a b'" -o json)"
+grep -qF "\`env-\${where[1]}\`, 'bash', 'qi/kubectl.sh']" "$SCRIPTS/security-checks.mjs" \
+  || { echo "  the deployment checks reach k3s through qi/kubectl.sh in an Environment"; FAILED=1; }
 # A second up reuses it.
 E up 1.0.1 2>/dev/null >/dev/null
 assert_eq "the active Environment is reused" "$n" "$(E where | jq -r .name)"
@@ -146,5 +154,13 @@ sed -i.bak 's/^- nested_target: vm$/- nested_target: auto/' "$WORK_DIR/CONFIG.md
 mv "$H/.platform/platform-mcp-entry.json" "$H/.platform/off.json"
 E up 3.0.3 2>"$SANDBOX/err" >/dev/null
 grep -q "the platform's Environments do not answer" "$SANDBOX/err" || { echo "  no tools: this VM with the reason: $(cat "$SANDBOX/err")"; FAILED=1; }
+
+# nested_target: environment never falls back to this VM: up fails with the reason.
+sed -i.bak 's/^- nested_target: auto$/- nested_target: environment/' "$WORK_DIR/CONFIG.md"
+: > "$WORK_DIR/env/calls"
+E up 3.0.4 2>"$SANDBOX/err" >/dev/null; assert_eq "environment: no Environment → up fails" 1 "$?"
+grep -q "nested_target is environment, and no Environment runs the product: the platform's Environments do not answer" "$SANDBOX/err" \
+  || { echo "  environment: the reason is said: $(cat "$SANDBOX/err")"; FAILED=1; }
+grep -q "^up 3.0.4" "$WORK_DIR/env/calls" && { echo "  environment: nothing runs in this VM"; FAILED=1; }
 
 exit $FAILED
