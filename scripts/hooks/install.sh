@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # install.sh — register the policy hook (policy.sh, PreToolUse), the backup hook (backup.sh,
-# Stop), the trace hook (trace.sh) and the static deny list in the harness's user settings
+# Stop), the trace hook (trace.sh), the resume hook (resume.sh, SessionStart) and the static deny list in the harness's user settings
 # (docs/black-box.md → Enforcement layers; docs/persistence.md → Backup & restore;
-# docs/logging.md → Harness trace). The one home of the registration and its checks.
+# docs/logging.md → Harness trace; docs/nested-env.md → After a VM restart). The one home of the registration and its checks.
 #
 #   install.sh                merge into $HOME/.claude/settings.json: created when missing, every
 #                             other key kept, re-running changes nothing. Effective next session.
@@ -11,6 +11,8 @@
 #                             rule is present. One line on stdout.
 #   install.sh --check-trace  read-only, the audit's: exit 0 iff the trace hook is registered for
 #                             every event this harness has. One line on stdout.
+#   install.sh --check-resume read-only, the audit's: exit 0 iff the resume hook is registered and
+#                             executable. One line on stdout.
 #
 # A harness before FAILURE_EVENTS_MIN (below) ignores the whole settings file over an event it does not
 # know, so PostToolUseFailure and StopFailure are registered only on a harness that has them
@@ -25,6 +27,7 @@ SETTINGS="${QI_CLAUDE_SETTINGS:-${HOME:-/home/agent}/.claude/settings.json}"
 HOOK_CMD='"$HOME"/scripts/hooks/policy.sh'
 BACKUP_CMD='"$HOME"/scripts/hooks/backup.sh'
 TRACE_CMD='"$HOME"/scripts/hooks/trace.sh'
+RESUME_CMD='"$HOME"/scripts/hooks/resume.sh'
 TRACE_EVENTS='["UserPromptSubmit","PostToolUse","Stop"]'
 FAILURE_EVENTS='["PostToolUseFailure","StopFailure"]'
 FAILURE_EVENTS_MIN=2.1.101   # unknown hook events stopped voiding settings.json (Claude Code changelog)
@@ -71,6 +74,15 @@ if [ "${1:-}" = --check-schedules ]; then
   echo "policy hook registered for the platform's schedules"; exit 0
 fi
 
+if [ "${1:-}" = --check-resume ]; then
+  [ -x "$HERE/resume.sh" ] && bash -n "$HERE/resume.sh" 2>/dev/null \
+    || { echo "scripts/hooks/resume.sh is missing, not executable or has a syntax error"; exit 1; }
+  jq -e --arg c "$RESUME_CMD" '[.hooks.SessionStart[]? | .hooks[]? | select(.type == "command" and .command == $c)] | length > 0' \
+    "$SETTINGS" >/dev/null 2>&1 \
+    || { echo "resume hook not registered, so the product stays down after a VM restart — run scripts/hooks/install.sh"; exit 1; }
+  echo "resume hook registered"; exit 0
+fi
+
 if [ "${1:-}" = --check-trace ]; then
   [ -x "$HERE/trace.sh" ] && bash -n "$HERE/trace.sh" 2>/dev/null \
     || { echo "scripts/hooks/trace.sh is missing, not executable or has a syntax error"; exit 1; }
@@ -106,7 +118,7 @@ done
 [ -s "$SETTINGS" ] || echo '{}' > "$SETTINGS"
 jq -e 'type == "object"' "$SETTINGS" >/dev/null 2>&1 || { echo "$SETTINGS is not a JSON object — left untouched; fix it by hand" >&2; exit 1; }
 tmp="$SETTINGS.qi-tmp.$$"
-jq --arg m "$MATCHER" --arg sm "$SCHED_MATCHER" --arg c "$HOOK_CMD" --arg b "$BACKUP_CMD" --arg t "$TRACE_CMD" --argjson e "$EVENTS" \
+jq --arg m "$MATCHER" --arg sm "$SCHED_MATCHER" --arg c "$HOOK_CMD" --arg b "$BACKUP_CMD" --arg t "$TRACE_CMD" --arg r "$RESUME_CMD" --argjson e "$EVENTS" \
    --argjson d "$DENY" '
   def drop($cmd): [.[] | select(any(.hooks[]?; .command == $cmd) | not)];
   .hooks = (.hooks // {})
@@ -115,11 +127,12 @@ jq --arg m "$MATCHER" --arg sm "$SCHED_MATCHER" --arg c "$HOOK_CMD" --arg b "$BA
                             {matcher: $sm, hooks: [{type: "command", command: $c, timeout: 10}]}])
   | .hooks.Stop = ([(.hooks.Stop // [])[] | select(any(.hooks[]?; .command == $b) | not)]
                    + [{hooks: [{type: "command", command: $b, timeout: 30}]}])
+  | .hooks.SessionStart = ((.hooks.SessionStart // [] | drop($r)) + [{hooks: [{type: "command", command: $r, timeout: 30}]}])
   | reduce $e[] as $ev (.; .hooks[$ev] = ((.hooks[$ev] // []) | drop($t)) + [{hooks: [{type: "command", command: $t, timeout: 10}]}])
   | if ($e | index("StopFailure")) then .hooks.StopFailure = ((.hooks.StopFailure // [] | drop($b)) + [{hooks: [{type: "command", command: $b, timeout: 30}]}]) else . end
   | .permissions = (.permissions // {})
   | .permissions.deny = ((.permissions.deny // []) as $have | $have + ($d - $have))' "$SETTINGS" > "$tmp" \
   && mv -f "$tmp" "$SETTINGS" || { echo "merge into $SETTINGS failed" >&2; exit 1; }
 tmp=""; release
-chmod +x "$HERE/policy.sh" "$HERE/backup.sh" "$HERE/trace.sh" 2>/dev/null || true
-echo "policy, backup and trace hooks registered in $SETTINGS (trace: $(jq -r 'join(", ")' <<<"$EVENTS"))"
+chmod +x "$HERE/policy.sh" "$HERE/backup.sh" "$HERE/trace.sh" "$HERE/resume.sh" 2>/dev/null || true
+echo "policy, backup, trace and resume hooks registered in $SETTINGS (trace: $(jq -r 'join(", ")' <<<"$EVENTS"))"

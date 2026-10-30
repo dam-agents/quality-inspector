@@ -75,7 +75,7 @@ run type (`issues`, `regression`, `security`, `modules`, `radar`, `scenario`, `d
 | `finding_rechecked` | you | `id=D-<k>\|VAL-<k> build=<c> before=<status> after=<status>` ([ui-sweep.md](ui-sweep.md) → **5. Recheck**, [validation.md](validation.md) → **Recheck**) |
 | `steps_walked` | you | `steps=<n> done=<k> live=<0\|1> build=<b>` — the Test builder's walk ([on-demand.md](on-demand.md) → "walk these steps live") |
 | `artifact_viewer_declined` | you | `artifact=<id>` — a shared dashboard's viewer asked for anything but a scenario ([modules.md](modules.md) → Control) |
-| `env_up` / `env_reset` / `env_failed` / `env_lock_takeover` | `scripts/env.sh` | free text; `env_up` ends `took_s=<seconds>`; a failed `up` / `reset` names its output, `work/env/last-<cmd>.log` |
+| `env_up` / `env_reset` / `env_failed` / `env_lock_takeover` / `env_resume` | `scripts/env.sh` | free text; `env_up` ends `took_s=<seconds>`; a failed `up` / `reset` / resume names its output, `work/env/last-<cmd>.log` (`last-resume.log`); `env_resume`: a resume after a VM restart started, ended, or was stopped ([nested-env.md](nested-env.md) → **After a VM restart**) |
 | `slack_test` | you, when a Slack test starts | `issue=<n>` or `feature=<id>`, `user=<sender id>` — counted against `slack_tests_per_day` ([slack.md](slack.md)) |
 | `feature_run` | you, after a feature run | `feature=<id> build=<b> passed=<n> failed=<n> blocked=<n>` ([features.md](features.md)) |
 | `suite_run` / `suite_failed` | `scripts/suite.sh` | `<label> exit=<rc>` / free text |

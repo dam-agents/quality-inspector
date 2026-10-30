@@ -25,6 +25,14 @@
 #                                its output, credential values masked
 #   env.sh watch                 the Browser Panel button for the product's UI when live_browser
 #                                attaches (lib/config.sh → live_link); prints nothing, exit 1, otherwise
+#   env.sh resume               after this VM booted again (the platform hibernates it when idle),
+#                                bring back the build the last `up` left answering — no reset, no
+#                                other build, where that `up` put it: in this VM its `up`, in an
+#                                Environment only the forward (none recorded, or gone: nothing) —
+#                                in the background; prints one line for the session
+#                                when it starts, nothing otherwise. The SessionStart hook's
+#                                (scripts/hooks/resume.sh). `down` and `reset` stop a running resume
+#                                and turn it off until the next `up`; `up` first waits for it to end
 #   env.sh between <from> <to>   read-only: the profile's `bin/versions --between` — a JSON
 #                                array of builds between the two, oldest first; exit 2 when
 #                                the profile does not implement it (no array), 1 when it
@@ -139,8 +147,9 @@ delegate() { # <cmd> [args]
   esac
   return "$rc"
 }
-# work/env/last-<cmd>.log — started anew by each `up` (cmd_up) and `reset` (delegate).
-outlog() { local f="$ENVD/last-$1.log"; [ -f "$f" ] || ( umask 077; : > "$f" ); printf '%s' "$f"; }
+# work/env/last-<cmd>.log — started anew by each `up` (cmd_up) and `reset` (delegate); a
+# resume's `up` writes work/env/last-resume.log (OUTLOG_AS).
+outlog() { local f="$ENVD/last-${OUTLOG_AS:-$1}.log"; [ -f "$f" ] || ( umask 077; : > "$f" ); printf '%s' "$f"; }
 # The last <n> lines of an output log, each credential value of work/env/credentials.env masked.
 outtail() { # <cmd> <n>
   local f="$ENVD/last-$1.log" out
@@ -178,6 +187,7 @@ cmd_up() {
   local rc
   mkdir -p "$ENVD" && chmod 700 "$ENVD"
   printf 'running %s %s %s %s\n' "$1" "$(now)" "$$" "${ME:--}" > "$UPF"
+  resume_wait
   ( umask 077; printf 'env.sh up %s at %s\n' "$1" "$(now)" > "$ENVD/last-up.log" )
   ( up_where "$1" ); rc=$?
   printf 'done %s %s %s %s\n' "$1" "$(now)" "$rc" "${ME:--}" > "$UPF"
@@ -253,6 +263,101 @@ cmd_status() {
 }
 cmd_down() { if target_name >/dev/null; then fwd_stop; else delegate down; fi; }
 
+# A VM restart stops k3s and the product with it, and the Environment's forward; nothing in the
+# VM starts them again (a boot service is the platform's to refuse). So the first session after
+# a boot does: the build of the last `up` that succeeded, from before this boot, unless `down`
+# or `reset` came after it. work/env/RESUME: `running <build> <ISO> <pid>`, `done <build> <ISO>
+# <exit>`, or `off - <ISO> -` (down, reset). Never a verdict; a failed resume leaves the next
+# `up` to install as usual.
+RESF="$ENVD/RESUME"
+iso_epoch() { date -u -d "$1" +%s 2>/dev/null || date -u -j -f %Y-%m-%dT%H:%M:%SZ "$1" +%s 2>/dev/null; }
+boot_epoch() { [ -n "${QI_BOOT_EPOCH:-}" ] && { echo "$QI_BOOT_EPOCH"; return; }; awk '$1 == "btime" {print $2}' /proc/stat 2>/dev/null; }
+# A `running` record from before this boot is dead: after a restart its pid can be another process's.
+resume_running() {
+  local st b ts x _ boot
+  [ -f "$RESF" ] && read -r st b ts x _ < "$RESF" && [ "$st" = running ] || return 1
+  boot="$(boot_epoch)"; ts="$(iso_epoch "$ts")"
+  [ -n "$boot" ] && [ -n "$ts" ] && [ "$ts" -lt "$boot" ] && return 1
+  kill -0 "$x" 2>/dev/null
+}
+resume_off() { mkdir -p "$ENVD" && printf 'off - %s -\n' "$(now)" > "$RESF"; }
+# The build to bring back, or nothing (exit 1).
+resume_due() {
+  local boot st b ts x _ up rs rts rx
+  boot="$(boot_epoch)"; [ -n "$boot" ] || return 1
+  [ -f "$UPF" ] && read -r st b ts x _ < "$UPF" || return 1
+  [ "$st" = done ] && [ "$x" = 0 ] || return 1
+  up="$(iso_epoch "$ts")" && [ -n "$up" ] && [ "$up" -lt "$boot" ] || return 1
+  if [ -f "$RESF" ] && read -r rs _ rts rx _ < "$RESF"; then
+    rts="$(iso_epoch "$rts")" || return 1
+    [ "$rs" = off ] && [ "$rts" -ge "$up" ] && return 1
+    [ "$rs" != off ] && [ "$rts" -ge "$boot" ] && return 1
+  fi
+  echo "$b"
+}
+cmd_resume() {
+  local b pid
+  mkdir -p "$ENVD" && chmod 700 "$ENVD"
+  lock_mutex "$ENVD/RESUME.mutex" || return 0
+  b="$(resume_due)" || { rm -f "$ENVD/RESUME.mutex"; return 0; }
+  ( umask 077; printf 'env.sh resume %s at %s\n' "$b" "$(now)" > "$ENVD/last-resume.log" )
+  if command -v setsid >/dev/null 2>&1; then
+    setsid nohup bash "$0" resume-run "$b" </dev/null >/dev/null 2>&1 & pid=$!
+  else
+    nohup bash "$0" resume-run "$b" </dev/null >/dev/null 2>&1 & pid=$!
+  fi
+  printf 'running %s %s %s\n' "$b" "$(now)" "$pid" > "$RESF"
+  rm -f "$ENVD/RESUME.mutex"
+  logev info env_resume "the VM started again: bringing build $b back in the background"
+  echo "quality-inspector: this VM started again after a restart, so the product was down; env.sh resume brings build $b back in the background (a few minutes; work/env/last-resume.log). env.sh status says when it answers; a Browser Panel tab open before the restart is empty — open the product's URL again (env.sh watch)."
+}
+# A resume keeps the target of the last `up` (work/env/TARGET) and never chooses one
+# (target_choose), never makes, deletes or extends an Environment. In this VM it runs `up`; in an
+# Environment the product is that Environment's own (its boot.sh brings it back), so only the
+# forward starts again. Exit 4, nothing resumed: no TARGET (`keep` and `release` remove it), or
+# that Environment is gone; the next `up` chooses where.
+resume_up() { # <build>
+  local t n
+  read -r t n < "$TARGET_F" 2>/dev/null \
+    || { echo "env: no target of the last up recorded (kept or released) — nothing resumed; the next up chooses where" | tee -a "$(outlog up)" >&2; return 4; }
+  if [ "$t" = environment ] && [ -n "${n:-}" ]; then
+    env_exists "$n" || { echo "env: Environment $n of the last up is gone — nothing resumed; the next up chooses where" | tee -a "$(outlog up)" >&2; return 4; }
+    fwd_start "$n" && echo "env: the forward to Environment $n runs again" | tee -a "$(outlog up)" >&2
+  else
+    disk_gate && delegate up "$1"
+  fi
+}
+cmd_resume_run() { # <build>
+  local rc
+  ME="" OUTLOG_AS=resume
+  ( resume_up "$1" ) >/dev/null 2>&1; rc=$?   # its output goes to last-resume.log (outlog)
+  case "$rc" in
+    (0) logev info env_resume "build $1 answers again" ;;
+    (4) logev warn env_resume "no target of the last up, or its Environment is gone: build $1 not resumed" ;;
+    (*) logev error env_failed "resume of build $1 exited $rc (output: work/env/last-resume.log)" ;;
+  esac
+  printf 'done %s %s %s\n' "$1" "$(now)" "$rc" > "$RESF"
+}
+# Stop a running resume: its process group, and `done <build> <ISO> 143`.
+resume_stop() { # <why>
+  local st b ts x _
+  resume_running || return 0
+  read -r st b ts x _ < "$RESF"; kill -- -"$x" 2>/dev/null || kill "$x" 2>/dev/null
+  printf 'done %s %s 143\n' "$b" "$(now)" > "$RESF"
+  logev warn env_resume "resume of build $b stopped: $1"
+}
+# An `up` (a background task) waits for a resume to end, at most 15 minutes (QI_RESUME_WAIT_S,
+# tests), then stops it. `reset` and `down` run in the foreground and stop it at once.
+resume_wait() {
+  local max="${QI_RESUME_WAIT_S:-900}" end
+  case "$max" in (''|*[!0-9]*) max=900;; esac
+  end=$(( $(date -u +%s) + max ))
+  while resume_running; do
+    [ "$(date -u +%s)" -ge "$end" ] && { resume_stop "after $((max / 60)) minutes"; break; }
+    sleep 5
+  done
+}
+
 cmd_wait() { # <build> [<seconds>]
   local want="$1" max="${2:-540}" end st b ts x who
   case "$max" in (''|*[!0-9]*) max=540;; esac
@@ -278,9 +383,12 @@ case "${1:-}" in
   between) [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "usage: $0 between <from> <to>" >&2; exit 1; }; cmd_between "$2" "$3" ;;
   lock)   cmd_lock "${2:-}" ;;
   unlock) cmd_unlock "${2:-}" ;;
-  init|reset) delegate "$1" ;;
+  init)   delegate init ;;
+  reset)  resume_stop "a reset"; resume_off; delegate reset ;;
   status) cmd_status ;;
-  down)   cmd_down ;;
+  down)   resume_stop "a down"; resume_off; cmd_down ;;
+  resume) cmd_resume ;;
+  resume-run) [ -n "${2:-}" ] || exit 2; cmd_resume_run "$2" ;;
   where)  cmd_where ;;
   keep)   [ -n "${2:-}" ] || { echo "usage: $0 keep <label> [<days>]" >&2; exit 2; }; cmd_keep "$2" "${3:-}" ;;
   extend) [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "usage: $0 extend <label> <days>" >&2; exit 2; }; cmd_extend "$2" "$3" ;;
@@ -289,5 +397,5 @@ case "${1:-}" in
   up)     [ -n "${2:-}" ] || { echo "usage: $0 up <build>" >&2; exit 2; }; cmd_up "$2" ;;
   wait)   [ -n "${2:-}" ] || { echo "usage: $0 wait <build> [<seconds>]" >&2; exit 2; }; cmd_wait "$2" "${3:-}" ;;
   watch)  live_link "$(profile_field '.app.url')" ;;
-  *) echo "usage: $0 lock <owner>|unlock <owner>|init|up <build>|wait <build> [<seconds>]|reset|status|down|where|keep <label> [<days>]|extend <label> <days>|release <label|name>|kept|between <from> <to>|watch" >&2; exit 2 ;;
+  *) echo "usage: $0 lock <owner>|unlock <owner>|init|up <build>|wait <build> [<seconds>]|reset|status|down|resume|where|keep <label> [<days>]|extend <label> <days>|release <label|name>|kept|between <from> <to>|watch" >&2; exit 2 ;;
 esac
