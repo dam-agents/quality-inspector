@@ -7,6 +7,14 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.49.0 — 2026-10-30
+
+**Upgrade:**
+1. Nothing to run — docs are re-read per run, the dashboard is rebuilt by the next catalog
+   publish. Its new "Run it again" buttons send `run <ref>, <ref>…` (up to 20 test cases),
+   `recheck VAL-<k>` and `test scenario <slug>` ([docs/on-demand.md](docs/on-demand.md),
+   [docs/validation.md](docs/validation.md) → **Recheck**); "Repair this test" now shows.
+
 ## 3.48.0 — 2026-10-30
 
 **Upgrade:**

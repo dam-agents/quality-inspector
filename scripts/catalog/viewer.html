@@ -1084,7 +1084,7 @@ function stepText(t) {
 }
 // The commands the page may offer: the operator's words of docs/on-demand.md and docs/modules.md,
 // built from constants and ids only. Anything else is never shown, copied or sent.
-const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|run (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)|create issue for (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})(?:, (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})){0,19}(?: for the architect)?|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+(?: as (?:false-positive|wont-fix|duplicate|by-design))?|(?:reopen|recheck|discuss) D-\d+|categorize D-\d+ (?:[a-z0-9][a-z0-9-]{0,29}|-)|(?:add (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) to|remove (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) from) the collection [A-Za-z0-9][A-Za-z0-9 _.-]{0,39}|run feature [a-z0-9][a-z0-9-]{0,39}|(?:accept|rewrite|retire|keep) M-\d{1,6})$/;
+const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|run (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)(?:, (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)){0,19}|repair (?:#\d+(?: (?:AC|IN)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: AC-\d+)?)|test scenario [a-z0-9][a-z0-9-]{0,40}|create issue for (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})(?:, (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})){0,19}(?: for the architect)?|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+(?: as (?:false-positive|wont-fix|duplicate|by-design))?|(?:reopen|recheck|discuss) D-\d+|recheck VAL-\d{1,6}|categorize D-\d+ (?:[a-z0-9][a-z0-9-]{0,29}|-)|(?:add (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) to|remove (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) from) the collection [A-Za-z0-9][A-Za-z0-9 _.-]{0,39}|run feature [a-z0-9][a-z0-9-]{0,39}|(?:accept|rewrite|retire|keep) M-\d{1,6})$/;
 // A problem a found issue may be about (skills/create-issue): a criterion's or an exploration's failure,
 // a design finding, a validation case, a stress check.
 const PROB_RE = /^(?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})$/;
@@ -1337,13 +1337,16 @@ function renderTray() {
   if (!picked.length) return;
   const cmd = `create issue for ${picked.join(', ')}`;
   const over = picked.length > PICK_MAX;
+  // The selected test cases can also run again, before or instead of the bug issue — today's, never as of a build.
+  const again = S.at ? [] : picked.map((r) => runRef(ALL.find((i) => problemRef(i) === r))).filter(Boolean);
   document.body.append(h('div', { id: 'tray', role: 'region', 'aria-label': 'Problems selected for one bug issue' },
     h('div', { class: 'row' }, h('b', {}, `${ENT.bug[1]} ${picked.length} problem${picked.length === 1 ? '' : 's'} selected for one bug issue`),
       tip('Select failed test cases, design findings, validation findings or stress checks on this page. The agent writes one GitHub issue with one section for each problem: the problem, the correct function, the steps to reproduce it and the evidence. The agent creates the issue only when you agree. Only this browser keeps your selection.'),
       h('span', { style: 'flex:1' }), h('button', { class: 'btn', type: 'button', 'data-kind': 'local', title: 'Clears the selection.', onclick: () => { picked = []; savePicked(); render(); } }, ico('close'), 'Clear all')),
     h('div', { class: 'row' }, picked.map((r) => h('span', { class: 'chip' }, `${probIcon(r)} ${r}`, h('button', { type: 'button', 'data-kind': 'local', title: `Removes ${r} from the selection.`, 'aria-label': `Remove ${r}`, onclick: () => togglePick(r) }, '×')))),
     over ? h('p', { class: 'badge bad' }, `One bug issue can have a maximum of ${PICK_MAX} problems. Remove ${picked.length - PICK_MAX}.`) : [
-      h('div', { class: 'row' }, copyBox(cmd, 'Report them as one bug issue…', `${ENT.bug[1]} Report ${picked.length} problem${picked.length === 1 ? '' : 's'} as one bug issue`)),
+      h('div', { class: 'row' }, copyBox(cmd, 'Report them as one bug issue…', `${ENT.bug[1]} Report ${picked.length} problem${picked.length === 1 ? '' : 's'} as one bug issue`),
+        again.length ? copyBox(runList(again), `Run the ${again.length} test case${again.length === 1 ? '' : 's'} again…`, `${ENT.run[1]} Run the ${again.length} selected test case${again.length === 1 ? '' : 's'} again on the current build`) : null),
       FIX_LABEL ? h('div', { class: 'row' }, copyBox(`${cmd} for the architect`, '… and give it to the software architect…', `${ENT.bug[1]} Report them as one bug issue for the software architect (label "${FIX_LABEL}")`)) : null]));
 }
 // A failing test case's repair and bug actions (docs/catalog.md → Maintenance): "Repair this test"
@@ -1352,6 +1355,21 @@ function renderTray() {
 function repairOf(bad, cause, testable, proposals) {
   return { repair: testable && bad && cause !== 'product' && cause !== 'environment' && !proposals,
     hotBug: bad && cause !== 'test' && cause !== 'environment' };
+}
+// The ref a test case runs by (`#42 AC-1`, `S-7 EX-1`, docs/on-demand.md → "run"): only one with a test file.
+const runRef = (i) => { if (!i || !i.file) return null; const r = `${i.origin.kind === 'scenario' ? i.ref : `#${num(i.ref)}`} ${str(i.id)}`; return CMD_RE.test(`run ${r}`) ? r : null; };
+// One command that runs several test cases again, each one time on the current build: at most RUN_MAX.
+const RUN_MAX = 20;
+const runList = (refs) => { const u = [...new Set(refs.filter(Boolean))].slice(0, RUN_MAX); return u.length ? `run ${u.join(', ')}` : null; };
+const failing = (v) => ATTN.has(str(v)) || str(v) === 'blocked';
+const RUN_HELP = 'The agent runs them one time on the current build. The results show in the history as "Manual run". It does not change a verdict or a tier, and it does not post anything.';
+// "Run the failed ones again": the test cases of `list` whose value is not a pass, by one command.
+function runFailedAction(list, valueOf, what) {
+  const refs = list.filter((i) => failing(valueOf(i))).map(runRef).filter(Boolean);
+  const cmd = runList(refs);
+  if (!cmd) return null;
+  const n = Math.min(new Set(refs).size, RUN_MAX);
+  return action(`${ENT.run[1]} Run the ${n} failed test case${n === 1 ? '' : 's'} ${what} again`, `${RUN_HELP}${new Set(refs).size > RUN_MAX ? ` Only the first ${RUN_MAX}: one message runs at most ${RUN_MAX} test cases.` : ''}`, cmd, true);
 }
 // Manage a test case: run it, retest its issue, promote or demote it, report it, put it in a collection.
 function itemActions(i) {
@@ -1763,7 +1781,16 @@ function toolbar(list, gallery) {
       const on = JSON.stringify(Object.fromEntries(Object.entries(S.f).filter(([, x]) => x.length))) === JSON.stringify(f) && !S.q;
       return h('button', { class: `chip${on ? ' on' : ''}`, type: 'button', 'aria-pressed': on ? 'true' : 'false', 'data-kind': 'local', title: QUICK_HELP[label] || null, onclick: () => { S.f = on ? {} : JSON.parse(JSON.stringify(f)); S.q = ''; S.limit = 100; writeHash(); render(); } }, label);
     }), active ? h('button', { class: 'chip', type: 'button', 'data-kind': 'local', title: 'Removes all filters and the search.', onclick: () => { S.f = {}; S.q = ''; writeHash(); render(); } }, '✕ Clear') : null,
-    h('span', { class: 'count', 'aria-live': 'polite' }, `${ENT.testcase[1]} ${list.length} of ${items.length} test cases`)));
+    h('span', { class: 'count', 'aria-live': 'polite' }, `${ENT.testcase[1]} ${list.length} of ${items.length} test cases`),
+    runShown(list, active)));
+}
+// The catalog's filter or search as a run: every test case it shows, one time on the current build.
+function runShown(list, active) {
+  if (!active || S.at) return null;
+  const refs = [...new Set(list.map(runRef).filter(Boolean))];
+  if (!refs.length) return null;
+  if (refs.length > RUN_MAX) return h('span', { class: 'meta', title: `One message runs at most ${RUN_MAX} test cases.` }, `${ENT.run[1]} Filter to ${RUN_MAX} or fewer test cases to run them again.`);
+  return copyBox(runList(refs), `Run these ${refs.length} again…`, `${ENT.run[1]} Run the ${refs.length} test case${refs.length === 1 ? '' : 's'} of this filter again on the current build`);
 }
 function table(list) {
   const head = h('tr', {}, h('th', { title: 'Select failed test cases to report them together in one bug issue.', 'aria-label': 'Select', style: 'cursor:default' }, '☐'), storageOK ? h('th', { 'aria-label': 'Pinned', title: 'Your pins (only in this browser).', style: 'cursor:default' }, '★') : null, S.cols.map((k) => {
@@ -2076,6 +2103,8 @@ function originDrawer(ref) {
       rs.some((r) => r.type === 'regression') ? h('p', { class: 'meta' }, 'This list shows a night only when one of these test cases had a result that was not unchanged.') : null),
     crit && !S.at ? h('section', { class: 'sec' }, h('h3', {}, '🤖 What you can ask the agent', tip('Each violet command goes to the chat of the agent. Nothing changes before the agent does the action.')), h('div', { class: 'actions' },
       crit.file ? action(`${ENT.run[1]} Run all its tests now`, 'The agent runs them one time on the current build. The results show in the history as "Manual run".', `run ${o.kind === 'scenario' ? ref : `#${num(ref)}`}`) : null,
+      runFailedAction(its, (x) => x.latest, 'of it'),
+      /^P-[a-z0-9][a-z0-9-]*$/.test(ref) ? action(`${ENT.scenario[1]} Test the profile scenario again`, 'A full scenario run on the newest build, with a new report.', `test scenario ${ref.slice(2)}`) : null,
       commands(crit).map((c) => action(c.startsWith('test') ? `${ENT.issue[1]} Test the full issue again` : c.startsWith('promote') ? '🌙 Promote its tests into the nightly regression' : 'Demote its tests',
         c.startsWith('test') ? 'A full issue run: the agent tests each acceptance criterion on the new build and on the last release, and makes a new report.' : c.startsWith('promote') ? 'Before the agent does this, it shows you the tests and their criteria.' : 'This removes them from the nightly run.', c)))) : null,
   ]);
@@ -2150,6 +2179,24 @@ function winText(w) {
   if (typeof w !== 'object') return String(w);
   return w.from != null || w.to != null ? [end(w.from), end(w.to)].filter(Boolean).join(' → ') : end(w);
 }
+// A test run's "Run it again" (docs/catalog.md → Managing from the page): the same kind of run on the
+// current build, and its failed test cases alone.
+function runAgain(r) {
+  if (S.at) return null;
+  const ref = str(r.ref);
+  const scope = r.type === 'rerun' && CMD_RE.test(`run ${str(r.scope)}`) ? str(r.scope) : ref;
+  const slug = /^P-([a-z0-9][a-z0-9-]*)$/.exec(ref);
+  const acts = [
+    r.type === 'regression' ? action('🌙 Run the nightly regression again', 'The agent runs all the nightly tests on the newest build now. The result shows as a new night.', 'module regression run now') : null,
+    r.type === 'issue' ? action(`${ENT.issue[1]} Test the full issue again`, 'A full issue run: the agent tests each acceptance criterion on the new build and on the last release, and makes a new report with video and screenshots.', `test ${ref}`) : null,
+    slug ? action(`${ENT.scenario[1]} Test the profile scenario again`, 'A full scenario run on the newest build, with a new report.', `test scenario ${slug[1]}`) : null,
+    ['issue', 'scenario'].includes(r.type) ? action(`${ENT.run[1]} Run all its tests again`, RUN_HELP, `run ${ref}`) : null,
+    r.type === 'rerun' ? action(`${ENT.run[1]} Run the same tests again`, RUN_HELP, `run ${scope}`) : null,
+    r.type === 'feature' ? action(`${ENT.feature[1]} Run the feature "${featName(ref)}" again`, 'The agent runs all the recurring tests of this feature one time on the current build. The result shows as "Feature run".', `run feature ${ref}`) : null,
+    runFailedAction(r.entries.map((e) => byKey.get(e.key)).filter(Boolean), (i) => (r.entries.find((e) => e.key === i.key) || {}).value, 'of this run'),
+  ].filter(Boolean);
+  return acts.length ? h('section', { class: 'sec' }, h('h3', {}, '🔁 Run it again', tip('Each violet command goes to the chat of the agent. Nothing changes before the agent does the action.')), h('div', { class: 'actions' }, acts)) : null;
+}
 function runDrawer(r) {
   const night = r.type === 'regression';
   const ents = r.entries.slice().sort((a, b) => SEV[vClass(a.value)] - SEV[vClass(b.value)]);
@@ -2173,6 +2220,7 @@ function runDrawer(r) {
     h('h2', {}, night ? `🌙 Night of ${fmtDate(r.utc)} · ${r.build}` : r.type === 'feature' ? `${ENT.feature[1]} ${featName(r.ref)} · ${ENT.build[1]} ${r.build}` : `${originName(r.ref)} · ${ENT.build[1]} ${r.build}`),
     h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' }, badge(r.verdict)),
     agentSec(r),
+    runAgain(r),
     h('dl', { class: 'dl' },
       dt('Report'), h('dd', {}, artLink(r.report)),
       dt('Build'), h('dd', {}, buildLink(r.build)),
@@ -2708,17 +2756,23 @@ function viewFindings() {
     kpi(ENT.exploration[1], 'Edge-case observations', obs.length, obs.length ? { v: 'catalog', f: { kind: ['exploration'], verdict: ['observation'] }, q: '' } : null, obs.length ? 'warn' : null, VAL_HELP.observation)));
   const tableOf = (cols, rows) => h('div', { class: 'tablewrap' }, h('table', { class: 'list' }, h('thead', {}, h('tr', {}, cols.map((c) => h('th', { style: 'cursor:default' }, c)))),
     h('tbody', {}, rows.map((r) => h('tr', { style: 'cursor:default' }, r.map((c) => h('td', {}, c)))))));
-  const sec2 = (title, sub, body) => h('section', { class: 'panel', style: 'margin-top:14px' }, h('h2', {}, title), sub ? h('p', { class: 'meta' }, sub) : null, body);
+  const sec2 = (title, sub, body, again) => h('section', { class: 'panel', style: 'margin-top:14px' }, h('h2', {}, title), sub ? h('p', { class: 'meta' }, sub) : null, body,
+    again && !S.at ? h('div', { class: 'row', style: 'margin-top:8px' }, again) : null);
+  // A module's "run again" (docs/modules.md → Control): the whole module on the newest build, now.
+  const modAgain = (id, label, title) => copyBox(`module ${id} run now`, label, `${ENT.run[1]} ${title}`);
   v.append(h('p', { class: 'meta' }, `Select the problems (☐). Then report them in one bug issue (${ENT.bug[1]}) from the violet bar at the bottom.`));
   v.append(sec2(`${ENT.validation[1]} Form validation`, val ? ['The agent puts empty, incorrect, too long and unusual input into each form. A finding is a form that does not refuse the input visibly, or that changes the input. Build ', buildLink(val.build), ` · run ${str(val.run)} · ${fmtDate(val.utc)} · ${arr(val.cases).length} cases`] : null,
-    !val ? h('p', { class: 'muted-t' }, 'The validation module has not run yet.') : vf.length ? tableOf(['☐', 'Case', 'Page', 'Form · field', 'Input', 'Result', 'Severity', 'What broke', `${ENT.bug[1]} Bug issue`],
+    !val ? h('p', { class: 'muted-t' }, 'The validation module has not run yet.') : vf.length ? tableOf(['☐', 'Case', 'Page', 'Form · field', 'Input', 'Result', 'Severity', 'What broke', `${ENT.bug[1]} Bug issue`, S.at ? null : '🔁 Again'].filter(Boolean),
       vf.sort((a, b) => (a.result === 'finding' ? 0 : 1) - (b.result === 'finding' ? 0 : 1) || (SEVC[a.severity] === 'bad' ? 0 : 1) - (SEVC[b.severity] === 'bad' ? 0 : 1))
         .map((c) => [c.result === 'finding' ? pickBox(str(c.id)) : '', h('code', {}, str(c.id)), pageLink(str(c.page)), `${str(c.form)}${c.field ? ` · ${str(c.field)}` : ''}`, h('span', { title: VAL_KIND_HELP[str(c.kind)] || null }, str(c.kind)),
-          h('span', { class: `badge ${c.result === 'finding' ? 'bad' : c.result === 'flaky' ? 'warn' : 'muted'}`, title: VAL_RESULT_HELP[str(c.result)] || null }, str(c.result)), c.severity ? sevB(c.severity) : '', str(c.message), foundLinks(str(c.id))])) : h('p', { class: 'muted-t' }, 'Every case passed.')));
+          h('span', { class: `badge ${c.result === 'finding' ? 'bad' : c.result === 'flaky' ? 'warn' : 'muted'}`, title: VAL_RESULT_HELP[str(c.result)] || null }, str(c.result)), c.severity ? sevB(c.severity) : '', str(c.message), foundLinks(str(c.id)),
+          ...(S.at ? [] : [copyBox(`recheck ${str(c.id)}`, 'Recheck…', `${ENT.validation[1]} Recheck ${str(c.id)} on the current build`) || ''])])) : h('p', { class: 'muted-t' }, 'Every case passed.'),
+    val && modAgain('validation', 'Run all the cases again…', 'Run the form validation again on the newest build')));
   v.append(sec2(`${ENT.stress[1]} Stress`, st ? ['Many users at the same time use the most important pages and endpoints. This finds errors and slow answers under load. Build ', buildLink(st.build), ` · ${fmtDate(st.utc)}${st.config ? ` · ${str(st.config.concurrency)} workers × ${str(st.config.duration_s)} s` : ''}`] : null,
     !st ? h('p', { class: 'muted-t' }, 'The stress module has not run yet.') : sf.length ? tableOf(['☐', 'Check', 'Target', 'Status', 'Severity', 'Evidence', `${ENT.bug[1]} Bug issue`],
       sf.map((c) => [c.status === 'fail' ? pickBox(str(c.id)) : '', h('code', {}, str(c.id)), h('code', {}, str(c.target)), h('span', { class: `badge ${c.status === 'fail' ? 'bad' : 'muted'}` }, str(c.status)), sevB(c.severity),
-        typeof c.evidence === 'object' && c.evidence ? JSON.stringify(c.evidence) : str(c.evidence || c.reason), foundLinks(str(c.id))])) : h('p', { class: 'muted-t' }, 'Every check passed.')));
+        typeof c.evidence === 'object' && c.evidence ? JSON.stringify(c.evidence) : str(c.evidence || c.reason), foundLinks(str(c.id))])) : h('p', { class: 'muted-t' }, 'Every check passed.'),
+    st && modAgain('stress', 'Run the stress checks again…', 'Run the stress checks again on the newest build')));
   const rq = arr(F.requests).filter((x) => x && /^S-\d+$/.test(str(x.id)));
   const RQ = { queued: ['waiting for the environment', 'muted'], in_progress: ['being tested', 'warn'], report_pending: ['tested, report on its way', 'ok'], rejected: ['not testable as written', 'bad'] };
   v.append(sec2(`${ENT.scenario[1]} Requested scenarios`, rq.length ? 'Scenarios that people requested in Slack, in the chat or on this page, and that have no report yet. Finished scenarios are in Runs (🏃).' : null,
@@ -2732,10 +2786,12 @@ function viewFindings() {
   const fo = arr(F.focus).filter((x) => x && typeof x === 'object');
   v.append(sec2('🎯 Feature focus', fo.length ? `${fo.length} newest focus run(s)` : null, !fo.length ? h('p', { class: 'muted-t' }, 'The agent did not test an area in depth yet. You can add an area to the queue in Modules.')
     : fo.map((x) => h('div', { style: 'margin-top:8px' }, h('h3', {}, x.area && items.some((i) => str(i.area) === str(x.area)) ? facetLink('area', str(x.area)) : str(x.area) || str(x.run), x.build ? [' · ', buildLink(x.build)] : '', x.utc ? ` · ${fmtDate(x.utc)}` : ''),
-      tableOf(['Check', 'Heuristic', 'Expected', 'Result', 'Severity'], arr(x.checks).map((c) => [h('code', {}, str(c.id)), str(c.heuristic), str(c.expected), badge(str(c.verdict)), c.severity ? sevB(c.severity) : '']))))));
+      tableOf(['Check', 'Heuristic', 'Expected', 'Result', 'Severity'], arr(x.checks).map((c) => [h('code', {}, str(c.id)), str(c.heuristic), str(c.expected), badge(str(c.verdict)), c.severity ? sevB(c.severity) : ''])),
+      x.area && !S.at ? copyBox(`focus ${str(x.area)}`, 'Test this area again…', `🎯 Test "${str(x.area)}" in depth again in the next modules run`) : null))));
   v.append(sec2('🛡️ Security', sec ? ['Build ', buildLink(sec.candidate), ` · ${fmtDate(sec.utc)} — the findings stay in the private report`] : null,
     !sec ? h('p', { class: 'muted-t' }, 'The security run has not run yet.') : h('div', {}, h('p', {}, ['critical', 'high', 'medium', 'low', 'info', 'skipped'].map((k) =>
-      h('span', { style: 'margin-right:10px' }, sevB(k), ` ${+((sec.counts || {})[k]) || 0}`))), h('p', {}, sec.report ? artLink(sec.report) : h('span', { class: 'muted-t' }, 'No report reference for this run.')))));
+      h('span', { style: 'margin-right:10px' }, sevB(k), ` ${+((sec.counts || {})[k]) || 0}`))), h('p', {}, sec.report ? artLink(sec.report) : h('span', { class: 'muted-t' }, 'No report reference for this run.'))),
+    sec && modAgain('security', 'Run the security checks again…', 'Run the security checks again on the newest build')));
 }
 
 // ------------------------------------------------------------------ design

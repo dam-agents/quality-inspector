@@ -55,3 +55,26 @@ while the plan has cases. The module failed — an `<ISO> ERROR: module=validati
 Passing cases and double submits create `qa-val-*` objects; the run's closing `env.sh reset`
 removes them. A finding is never a verdict or a comment, an issue only on the operator's "create issue for VAL-`<k>`" ([skills/create-issue](../skills/create-issue/SKILL.md)); the dashboard lists it
 ([catalog.md](catalog.md)) with its run's evidence.
+
+## Recheck — the operator's "recheck VAL-`<k>`"
+
+One case again, on the build that is up, to see if a fix took — from the dashboard's Findings
+or in words. Direct session only ([on-demand.md](on-demand.md)); it is not a module run (no
+`modules.sh ran`, no `results.json`) and changes no verdict.
+
+1. The case comes from the newest `work/validation/<c>/` whose `plan.json` and `results.json`
+   both have it (case ids are stable): the plan gives the input, `results.json` its earlier
+   result. A plan whose run wrote no `results.json` is skipped; none → say so, end.
+2. `env.sh lock operator` (busy → say who holds it, end); from here every end runs
+   `env.sh unlock operator` first. `env.sh status` — no product up → `env.sh up <candidate>` and
+   `wait`. Failure → say so, end.
+3. `QI_VALIDATION_INPUT=<that plan> bash "$HOME/scripts/suite.sh" run
+   validation-recheck-<k>-<candidate>-<HHMM> --strict --tag val-<k> --repeat-each 3 --no-cache
+   --evidence failures`. From its start, every end runs `env.sh reset` before the unlock: passing
+   input leaves `qa-val-*` objects. A run with no `val-<k>` result (no `report.json`, a non-JSON
+   summary, an exit before the tests) is `blocked` — say why, with the summary's error; never
+   report the case as fixed.
+4. Reset, unlock; log `finding_rechecked` (`before` the case's `result` in that `results.json`,
+   `after` this one's).
+5. Answer: `ok` (all three pass — possibly fixed; the next validation run decides), `finding`
+   (all fail, with the message), `flaky` or `blocked`, and the build.

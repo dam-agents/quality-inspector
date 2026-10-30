@@ -31,7 +31,7 @@ The operator may share the page beyond themselves, so it carries only what conce
   diff text and signal counts, the agent's `analysis` ([reporting.md](reporting.md) → **The agent's
   analysis**) — or its environment failure (the step, cause, repair, next step and
   evidence of `work/regression/<c>/environment.json`, [regression.md](regression.md) step 2); each issue and scenario run with its
-  verdicts; each run by hand (`work/reruns/`, [on-demand.md](on-demand.md) → "run #N") with its raw
+  verdicts; each run by hand (`work/reruns/`, [on-demand.md](on-demand.md) → "run #N") with the ref it ran and its raw
   results; each feature run (`work/reruns/feature-<id>/`) with its criteria's raw results; an issue or
   scenario run with its `analysis` too; each with its length — the run file's `minutes`, else its `started_utc` to its time;
   else a night from its `due` line, an issue run from its `issue_done minutes=`, a scenario run
@@ -188,7 +188,22 @@ every test of its issue), retest the whole issue (`test #42`), promote or demote
 take it out of a collection, and report it as a GitHub issue (`create issue for #42 AC-1`, plus
 `… for the architect` when `fix_label` is set). A design finding's card has "Manage":
 categorize it, dismiss it with a reason or reopen it, recheck it (`recheck D-<k>`), discuss it
-with the agent (`discuss D-<k>`, with the person's question when typed), report it. **Several problems as one
+with the agent (`discuss D-<k>`, with the person's question when typed), report it.
+**Run it again**, wherever a result shows — each one time on the build that is up, never a
+verdict unless it says a full run:
+
+| Where | Commands |
+| --- | --- |
+| A test case's panel | `run #42 AC-1`, `run #42`, `test #42`, `repair #42 AC-1` (above) |
+| An issue's or a scenario's panel | `run #42`; its failing test cases, `run #42 AC-1, #42 AC-3`; a profile scenario's full run, `test scenario <slug>` |
+| A run's panel, "🔁 Run it again" | by its type: a night `module regression run now`; an issue run `test #42` and `run #42`; a scenario run `run S-7` (a profile one also `test scenario <slug>`); a manual run the same ref it ran (`run #42 AC-1`); a feature run `run feature <id>`; and its failed test cases, `run <ref>, <ref>…` |
+| The catalog's toolbar, with a filter or a search | the test cases it shows, `run <ref>, <ref>…` — a collection, an area, a feature, "failing" |
+| The selection bar | the ticked test cases, `run <ref>, <ref>…`, beside the bug issue |
+| Findings | a validation case `recheck VAL-<k>`; the whole module `module validation\|stress\|security run now`; a focus area `focus <area>` |
+| Design | `recheck D-<k>` (above) |
+
+A list holds at most 20 test cases (the first 20; a larger filter says to narrow it); only a
+test case with a test file runs. **Several problems as one
 issue:** every test (catalog table and cards; the failing ones in Needs attention), design finding,
 validation finding and failed stress check has a ☐; the ticked ones gather in a bar at the bottom
 of every view with one command, `create issue for <ref>, <ref>…` (at most 20), and its

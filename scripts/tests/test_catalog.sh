@@ -375,7 +375,7 @@ printf -- '- fix_label: architect:fix\n' >> "$W/CONFIG.md"
 node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a build with the triage and a run by hand" 0 "$?"
 data="$(page_data)"
 assert "a run by hand: in the history and the runs, its raw result only" '(.items[] | select(.key == "scenario-7/AC-1") | .history[-1] == {"build":"c3","run":"rerun","value":"failed","utc":"2026-10-14T12:00:00Z","cause":null})
-  and ([.runs[] | select(.type == "rerun")] | length == 1 and .[0].ref == "S-7" and .[0].entries == [{"key":"scenario-7/AC-1","value":"failed","cause":null}] and .[0].report == null)' "$data"
+  and ([.runs[] | select(.type == "rerun")] | length == 1 and .[0].ref == "S-7" and .[0].scope == "S-7 AC-1" and .[0].entries == [{"key":"scenario-7/AC-1","value":"failed","cause":null}] and .[0].report == null)' "$data"
 assert "found issues: a row per problem, a non-https address dropped" '[.found[] | .ref + ":" + (.issue|tostring)] == ["S-7 AC-1:101","D-1:101"] and .found[0].labels == ["qa:found","architect:fix"] and .found[0].title == "The upload / never ends" and .found[1].title == null' "$data"
 assert "design triage: a category, a dismissal reason, a malformed category dropped" '(.design[] | select(.id == "D-1") | .category == "layout" and .dismiss_reason == null)
   and (.design[] | select(.id == "D-2") | .category == null)' "$data"
@@ -390,6 +390,13 @@ const t=["run #42", "run #42 AC-1", "run S-7 AC-1", "run P-sign-in", "create iss
   "recheck D-3", "discuss D-3", "recheck D-3 now", "recheck #42", "discuss VAL-2"];
 process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "the managing commands: their shapes only, at most 20 problems" 1111111111110000000111001110011000 "$cmd"
+# Run it again (docs/catalog.md → Managing from the page): a list of test cases, a repair, a
+# validation case, a profile scenario's full run — and nothing around them.
+again="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const re=eval(s.match(/^const CMD_RE = (\/.*\/);$/m)[1]);
+const t=["run #42 AC-1, #42 AC-3", "run #42, S-7 AC-1, P-sign-in EX-2", `run ${Array(20).fill("#42 AC-1").join(", ")}`, "repair #42 AC-1", "repair S-7 AC-1", "recheck VAL-12", "test scenario sign-in", "module regression run now",
+  `run ${Array(21).fill("#42 AC-1").join(", ")}`, "run #42 AC-1,#42 AC-2", "run #42 AC-1, ", "run #42 AC-1, S-7 IN-1", "repair #42 EX-1", "recheck VAL-1 now", "recheck STRESS-API-1", "test scenario Sign-In", "test scenario sign-in; rm -rf ~"];
+process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "run it again: up to 20 test cases, a repair, a validation recheck, a profile scenario" 11111111000000000 "$again"
 # A question about a design finding: the operator's words, bounded (docs/ui-sweep.md → Discuss).
 disc="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const re=eval(s.match(/^const DISCUSS_RE = (\/.*\/);$/m)[1]);
 const t=["discuss D-15: Is it the same defect as D-26?", "discuss D-15: Je to stejná chyba jako D-26?", "discuss D-15: ", "discuss D-15: a\u0007b",
