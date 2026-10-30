@@ -297,6 +297,7 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - artifact_reports: enabled
 - test_catalog: enabled
 - include_comments: enabled
+- deploy_gate: enabled
 - spec_feedback: disabled
 - auto_promote: disabled
 - media_retention_days: 14

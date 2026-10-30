@@ -51,6 +51,9 @@ MAX_ISSUES="$(reg max_issues_per_run)"; MAX_ISSUES="${MAX_ISSUES:-1}"
 LOCK_TTL_MIN="$(cfg lock_ttl_min)"; LOCK_TTL_MIN="${LOCK_TTL_MIN:-180}"
 case "$MAX_ISSUES" in (''|*[!0-9]*) MAX_ISSUES=1;; esac
 case "$LOCK_TTL_MIN" in (''|*[!0-9]*) LOCK_TTL_MIN=180;; esac
+# The deploy gate (docs/issue-qa.md): anything but `disabled` is on.
+DEPLOY_GATE="$(cfg deploy_gate)"; [ "$DEPLOY_GATE" = disabled ] || DEPLOY_GATE=enabled
+MAX_LINKED=10
 
 # A [host/]owner/repo ref: the host part only when it has three segments.
 GH_HOST_ARGS=(); REPO_PATH="$TARGET"
@@ -133,25 +136,44 @@ mode_issues() {
   printf '%s' "$listing" | jq -e 'type == "array"' >/dev/null 2>&1 \
     || fail_out "issue listing returned no array"
 
-  local scan due reports deferred tmp="/tmp/quality-inspector-listing.$$"
+  local scan due reports deferred waiting tmp="/tmp/quality-inspector-listing.$$" n one missing
   printf '%s' "$listing" > "$tmp"
+  # A labelled pull request stands for the issues it closes (docs/issue-qa.md → The deploy gate):
+  # the ones the listing lacks are read one by one, at most MAX_LINKED a run.
+  missing="$(node "$SCRIPT_DIR/lib/scan-issues.mjs" --missing "$tmp" 2>/dev/null)" || missing='[]'
+  for n in $(printf '%s' "$missing" | jq -r '.[]' 2>/dev/null | head -"$MAX_LINKED"); do
+    if one="$(gh api ${GH_HOST_ARGS[@]+"${GH_HOST_ARGS[@]}"} "repos/$REPO_PATH/issues/$n" 2>/dev/null)" \
+       && printf '%s' "$one" | jq -e 'type == "object" and (has("pull_request") | not)' >/dev/null 2>&1; then
+      listing="$(jq -c --argjson i "$one" '. + [$i]' <<<"$listing")"
+    else log "issue #$n: a labelled pull request closes it, but it cannot be read as an issue — skip"; fi
+  done
+  [ "$(printf '%s' "$missing" | jq length 2>/dev/null || echo 0)" -gt "$MAX_LINKED" ] \
+    && log "labelled pull requests close more than $MAX_LINKED unlabelled issues — the rest next run"
+  printf '%s' "$listing" > "$tmp"
+  local built=""
+  if [ "$DEPLOY_GATE" != disabled ]; then
+    built="$(profile_run build-time "$candidate" 2>/dev/null | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}T' | head -1)"
+    [ -n "$built" ] || log "candidate $candidate: publish time unknown (profile bin/build-time) — every issue waits for it"
+  fi
   scan="$(QI_OPERATOR_FILE="$WORK/OPERATOR.md" QI_RETEST_LABEL="$RETEST_LABEL" QI_MAX_ISSUES="$MAX_ISSUES" QI_LOCK_TTL_MIN="$LOCK_TTL_MIN" QI_NOW_EPOCH="$NOW_EPOCH" QI_ENV_LOCK="$ENV_LOCK" \
+          QI_DEPLOY_GATE="$DEPLOY_GATE" QI_CANDIDATE="$candidate" QI_CANDIDATE_BUILT="$built" \
           node "$SCRIPT_DIR/lib/scan-issues.mjs" "$tmp" "$WORK/QA.md" "$WORK/logs" 2>/dev/null)"
   rm -f "$tmp"
   [ -n "$scan" ] || fail_out "the issue scan failed (node scripts/lib/scan-issues.mjs)"
   due="$(jq -c .due <<<"$scan")"; reports="$(jq -c .reports <<<"$scan")"; deferred="$(jq -r .deferred <<<"$scan")"
+  waiting="$(jq -c '.waiting // []' <<<"$scan")"
   while IFS= read -r l; do log "$l"; done < <(jq -r '.logs[]' <<<"$scan")
   local scen sc; scen="$(scenarios_due)"; [ -n "$scen" ] || scen='[]'; sc="$(printf '%s' "$scen" | jq length)"
   [ "$sc" = 0 ] || log "$sc scenario(s) waiting: $(printf '%s' "$scen" | jq -r 'map(.id + " " + .kind) | join(", ")')"
   [ "$(scenario_runs_today)" -ge "$SCEN_CAP" ] && table_rows "$WORK/SCENARIOS.md" | grep -qE '\| *queued *\|' \
     && log "daily scenario cap reached ($SCEN_CAP) — queued scenarios wait for the next UTC day"
   local count rc; count="$(printf '%s' "$due" | jq length)"; rc="$(printf '%s' "$reports" | jq length)"
-  runlog ISSUES "candidate=$candidate baseline=${baseline:-none} due=$count reports=$rc deferred=$deferred scenarios=$sc"
-  jq -nc --arg mode issues --arg c "$candidate" --arg b "$baseline" \
-    --argjson due "$due" --argjson rep "$reports" --argjson scen "$scen" --argjson logs "$(logs_json)" \
+  runlog ISSUES "candidate=$candidate baseline=${baseline:-none} due=$count reports=$rc deferred=$deferred waiting=$(printf '%s' "$waiting" | jq length) scenarios=$sc"
+  jq -nc --arg mode issues --arg c "$candidate" --arg b "$baseline" --arg built "$built" \
+    --argjson due "$due" --argjson rep "$reports" --argjson wait "$waiting" --argjson scen "$scen" --argjson logs "$(logs_json)" \
     '{mode:$mode, nothing_to_do:(($due|length)==0 and ($rep|length)==0 and ($scen|length)==0),
-      candidate:$c, baseline:(if $b=="" then null else $b end),
-      issues_due:$due, reports_due:$rep, scenarios_due:$scen, logs:$logs}'
+      candidate:$c, candidate_built:(if $built=="" then null else $built end), baseline:(if $b=="" then null else $b end),
+      issues_due:$due, issues_waiting:$wait, reports_due:$rep, scenarios_due:$scen, logs:$logs}'
 }
 
 # Scenarios this run takes over (docs/scenarios.md → Waiting scenarios): frozen and

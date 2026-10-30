@@ -208,7 +208,8 @@ configuration.
 | `profile_scenarios`, `regression_channel` | default `enabled`; asked when a channel is connected, default empty | The profile's `scenarios/` (the product team's flows) are adopted and replayed nightly; the Slack conversation for the nightly summary and a black-box breach alert (else `slack_channel`). |
 | `auto_promote` | default `disabled` | `verified`: tests whose every criterion was verified join the nightly regression without the operator's "promote". |
 | `marker_prefix` | default `quality-inspector` | Dedup marker; **immutable once a comment exists**. |
-| `qa_label`, `retest_label` | defaults | The gates (`qa:ready`, `qa:retest`). |
+| `qa_label`, `retest_label` | defaults | The gates (`qa:ready`, `qa:retest`). The QA label goes on an issue or on the pull request that closes it. |
+| `deploy_gate` | default `enabled` | An issue is tested only on a candidate build published after its change merged ([docs/issue-qa.md](docs/issue-qa.md) → The deploy gate). |
 | `candidate_channel`, `baseline_channel` | the profile's defaults | What is tested against what (`none` turns red-green off). |
 | `test_catalog` | default `enabled` | One page to browse, describe, filter, group and categorize every test, published as an artifact after a run that changes it ([docs/catalog.md](docs/catalog.md)). |
 | `artifact_reports`, `include_comments`, `max_issues_per_run`, `lock_ttl_min`, `display_name` | defaults | Reporting and pacing. |
