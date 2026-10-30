@@ -23,7 +23,7 @@ const NAME = /^[a-z0-9_]+$/;
 const K8S = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 const KNOWN = ['chart', 'registry_api', 'release', 'namespace', 'app_port', 'traefik_port', 'apply_chart_crds',
   'channels', 'default_candidate', 'default_baseline', 'helm_version', 'credentials', 'prerequisites', 'values',
-  'overlays', 'max_pages', 'prune_below_gi'];
+  'overlays', 'max_pages', 'prune_below_gi', 'kvm', 'host_dirs'];
 
 const json = (s, what) => { try { return JSON.parse(s || '{}'); } catch { fail(`${what} is not JSON`); return null; } };
 const raw = json(process.env.QI_ENGINE_CONFIG, 'QI_ENGINE_CONFIG');
@@ -82,7 +82,7 @@ for (const k of ['release', 'namespace']) {
 }
 const port = Number(cfg.app_port);
 if (!Number.isInteger(port) || port < 1 || port > 65535) fail(`app_port '${cfg.app_port ?? ''}' is not a port number`);
-for (const k of ['traefik_port', 'apply_chart_crds']) {
+for (const k of ['traefik_port', 'apply_chart_crds', 'kvm']) {
   if (cfg[k] !== undefined && typeof cfg[k] !== 'boolean') fail(`${k} must be true or false`);
 }
 if (process.env.QI_PROFILE_DIR && Number.isInteger(port)) {
@@ -97,6 +97,23 @@ if (cfg.helm_version !== undefined && !/^v\d+\.\d+\.\d+$/.test(String(cfg.helm_v
 }
 if (cfg.prune_below_gi !== undefined && !(Number.isInteger(cfg.prune_below_gi) && cfg.prune_below_gi >= 0)) {
   fail(`prune_below_gi '${cfg.prune_below_gi}' is not a whole number of Gi (0 or more)`);
+}
+// host_dirs: a directory the engine bind-mounts over (README → KVM), never one the system or
+// the engine itself owns — k3s' data, the kubelet's root, the home the sources live in.
+const SYSTEM = ['/var', '/var/lib'];
+const OWNED = ['/etc', '/usr', '/bin', '/sbin', '/lib', '/lib64', '/boot', '/dev', '/proc', '/sys', '/run', '/tmp',
+  '/home', '/root', '/var/run', '/var/lib/rancher', '/var/lib/kubelet', '/var/lib/cni'];
+const hd = cfg.host_dirs ?? [];
+if (!Array.isArray(hd)) fail('host_dirs must be a list of absolute paths');
+else {
+  const seenDirs = new Set();
+  for (const d of hd) {
+    const n = str(d) ? d.replace(/\/+/g, '/').replace(/(.)\/$/, '$1') : '';
+    if (!str(d) || !d.startsWith('/') || d.split('/').includes('..') || d.split('/').includes('.') || /\s/.test(d)) fail(`host_dirs entry '${d}' is not an absolute path`);
+    else if (n === '/' || SYSTEM.includes(n) || OWNED.some((o) => n === o || n.startsWith(`${o}/`))) fail(`host_dirs entry '${d}' is or lies under a directory the system or the engine owns`);
+    else if (seenDirs.has(n)) fail(`host_dirs entry '${d}' is listed twice`);
+    else seenDirs.add(n);
+  }
 }
 
 // Channels and their defaults.

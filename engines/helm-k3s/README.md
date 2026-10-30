@@ -35,6 +35,8 @@ pulls it again, so its registry must be reachable unless k3s keeps it pinned.
 | `overlays` | `[{when: <config key>, values: {…}}]` — merged into `values` when that profile key is set; `when: "@model"` — while the agent lends its model; `when: "@sandbox:<id>"` — while every `E2E_SANDBOX_<ID>_*` line of `credentials.env` is filled |
 | `max_pages` | quay pages to read at most (default 30) |
 | `prune_below_gi` | after an `up`, the images no container uses (earlier builds') are removed while the k3s data volume has less free than this, in Gi (default 20); `reset` always removes them |
+| `kvm` | `true` — the product's pods open `/dev/kvm` from a user namespace (a VM runner) — see below |
+| `host_dirs` | absolute node directories the chart hands such pods as `hostPath` volumes — see below |
 
 `bin/versions --between <from> <to>` (bisection) reads the same tag listing — tags only —
 and returns the tags of the channel both builds match, in that channel's order.
@@ -53,6 +55,35 @@ any other `url` does.
 
 `wait`: `{namespace, deployments: true}` waits for every deployment to be Available;
 `{namespace, rollout: "ds/<name>"}` for one rollout.
+
+## KVM
+
+The device comes from the platform that hosts this VM (nested virtualization), never from
+the engine; the profile ships the cluster's device plugin as a `manifest` prerequisite and
+names its resource in `values`. With `kvm: true`, `up`:
+
+- opens `/dev/kvm` to all (`0666`) every time: in a user namespace the device keeps its
+  host owner unmapped, so a `0660 root:kvm` device opens for nobody. No `/dev/kvm` is a
+  warning, not a failure: the product installs, its VMs do not start, and `status` says
+  `"kvm": false` (`true` when the device is there; absent without `kvm`).
+- moves the kubelet's root to `~/.local/share/kubelet` when `/var/lib/kubelet` is on an
+  overlay (this VM's root is one): runc cannot idmap a volume whose source is on an overlay,
+  so a user-namespace pod's emptyDirs fail to mount. A drop-in in
+  `/etc/rancher/k3s/config.yaml.d/` does it; a k3s already running on the old root is
+  stopped once (with its pods' shims, mounts and iptables rules) and started again.
+
+Each `host_dirs` entry on an overlay, and not yet a mount point, gets
+`~/.local/share/host<path>` bind-mounted over it at every `up` (a bind mount does not
+outlive the VM) — `<path>` the whole path with `-` doubled and `/` made `-`
+(`/var/lib/vm-images` → `host-var-lib-vm--images`), so no two entries share a source; what
+it held before is copied over first, and a pod that started on the overlay directory is
+deleted, so its controller starts it again on the mount. `bin/check` refuses an entry listed
+twice, and one that is or lies under a directory the system or the engine owns (`/`, `/var`,
+`/var/lib`, `/etc`, `/usr`, `/home`, `/root`, `/dev`, `/run`, `/tmp`, `/var/lib/rancher`,
+`/var/lib/kubelet`, `/var/lib/cni`, …).
+
+k3s listens on its config's port, unless its data dir holds a cluster made on another port
+(its stored kubeconfigs name it): then on that one, as k3s exits when they disagree.
 
 ## Placeholders
 
