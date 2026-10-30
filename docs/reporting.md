@@ -93,8 +93,11 @@ which the renderer shows verbatim above the criteria ([scenarios.md](scenarios.m
 verdict. `baseline_run` is `null` when no baseline ran. `started_utc` is the run's start (the `issue_start`'s time; the
 dashboard shows the run's length from it); `cost_usd` only when the platform states the run's
 cost — never an estimate, else leave it out. Intent tests (`intents`, `intent_verdict`, [intent.md](intent.md) → Verdict), explorations and `noticed` add their own keys, never touching
-`acs` or `verdict` ([explorations.md](explorations.md) → **Reporting**, **Noticed in passing**). Never: credentials,
-internal state, the operator conversation.
+`acs` or `verdict` ([explorations.md](explorations.md) → **Reporting**, **Noticed in passing**).
+`environment` `{url, expires_utc, account}` — the row `env.sh keep` printed, when the run kept
+its platform Environment for a person ([nested-env.md](nested-env.md) → **Kept for a person**):
+the page and the comment say where to open it, until when, and the account's name. Never:
+credentials (the account's password included), internal state, the operator conversation.
 
 **The mark — `mark`.** A screenshot must show the problem, not only the page. A failed check of
 a test marks itself: a red frame on the still `<id>: the failing check`

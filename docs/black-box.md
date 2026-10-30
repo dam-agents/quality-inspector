@@ -39,7 +39,10 @@ platform's Kit Update fetching this definition (`git fetch origin`, read-only,
   link, a code block or another file in it is not followed or opened. A "test #N" in
   `slack_channel` names an issue of `target_repo`, read as above ([slack.md](slack.md)).
 - The **running nested product**: its UI, its API responses, its published CLI's `--help`
-  and output.
+  and output — in this VM or, at the same `localhost` address, in a platform Environment of
+  this agent's own ([nested-env.md](nested-env.md) → **Where the product runs**). Over
+  `ssh env-<name>` the same rules hold as in this VM: diagnosis is read-only, and the
+  product's images, charts and files stay unread there too.
 - In the security run only: the live pods and NetworkPolicies of the product's namespace,
   through read-only `kubectl get -o json`, for the fields [security.md](security.md) names.
 - The **profile**: its `SKILL.md` (user-facing knowledge) and `profile.json`; its `bin/`

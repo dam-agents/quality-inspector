@@ -133,7 +133,7 @@ grep -q "both on an overlay" "$SANDBOX/err" || { echo "  home on an overlay: say
 # No /dev/kvm: the install still runs, with a warning.
 fresh
 assert_eq "no /dev/kvm: up succeeds" 0 "$(up '.kvm = true')"
-grep -q "no /dev/kvm in this VM" "$SANDBOX/err" || { echo "  no /dev/kvm: warns"; FAILED=1; }
+grep -q "no /dev/kvm on the node" "$SANDBOX/err" || { echo "  no /dev/kvm: warns"; FAILED=1; }
 
 # host_dirs: each from a source of its own whole path, what it held copied over; a mount point skipped.
 fresh; mkdir -p "$N/a/images" "$N/b/images" "$N/var/lib/vm-images"; echo old > "$N/a/images/keep"

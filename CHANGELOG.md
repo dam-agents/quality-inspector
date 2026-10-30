@@ -7,6 +7,18 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.45.0 — 2026-10-30
+
+**Upgrade:**
+1. Nothing to run. From the next `env.sh up` the product runs in a platform Environment of this
+   agent's own when the profile declares `environment`, `lend_model` is off, the profile does not
+   set `engine_config.kvm` and the owner has the platform's `environments` feature; else in this VM as before, with the reason in the output
+   ([docs/nested-env.md](docs/nested-env.md) → **Where the product runs**). To keep it in this
+   VM, set `- nested_target: vm` in `work/CONFIG.md`.
+2. A run in an Environment that fails keeps it 3 days for a person (`env.sh keep`), listed in
+   `work/ENVIRONMENTS.json` (**Kept for a person**); "keep #N for <d> days" and "release #N" in the
+   direct session change that.
+
 ## 3.44.0 — 2026-10-30
 
 **Upgrade:**
