@@ -62,8 +62,9 @@ One case again, on the build that is up, to see if a fix took — from the dashb
 or in words. Direct session only ([on-demand.md](on-demand.md)); it is not a module run (no
 `modules.sh ran`, no `results.json`) and changes no verdict.
 
-1. The case comes from the newest `work/validation/<c>/plan.json` that has it (case ids are
-   stable), with its result there; none → say so, end.
+1. The case comes from the newest `work/validation/<c>/` whose `plan.json` and `results.json`
+   both have it (case ids are stable): the plan gives the input, `results.json` its earlier
+   result. A plan whose run wrote no `results.json` is skipped; none → say so, end.
 2. `env.sh lock operator` (busy → say who holds it, end); from here every end runs
    `env.sh unlock operator` first. `env.sh status` — no product up → `env.sh up <candidate>` and
    `wait`. Failure → say so, end.
@@ -73,6 +74,7 @@ or in words. Direct session only ([on-demand.md](on-demand.md)); it is not a mod
    input leaves `qa-val-*` objects. A run with no `val-<k>` result (no `report.json`, a non-JSON
    summary, an exit before the tests) is `blocked` — say why, with the summary's error; never
    report the case as fixed.
-4. Reset, unlock; log `finding_rechecked` (`before` the plan's result, `after` this one's).
+4. Reset, unlock; log `finding_rechecked` (`before` the case's `result` in that `results.json`,
+   `after` this one's).
 5. Answer: `ok` (all three pass — possibly fixed; the next validation run decides), `finding`
    (all fail, with the message), `flaky` or `blocked`, and the build.

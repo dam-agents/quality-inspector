@@ -52,6 +52,8 @@ operator-only steps, and tick each with `complete_onboarding_step` as it is sett
 9. *Sandbox accounts* — only when the profile declares them: the throwaway accounts its
    guides describe are created, their values filled in `work/env/credentials.env`, and
    `scripts/sandbox.sh check` passes — or the operator declines them (Step 3a).
+10. *Operator credentials* — only when the profile declares them: each `E2E_<NAME>` line its
+   `operator_credentials` names is filled with the value it asks for — never in chat (Step 3a).
 
 The schedules are **held** until Step 7 marks onboarding complete.
 
@@ -361,7 +363,8 @@ until it shows no `FAIL` and nothing held.
 
 ## Step 3a — Sandbox accounts (only when the profile declares them)
 
-`bash "$HOME/scripts/sandbox.sh" status` — `declared: false` → tick item 9 and go on. Otherwise
+`bash "$HOME/scripts/sandbox.sh" status` — `declared: false` → tick item 9, then the
+**Operator credentials** paragraph below, and go on. Otherwise
 the profile's flows reach outside the product (docs/profile-contract.md → `sandbox`), and the
 operator creates throwaway accounts for them — you cannot: creating an account is the
 operator's, on the service's own pages. A restored `work/` keeps no credentials, so a restore
@@ -387,6 +390,14 @@ asks again.
    what is wrong (a token, a missing channel, a refused request = an egress rule). Exit 3
    (the profile has no check) → say so; the first scenario that uses the accounts proves them.
    Tick item 9.
+
+**Operator credentials** (`operator_credentials` in `profile.json`,
+[docs/profile-contract.md](docs/profile-contract.md) → `operator_credentials`): values the
+profile asks the operator for directly — a real API key, not a throwaway account. `env.sh init`
+has seeded each as an empty `E2E_<NAME>` line; ask the operator to fill them in
+`work/env/credentials.env` from the agent's files (never by pasting them here), saying what each
+is for and which are optional. `verify-onboarding.sh` reports each as set, missing (required) or
+missing (optional). Tick item 10 and go on.
 
 ## Step 4 — Reconstruct `QA.md` (only when it has no rows and comments were used before)
 

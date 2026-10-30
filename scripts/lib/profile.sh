@@ -166,6 +166,22 @@ provided_roles() { # <credentials.env>
     sub(/^E2E_USER_/, "", k); sub(/_USERNAME$/, "", k); print tolower(k) }' "$1" | jq -R . | jq -sc 'unique'
 }
 
+# The profile's operator-filled credentials (docs/profile-contract.md →
+# `operator_credentials`): `<name>\t<what>\t<required>` per entry, `required` true|false.
+# Each lands in credentials.env as `E2E_<NAME>`, seeded empty by `env.sh init` for the
+# operator to fill; nothing when the profile declares none.
+operator_credentials() {
+  local dir; dir="$(profile_dir)" || return 1
+  jq -r '.operator_credentials // [] | .[]? | [(.name // ""), (.what // ""), ((.required // false) | tostring)] | @tsv' \
+    "$dir/profile.json" 2>/dev/null
+}
+# A valid operator credential name: [A-Z][A-Z0-9_]{0,31} with a PASSWORD, TOKEN, SECRET or KEY
+# segment, so lib/secrets.mjs masks its value in every run artefact.
+operator_credential_name_ok() { # <name>
+  printf '%s' "$1" | grep -qE '^[A-Z][A-Z0-9_]{0,31}$' \
+    && printf '%s' "$1" | grep -qE '(^|_)(PASSWORD|TOKEN|SECRET|KEY)(_|$)'
+}
+
 # The product team's scenarios (docs/profile-contract.md → `scenarios/`): one line
 # `<slug>\t<spec_hash>\t<path>` per `scenarios/<slug>.md` or `scenarios/<slug>.feature` (Gherkin)
 # of the profile, sorted by slug. A slug is [a-z0-9] then [a-z0-9-], at most 48 characters; any

@@ -1337,8 +1337,8 @@ function renderTray() {
   if (!picked.length) return;
   const cmd = `create issue for ${picked.join(', ')}`;
   const over = picked.length > PICK_MAX;
-  // The selected test cases can also run again, before or instead of the bug issue.
-  const again = picked.map((r) => runRef(items.find((i) => problemRef(i) === r))).filter(Boolean);
+  // The selected test cases can also run again, before or instead of the bug issue — today's, never as of a build.
+  const again = S.at ? [] : picked.map((r) => runRef(ALL.find((i) => problemRef(i) === r))).filter(Boolean);
   document.body.append(h('div', { id: 'tray', role: 'region', 'aria-label': 'Problems selected for one bug issue' },
     h('div', { class: 'row' }, h('b', {}, `${ENT.bug[1]} ${picked.length} problem${picked.length === 1 ? '' : 's'} selected for one bug issue`),
       tip('Select failed test cases, design findings, validation findings or stress checks on this page. The agent writes one GitHub issue with one section for each problem: the problem, the correct function, the steps to reproduce it and the evidence. The agent creates the issue only when you agree. Only this browser keeps your selection.'),
