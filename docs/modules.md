@@ -32,6 +32,7 @@ Only the operator, in the direct session, changes a module (CLAUDE.md → trust 
 | `reopen D-<k>` | `modules.sh reopen D-<k>` — its row off `DISMISSED.md`; the next merge decides open or resolved |
 | `categorize D-<k> <category>` | `modules.sh categorize D-<k> <category>` — a row in `work/design/CATEGORIES.md` (lower-case letters, digits, `-`, up to 30; `-` clears it) |
 | `recheck D-<k>` / `discuss D-<k>[: <question>]` | [ui-sweep.md](ui-sweep.md) → **5. Recheck** / **6. Discuss** — no `modules.sh` write |
+| `recheck VAL-<k>` | [validation.md](validation.md) → **Recheck** — no `modules.sh` write |
 
 `modules.sh set`, `focus`, `dismiss`, `reopen` and `categorize` write only registry keys with valid values, an area name,
 a finding id with a reason or a category, and refuse to run outside the direct session (`lib/config.sh` →
