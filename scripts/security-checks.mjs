@@ -417,8 +417,15 @@ await guarded('SEC-BRUTE-1', async () => {
 // SEC-DEP-1..5 — the live objects of the product's namespace, read-only.
 if (ctx.deployment.run) {
   await guarded(['SEC-DEP-1', 'SEC-DEP-2', 'SEC-DEP-3', 'SEC-DEP-4', 'SEC-DEP-5'], async () => {
-    const kc = (() => { try { execFileSync('sh', ['-c', 'command -v kubectl'], { stdio: 'ignore' }); return ['kubectl']; } catch { return ['k3s', 'kubectl']; } })();
-    const get = (kind) => JSON.parse(execFileSync(kc[0], [...kc.slice(1), 'get', kind, '-n', ctx.deployment.namespace, '-o', 'json'], { encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'pipe'] }));
+    // In a platform Environment the cluster is there, over its link (docs/nested-env.md).
+    const where = (() => { try { return readFileSync(join(WORK, 'env', 'TARGET'), 'utf8').trim().split(/\s+/); } catch { return ['vm']; } })();
+    // There, k3s can be off a plain ssh shell's PATH: qi/kubectl.sh sets it as the copy's run.sh
+    // does (scripts/lib/environment.sh → env_sync); ssh joins the words, so the namespace is quoted.
+    const sq = (x) => `'${String(x).replace(/'/g, `'\\''`)}'`;
+    const kc = where[0] === 'environment' && /^qi-[a-z0-9-]+$/.test(where[1] ?? '') ? ['ssh', '-o', 'BatchMode=yes', `env-${where[1]}`, 'bash', 'qi/kubectl.sh']
+      : (() => { try { execFileSync('sh', ['-c', 'command -v kubectl'], { stdio: 'ignore' }); return ['kubectl']; } catch { return ['k3s', 'kubectl']; } })();
+    const ns = kc[0] === 'ssh' ? sq(ctx.deployment.namespace) : ctx.deployment.namespace;
+    const get = (kind) => JSON.parse(execFileSync(kc[0], [...kc.slice(1), 'get', kind, '-n', ns, '-o', 'json'], { encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'pipe'] }));
     const pods = get('pods').items ?? []; const nps = get('networkpolicies').items ?? [];
     const DEFAULTS = new Set(['admin', 'administrator', 'password', 'passw0rd', 'changeme', 'change-me', 'changeit', 'secret', 'default', 'root', 'test',
       'guest', '123456', '12345678', 'letmein', 'postgres', 'mysql', 'minioadmin', 'minio123', 'redis', 'rabbitmq']);

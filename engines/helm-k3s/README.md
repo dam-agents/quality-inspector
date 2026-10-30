@@ -1,7 +1,8 @@
 # Engine `helm-k3s`
 
-Runs a product that ships as a **Helm chart in an OCI registry** inside the inspector's VM:
-k3s, the profile's prerequisites, then the chart at the build under test. A profile uses
+Runs a product that ships as a **Helm chart in an OCI registry** on its node (the inspector's
+VM, or a platform Environment that runs the product): k3s, the profile's prerequisites, then
+the chart at the build under test. A profile uses
 it with `"engine": "helm-k3s"` and describes its product in `engine_config` — no scripts
 of its own ([docs/profile-contract.md](../../docs/profile-contract.md) → Engines).
 
@@ -32,11 +33,12 @@ pulls it again, so its registry must be reachable unless k3s keeps it pinned.
 | `credentials` | `users: {name: {username}}` — passwords are generated into `credentials.env` as `E2E_USER_<NAME>_*`; `secrets: [name]` — generated as `QI_SECRET_<NAME>` |
 | `prerequisites` | ordered, installed once, never upgraded by `up` — see below |
 | `values` | the Helm values, as JSON, with placeholders |
-| `overlays` | `[{when: <config key>, values: {…}}]` — merged into `values` when that profile key is set; `when: "@model"` — while the agent lends its model; `when: "@sandbox:<id>"` — while every `E2E_SANDBOX_<ID>_*` line of `credentials.env` is filled |
+| `overlays` | `[{when: <config key>, values: {…}}]` — merged into `values` when that profile key is set; `when: "@model"` — while the agent lends its model; `when: "@sandbox:<id>"` — while every `E2E_SANDBOX_<ID>_*` line of `credentials.env` is filled; `when: "@environment"` — while the product runs in a platform Environment; `tags` (a regex) — only for a build whose tag matches it, the builds that understand the overlay's values |
 | `max_pages` | quay pages to read at most (default 30) |
 | `prune_below_gi` | after an `up`, the images no container uses (earlier builds') are removed while the k3s data volume has less free than this, in Gi (default 20); `reset` always removes them |
 | `kvm` | `true` — the product's pods open `/dev/kvm` from a user namespace (a VM runner) — see below |
 | `host_dirs` | absolute node directories the chart hands such pods as `hostPath` volumes — see below |
+| `environment_bridge` | `{image, port}` — the host-name bridge of an install in a platform Environment — see below |
 
 `bin/versions --between <from> <to>` (bisection) reads the same tag listing — tags only —
 and returns the tags of the channel both builds match, in that channel's order.
@@ -58,23 +60,26 @@ any other `url` does.
 
 ## KVM
 
-The device comes from the platform that hosts this VM (nested virtualization), never from
+The device comes from the platform that hosts the node (nested virtualization), never from
 the engine; the profile ships the cluster's device plugin as a `manifest` prerequisite and
-names its resource in `values`. With `kvm: true`, `up`:
+names its resource in `values`. The node is this VM or the platform Environment that runs the
+product. An Environment does not promise the device: with `kvm: true` the product stays in
+this VM under `nested_target: auto`, and `env.sh up` fails under `environment`
+([docs/nested-env.md](../../docs/nested-env.md) → **Where the product runs**). With `kvm: true`, `up`:
 
 - opens `/dev/kvm` to all (`0666`) every time: in a user namespace the device keeps its
   host owner unmapped, so a `0660 root:kvm` device opens for nobody. No `/dev/kvm` is a
   warning, not a failure: the product installs, its VMs do not start, and `status` says
   `"kvm": false` (`true` when the device is there; absent without `kvm`).
 - moves the kubelet's root to `~/.local/share/kubelet` when `/var/lib/kubelet` is on an
-  overlay (this VM's root is one): runc cannot idmap a volume whose source is on an overlay,
+  overlay (an agent VM's root is one): runc cannot idmap a volume whose source is on an overlay,
   so a user-namespace pod's emptyDirs fail to mount. A drop-in in
   `/etc/rancher/k3s/config.yaml.d/` does it; a k3s already running on the old root is
   stopped once (with its pods' shims, mounts and iptables rules) and started again.
 
 Each `host_dirs` entry on an overlay, and not yet a mount point, gets
 `~/.local/share/host<path>` bind-mounted over it at every `up` (a bind mount does not
-outlive the VM) — `<path>` the whole path with `-` doubled and `/` made `-`
+outlive a boot of the node) — `<path>` the whole path with `-` doubled and `/` made `-`
 (`/var/lib/vm-images` → `host-var-lib-vm--images`), so no two entries share a source; what
 it held before is copied over first, and a pod that started on the overlay directory is
 deleted, so its controller starts it again on the mount. `bin/check` refuses an entry listed
@@ -84,6 +89,23 @@ twice, and one that is or lies under a directory the system or the engine owns (
 
 k3s listens on its config's port, unless its data dir holds a cluster made on another port
 (its stored kubeconfigs name it): then on that one, as k3s exits when they disagree.
+
+## Environment
+
+In a platform Environment ([docs/nested-env.md](../../docs/nested-env.md) → Where the product
+runs) `bin/env` runs there over the Environment Link with `QI_NESTED_TARGET=environment` and
+`QI_ENV_ENDPOINTS` (`{endpoint: url}`, the addresses the profile's `environment.endpoints`
+got). The same engine installs the same chart; on top:
+
+- the `"@environment"` overlay applies, where `{{env_url:<endpoint>}}` (no trailing `/`) and
+  `{{env_scheme}}` give the product its public addresses;
+- Traefik's `app` entrypoint trusts forwarded headers (`forwardedHeaders.insecure`): only the
+  Environment's loopback reaches it, through the gate and the bridge;
+- with `environment_bridge: {image, port}`, an Envoy on the node's network listens on
+  `port` — every endpoint's port in `environment.endpoints` — and passes each request to
+  `app_port` with its host set from `X-Forwarded-Host` and the public scheme and port named,
+  as the gate relays with `Host: 127.0.0.1:<port>` while the ingress routes by host name.
+  `port` differs from `app_port`, which stays the one the agent's forward reaches.
 
 ## Placeholders
 
@@ -96,7 +118,7 @@ held in that key. In `values` only: `{{user:<name>.username|password}}`,
 → The `bin/` contract), empty when not lent; `{{proxy:https|http|no}}` — the gateway proxy
 for pods that must reach the outside (the lent model's host), `no` with the cluster's own
 ranges added; `{{gateway_ca}}` — the PEM of the CA the gateway presents (the file
-`NODE_EXTRA_CA_CERTS` or `SSL_CERT_FILE` names), empty when neither does; `{{gateway_ip}}` — the
+`NODE_EXTRA_CA_CERTS` or `SSL_CERT_FILE` names), empty when neither does; `{{env_url:<endpoint>}}`, `{{env_scheme}}` — see **Environment**; `{{gateway_ip}}` — the
 gateway's IPv4 address, which the VM's DNS gives for every public name, for a product whose
 own egress policy must name it (a nested platform's gateways); rendering fails when it does not
 resolve. The rendered
@@ -108,12 +130,16 @@ values (`$QI_ENV_DIR/values.json`) are mode 600 and never printed.
 the channels and their defaults, the owner account, each prerequisite's fields (a manifest `file` must exist in the profile), `app_port`
 against the profile's `app.url`, and every placeholder rendered with throw-away
 credentials — once with the config defaults and no lent model, once with every overlay
-switched on. An overlay's `when` must be a profile config key, `"@model"` or
-`"@sandbox:<id>"`; the second render sets a throw-away `QI_MODEL_KEY` and sandbox
-credentials, so those overlays and their `{{model:*}}` and `{{sandbox:*}}` placeholders are
-rendered too.
+switched on. An overlay's `when` must be a profile config key, `"@model"`, `"@environment"`
+or `"@sandbox:<id>"`; the second render sets a throw-away `QI_MODEL_KEY` and sandbox
+credentials and runs as in an Environment (each of the profile's `environment.endpoints` at a
+throw-away address), so those overlays and their `{{model:*}}`, `{{sandbox:*}}` and
+`{{env_url:*}}` placeholders are rendered too. `environment_bridge` needs an image and a port
+other than `app_port`, the port of every `environment.endpoints` entry.
 
 ## Diagnosis (read-only)
 
 `k3s kubectl get pods -A`, `k3s kubectl -n <ns> describe pod <p>`, `k3s kubectl -n <ns>
-logs <p>`, `helm -n <ns> status <release>`, `/var/log/k3s.log`.
+logs <p>`, `helm -n <ns> status <release>`, `/var/log/k3s.log` — in a platform Environment
+each as `ssh env-<name> '<command>'`, and `k3s kubectl …` as `ssh env-<name> bash qi/kubectl.sh …`
+(a plain ssh shell there can miss `k3s` on its PATH).

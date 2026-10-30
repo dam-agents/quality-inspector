@@ -1,9 +1,60 @@
 # The nested product
 
-The system under test runs **inside this agent's own VM**, at the build under test, brought
-up by the profile ([profile-contract.md](profile-contract.md)). `scripts/env.sh` is the one
-entry: it holds the lock and hands every other command to the profile's `bin/env`. This
-file is the why and the recovery path; how one product is installed is the profile's.
+The system under test runs **in this agent's own VM or in a platform Environment of its
+own**, at the build under test, brought up by the profile ([profile-contract.md](profile-contract.md)).
+`scripts/env.sh` is the one entry: it holds the lock, chooses where the product runs, and
+hands every other command to the profile's `bin/env` there. This file is the why and the
+recovery path; how one product is installed is the profile's.
+
+## Where the product runs
+
+`env.sh up` chooses, per `nested_target` in `work/CONFIG.md` (`auto`, the default; `vm`;
+`environment`), and says which on its first line; `env.sh where` tells it any time.
+
+- **An Environment** when the profile declares one (`environment` in `profile.json`), the
+  agent does not lend its model (`lend_model`: an Environment holds no connection), the
+  profile does not set `engine_config.kvm` (an Environment does not promise `/dev/kvm`), and the
+  platform's Environment tools answer (the owner's `environments` feature). The active
+  Environment is reused from run to run while it lives (each `up` extends it two days);
+  otherwise `up` makes a new one, `qi-<date>`, and moving to it stops the product in this VM.
+- **This VM** otherwise, and whenever the platform does not make the Environment — with the
+  reason in the output and the `env_target` log line. Moving back deletes the active
+  Environment. With `nested_target: environment` this VM is never the fallback: `up` fails
+  with the reason, an environment failure.
+
+In an Environment, `bin/env` runs over the Environment Link (`ssh env-<name>`) from a copy
+of the profile and the engines in `~/qi` there; `init` and the credentials stay here and are
+copied over at every call. One `ssh -L` keeps the product at the profile's `app.url` on this
+VM, so tests, the CLI and the API address `localhost` in both places and nothing below
+changes. `env.sh status` adds `target` (and `environment`, `forward`) and brings a dropped
+forward back; `env.sh down` there only closes the forward, and the Environment sleeps. A
+lost link mid-run is an environment failure, never a verdict. The profile's diagnosis
+commands run there as `ssh env-<name> '<command>'`, under the same read-only rule;
+`k3s kubectl` as `ssh env-<name> bash qi/kubectl.sh …`, as a plain ssh shell can miss `k3s`.
+
+## Kept for a person
+
+An Environment can stay as a run left it — the build, its data, the state at the failed
+step — so a person signs in and looks, beyond the video and screenshots.
+
+- **When:** an issue, scenario or regression run in an Environment ends with a criterion
+  `failed` or `blocked` by the product (not by the budget, the environment or the model):
+  `env.sh keep <label>` before the report — `issue-<n>`, `scenario-s-<k>`,
+  `regression-<candidate>` — prints the row, and its `url`, `account` and `expires_utc` go
+  into the verdicts file as `environment` ([reporting.md](reporting.md) → Verdicts file).
+  It keeps the Environment 3 days (`env.sh keep <label> <days>`, at most 30); the
+  operator's "keep #N for <d> days" gives a kept one more (`env.sh extend <label> <d>`). An
+  earlier one of the same label goes. The next `up`
+  makes a new Environment.
+- **Who opens it:** the Environment's `app` address admits only the owner's access list
+  (the platform's sign-in). In the product, a person signs in with the account of the
+  profile's `environment.account` role; its password stays in `work/env/credentials.env`,
+  which the operator opens in the agent's files — never in a report, comment or chat.
+- **Released:** `env.sh release <label>` when the same issue or scenario passes later
+  (verified, inconclusive or passed), on the operator's "release #N", and by the platform
+  at its expiry. At the platform's cap a new run releases the oldest kept one first.
+  `env.sh kept` lists them (and drops those the platform deleted); the weekly audit names
+  each.
 
 ## Shape
 
@@ -33,7 +84,8 @@ file is the why and the recovery path; how one product is installed is the profi
   otherwise, and two hours is its maximum. A suite run that may take longer is split by
   `--tag` into several runs.
 - **What a run leaves stays until the next reset**: a failed AC's data is there to look
-  at ("show the environment") until a run resets for its baseline.
+  at ("show the environment") until a run resets for its baseline — and, in an Environment,
+  for days when the run keeps it (**Kept for a person** above).
 - **Credentials are the profile's** — `env.sh init` makes it write
   `work/env/credentials.env` (mode 600). Tests reach them only as `e2e` credentials.
 - **Builds move forward only.** To run an older build (the baseline) after a newer one,

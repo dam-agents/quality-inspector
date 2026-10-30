@@ -277,4 +277,18 @@ jq '.verdict = "passed" | .acs[0].verdict = "verified"' "$SANDBOX/s.json" > "$SA
 QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/s-ver.json" "$SANDBOX/s-out" >/dev/null 2>&1
 assert_eq "a verified scenario AC is refused" 2 "$?"
 [ -f "$SANDBOX/s-out/index.html" ] || { echo "  the refused render removed the earlier report"; FAILED=1; }
+# A kept Environment (docs/nested-env.md → Kept for a person): where and until when, the account's
+# name — never anything that is not an https address.
+jq '. + {environment: {url: "https://app-qi-1.env.example", expires_utc: "2026-11-02T10:00:00Z", account: "qa-viewer", password: "pw-secret"}}' "$SANDBOX/v.json" > "$SANDBOX/vk.json"
+QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/vk.json" "$SANDBOX/outk" >/dev/null
+grep -q 'Examine the build yourself' "$SANDBOX/outk/index.html" && grep -q 'href="https://app-qi-1.env.example"' "$SANDBOX/outk/index.html" \
+  || { echo "  kept: the page links the Environment"; FAILED=1; }
+grep -qx 'Examine the build yourself until 2026-11-02: https://app-qi-1.env.example (account qa-viewer)' "$SANDBOX/outk/comment.md" \
+  || { echo "  kept: the comment names it: $(cat "$SANDBOX/outk/comment.md")"; FAILED=1; }
+grep -q pw-secret "$SANDBOX/outk/index.html" "$SANDBOX/outk/comment.md" && { echo "  kept: never a password"; FAILED=1; }
+jq '. + {environment: {url: "javascript:alert(1)"}}' "$SANDBOX/v.json" > "$SANDBOX/vk2.json"
+QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/vk2.json" "$SANDBOX/outk2" >/dev/null
+grep -q 'Examine the build yourself' "$SANDBOX/outk2/index.html" && { echo "  kept: only an https address is shown"; FAILED=1; }
+grep -q 'Examine the build yourself' "$SANDBOX/out/index.html" 2>/dev/null && { echo "  no environment: no section"; FAILED=1; }
+
 exit $FAILED

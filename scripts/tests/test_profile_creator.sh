@@ -72,6 +72,15 @@ grep -q "unknown key 'expected_requests'" <<<"$out" && { echo "  expected_reques
 P="$(helm_profile expected-bad)"; edit "$P" '.expected_requests = [{"method":"get","path":"/api/*?x=1","status":200}]'
 out="$(check "$P")"
 for k in method path status why; do grep -q "^FAIL  expected_requests\[0\]\.$k" <<<"$out" || { echo "  a bad expected_requests.$k must fail"; FAILED=1; }; done
+P="$(helm_profile environment)"; edit "$P" '.environment = {"endpoints":[{"name":"app","port":4400},{"name":"keycloak","port":4400}],"storage":"60Gi","account":"owner"}'
+out="$(check "$P")"
+grep -q '^PASS  environment: app:4400, keycloak:4400, 60Gi' <<<"$out" || { echo "  environment not reported: $(grep environment <<<"$out")"; FAILED=1; }
+grep -q "unknown key 'environment'" <<<"$out" && { echo "  environment is a contract key"; FAILED=1; }
+P="$(helm_profile environment-bad)"; edit "$P" '.environment = {"endpoints":[{"name":"Key-cloak","port":0}],"storage":"60G","account":"nobody"}'
+out="$(check "$P")"
+for k in "endpoints\\[0\\]\\.name" "endpoints\\[0\\]\\.port" "endpoints: needs 'app'" "storage" "account"; do
+  grep -q "^FAIL  environment\.$k" <<<"$out" || { echo "  a bad environment.$k must fail"; FAILED=1; }
+done
 P="$(helm_profile validation)"; edit "$P" '.validation = {"exclude":["/admin"]}'
 check "$P" | grep -q "unknown key 'validation'" && { echo "  validation is a contract key"; FAILED=1; }
 P="$(helm_profile canary-none)"; edit "$P" '.canary = {"none":"nothing a user names"}'

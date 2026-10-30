@@ -109,7 +109,11 @@ A direct session's first request names it ([logging.md](logging.md) → **Sessio
   problems (a failed test, a design finding, a validation case, a stress check):
   [skills/create-issue](../skills/create-issue/SKILL.md). The operator sees the draft and says yes
   before anything is posted.
-- **"show the environment"** — `env.sh status` plus non-running pods; read-only.
+- **"show the environment"** — `env.sh where`, `env.sh status` plus non-running pods (in an
+  Environment over `ssh env-<name>`), and `env.sh kept`; read-only.
+- **"keep #N [for <d> days]"** / **"release #N"** — `env.sh extend issue-<n> <d>` (3 when no
+  number is named) / `env.sh release issue-<n>`; also `scenario-s-<k>` and `regression-<build>`
+  ([nested-env.md](nested-env.md) → **Kept for a person**).
 - **"add #N to the collection <name>"** / **"remove … from the collection <name>"** / **"show the catalog"** — edit
   `work/CATALOG.md` ([catalog.md](catalog.md) → Describing and categorizing), then build and
   publish it; "show" just builds, publishes and gives the artifact reference.

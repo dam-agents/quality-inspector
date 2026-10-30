@@ -224,6 +224,7 @@ configuration.
 | `slack_channel`, `slack_tests_per_day` | asked (optional), default `3` | Slack test requests ([docs/slack.md](docs/slack.md)). |
 | `report_visibility` | default `private` | `public`: every report but the security run's gets a link anyone holding it opens, and the dashboard opens it in one click ([docs/reporting.md](docs/reporting.md) → Delivery). |
 | `slack_report_visibility` | default `private` | `public`: a report answered in a Slack thread gets a link anyone holding it opens, posted in that thread only ([docs/slack.md](docs/slack.md) → The answer in the thread). |
+| `nested_target` | default `auto` | Where the nested product runs: a platform Environment when the profile declares one and the platform makes it, else this VM; `vm` keeps it here, `environment` refuses this VM ([docs/nested-env.md](docs/nested-env.md) → Where the product runs). |
 | `lend_model`, `live_browser` | `lend_model` offered, default `disabled`; `live_browser` detected | The product calls the agent's model by placeholder; exploration in the browser the operator watches. |
 
 ## Runtime requirements

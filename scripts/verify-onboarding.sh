@@ -83,7 +83,7 @@ e2e_version e2e_web_version e2e_model audit_report log_level media_retention_day
 explorations max_explorations_per_ac auto_promote security_checks security_failed_logins
 confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi
 scenario_discovery scenario_channel profile_scenarios regression_channel max_scenarios_per_run max_scenarios_per_day work_repo test_catalog
-lend_model live_browser slack_channel slack_tests_per_day slack_report_visibility report_visibility github_login found_label fix_label
+lend_model nested_target live_browser slack_channel slack_tests_per_day slack_report_visibility report_visibility github_login found_label fix_label
 $(jq -r '[.global, (.modules[] | select(.kind == "modules" or .kind == "queue") | .settings)] | add | keys[]' "$SCRIPT_DIR/lib/modules.json" 2>/dev/null)"
 
 if [ "$STRUCTURE" = 1 ]; then
@@ -186,7 +186,7 @@ if [ -f "$CONFIG" ]; then
     case " $2 " in (*" $v "*) ok "cfg:$1" "$v";; (*) fail "cfg:$1" "'$v' is not one of: $2" "set a documented value (CLAUDE.md → Runtime configuration)";; esac; }
   enum issue_comments "enabled disabled"; enum artifact_reports "enabled disabled"
   enum include_comments "enabled disabled"; enum audit_report "enabled disabled"; enum log_level "info debug"; enum deploy_gate "enabled disabled"
-  enum spec_feedback "enabled disabled"; enum auto_promote "disabled verified"; enum lend_model "enabled disabled"
+  enum spec_feedback "enabled disabled"; enum auto_promote "disabled verified"; enum lend_model "enabled disabled"; enum nested_target "auto vm environment"
   enum test_catalog "enabled disabled"; enum slack_report_visibility "private public"; enum report_visibility "private public"
   v="$(cfg scenario_channel)"
   if [ -z "$v" ]; then ok cfg:scenario_channel "empty — proposals stay in the chat UI"

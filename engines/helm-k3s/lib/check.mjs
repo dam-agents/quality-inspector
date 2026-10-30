@@ -23,7 +23,7 @@ const NAME = /^[a-z0-9_]+$/;
 const K8S = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 const KNOWN = ['chart', 'registry_api', 'release', 'namespace', 'app_port', 'traefik_port', 'apply_chart_crds',
   'channels', 'default_candidate', 'default_baseline', 'helm_version', 'credentials', 'prerequisites', 'values',
-  'overlays', 'max_pages', 'prune_below_gi', 'kvm', 'host_dirs'];
+  'overlays', 'max_pages', 'prune_below_gi', 'kvm', 'host_dirs', 'environment_bridge'];
 
 const json = (s, what) => { try { return JSON.parse(s || '{}'); } catch { fail(`${what} is not JSON`); return null; } };
 const raw = json(process.env.QI_ENGINE_CONFIG, 'QI_ENGINE_CONFIG');
@@ -43,16 +43,24 @@ const overlays = raw.overlays ?? [];
 if (!Array.isArray(overlays)) fail('overlays must be a list');
 const ovl = Array.isArray(overlays) ? overlays : [];
 const MODEL = '@model';
+const ENVIRONMENT = '@environment';
 const SANDBOX = /^@sandbox:([a-z][a-z0-9]{0,15})$/;
-const special = (w) => w === MODEL || SANDBOX.test(w);
+const special = (w) => w === MODEL || w === ENVIRONMENT || SANDBOX.test(w);
 for (const o of ovl) {
-  if (!obj(o) || !str(o.when)) { fail('every overlay needs `when` (a profile config key, "@model" or "@sandbox:<id>") and `values`'); continue; }
-  if (!special(o.when) && !(o.when in pcfg)) fail(`overlay when '${o.when}' is not a profile config key, "@model" or "@sandbox:<id>"`);
+  if (!obj(o) || !str(o.when)) { fail('every overlay needs `when` (a profile config key, "@model", "@environment" or "@sandbox:<id>") and `values`'); continue; }
+  if (!special(o.when) && !(o.when in pcfg)) fail(`overlay when '${o.when}' is not a profile config key, "@model", "@environment" or "@sandbox:<id>"`);
   if (!obj(o.values)) fail(`overlay '${o.when}' has no values object`);
+  if (o.tags !== undefined) { try { new RegExp(o.tags); if (!str(o.tags)) throw 0; } catch { fail(`overlay '${o.when}': tags '${o.tags}' is not a regex`); } }
 }
 // The defaults render lends no model; the "every overlay on" render lends a throw-away one.
 const NO_MODEL = { QI_MODEL_KEY: '', QI_MODEL_KIND: '', QI_MODEL_BASE_URL: '', QI_GATEWAY_IP: '192.0.2.1' };
 const LENT = { QI_MODEL_KEY: 'check:model', QI_MODEL_KIND: 'api-key', QI_MODEL_BASE_URL: '', QI_GATEWAY_IP: '192.0.2.1' };
+// The every-overlay-on render runs as in a platform Environment, each endpoint the profile
+// declares (profile.json → environment) at a throw-away address.
+let envEps = [];
+try { envEps = JSON.parse(readFileSync(join(process.env.QI_PROFILE_DIR ?? '', 'profile.json'), 'utf8')).environment?.endpoints ?? []; } catch { /* no profile.json here */ }
+const IN_ENV = { QI_NESTED_TARGET: 'environment',
+  QI_ENV_ENDPOINTS: JSON.stringify(Object.fromEntries((Array.isArray(envEps) ? envEps : []).map((e) => [e?.name, `https://${e?.name}-check.env.invalid`]))) };
 // Throw-away sandbox credentials: one line per {{sandbox:<id>.<NAME>}} and per "@sandbox:<id>"
 // overlay, in a credentials file of their own — so the defaults render has every sandbox off.
 const sbVars = new Set([...JSON.stringify(raw).matchAll(/\{\{sandbox:([a-z][a-z0-9]*)\.([A-Z][A-Z0-9_]*)\}\}/g)]
@@ -64,7 +72,7 @@ const base = render('config', raw, { QI_PROFILE_CONFIG: JSON.stringify(pcfg), QI
 if (base.err) fail(`placeholders: ${base.err}`);
 const on = { ...pcfg };
 for (const o of ovl) if (obj(o) && str(o.when) && !special(o.when) && !on[o.when]) on[o.when] = 'registry.invalid/check:on';
-const all = ovl.length ? render('config', raw, { QI_PROFILE_CONFIG: JSON.stringify(on), QI_ENV_DIR: sbDir, ...LENT }) : base;
+const all = ovl.length ? render('config', raw, { QI_PROFILE_CONFIG: JSON.stringify(on), QI_ENV_DIR: sbDir, ...LENT, ...IN_ENV }) : base;
 rmSync(sbDir, { recursive: true, force: true });
 if (all.err && !base.err) fail(`placeholders with every overlay on: ${all.err}`);
 const cfg = base.out ?? raw;
@@ -114,6 +122,17 @@ else {
     else if (seenDirs.has(n)) fail(`host_dirs entry '${d}' is listed twice`);
     else seenDirs.add(n);
   }
+}
+
+// The host-name bridge of an install in a platform Environment: every endpoint the profile
+// declares answers on its port (README → Environment).
+const eb = cfg.environment_bridge;
+if (eb !== undefined) {
+  const ebPort = obj(eb) ? Number(eb.port) : NaN;
+  if (!obj(eb) || !str(eb.image) || !Number.isInteger(ebPort) || ebPort < 1 || ebPort > 65535) fail('environment_bridge needs an image and a port');
+  else if (ebPort === Number(cfg.app_port)) fail('environment_bridge.port must differ from app_port (the ingress listens there)');
+  else if (!envEps.length) warn('environment_bridge without an `environment` in profile.json — the product never runs in an Environment');
+  else for (const e of envEps) if (Number(e?.port) !== ebPort) fail(`environment endpoint '${e?.name}' is on port ${e?.port}, the bridge on ${ebPort}`);
 }
 
 // Channels and their defaults.
@@ -182,7 +201,7 @@ try {
     ...(Array.isArray(secrets) ? secrets : []).map((s) => `QI_SECRET_${String(s).toUpperCase()}=check`),
     ...[...sbVars].map((v) => `${v}=check`),
   ].join('\n') + '\n', { mode: 0o600 });
-  const runs = ovl.length ? [['', base.out, NO_MODEL], [' with every overlay on', all.out, LENT]] : [['', base.out, NO_MODEL]];
+  const runs = ovl.length ? [['', base.out, NO_MODEL], [' with every overlay on', all.out, { ...LENT, ...IN_ENV }]] : [['', base.out, NO_MODEL]];
   for (const [label, c, model] of runs) {
     if (!c || !obj(c.values)) continue;
     const v = render('values', c, model, [cred]);

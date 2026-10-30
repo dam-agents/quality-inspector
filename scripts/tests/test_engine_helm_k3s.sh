@@ -100,6 +100,22 @@ assert "a sandbox line still empty, overlay off" 'has("slack") | not' "$(rs)"
 sed -i.bak 's/^E2E_SANDBOX_SLACK_APP_TOKEN=$/export E2E_SANDBOX_SLACK_APP_TOKEN=xapp-2/' "$SBE/credentials.env"
 assert "every sandbox line filled, overlay on" '.slack == {"bot":"xoxb-1","app":"xapp-2"}' "$(rs)"
 
+# "@environment" (docs/nested-env.md → Where the product runs): on only in a platform
+# Environment, where {{env_url:<endpoint>}} and {{env_scheme}} take its addresses.
+envcfg() { cfg oci | jq -c '.overlays += [{when:"@environment", values:{urls:{ui:"{{env_url:app}}", kc:"{{env_url:keycloak}}"}, scheme:"{{env_scheme}}"}}]'; }
+re() { QI_PROFILE_CONFIG='{"img":"x","mock":""}' node "$ENG/lib/render.mjs" config <<<"$(envcfg)" \
+       | node "$ENG/lib/render.mjs" values "$SANDBOX/cred.env" 2>&1; }
+assert "in this VM, no environment values" 'has("urls") | not' "$(re)"
+assert "in an Environment, its addresses" '.urls == {"ui":"https://app-x.env.test","kc":"https://keycloak-x.env.test"} and .scheme == "https"' \
+  "$(QI_NESTED_TARGET=environment QI_ENV_ENDPOINTS='{"app":"https://app-x.env.test/","keycloak":"https://keycloak-x.env.test"}' re)"
+# An overlay's `tags`: only for the builds that match.
+rt() { QI_BUILD="$1" QI_PROFILE_CONFIG='{"img":"x","mock":"reg.example/m:v1"}' node "$ENG/lib/render.mjs" config <<<"$(cfg oci | jq -c '.overlays[0].tags = "^2\\."')"; }
+assert "tags: a matching build takes the overlay" '.values.mock.tag == "v1"' "$(rt 2.0.0)"
+assert "tags: another build does not" '.values | has("mock") | not' "$(rt 1.9.0)"
+assert "tags: no build named (not an up) takes it" '.values.mock.tag == "v1"' "$(rt '')"
+QI_NESTED_TARGET=environment QI_ENV_ENDPOINTS='{"app":"https://app-x.env.test"}' re | grep -q "{{env_url:keycloak}}: the Environment has no address for endpoint 'keycloak'" \
+  || { echo "  a missing endpoint address must fail the render"; FAILED=1; }
+
 # {{gateway_ip}}: the VM gateway's address from the environment; rendering fails without one.
 gi() { jq -nc '{values:{cidr:"{{gateway_ip}}/32"}}' | QI_GATEWAY_IP="$1" node "$ENG/lib/render.mjs" values "$SANDBOX/cred.env" 2>&1; }
 assert "gateway_ip fills the value" '.cidr == "10.0.2.3/32"' "$(gi 10.0.2.3)"
@@ -220,6 +236,18 @@ for bad in '"/var/lib/x"' '["var/lib/x"]' '["/var/lib/../etc"]' '["/var/lib"]' '
   c "$(cfg oci | jq -c --argjson h "$bad" '.host_dirs = $h')" | grep -q '^FAIL host_dirs' \
     || { echo "  check: host_dirs $bad must fail"; FAILED=1; }
 done
+c "$(cfg oci | jq -c '.overlays[0].tags = "("')" | grep -q "^FAIL overlay 'mock': tags '(' is not a regex" || { echo "  check: a bad tags regex must fail"; FAILED=1; }
+# environment_bridge and the "@environment" overlay, against the profile's environment endpoints.
+jq '. + {environment:{endpoints:[{name:"app",port:4400},{name:"keycloak",port:4400}]}}' "$SANDBOX/pd/profile.json" > "$SANDBOX/pd/p.tmp" && mv "$SANDBOX/pd/p.tmp" "$SANDBOX/pd/profile.json"
+out="$(c "$(envcfg | jq -c '.environment_bridge = {image:"mirror.example/envoy:v1", port:4400}')")"; rc=$?
+assert_eq "check: an @environment overlay and a bridge pass" "0 " "$rc $(grep -E '^FAIL|unknown key' <<<"$out")"
+c "$(envcfg | jq -c '.overlays[2].values.urls.x = "{{env_url:share}}"')" | grep -q "^FAIL values with every overlay on: {{env_url:share}}: the Environment has no address" \
+  || { echo "  check: an endpoint the profile does not declare must fail"; FAILED=1; }
+c "$(cfg oci | jq -c '.environment_bridge = {image:"e:1", port:4401}')" | grep -q "^FAIL environment endpoint 'app' is on port 4400, the bridge on 4401" \
+  || { echo "  check: the endpoints must share the bridge's port"; FAILED=1; }
+c "$(cfg oci | jq -c '.environment_bridge = {image:"e:1", port:8080}')" | grep -q '^FAIL environment_bridge.port must differ from app_port' \
+  || { echo "  check: the bridge's port is not app_port"; FAILED=1; }
+jq 'del(.environment)' "$SANDBOX/pd/profile.json" > "$SANDBOX/pd/p.tmp" && mv "$SANDBOX/pd/p.tmp" "$SANDBOX/pd/profile.json"
 touch "$SANDBOX/pd/marker.yaml"
 mf() { cfg oci | jq -c --argjson m "$1" '.prerequisites = [{kind:"manifest", name:"m"} + $m]'; }
 out="$(c "$(mf '{"file":"marker.yaml"}')")"; rc=$?

@@ -145,7 +145,10 @@ line) — their words like any other: what a Check states is the oracle, a Do is
    [reporting.md](reporting.md) → Verdicts file, with `"mode": "scenario"`, `"scenario"`,
    `"source"`, `"spec_hash"` and `"request_file"` in place of `issue` and `ac_hash`, and its
    `analysis` ([reporting.md](reporting.md) → **The agent's analysis**; written again when step 10
-   changes a verdict — never with the request's words); render it with
+   changes a verdict — never with the request's words); in a platform Environment with a
+   criterion `failed` or `blocked` by the product, first `env.sh keep scenario-s-<k>` and its
+   row as `environment` (passed: `env.sh release scenario-s-<k>`; [nested-env.md](nested-env.md)
+   → **Kept for a person**); render it with
    `scripts/render-report.mjs` into `report-<spec_hash>-<build>/`.
 10. **Judge the verdicts** ([judge.md](judge.md) → Verdict). An AC it disagrees with gets
     one re-check: a test defect is repaired outside the AC block and the run repeated;
