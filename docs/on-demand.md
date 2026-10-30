@@ -69,6 +69,9 @@ A direct session's first request names it ([logging.md](logging.md) → **Sessio
 - **"module <id> set|on|off|run now …"**, **"focus <area>"**, **"dismiss D-<k> [as <reason>]"**,
   **"reopen D-<k>"**, **"categorize D-<k> <category>"** — the testing modules and the design
   findings' triage ([modules.md](modules.md) → **Control**); the dashboard's buttons send the same words.
+- **"recheck VAL-<k>"** — that validation case again on the candidate now
+  ([validation.md](validation.md) → **Recheck**). Never from a dashboard viewer; beside a scheduled
+  run's chat, a fresh session ([persistence.md](persistence.md) → **Handoff**).
 - **"recheck D-<k>"** — that design finding's page and viewport swept again on the candidate now
   ([ui-sweep.md](ui-sweep.md) → **5. Recheck**). **"discuss D-<k>[: <question>]"** — talk about the
   finding, read-only ([ui-sweep.md](ui-sweep.md) → **6. Discuss**). Never from a dashboard viewer
@@ -84,6 +87,11 @@ A direct session's first request names it ([logging.md](logging.md) → **Sessio
   message, `blocked`) and the run's screenshots of a failure. It is never a verdict: no
   criteria, no verdicts file, no comment, no tier or `work/QA.md` change. Then the catalog
   ([catalog.md](catalog.md) → Build and publish) — the result shows in the history as "Manual run".
+  **"run <ref>, <ref>…"** (2 to 20 of these refs, the dashboard's "Run it again" for a selection,
+  a filter or a run's failed test cases) is the same under one lock: per ref in its order one
+  `suite.sh run` (its label ends in `-<position>`, so two refs of one file never share a run dir)
+  and one `rerun.mjs`; a ref whose test file is gone is skipped and named. One answer for all, one
+  catalog at the end.
 - **"walk these steps live: On the page <pattern>: <steps>"** — the dashboard's Test builder
   ([catalog.md](catalog.md) → Test builder): do the steps on the product that is up, live in the
   Browser Panel, so the operator sees them. Never from a dashboard viewer: that press is declined

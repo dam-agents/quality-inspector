@@ -253,6 +253,7 @@ for (const n of ls(join(work, 'issues')).filter((x) => /^\d+$/.test(x))) readVer
 for (const s of ls(join(work, 'scenarios')).filter((x) => /^(S-\d+|P-[a-z0-9][a-z0-9-]*)$/.test(x))) readVerdicts(join(work, 'scenarios', s), scenKey(s), 'scenario', s);
 // Runs by hand (scripts/rerun.mjs, docs/on-demand.md → "run #N"): each criterion's raw result —
 // passed, failed or blocked — never a verdict, and no report of their own.
+const RERUN_REF = /^(?:#\d{1,7}(?: (?:AC|IN|EX)-\d{1,3})?|S-\d{1,6}(?: (?:AC|EX)-\d{1,3})?|P-[a-z0-9][a-z0-9-]{0,40}(?: (?:AC|EX)-\d{1,3})?)$/;
 const stemRef = (stem) => (stem.startsWith('issue-') ? `#${stem.slice(6)}` : stem.startsWith('profile-') ? `P-${stem.slice(8)}` : `S-${stem.slice(9)}`);
 for (const stem of ls(join(work, 'reruns')).filter((x) => /^(issue-\d+|scenario-\d+|profile-[a-z0-9][a-z0-9-]*)$/.test(x))) {
   for (const f of ls(join(work, 'reruns', stem)).filter((x) => x.endsWith('.json'))) {
@@ -264,7 +265,9 @@ for (const stem of ls(join(work, 'reruns')).filter((x) => /^(issue-\d+|scenario-
     for (const e of entries) addHist(e.key, { build: v.build ?? null, run: 'rerun', value: e.value, utc, cause: e.cause });
     const worst = entries.map((e) => e.value).sort((a, b) => rank(a) - rank(b))[0] ?? null;
     runs.push({ type: 'rerun', ref: stemRef(stem), build: v.build ?? null, utc, verdict: worst, report: null, secs: secsOf(v, utc), cost_usd: costOf(v),
-      label: /^[A-Za-z0-9._-]{1,120}$/.test(String(v.label)) ? v.label : null, entries });
+      label: /^[A-Za-z0-9._-]{1,120}$/.test(String(v.label)) ? v.label : null, entries,
+      // What it ran (rerun.mjs's <ref>), for the page's "Run the same tests again".
+      scope: typeof v.ref === 'string' && RERUN_REF.test(v.ref) ? v.ref : null });
   }
 }
 

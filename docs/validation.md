@@ -53,5 +53,17 @@ while the plan has cases. The module failed — an `<ISO> ERROR: module=validati
 `modules.sh ran validation <c> cases=<n> major=<n> minor=<n> blocked=<n>`.
 
 Passing cases and double submits create `qa-val-*` objects; the run's closing `env.sh reset`
-removes them. A finding is never a verdict or a comment, an issue only on the operator's "create issue for VAL-`<k>`" ([skills/create-issue](../skills/create-issue/SKILL.md)); the dashboard lists it
+removes them.
+
+## Recheck
+
+The operator's "recheck VAL-`<k>`" ([on-demand.md](on-demand.md)), from the dashboard's Findings: one
+case again, on the build that is up, to see if a fix took. `env.sh lock operator` (busy → say who
+holds it, end); `env.sh status` — no product up → `env.sh up <candidate>` and `wait`. The case
+comes from the newest `work/validation/<c>/plan.json` that has it — case ids are stable — else
+say so, unlock and end. `QI_VALIDATION_INPUT=<that plan> bash "$HOME/scripts/suite.sh" run
+validation-recheck-<k>-<candidate>-<HHMM> --strict --tag val-<k> --repeat-each 3 --no-cache
+--evidence failures`, `env.sh reset`, `env.sh unlock operator`. Answer: `ok` (all three pass —
+possibly fixed; the next validation run decides), `finding` (all fail, with the message), `flaky`
+or `blocked`, and the build. Read-only for the register: no `results.json`, no `modules.sh ran`. A finding is never a verdict or a comment, an issue only on the operator's "create issue for VAL-`<k>`" ([skills/create-issue](../skills/create-issue/SKILL.md)); the dashboard lists it
 ([catalog.md](catalog.md)) with its run's evidence.
