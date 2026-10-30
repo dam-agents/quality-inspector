@@ -7,15 +7,17 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.48.0 — 2026-10-30
+## 3.49.0 — 2026-10-30
 
 **Upgrade:**
-<<<<<<< HEAD
 1. Nothing to run — docs are re-read per run, the dashboard is rebuilt by the next catalog
    publish. Its new "Run it again" buttons send `run <ref>, <ref>…` (up to 20 test cases),
    `recheck VAL-<k>` and `test scenario <slug>` ([docs/on-demand.md](docs/on-demand.md),
    [docs/validation.md](docs/validation.md) → **Recheck**); "Repair this test" now shows.
-=======
+
+## 3.48.0 — 2026-10-30
+
+**Upgrade:**
 1. Nothing to run for an instance whose profile declares no `operator_credentials` — the key is
    optional and a profile without it behaves as before. When the profile declares one, run
    `bash "$HOME/scripts/env.sh" init` once (it only adds missing lines and never touches a
@@ -28,7 +30,6 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 2. Nothing to run — `scripts/lib/secrets.mjs` masks a value whose name ends in `KEY` too, in
    every run artefact and in the `work_repo` snapshot, so a line an operator filled as
    `..._KEY` no longer has to be renamed to `..._TOKEN` to stay out of them.
->>>>>>> b95b368e481e895b8a6878cb77eb4028cd8f1f7a
 
 ## 3.47.0 — 2026-10-30
 
