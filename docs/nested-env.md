@@ -107,16 +107,20 @@ again, and a boot service of the agent's own is not allowed. So the **SessionSta
 (`scripts/hooks/resume.sh`, registered by `scripts/hooks/install.sh`) runs `env.sh resume` in
 the first session after a boot: when the last `up` succeeded before this boot and no `down` or
 `reset` came after it, it brings **that build** back in the background — no reset, no other
-build, the data as it was, **where that `up` put it** (`work/env/TARGET`): a resume never
-chooses where the product runs, never makes or deletes an Environment. When that Environment
-is gone, it resumes nothing (an `env_resume` warning); the next `up` chooses. The engine finds
-the cluster on disk and only waits for the UI. Its
-output is `work/env/last-resume.log`, its state `work/env/RESUME`, its events `env_resume` (and
-`env_failed` when it fails — the next `up` then installs as usual; never a verdict).
+build, the data as it was, **where that `up` put it** (`work/env/TARGET`). In this VM it runs
+that `up` again: the engine finds the cluster on disk and only waits for the UI. In an
+Environment the product is the Environment's own (its `boot.sh` brings it back), so a resume
+only starts the forward again. A resume never chooses where the product runs, never makes,
+deletes or extends an Environment. With no target recorded (`env.sh keep` and `release`
+remove it) or that Environment gone, it resumes nothing (an `env_resume` warning); the next
+`up` chooses. Its output is `work/env/last-resume.log`, its state `work/env/RESUME`, its
+events `env_resume` (and `env_failed` when it fails — the next `up` then installs as usual;
+never a verdict).
 
 - The hook gives the session one line when it starts a resume. The product answers again
-  in a few minutes: `env.sh status`. A run's `up`, `reset` or `down` waits for a resume to end
-  first (at most 15 minutes, then stops it), so they never install at the same time.
+  in a few minutes: `env.sh status`. A run's `up` (a background task) waits for a resume to
+  end first (at most 15 minutes, then stops it), so two installs never run at the same time.
+  `reset` and `down` run in the foreground: they stop a running resume at once.
 - A Browser Panel tab that was open before the restart is empty after it: when a person
   watches, give the `env.sh watch` button again.
 - `env.sh down` (and `reset`) turn the resume off until the next `up`. The audit's

@@ -137,6 +137,7 @@ Slack turn except a Slack-ordered "test #N"'s comment and retest-label removal o
 ([docs/black-box.md](docs/black-box.md) → Enforcement layers). The daily gate also stops every
 run while a hook or the deny list is gone. A trace hook logs every turn's start and end and every failed
 tool call to `work/logs/`, so the weekly audit sees crashed runs and repeating failures ([docs/logging.md](docs/logging.md) → Harness trace).
+A SessionStart hook brings the nested product back after the platform restarted the VM ([docs/nested-env.md](docs/nested-env.md) → After a VM restart).
 
 ## What a report looks like
 

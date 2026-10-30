@@ -15,11 +15,12 @@ echo "$1 ${2:-} end $(date +%s.%N)" >> "$STUB_DIR/calls"
 exit 0
 S
 echo "- nested_target: vm" >> "$WORK_DIR/CONFIG.md"
+echo vm > "$E/TARGET"
 NOW="$(date -u +%s)"
 iso() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$1" +%Y-%m-%dT%H:%M:%SZ; }
 resume() { QI_BOOT_EPOCH="$1" bash "$SCRIPTS/env.sh" resume 2>/dev/null; }
 settle() { local i; for i in $(seq 1 100); do grep -q '^running' "$E/RESUME" 2>/dev/null || return 0; sleep 0.2; done; }
-ups() { grep -c "^up $1 start" "$STUB_DIR/calls" 2>/dev/null || echo 0; }
+ups() { cat "$STUB_DIR/calls" 2>/dev/null | grep -c "^up $1 start"; }
 
 assert_eq "no up yet: nothing to resume" "" "$(resume "$NOW")"
 [ -f "$E/RESUME" ] && { echo "  RESUME written without an up"; FAILED=1; }
@@ -83,8 +84,27 @@ QI_RESUME_WAIT_S=1 bash "$SCRIPTS/env.sh" up 2.0.0 >/dev/null 2>&1; assert_eq "t
 kill -0 "$rpid" 2>/dev/null && { echo "  the resume still runs"; FAILED=1; kill "$rpid" 2>/dev/null; }
 read -r st b _ rc _ < "$E/RESUME"
 assert_eq "a stopped resume records 143" "done 1.0.0 143" "$st $b $rc"
-assert_eq "the stop is logged" 1 "$(cat "$WORK_DIR"/logs/events-*.jsonl | jq -sc '[.[] | select(.event == "env_resume" and (.msg | test("stopped after")))] | length')"
+assert_eq "the stop is logged" 1 "$(cat "$WORK_DIR"/logs/events-*.jsonl | jq -sc '[.[] | select(.event == "env_resume" and (.msg | test("stopped: after")))] | length')"
 assert_eq "the run's up ran" 1 "$(ups 2.0.0)"
+
+# reset and down run in the foreground: they stop a running resume at once, and turn it off.
+for c in reset down; do
+  printf 'done 1.0.0 %s 0 -\n' "$(iso $((NOW - 3600)))" > "$E/UP"; rm -f "$E/RESUME"
+  STUB_UP_SLEEP=60 resume $((later + 60)) >/dev/null
+  read -r _ _ _ rpid _ < "$E/RESUME"; t0=$(date -u +%s)
+  bash "$SCRIPTS/env.sh" "$c" >/dev/null 2>&1
+  assert_eq "$c returns at once during a resume" 1 "$(( $(date -u +%s) - t0 < 5 ? 1 : 0 ))"
+  kill -0 "$rpid" 2>/dev/null && { echo "  $c: the resume still runs"; FAILED=1; kill "$rpid" 2>/dev/null; }
+  assert_eq "$c turns the resume off" off "$(cut -d' ' -f1 "$E/RESUME")"
+done
+assert_eq "both stops are logged" 2 "$(cat "$WORK_DIR"/logs/events-*.jsonl | jq -sc '[.[] | select(.event == "env_resume" and (.msg | test("stopped: a (reset|down)")))] | length')"
+
+# No target recorded (env.sh keep or release removed it): nothing resumed, nothing installed.
+printf 'done 1.0.0 %s 0 -\n' "$(iso $((NOW - 3600)))" > "$E/UP"; rm -f "$E/RESUME" "$E/TARGET"; : > "$STUB_DIR/calls"
+resume $((later + 70)) >/dev/null; settle
+assert_eq "no target: exit 4" "done 1.0.0 4" "$(cut -d' ' -f1,2,4 "$E/RESUME")"
+assert_eq "no target: no up" 0 "$(ups 1.0.0)"
+echo vm > "$E/TARGET"
 
 # A running record from before this boot is dead, even when its pid is alive (reused after a restart).
 sleep 30 & alive=$!
