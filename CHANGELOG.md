@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.47.0 — 2026-10-30
+## 3.48.0 — 2026-10-30
 
 **Upgrade:**
 1. Run `bash "$HOME/scripts/hooks/install.sh"` once in the direct session: it registers the
@@ -15,6 +15,15 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    platform hibernates an idle VM), the product comes back at the build it ran, in the background
    ([docs/nested-env.md](docs/nested-env.md) → **After a VM restart**). Do not install a boot
    service for this. The audit's `resume_hook` check warns until the hook is registered.
+
+## 3.47.0 — 2026-10-30
+
+**Upgrade:**
+1. Nothing to run. Under `nested_target: auto` a profile that sets `engine_config.kvm` now runs
+   in a platform Environment too, when this VM has `/dev/kvm` and the new Environment has it as
+   well; an Environment without the device is deleted and the product runs in this VM, as before
+   ([docs/nested-env.md](docs/nested-env.md) → **Where the product runs**). To keep it in this
+   VM, set `- nested_target: vm` in `work/CONFIG.md`.
 
 ## 3.46.0 — 2026-10-30
 
