@@ -6,9 +6,12 @@
 #
 # The choice (nested_target: auto | vm | environment, default auto) is made at `env.sh up`:
 # an Environment when the profile declares one (`environment` in profile.json), the agent does
-# not lend its model (an Environment holds no connection), the profile does not set
-# `engine_config.kvm` (an Environment does not promise /dev/kvm), and the platform's Environment
-# tools answer; else this VM, with the reason logged (with `environment`, env.sh up fails instead).
+# not lend its model (an Environment holds no connection), this VM has /dev/kvm when the profile
+# sets `engine_config.kvm` (the platform gives an Environment the device on the same terms as
+# this VM, and its tools say nothing of it), and the platform's Environment tools answer; else
+# this VM, with the reason logged (with `environment`, env.sh up fails instead). With kvm,
+# env.sh up then looks for /dev/kvm in the Environment itself (env_has_kvm): none there → the
+# Environment is deleted and the product runs in this VM (with `environment`, up fails).
 # In an Environment the profile's `bin/env` runs over the Environment Link (`ssh env-<name>`),
 # from a copy of the profile and the engines in ~/qi there, and one `ssh -L` keeps the product
 # at the profile's app.url on this VM — so every test, CLI and API call addresses localhost in
@@ -25,6 +28,7 @@ FWD_F="$ENVD/FORWARD"
 KEPT_F="$WORK/ENVIRONMENTS.json"
 KEEP_DAYS_DEFAULT=3
 ACTIVE_EXPIRES=2d
+KVM_DEV="${QI_KVM_DEVICE:-/dev/kvm}"   # this VM's device; the tests point it at a file
 
 penv() { node "$SCRIPT_DIR/lib/platform-env.mjs" "$@"; }
 # One SSH master per Environment for the commands (not the forward), so each call after the
@@ -47,11 +51,15 @@ target_choose() {
   [ "$(profile_field '.environment.endpoints | length')" -gt 0 ] 2>/dev/null \
     || { echo "vm the profile declares no environment"; return; }
   [ "$(cfg lend_model)" = enabled ] && { echo "vm lend_model is enabled, and an Environment holds no connection"; return; }
-  [ "$(profile_field '.engine_config.kvm')" = true ] && { echo "vm the profile sets kvm, and an Environment does not promise /dev/kvm"; return; }
+  profile_kvm && [ ! -e "$KVM_DEV" ] && { echo "vm the profile sets kvm, and this VM has no /dev/kvm, so an Environment has none either"; return; }
   command -v ssh >/dev/null 2>&1 || { echo "vm no ssh client"; return; }
   local why; why="$(penv available 2>&1 >/dev/null)" || { echo "vm the platform's Environments do not answer: ${why#platform-env: }"; return; }
   echo environment
 }
+
+profile_kvm() { [ "$(profile_field '.engine_config.kvm')" = true ]; }
+# Whether the Environment has /dev/kvm: `yes`, `no`, or empty when its link does not answer.
+env_has_kvm() { essh "$1" 'if test -e /dev/kvm; then echo yes; else echo no; fi' 2>/dev/null; }
 
 env_exists() { penv list 2>/dev/null | jq -e --arg n "$1" 'any(.[]; .name == $n)' >/dev/null; }
 env_url() { penv list 2>/dev/null | jq -r --arg n "$1" --arg e "${2:-app}" '.[] | select(.name == $n) | .endpoints[]? | select(.name == $e) | .url // empty' | head -1; }

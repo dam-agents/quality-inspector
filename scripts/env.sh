@@ -168,8 +168,9 @@ cmd_up() {
 # Where this `up` runs (lib/environment.sh → target_choose): the active Environment when it
 # still exists, else a new one; this VM when an Environment is not possible — the reason in the
 # output and the log. Moving from this VM stops the product here (its port is the forward's);
-# moving back deletes the active Environment (a kept one is never active). With nested_target
-# environment there is no fallback: `up` fails with the reason.
+# moving back deletes the active Environment (a kept one is never active). A profile that sets
+# kvm needs /dev/kvm in the Environment too: none there → it is deleted, and this VM runs the
+# product. With nested_target environment there is no fallback: `up` fails with the reason.
 up_where() { # <build>
   local choice reason cur n
   read -r choice reason <<<"$(target_choose)"
@@ -185,6 +186,18 @@ up_where() { # <build>
       else
         choice=vm; reason="the platform did not create an Environment"; n=""
       fi
+    fi
+  fi
+  if [ "$choice" = environment ] && profile_kvm; then
+    case "$(env_has_kvm "$n")" in
+      (yes) ;;
+      (no) reason="the profile sets kvm, and Environment $n has no /dev/kvm";;
+      (*) reason="the profile sets kvm, and the link to Environment $n did not answer the /dev/kvm check";;
+    esac
+    if [ -n "$reason" ]; then
+      fwd_stop; penv delete "$n" >/dev/null 2>&1 || true; rm -f "$TARGET_F"
+      logev warn env_released "Environment $n deleted: $reason"
+      choice=vm; [ "$cur" = "$n" ] && cur=""; n=""
     fi
   fi
   if [ "$choice" = environment ]; then
