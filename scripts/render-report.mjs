@@ -22,7 +22,10 @@
 // to the criteria the agent froze from it, the judge's reading per criterion, and comment.md
 // as the channel reply. Nothing else is read, except the previous build's
 // screenshots an AC names as "before_shot", the new map's screenshots a context.signals
-// item names as "shot", and the screenshot a "noticed" item names as "shot".
+// item names as "shot", and the screenshot a "noticed" item names as "shot". With
+// "environment" ({url, expires_utc, account?}: `env.sh keep`, docs/nested-env.md → Kept for a
+// person) the page and comment.md say where a person opens the build as the run left it, and
+// with which account — never its password.
 
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -436,6 +439,14 @@ const qHtml = !questions.length ? '' : `
 const coverage = `${acs.filter((ac) => ['verified', 'failed', 'inconclusive'].includes(ac.verdict)).length} of ${acs.length} criteria tested`;
 const summaryRows = acs.map((ac) => `<tr><td><a href="#${esc(slug(key(ac)))}">${regression ? `${esc(owner(ac).name)} ` : ''}${esc(ac.id)}</a></td><td>${esc(ac.name)}</td><td>${stateBadge(ac.cand?.state ?? 'not-run')}</td>${regression ? '' : `<td>${stateBadge(ac.base?.state ?? 'not-run')}</td>`}<td>${badge(ac.verdict)}</td></tr>`).join('');
 
+// The platform Environment kept with the build and data this run left (env.sh keep).
+const kept = v.environment && /^https:\/\/[^\s"'<>]+$/.test(String(v.environment.url ?? '')) ? v.environment : null;
+const keptUntil = kept ? String(kept.expires_utc ?? '').slice(0, 10) : '';
+const keptAcct = kept && /^[A-Za-z0-9._@-]{1,64}$/.test(String(kept.account ?? '')) ? kept.account : '';
+const keptHtml = kept ? `<section class="ac"><header><h3>Examine the build yourself</h3></header>
+<p>The agent kept this build, with the data that the tests left, at <a href="${esc(kept.url)}">${esc(kept.url)}</a>${keptUntil ? ` until ${esc(keptUntil)}` : ''}. Only people on the owner's access list can open it.${keptAcct ? ` Sign in to the product with the account <code>${esc(keptAcct)}</code>. The operator has its password.` : ''}</p></section>` : '';
+const keptLine = kept ? [`Examine the build yourself${keptUntil ? ` until ${keptUntil}` : ''}: ${kept.url}${keptAcct ? ` (account ${keptAcct})` : ''}`] : [];
+
 const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${regression ? `Regression ${esc(v.candidate)}` : scenario ? `${esc(v.scenario)} scenario verdict` : `#${esc(v.issue)} QA verdict`}</title>
@@ -458,6 +469,7 @@ ${(() => { const t = requestText(); return t == null ? '' : `<details class="req
 <p class="dim">The agent tested each criterion on the candidate build and on the baseline release. <b>Verified</b> means that the test fails on the baseline and passes on the candidate. You can examine the videos and screenshots to check the result.</p>
 ${analysisHtml}
 <table><thead><tr><th>AC</th><th>Criterion</th><th>Candidate</th><th>Baseline</th><th>Verdict</th></tr></thead><tbody>${summaryRows}</tbody></table>`}
+${keptHtml}
 ${qHtml}
 ${acHtml}
 ${inHtml}
@@ -473,6 +485,7 @@ writeFileSync(join(outDir, 'index.html'), html);
 const comment = scenario ? [
   `*${v.scenario} — ${v.title}*: ${(VERDICT[v.verdict] ?? [v.verdict])[0]} on \`${v.candidate ?? '–'}\``,
   ...acs.map((ac) => `• ${ac.id} ${ac.name} — ${ac.verdict}${ac.judge && !ac.judge.agree ? ' (the judge disagrees)' : ''}${ac.note ? ` — ${ac.note}` : ''}`),
+  ...keptLine,
   'Evidence (videos, screenshots, steps): EVIDENCE_LINK',
 ].join('\n') : [
   `## ${v.display_name ?? 'Quality Inspector'} — #${v.issue} verdict: ${(VERDICT[v.verdict] ?? [v.verdict])[0]}`,
@@ -485,6 +498,7 @@ const comment = scenario ? [
   ...(intentVerdict ? [`Intent (what the author wanted): ${INTENT[intentVerdict]}${intents.length ? ` — ${intents.map((x) => `${x.id} ${x.verdict}`).join(', ')}` : ''}${lettersOnly ? '. The criteria are true, but the goal is not met.' : ''}`, ''] : []),
   ...(exps.length ? [`${exps.length} explorations beyond the criteria: ${observations} observations (see evidence)`, ''] : []),
   ...(noticed.length ? [`${noticed.length} noticed in passing, not tested (see evidence)`, ''] : []),
+  ...(kept ? [...keptLine, ''] : []),
   'Evidence (videos, screenshots, step traces): EVIDENCE_LINK',
 ].join('\n');
 writeFileSync(join(outDir, 'comment.md'), `${comment}\n`);

@@ -32,11 +32,12 @@ pulls it again, so its registry must be reachable unless k3s keeps it pinned.
 | `credentials` | `users: {name: {username}}` — passwords are generated into `credentials.env` as `E2E_USER_<NAME>_*`; `secrets: [name]` — generated as `QI_SECRET_<NAME>` |
 | `prerequisites` | ordered, installed once, never upgraded by `up` — see below |
 | `values` | the Helm values, as JSON, with placeholders |
-| `overlays` | `[{when: <config key>, values: {…}}]` — merged into `values` when that profile key is set; `when: "@model"` — while the agent lends its model; `when: "@sandbox:<id>"` — while every `E2E_SANDBOX_<ID>_*` line of `credentials.env` is filled |
+| `overlays` | `[{when: <config key>, values: {…}}]` — merged into `values` when that profile key is set; `when: "@model"` — while the agent lends its model; `when: "@sandbox:<id>"` — while every `E2E_SANDBOX_<ID>_*` line of `credentials.env` is filled; `when: "@environment"` — while the product runs in a platform Environment; `tags` (a regex) — only for a build whose tag matches it, the builds that understand the overlay's values |
 | `max_pages` | quay pages to read at most (default 30) |
 | `prune_below_gi` | after an `up`, the images no container uses (earlier builds') are removed while the k3s data volume has less free than this, in Gi (default 20); `reset` always removes them |
 | `kvm` | `true` — the product's pods open `/dev/kvm` from a user namespace (a VM runner) — see below |
 | `host_dirs` | absolute node directories the chart hands such pods as `hostPath` volumes — see below |
+| `environment_bridge` | `{image, port}` — the host-name bridge of an install in a platform Environment — see below |
 
 `bin/versions --between <from> <to>` (bisection) reads the same tag listing — tags only —
 and returns the tags of the channel both builds match, in that channel's order.
@@ -85,6 +86,23 @@ twice, and one that is or lies under a directory the system or the engine owns (
 k3s listens on its config's port, unless its data dir holds a cluster made on another port
 (its stored kubeconfigs name it): then on that one, as k3s exits when they disagree.
 
+## Environment
+
+In a platform Environment ([docs/nested-env.md](../../docs/nested-env.md) → Where the product
+runs) `bin/env` runs there over the Environment Link with `QI_NESTED_TARGET=environment` and
+`QI_ENV_ENDPOINTS` (`{endpoint: url}`, the addresses the profile's `environment.endpoints`
+got). The same engine installs the same chart; on top:
+
+- the `"@environment"` overlay applies, where `{{env_url:<endpoint>}}` (no trailing `/`) and
+  `{{env_scheme}}` give the product its public addresses;
+- Traefik's `app` entrypoint trusts forwarded headers (`forwardedHeaders.insecure`): only the
+  Environment's loopback reaches it, through the gate and the bridge;
+- with `environment_bridge: {image, port}`, an Envoy on the node's network listens on
+  `port` — every endpoint's port in `environment.endpoints` — and passes each request to
+  `app_port` with its host set from `X-Forwarded-Host` and the public scheme and port named,
+  as the gate relays with `Host: 127.0.0.1:<port>` while the ingress routes by host name.
+  `port` differs from `app_port`, which stays the one the agent's forward reaches.
+
 ## Placeholders
 
 In any string of `engine_config`: `{{config:<key>}}` — a profile config key;
@@ -96,7 +114,7 @@ held in that key. In `values` only: `{{user:<name>.username|password}}`,
 → The `bin/` contract), empty when not lent; `{{proxy:https|http|no}}` — the gateway proxy
 for pods that must reach the outside (the lent model's host), `no` with the cluster's own
 ranges added; `{{gateway_ca}}` — the PEM of the CA the gateway presents (the file
-`NODE_EXTRA_CA_CERTS` or `SSL_CERT_FILE` names), empty when neither does; `{{gateway_ip}}` — the
+`NODE_EXTRA_CA_CERTS` or `SSL_CERT_FILE` names), empty when neither does; `{{env_url:<endpoint>}}`, `{{env_scheme}}` — see **Environment**; `{{gateway_ip}}` — the
 gateway's IPv4 address, which the VM's DNS gives for every public name, for a product whose
 own egress policy must name it (a nested platform's gateways); rendering fails when it does not
 resolve. The rendered
@@ -108,12 +126,15 @@ values (`$QI_ENV_DIR/values.json`) are mode 600 and never printed.
 the channels and their defaults, the owner account, each prerequisite's fields (a manifest `file` must exist in the profile), `app_port`
 against the profile's `app.url`, and every placeholder rendered with throw-away
 credentials — once with the config defaults and no lent model, once with every overlay
-switched on. An overlay's `when` must be a profile config key, `"@model"` or
-`"@sandbox:<id>"`; the second render sets a throw-away `QI_MODEL_KEY` and sandbox
-credentials, so those overlays and their `{{model:*}}` and `{{sandbox:*}}` placeholders are
-rendered too.
+switched on. An overlay's `when` must be a profile config key, `"@model"`, `"@environment"`
+or `"@sandbox:<id>"`; the second render sets a throw-away `QI_MODEL_KEY` and sandbox
+credentials and runs as in an Environment (each of the profile's `environment.endpoints` at a
+throw-away address), so those overlays and their `{{model:*}}`, `{{sandbox:*}}` and
+`{{env_url:*}}` placeholders are rendered too. `environment_bridge` needs an image and a port
+other than `app_port`, the port of every `environment.endpoints` entry.
 
 ## Diagnosis (read-only)
 
 `k3s kubectl get pods -A`, `k3s kubectl -n <ns> describe pod <p>`, `k3s kubectl -n <ns>
-logs <p>`, `helm -n <ns> status <release>`, `/var/log/k3s.log`.
+logs <p>`, `helm -n <ns> status <release>`, `/var/log/k3s.log` — in a platform Environment
+each as `ssh env-<name> '<command>'`.

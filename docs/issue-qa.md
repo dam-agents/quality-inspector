@@ -87,7 +87,11 @@ builds (from the profile). `T` below is the configured `target_repo`; never prin
    → **Run and judge** — never into an AC verdict. Write
    `verdicts-<ac_hash>-<candidate>.json` ([reporting.md](reporting.md) → Verdicts file), its
    `analysis` last ([reporting.md](reporting.md) → **The agent's analysis**).
-8. **Report.** Render it — `node "$HOME/scripts/render-report.mjs" <verdicts.json>
+8. **Report.** In a platform Environment (`env.sh where`), with an AC `failed` or `blocked`
+   by the product: `env.sh keep issue-<n>` first and put its `url`, `account` and
+   `expires_utc` into the verdicts file as `environment`; with none such, `env.sh release
+   issue-<n>` releases one an earlier run kept ([nested-env.md](nested-env.md) → **Kept for a
+   person**). Render it — `node "$HOME/scripts/render-report.mjs" <verdicts.json>
    work/issues/<n>/report-<ac_hash>-<candidate>` — open its `index.html` and check
    every tested AC shows a video, set the row to the issue verdict with
    `status: report_pending`, then deliver per [reporting.md](reporting.md) (which sets

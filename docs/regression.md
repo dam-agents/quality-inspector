@@ -110,7 +110,9 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
    (`ui_diff`, `iface_diff`: the diffs' `--md` text; `signals`: `{console_errors_new,
    failed_requests_new, slower_pages, slow_tests}` — the UI diff's lists plus `slow_tests` from
    `node "$HOME/scripts/perf-trend.mjs" regression-<candidate>`, each item made a
-   `needs-review` entry per [triage.md](triage.md) → **Signals no test covers**). Add `analysis` last
+   `needs-review` entry per [triage.md](triage.md) → **Signals no test covers**). In a platform Environment with a confirmed `regression`, `env.sh keep
+   regression-<candidate>` and its row as `environment` ([nested-env.md](nested-env.md) →
+   **Kept for a person**). Add `analysis` last
    ([reporting.md](reporting.md) → **The agent's analysis**): what the night ran, why its top verdict
    is what it is, each problem with its cause and repair — also a night of only `blocked` or adoption
    results. Render it with `scripts/render-report.mjs` into

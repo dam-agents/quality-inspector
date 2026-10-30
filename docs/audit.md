@@ -47,6 +47,10 @@ when `audit_report: disabled` (still append the log line).
      dashboard's switches); delete the file afterwards.
    - `precheck.sh issues` and `… regression`, timed: exit 0 or 1 within
      two minutes.
+   - `env.sh kept` ([nested-env.md](nested-env.md) → **Kept for a person**): list each kept
+     Environment with its label, build and expiry; one whose issue is closed or passed since,
+     or whose scenario passed → a `warn` naming it (release it in the direct session:
+     "release #N"). `env.sh where` in the report's environment line.
    - Each `failures[]` signature: cause + fix, classified *environment* / *agent
      mistake* / *definition bug*. A reproduced environment cause → `work/LESSONS.md`. A
      definition bug → one deduplicated issue on the definition repository (search open

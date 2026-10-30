@@ -1,7 +1,7 @@
 # Quality Inspector
 
 Black-box QA for any product with a web UI. Per issue carrying the QA label it freezes acceptance
-criteria (ACs) from the issue text, brings the newest build up **inside this agent's own VM**, tests
+criteria (ACs) from the issue text, brings the newest build up **in its own VM or Environment**, tests
 the ACs through the UI (`e2e`, built-in Chromium; CLI and API as a supplement), confirms each
 red-green against the last release, and reports a per-AC verdict with evidence; nightly it replays
 promoted tests aware of what changed. It also tests scenarios people ask for in Slack, and proposes its own.
@@ -85,7 +85,7 @@ stripped. Every script reads it through `scripts/lib/config.sh`, so the verifier
   empty = chat UI), `max_scenarios_per_run` (`3`; also profile adoptions a night), `max_scenarios_per_day` (`10`), `profile_scenarios` (`enabled`; the profile's `scenarios/` join the nightly run), `regression_channel` (Slack id for the nightly summary and a black-box breach alert, else `slack_channel`; empty = chat UI) — [docs/scenarios.md](docs/scenarios.md).
 - `security_checks` (`enabled`), `security_failed_logins` (`10`) — [docs/security.md](docs/security.md).
 - `max_wallclock_min_per_issue` (`150`, < `lock_ttl_min`), `max_model_steps_per_issue` (`400`) —
-  [docs/nested-env.md](docs/nested-env.md) → **Budgets**; `min_free_disk_gi` (`10`) — `env.sh up` refuses below it.
+  [docs/nested-env.md](docs/nested-env.md) → **Budgets**; `min_free_disk_gi` (`10`) — `env.sh up` refuses below it; `nested_target` (`auto` | `vm` | `environment`) — where it runs (→ **Where the product runs**).
 - `lend_model` (`disabled`; tokens per product AI step) — [docs/profile-contract.md](docs/profile-contract.md); `live_browser`
   (empty = detected; `disabled` turns it off) — [docs/test-authoring.md](docs/test-authoring.md) → **Watching live**; `slack_channel` (none = Slack
   orders nothing), `slack_tests_per_day` (`3`), `slack_report_visibility` (`private` | `public`: a report answered in a

@@ -124,7 +124,7 @@ else {
 if (m !== null && !obj(m)) { fail('profile.json: not an object'); m = null; }
 
 if (m) {
-  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'security', 'canary', 'interfaces', 'validation', 'expected_requests', 'config', 'sandbox'];
+  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'security', 'canary', 'interfaces', 'validation', 'expected_requests', 'environment', 'config', 'sandbox'];
   for (const k of Object.keys(m)) if (!TOP.includes(k)) warn(`profile.json: unknown key '${k}' — the core ignores it`);
   m.schema === 'qi-profile/v1' ? pass('schema qi-profile/v1') : fail(`schema '${m.schema ?? ''}' is not qi-profile/v1`);
   str(m.product) ? pass(`product: ${m.product}`) : fail('product: missing');
@@ -316,6 +316,28 @@ if (m) {
       });
       if (fails === before) pass(`expected_requests: ${er.map((e) => `${e.method} ${e.path} → ${e.status}`).join(', ') || 'none'}`);
     }
+  }
+
+  // environment: optional; the platform Environment the product may run in (docs/nested-env.md).
+  if (m.environment !== undefined) {
+    const en = m.environment;
+    const before = fails;
+    if (!obj(en) || !Array.isArray(en.endpoints) || !en.endpoints.length) fail('environment.endpoints: a non-empty list of {name, port}');
+    else {
+      const names = new Set();
+      en.endpoints.forEach((e, i) => {
+        if (!obj(e) || !/^[a-z0-9]{1,20}$/.test(String(e.name ?? ''))) fail(`environment.endpoints[${i}].name: lowercase letters and digits`);
+        else if (names.has(e.name)) fail(`environment.endpoints[${i}].name '${e.name}': used twice`);
+        else names.add(e.name);
+        if (!obj(e) || !Number.isInteger(e.port) || e.port < 1 || e.port > 65535) fail(`environment.endpoints[${i}].port: a port number`);
+      });
+      if (!names.has('app')) fail("environment.endpoints: needs 'app', the address a person opens");
+      if (en.storage !== undefined && !/^\d+Gi$/.test(String(en.storage))) fail(`environment.storage '${en.storage}': e.g. 40Gi`);
+      if (en.account !== undefined && (!/^[a-z0-9_]+$/.test(String(en.account)) || (m.engine_config?.credentials?.users && !(en.account in m.engine_config.credentials.users)))) {
+        fail(`environment.account '${en.account}': the role of the account a person signs in with (a credentials user)`);
+      }
+    }
+    if (fails === before) pass(`environment: ${en.endpoints.map((e) => `${e.name}:${e.port}`).join(', ')}${en.storage ? `, ${en.storage}` : ''}`);
   }
 
   // config

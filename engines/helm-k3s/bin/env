@@ -13,6 +13,7 @@ export LC_ALL=C
 HOME_DIR="${HOME:-/home/agent}"
 ENVD="${QI_ENV_DIR:?QI_ENV_DIR is required}"
 CRED="$ENVD/credentials.env"
+[ "${1:-}" = up ] && export QI_BUILD="${2:-}"   # an overlay's `tags` (README → Configuration)
 CFG="$(engine_config)" || exit 1
 cfgv() { jq -r "$1 // empty" <<<"$CFG"; }
 CHART="$(cfgv .chart)"; RELEASE="$(cfgv .release)"; RELEASE="${RELEASE:-app}"
@@ -196,8 +197,16 @@ start_k3s() {
   kc wait --for=condition=Ready node --all --timeout=180s >/dev/null || die "node not Ready"
 }
 
+in_environment() { [ "${QI_NESTED_TARGET:-}" = environment ]; }
+
+# In a platform Environment the gate relays only to this machine's loopback, through the
+# host-name bridge below, so the app entrypoint trusts the forwarded headers: Keycloak-like
+# products then build their links from the public scheme and host.
 traefik_port() {
   [ "$(cfgv .traefik_port)" = true ] || return 0
+  local fwd=""
+  in_environment && fwd="        forwardedHeaders:
+          insecure: true"
   kc apply -f - >/dev/null <<YAML || die "traefik port config failed"
 apiVersion: helm.cattle.io/v1
 kind: HelmChartConfig
@@ -213,6 +222,91 @@ spec:
           default: true
         exposedPort: $APP_PORT
         protocol: TCP
+$fwd
+YAML
+}
+
+# `environment_bridge: {image, port}` — in a platform Environment only. The gate relays each
+# endpoint to its port on the Environment's loopback with `Host: 127.0.0.1:<port>` and names
+# the address the browser asked for in X-Forwarded-Host, while the ingress routes by host
+# name: an Envoy on the node's network, on that port, puts the address back as the host and
+# passes the request to app_port, naming the public scheme and port (README → Environment).
+env_bridge() {
+  in_environment || return 0
+  local img port app scheme pport eps="${QI_ENV_ENDPOINTS:-}"
+  img="$(cfgv .environment_bridge.image)"; port="$(cfgv .environment_bridge.port)"
+  [ -n "$img" ] && [ -n "$port" ] || return 0
+  app="$(jq -r '.app // empty' <<<"${eps:-null}" 2>/dev/null)"
+  [ -n "$app" ] || die "the Environment has no address for endpoint 'app'"
+  scheme="${app%%://*}"; pport="$(sed -nE 's#^https?://[^/:]+:([0-9]+).*#\1#p' <<<"$app")"
+  [ -n "$pport" ] || { [ "$scheme" = https ] && pport=443 || pport=80; }
+  say "installing the host-name bridge on port $port"
+  kc apply -f - >/dev/null <<YAML || die "host-name bridge apply failed"
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qi-environment-bridge
+  namespace: kube-system
+data:
+  envoy.yaml: |
+    static_resources:
+      listeners:
+        - name: bridge
+          address: { socket_address: { address: 127.0.0.1, port_value: $port } }
+          filter_chains:
+            - filters:
+                - name: envoy.filters.network.http_connection_manager
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                    stat_prefix: bridge
+                    upgrade_configs: [{ upgrade_type: websocket }]
+                    stream_idle_timeout: 0s
+                    route_config:
+                      request_headers_to_add:
+                        - { header: { key: x-forwarded-proto, value: "$scheme" }, append_action: OVERWRITE_IF_EXISTS_OR_ADD }
+                        - { header: { key: x-forwarded-port, value: "$pport" }, append_action: OVERWRITE_IF_EXISTS_OR_ADD }
+                      virtual_hosts:
+                        - name: all
+                          domains: ["*"]
+                          routes:
+                            - match: { prefix: "/" }
+                              route: { cluster: ingress, host_rewrite_header: x-forwarded-host, timeout: 0s }
+                    http_filters:
+                      - name: envoy.filters.http.router
+                        typed_config: { "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router }
+      clusters:
+        - name: ingress
+          type: STATIC
+          load_assignment:
+            cluster_name: ingress
+            endpoints: [{ lb_endpoints: [{ endpoint: { address: { socket_address: { address: 127.0.0.1, port_value: $APP_PORT } } } }] }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qi-environment-bridge
+  namespace: kube-system
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: qi-environment-bridge }
+  template:
+    metadata:
+      labels: { app: qi-environment-bridge }
+      annotations:
+        qi-environment-bridge/config: "$port-$APP_PORT-$scheme-$pport"
+    spec:
+      hostNetwork: true
+      containers:
+        - name: envoy
+          image: $img
+          args: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "warn"]
+          volumeMounts:
+            - { name: config, mountPath: /etc/envoy }
+      volumes:
+        - name: config
+          configMap: { name: qi-environment-bridge }
 YAML
 }
 
@@ -293,6 +387,7 @@ cmd_up() {
   fi
   ensure_helm
   traefik_port
+  env_bridge
   prerequisites
   tmp="/tmp/quality-inspector-chart-$tag"; rm -rf "$tmp"; mkdir -p "$tmp"
   low helm pull "$CHART" --version "$tag" --untar --untardir "$tmp" >/dev/null 2>&1 || { rm -rf "$tmp"; die "helm pull $tag failed"; }

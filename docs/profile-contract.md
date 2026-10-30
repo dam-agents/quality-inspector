@@ -79,6 +79,7 @@ this contract (`--live` also lists its builds).
   "canary": { "thing": "widget, under Widgets → New", "field": "description" },
   "interfaces": { "cli": "widgets", "openapi": "/api/openapi.json" },
   "expected_requests": [{ "method": "GET", "path": "/api/billing/status", "status": 404, "why": "the QA install sets no billing provider" }],
+  "environment": { "endpoints": [{ "name": "app", "port": 4400 }], "storage": "60Gi", "account": "viewer" },
   "config": {
     "image_ref": { "default": "registry.example.com/widgets", "about": "image repository the builds come from" },
     "admin_email": { "default": "", "about": "which address the seeded admin account uses", "ask": true }
@@ -87,7 +88,8 @@ this contract (`--live` also lists its builds).
 ```
 
 - `app.url` — the product's base URL **inside this agent's VM**; it must be `localhost`
-  or `127.0.0.1` (the nested-only rule).
+  or `127.0.0.1` (the nested-only rule). In a platform Environment it is the forward's
+  end on this VM ([nested-env.md](nested-env.md) → Where the product runs).
 - `issues.provider` — `github` today; the target repository is the instance's
   `target_repo`.
 - `boundary` — what the black-box probes must find refused **in addition** to the core's
@@ -125,6 +127,16 @@ this contract (`--live` also lists its builds).
   diff never reports it as new ([change-awareness.md](change-awareness.md)); the UI map keeps
   it. List only what the install cannot do — the same thing the SKILL.md says in words — never
   a failure to hide.
+- `environment` (optional) — the platform Environment the product may run in
+  ([nested-env.md](nested-env.md) → **Where the product runs**); absent → always this VM.
+  `endpoints`: `[{name, port}]`, the public addresses the Environment gets, `app` among them
+  (what a person opens), names of lowercase letters and digits; `storage` (`<n>Gi`, the
+  platform's default otherwise); `account`: the credentials role a person signs in with when
+  a run keeps the Environment (**Kept for a person**), its username shown, never its
+  password. The product learns the addresses through its engine (`helm-k3s`:
+  `{{env_url:<name>}}` in a `"@environment"` overlay, [README](../engines/helm-k3s/README.md)).
+  `bin/env` runs there with `QI_NESTED_TARGET=environment` and `QI_ENV_ENDPOINTS` (`{name:
+  url}`), never with the lent model.
 - `config` — the profile's own keys, written in `work/CONFIG.md` as
   `- profile.<key>: <value>`, each with a default and an `about` sentence; `"ask": true`
   makes onboarding ask the operator instead of defaulting. The core validates that no
@@ -178,7 +190,8 @@ Every executable runs with cwd `$HOME/work`, and with:
 - `bin/env reset` — wipe product data so the next `up` starts clean (fresh users, no
   content). Needed before every downgrade.
 - `bin/env status` → stdout `{"running": bool, "build": "<build>"|null, "ui_http": "<code>"}`;
-  an engine may add keys of its own (helm-k3s: `kvm`), which the profile's `SKILL.md` reads.
+  an engine may add keys of its own (helm-k3s: `kvm`), which the profile's `SKILL.md` reads;
+  `env.sh status` adds `target` (`vm` | `environment`).
 - `bin/env down` — stop it; state may stay on disk.
 - `bin/sandbox check` — optional, read-only toward the product; see **`sandbox`** below.
 

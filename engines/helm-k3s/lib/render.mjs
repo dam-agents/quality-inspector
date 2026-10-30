@@ -8,10 +8,15 @@
 //                                      with {{user:NAME.username|password}}, {{secret:name}} and
 //                                      {{app_port}} filled from the credentials file, and
 //                                      {{model:key|kind|base_url}}, {{proxy:https|http|no}},
-//                                      {{gateway_ca}}, {{gateway_ip}} from the environment.
+//                                      {{gateway_ca}}, {{gateway_ip}}, {{env_url:<endpoint>}},
+//                                      {{env_scheme}} from the environment.
 // An overlay whose `when` is "@model" applies while the agent lends its model (QI_MODEL_KEY);
 // "@sandbox:<id>" while that sandbox account's lines in $QI_ENV_DIR/credentials.env are all
-// filled (docs/profile-contract.md → `sandbox`), and its {{sandbox:<id>.<NAME>}} fill values.
+// filled (docs/profile-contract.md → `sandbox`), and its {{sandbox:<id>.<NAME>}} fill values;
+// "@environment" while the product runs in a platform Environment (QI_NESTED_TARGET), whose
+// endpoints' addresses (QI_ENV_ENDPOINTS, {name: url}) fill {{env_url:<name>}} and {{env_scheme}}.
+// An overlay with `tags` (a regex) applies only to a build whose tag matches it (QI_BUILD, set
+// by `up`): the builds that understand its values.
 import { existsSync, readFileSync } from 'node:fs';
 
 const input = JSON.parse(readFileSync(0, 'utf8'));
@@ -49,10 +54,13 @@ if (mode === 'config') {
     return vals.length > 0 && vals.every((v) => v !== '');
   };
   const on = (w) => (w === '@model' ? !!process.env.QI_MODEL_KEY
+    : w === '@environment' ? process.env.QI_NESTED_TARGET === 'environment'
     : w.startsWith('@sandbox:') ? sandboxOn(w.slice(9)) : String(cfg[w] ?? '') !== '');
   for (const o of overlays) {
     if (!o.when) fail('an overlay needs `when`');
-    if (on(o.when)) out = { ...out, values: merge(out.values ?? {}, walk(o.values ?? {}, fill)) };
+    const build = process.env.QI_BUILD ?? '';
+    const forBuild = !o.tags || !build || new RegExp(o.tags).test(build);
+    if (on(o.when) && forBuild) out = { ...out, values: merge(out.values ?? {}, walk(o.values ?? {}, fill)) };
   }
   console.log(JSON.stringify(out));
 } else if (mode === 'values') {
@@ -62,6 +70,11 @@ if (mode === 'config') {
   // Pods reach the outside only through the gateway; cluster-internal traffic never does.
   const proxy = { https: e.HTTPS_PROXY ?? e.https_proxy ?? '', http: e.HTTP_PROXY ?? e.http_proxy ?? '',
     no: [e.NO_PROXY ?? e.no_proxy, 'localhost,127.0.0.1,::1,10.42.0.0/16,10.43.0.0/16,.svc,.cluster.local'].filter(Boolean).join(',') };
+  // The platform Environment's public addresses, {endpoint: url}, while the product runs in one.
+  let eps = {};
+  try { eps = JSON.parse(e.QI_ENV_ENDPOINTS || '{}') ?? {}; } catch { fail('QI_ENV_ENDPOINTS is not JSON'); }
+  const envUrl = (n) => (typeof eps[n] === 'string' && /^https?:\/\/[^/\s]+/.test(eps[n]) ? eps[n].replace(/\/+$/, '')
+    : fail(`{{env_url:${n}}}: the Environment has no address for endpoint '${n}'`));
   // The CA the gateway presents, as PEM — the file the VM's own Node or OpenSSL trust names.
   const ca = () => { for (const f of [e.NODE_EXTRA_CA_CERTS, e.SSL_CERT_FILE]) { try { if (f) return readFileSync(f, 'utf8'); } catch {} } return ''; };
   const fill = (s) => s
@@ -71,6 +84,8 @@ if (mode === 'config') {
     .replace(/\{\{app_port\}\}/g, String(input.app_port ?? ''))
     .replace(/\{\{model:(key|kind|base_url)\}\}/g, (_, k) => e[`QI_MODEL_${k.toUpperCase()}`] ?? '')
     .replace(/\{\{proxy:(https|http|no)\}\}/g, (_, k) => proxy[k])
+    .replace(/\{\{env_url:([a-z0-9]+)\}\}/g, (_, n) => envUrl(n))
+    .replace(/\{\{env_scheme\}\}/g, () => envUrl('app').split(':')[0])
     .replace(/\{\{gateway_ca\}\}/g, () => ca())
     .replace(/\{\{gateway_ip\}\}/g, () => /^\d{1,3}(\.\d{1,3}){3}$/.test(e.QI_GATEWAY_IP ?? '') ? e.QI_GATEWAY_IP
       : fail("{{gateway_ip}}: the VM's gateway address did not resolve (getent ahostsv4 github.com)"));

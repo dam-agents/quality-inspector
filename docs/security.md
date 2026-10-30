@@ -39,7 +39,8 @@ the profile's accounts ([profile-contract.md](profile-contract.md) → **The `bi
 | `SEC-DEP-4` | The namespace | at least one `NetworkPolicy` | low | script · as `SEC-DEP-1` |
 | `SEC-DEP-5` | Plain env values of secret-named variables | none is a well-known default (`admin`, `password`, `changeme`, … — the list in the script) | medium | script · as `SEC-DEP-1` |
 
-The deployment checks use read-only `kubectl get -o json` (else `k3s kubectl`) of pods and
+The deployment checks use read-only `kubectl get -o json` (else `k3s kubectl`; in a platform
+Environment `ssh env-<name> k3s kubectl`, [nested-env.md](nested-env.md)) of pods and
 NetworkPolicies in `security.namespace`, else `engine_config.namespace`. The chart's
 default values (`helm show values`) are a product package file and stay unread
 ([black-box.md](black-box.md)); `SEC-DEP-5` judges the live objects instead.
