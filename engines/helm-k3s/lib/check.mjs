@@ -108,7 +108,7 @@ if (!Array.isArray(hd)) fail('host_dirs must be a list of absolute paths');
 else {
   const seenDirs = new Set();
   for (const d of hd) {
-    const n = str(d) ? d.replace(/\/+$/, '') || '/' : '';
+    const n = str(d) ? d.replace(/\/+/g, '/').replace(/(.)\/$/, '$1') : '';
     if (!str(d) || !d.startsWith('/') || d.split('/').includes('..') || d.split('/').includes('.') || /\s/.test(d)) fail(`host_dirs entry '${d}' is not an absolute path`);
     else if (n === '/' || SYSTEM.includes(n) || OWNED.some((o) => n === o || n.startsWith(`${o}/`))) fail(`host_dirs entry '${d}' is or lies under a directory the system or the engine owns`);
     else if (seenDirs.has(n)) fail(`host_dirs entry '${d}' is listed twice`);

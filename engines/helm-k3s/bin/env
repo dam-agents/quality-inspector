@@ -59,14 +59,8 @@ ensure_helm() {
 k3s_running() { kc get --raw=/readyz >/dev/null 2>&1; }
 
 # ---------------------------------------------------------------- kvm ----
-# `kvm: true` — the product's pods open /dev/kvm (a VM runner) from inside a user namespace
-# (hostUsers: false). The device comes from the platform that hosts this VM (nested
-# virtualization), never from the engine: without it the install still runs and `status`
-# says `kvm: false`. In a user namespace the device keeps its host owner unmapped, so a
-# 0660 root:kvm device opens for nobody: it is opened to all, at every `up` (a restart
-# resets its mode). And runc cannot idmap a volume whose source is on an overlay, which
-# this VM's root is: the kubelet's root (the pods' emptyDirs) and every `host_dirs` entry
-# go to the home disk instead.
+# `kvm` and `host_dirs`: the node side of pods that open /dev/kvm from a user namespace —
+# why each step is needed is in README → KVM.
 SHARE="$HOME_DIR/.local/share"
 NODE="${QI_NODE_ROOT:-}"   # / — the offline tests put a directory in its place (test_engine_kvm.sh)
 KUBELET_DROPIN="$NODE/etc/rancher/k3s/config.yaml.d/60-kubelet-root.yaml"
@@ -119,7 +113,7 @@ host_dirs_mount() {
     [ -z "$(ls -A "$at")" ] || [ -n "$(ls -A "$src")" ] || cp -a "$at/." "$src/"
     mount --bind "$src" "$at" || { say "could not mount $src over $dir"; continue; }
     printf '%s\n' "$dir"
-  done < <(jq -r '.host_dirs // [] | .[] | sub("/+$"; "")' <<<"$CFG")
+  done < <(jq -r '.host_dirs // [] | .[] | gsub("/+"; "/") | sub("/$"; "")' <<<"$CFG")
 }
 # A pod that started before its directory was mounted keeps the overlay one (the chart may
 # hand a subdirectory of it): delete it, and its controller starts it again on the mount.

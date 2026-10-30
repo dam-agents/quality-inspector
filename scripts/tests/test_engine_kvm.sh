@@ -111,9 +111,9 @@ grep -q "no /dev/kvm in this VM" "$SANDBOX/err" || { echo "  no /dev/kvm: warns"
 # host_dirs: each from a source of its own whole path, what it held copied over; a mount point skipped.
 fresh; mkdir -p "$N/a/images" "$N/b/images" "$N/var/lib/vm-images"; echo old > "$N/a/images/keep"
 echo "$N/var/lib/vm-images" > "$N.mounts"
-assert_eq "host_dirs: up succeeds" 0 "$(up '.host_dirs = ["/a/images", "/b/images/", "/var/lib/vm-images"]')"
+assert_eq "host_dirs: up succeeds" 0 "$(up '.host_dirs = ["/a/images", "/b//images/", "/var/lib/vm-images"]')"
 grep -qx "mount --bind $H/.local/share/host-a-images $N/a/images" "$L" || { echo "  host_dirs: /a/images from host-a-images: $(cat "$L")"; FAILED=1; }
-grep -qx "mount --bind $H/.local/share/host-b-images $N/b/images" "$L" || { echo "  host_dirs: /b/images/ from its own source"; FAILED=1; }
+grep -qx "mount --bind $H/.local/share/host-b-images $N/b/images" "$L" || { echo "  host_dirs: /b//images/ from its own source, slashes collapsed"; FAILED=1; }
 grep -q "vm-images" "$L" && { echo "  host_dirs: a mount point is left alone"; FAILED=1; }
 assert_eq "host_dirs: what it held is copied over" old "$(cat "$H/.local/share/host-a-images/keep" 2>/dev/null)"
 [ -e "$H/.local/share/host-b-images/keep" ] && { echo "  host_dirs: sources never shared"; FAILED=1; }
