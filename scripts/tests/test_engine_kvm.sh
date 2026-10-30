@@ -23,11 +23,18 @@ cat > "$B/mountpoint" <<'S'
 #!/usr/bin/env bash
 grep -qxF "${!#}" "$N.mounts" 2>/dev/null
 S
+# mount with no argument prints the table in $N.table; umount and the iptables pairs never touch
+# this machine: the suite also runs on the agent's own VM (docs/self-modification.md §9).
 cat > "$B/mount" <<'S'
 #!/usr/bin/env bash
-[ $# -eq 0 ] && exit 0
+[ $# -eq 0 ] && { cat "$N.table" 2>/dev/null; exit 0; }
 echo "mount $*" >> "$L"; [ "$1" = --bind ] && echo "$3" >> "$N.mounts"; exit 0
 S
+printf '#!/usr/bin/env bash\necho "umount $*" >> "$L"\n' > "$B/umount"
+for b in iptables iptables-legacy; do
+  printf '#!/usr/bin/env bash\ncat "$N.rules" 2>/dev/null\n' > "$B/$b-save"
+  printf '#!/usr/bin/env bash\ncat > "$N.restored-%s"\n' "$b" > "$B/$b-restore"
+done
 cat > "$B/pkill" <<'S'
 #!/usr/bin/env bash
 echo "pkill $*" >> "$L"; case "$*" in (*"k3s server"*) rm -f "$N.running";; esac; exit 0
@@ -76,8 +83,28 @@ grep -q '^kubelet-arg+:' "$DROPIN" 2>/dev/null || { echo "  kvm: the drop-in app
 grep -q "^pkill" "$L" && { echo "  kvm: a k3s not running is not stopped"; FAILED=1; }
 
 # kvm, k3s running on the old root: stopped once, then the drop-in, then started again.
-fresh; mkdir -p "$N/dev"; : > "$N/dev/kvm"; touch "$N.running"
+fresh; mkdir -p "$N/dev" "$N/var/lib/cni"; : > "$N/dev/kvm"; touch "$N.running"
+cat > "$N.table" <<T
+overlay on / type overlay (rw)
+shm on /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/abc/shm type tmpfs (rw)
+tmpfs on /var/lib/kubelet/pods/p1/volumes/kubernetes.io~projected/kube-api-access type tmpfs (rw)
+tmpfs on $H/.local/share/kubelet/pods/p2/volumes/v type tmpfs (rw)
+nsfs on /run/netns/cni-1234 type nsfs (rw)
+/dev/vdb on /home/agent type ext4 (rw)
+tmpfs on /run/user/1000 type tmpfs (rw)
+T
+printf '%s\n' '*filter' ':INPUT ACCEPT [0:0]' ':KUBE-SERVICES - [0:0]' ':CNI-FORWARD - [0:0]' ':FLANNEL-FWD - [0:0]' \
+  '-A INPUT -j KUBE-SERVICES' '-A INPUT -p tcp --dport 22 -j ACCEPT' '-A FORWARD -m comment --comment "flannel forwarding" -j ACCEPT' 'COMMIT' > "$N.rules"
 assert_eq "kvm, running: up succeeds" 0 "$(up '.kvm = true')"
+assert_eq "kvm, running: the pods' mounts are unmounted, and no other" \
+  "$(printf '%s\n' /var/lib/kubelet/pods/p1/volumes/kubernetes.io~projected/kube-api-access /run/netns/cni-1234 \
+      /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/abc/shm "$H/.local/share/kubelet/pods/p2/volumes/v" | sort | paste -sd'|' -)" \
+  "$(grep '^umount' "$L" | sed 's/^umount -l //' | sort -u | paste -sd'|' -)"
+for b in iptables iptables-legacy; do
+  assert_eq "kvm, running: $b keeps only the VM's own rules" \
+    "*filter|:INPUT ACCEPT [0:0]|-A INPUT -p tcp --dport 22 -j ACCEPT|COMMIT" "$(paste -sd'|' - < "$N.restored-$b" 2>/dev/null)"
+done
+[ -e "$N/var/lib/cni" ] && { echo "  kvm, running: the CNI state goes"; FAILED=1; }
 grep -q "^pkill -f k3s server" "$L" || { echo "  kvm, running: k3s is stopped"; FAILED=1; }
 grep -q "^pkill -9 -f /k3s/data/.*containerd-shim" "$L" || { echo "  kvm, running: its pods' shims go too"; FAILED=1; }
 grep -q "^k3s server" "$L" || { echo "  kvm, running: k3s starts again"; FAILED=1; }
@@ -134,6 +161,11 @@ printf 'data-dir: /data\nhttps-listen-port: 16443\n' > "$N/etc/rancher/k3s/confi
 printf 'clusters:\n- cluster:\n    server: https://127.0.0.1:6444\n' > "$N/data/server/cred/admin.kubeconfig"
 up '.' >/dev/null
 grep -qx "k3s server --https-listen-port 6443" "$L" || { echo "  port: a cluster made on 6443 keeps it: $(grep server "$L")"; FAILED=1; }
+fresh; mkdir -p "$N/data/server/cred"
+printf 'data-dir: "/data"\n' > "$N/etc/rancher/k3s/config.yaml"
+printf 'clusters:\n- cluster:\n    server: https://127.0.0.1:6444\n' > "$N/data/server/cred/admin.kubeconfig"
+up '.' >/dev/null
+grep -qx "k3s server --https-listen-port 6443" "$L" || { echo "  port: a quoted data-dir is read too: $(grep server "$L")"; FAILED=1; }
 fresh; up '.' >/dev/null
 grep -qx "k3s server" "$L" || { echo "  port: a fresh data dir takes the config's port"; FAILED=1; }
 

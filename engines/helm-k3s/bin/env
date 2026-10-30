@@ -168,7 +168,7 @@ RESTART_ON=()
 # after its own, and exits when they disagree. So a cluster keeps the port it was made on.
 k3s_port_args() {
   local data api
-  data="$(sed -n 's/^data-dir: *//p' "$NODE/etc/rancher/k3s/config.yaml" 2>/dev/null)"
+  data="$(sed -n "s/^data-dir: *[\"']\{0,1\}\([^\"']*\)[\"']\{0,1\} *\$/\1/p" "$NODE/etc/rancher/k3s/config.yaml" 2>/dev/null)"
   api="$(sed -n 's#^ *server: https://127.0.0.1:\([0-9]*\)$#\1#p' "$NODE${data:-/var/lib/rancher/k3s}/server/cred/admin.kubeconfig" 2>/dev/null | head -n 1)"
   [ -z "$api" ] || printf -- '--https-listen-port\n%s\n' "$((api - 1))"
 }
