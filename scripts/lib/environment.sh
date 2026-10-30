@@ -11,7 +11,8 @@
 # this VM, and its tools say nothing of it), and the platform's Environment tools answer; else
 # this VM, with the reason logged (with `environment`, env.sh up fails instead). With kvm,
 # env.sh up then looks for /dev/kvm in the Environment itself (env_has_kvm): none there → the
-# Environment is deleted and the product runs in this VM (with `environment`, up fails).
+# Environment is deleted and the product runs in this VM (with `environment`, up fails); no
+# answer → up fails, and the Environment stays.
 # In an Environment the profile's `bin/env` runs over the Environment Link (`ssh env-<name>`),
 # from a copy of the profile and the engines in ~/qi there, and one `ssh -L` keeps the product
 # at the profile's app.url on this VM — so every test, CLI and API call addresses localhost in
@@ -58,7 +59,7 @@ target_choose() {
 }
 
 profile_kvm() { [ "$(profile_field '.engine_config.kvm')" = true ]; }
-# Whether the Environment has /dev/kvm: `yes`, `no`, or empty when its link does not answer.
+# Whether the Environment has /dev/kvm: `yes` or `no`; anything else (empty) — its link did not answer.
 env_has_kvm() { essh "$1" 'if test -e /dev/kvm; then echo yes; else echo no; fi' 2>/dev/null; }
 
 env_exists() { penv list 2>/dev/null | jq -e --arg n "$1" 'any(.[]; .name == $n)' >/dev/null; }

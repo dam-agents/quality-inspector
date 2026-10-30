@@ -45,6 +45,7 @@ echo "ssh $*" >> "$SANDBOX/ssh.log"
 fwd=0
 while [ $# -gt 0 ]; do case "$1" in (-o|-L) shift 2;; (-N) fwd=1; shift;; (-*) shift;; (*) break;; esac; done
 host="$1"; shift
+[ -e "$SANDBOX/ssh-down" ] && exit 255
 [ "$fwd" = 1 ] && exec -a "$SANDBOX/fwd-sleep" sleep 300
 mkdir -p "$SANDBOX/envs/${host#env-}"; cd "$SANDBOX/envs/${host#env-}" || exit 1
 # /dev/kvm there is $SANDBOX/env-kvm, for every Environment.
@@ -106,7 +107,15 @@ grep -q "runs in this VM (the profile sets kvm, and Environment qi-[0-9-]* has n
 assert "kvm, none there: where" '.target == "vm"' "$(E where)"
 assert "kvm, none there: the Environment is deleted" 'length == 0' "$(cat "$ST")"
 grep -q "^up 1.0.0 target=vm" "$WORK_DIR/env/calls" || { echo "  kvm, none there: bin/env ran here"; FAILED=1; }
-# … both have it → an Environment.
+# … the link does not answer the check → up fails, and the Environment stays (no delete on doubt).
+touch "$SANDBOX/ssh-down"; : > "$WORK_DIR/env/calls"
+E up 1.0.0 2>"$SANDBOX/err" >/dev/null; assert_eq "kvm, no answer: up fails" 1 "$?"
+grep -q "did not answer the /dev/kvm check (3 tries)" "$SANDBOX/err" || { echo "  kvm, no answer: the reason is said: $(cat "$SANDBOX/err")"; FAILED=1; }
+assert "kvm, no answer: the Environment stays" 'length == 1' "$(cat "$ST")"
+assert "kvm, no answer: it stays the active one" '.target == "environment"' "$(E where)"
+grep -q "^up 1.0.0" "$WORK_DIR/env/calls" && { echo "  kvm, no answer: nothing runs in this VM"; FAILED=1; }
+rm -f "$SANDBOX/ssh-down"
+# … both have it → that Environment.
 touch "$SANDBOX/env-kvm"
 E up 1.0.0 2>"$SANDBOX/err" >/dev/null; assert_eq "kvm in both: up succeeds" 0 "$?"
 w="$(E where)"; assert "kvm in both: an Environment" '.target == "environment" and (.name | startswith("qi-"))' "$w"
