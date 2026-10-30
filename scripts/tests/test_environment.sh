@@ -162,6 +162,29 @@ grep -qF "\`env-\${where[1]}\`, 'bash', 'qi/kubectl.sh']" "$SCRIPTS/security-che
 E up 1.0.1 2>/dev/null >/dev/null
 assert_eq "the active Environment is reused" "$n" "$(E where | jq -r .name)"
 
+# A resume after a VM restart keeps the target of the last up: never target_choose, never a delete.
+# nested_target: vm here, which an up answers by deleting the Environment and installing in this VM.
+sed -i.bak 's/^- nested_target: auto$/- nested_target: vm/' "$WORK_DIR/CONFIG.md"
+NOW="$(date -u +%s)"; R="$WORK_DIR/env/RESUME"
+resettle() { local i; for i in $(seq 1 100); do grep -q '^running' "$R" 2>/dev/null || return 0; sleep 0.2; done; }
+printf 'done 1.0.1 %s 0 -\n' "$(date -u -d "@$((NOW - 3600))" +%Y-%m-%dT%H:%M:%SZ)" > "$WORK_DIR/env/UP"; rm -f "$R"
+: > "$WORK_DIR/env/calls"; : > "$SANDBOX/envs/$n/qi/env/calls"
+QI_BOOT_EPOCH=$((NOW - 60)) E resume >/dev/null 2>&1; resettle
+assert_eq "resume: done" "done 1.0.1 0" "$(cut -d' ' -f1,2,4 "$R")"
+assert "resume: the Environment stays" 'any(.[]; .name == "'"$n"'")' "$(cat "$ST")"
+assert_eq "resume: still the active one" "$n" "$(E where | jq -r .name)"
+grep -q "^up 1.0.1 target=environment" "$SANDBOX/envs/$n/qi/env/calls" || { echo "  resume: the up runs in that Environment"; FAILED=1; }
+grep -q "^up " "$WORK_DIR/env/calls" && { echo "  resume: nothing installs in this VM"; FAILED=1; }
+# … that Environment gone: nothing resumed, no Environment made, the target kept for the next up.
+cp "$ST" "$SANDBOX/st.keep"; jq --arg n "$n" 'map(select(.name != $n))' "$SANDBOX/st.keep" > "$ST"; rm -f "$R"
+QI_BOOT_EPOCH=$((NOW - 60)) E resume >/dev/null 2>&1; resettle
+assert_eq "resume, gone: exit 4" "done 1.0.1 4" "$(cut -d' ' -f1,2,4 "$R")"
+assert "resume, gone: no Environment made" 'length == 0' "$(cat "$ST")"
+grep -q "^up " "$WORK_DIR/env/calls" && { echo "  resume, gone: nothing installs in this VM"; FAILED=1; }
+assert_eq "resume, gone: logged" 1 "$(cat "$WORK_DIR"/logs/events-*.jsonl | jq -sc '[.[] | select(.event == "env_resume" and (.msg | test("is gone")))] | length')"
+cp "$SANDBOX/st.keep" "$ST"; rm -f "$R"
+sed -i.bak 's/^- nested_target: vm$/- nested_target: auto/' "$WORK_DIR/CONFIG.md"
+
 # keep: a row with the account's username (never a password); the next up makes a new one.
 k="$(E keep issue-7 2>/dev/null)"
 assert "keep: the row" '.name == "'"$n"'" and .label == "issue-7" and .build == "1.0.1" and .account == "qa-viewer" and (.url | startswith("https://app-")) and (.expires_utc | test("^20"))' "$k"

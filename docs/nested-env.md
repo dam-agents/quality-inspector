@@ -107,7 +107,10 @@ again, and a boot service of the agent's own is not allowed. So the **SessionSta
 (`scripts/hooks/resume.sh`, registered by `scripts/hooks/install.sh`) runs `env.sh resume` in
 the first session after a boot: when the last `up` succeeded before this boot and no `down` or
 `reset` came after it, it brings **that build** back in the background — no reset, no other
-build, the data as it was; the engine finds the cluster on disk and only waits for the UI. Its
+build, the data as it was, **where that `up` put it** (`work/env/TARGET`): a resume never
+chooses where the product runs, never makes or deletes an Environment. When that Environment
+is gone, it resumes nothing (an `env_resume` warning); the next `up` chooses. The engine finds
+the cluster on disk and only waits for the UI. Its
 output is `work/env/last-resume.log`, its state `work/env/RESUME`, its events `env_resume` (and
 `env_failed` when it fails — the next `up` then installs as usual; never a verdict).
 
