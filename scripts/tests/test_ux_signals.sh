@@ -36,6 +36,15 @@ cat > "$SANDBOX/inv.json" <<'J'
   "/admin":{"example":"/admin","title":"Admin"}}}
 J
 
+# The profile's bin/versions --resolve: 1.5.0 is a published chart's appVersion, 1.4.0 is none.
+cat > "$QI_PROFILE_DIR/bin/versions" <<'S'
+#!/usr/bin/env bash
+if [ "${1:-}" = --resolve ]; then
+  case "$2" in 1.5.0) echo '{"build":"0.0.0-main.12"}';; *) echo "no published chart has appVersion $2" >&2; exit 1;; esac; exit 0
+fi
+jq -c . "$STUB_DIR/versions.json"
+S
+
 # ---------------------------------------------------------------- fetch: the guard, no data, the floor
 r="$(node "$UXS" fetch --fixture "$SANDBOX/week1.json" --now 2026-10-31T05:00:00Z)"; rc=$?
 assert_eq "the install is the instance's: unset, the module is off" 2 "$rc"
@@ -78,8 +87,12 @@ assert "modules.sh: ux-signals is on, but never due by the candidate" '(.on | in
 r="$(node "$UXS" check --now 2026-10-31T09:00:00Z)"
 assert "due: two signals not evaluated, no fetch within the day" '.due and .new == 2 and .resolve == 0' "$r"
 r="$(node "$UXS" plan "$P1/scored.json" --inventory "$SANDBOX/inv.json" --max 1)"
-assert "the plan: the top candidate, its pages from the UI map" \
-  'length == 1 and .[0].page == {"pattern":"/assets/:id","example":"/assets/42"} and .[0].trails[0].steps[1].page.example == "/assets/42" and .[0].trails[0].steps[0].page == null' "$r"
+assert "the plan: the top candidate, its pages from the UI map, the chart its build is" \
+  'length == 1 and .[0].page == {"pattern":"/assets/:id","example":"/assets/42"} and .[0].trails[0].steps[1].page.example == "/assets/42" and .[0].trails[0].steps[0].page == null
+   and .[0].build == "1.5.0" and .[0].install == "0.0.0-main.12" and .[0].install_note == "build 1.5.0 is chart 0.0.0-main.12"' "$r"
+r="$(node "$UXS" plan "$P1/scored.json" --inventory "$SANDBOX/inv.json")"
+assert "a build no published chart is: no install, said why (signal-only)" \
+  '.[1].build == "1.4.0" and .[1].install == null and (.[1].install_note | test("^build 1.4.0 not installable: .*no published chart has appVersion 1.4.0"))' "$r"
 
 # ---------------------------------------------------------------- field findings
 mkdir -p "$P1/evidence" && printf 'png' > "$P1/evidence/a.png"

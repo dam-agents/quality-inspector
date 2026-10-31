@@ -6,6 +6,12 @@
 #   versions                      -> {"candidate": <tag>, "baseline": <tag>|null}
 #   versions --between <from> <to> -> JSON array of the tags of one channel published strictly
 #                                     between the two, oldest first (bisection, docs/triage.md)
+#   versions --resolve <build>     -> {"build": <tag>} — the chart to install for a build id the
+#                                     product reports (docs/ux-signals.md): the tag itself when it
+#                                     is one, else the newest channel tag whose chart appVersion is
+#                                     <build>, of the newest `resolve_max_tags` (50) per channel.
+#                                     appVersions are kept in $QI_ENV_DIR/app-versions.json (a tag's
+#                                     chart never changes). Exit 1: no published chart matches.
 set -u
 export LC_ALL=C
 . "$(dirname "$0")/../lib/common.sh"
@@ -17,7 +23,11 @@ BC="${QI_BASELINE_CHANNEL:-$(jq -r '.default_baseline // "none"' <<<"$CFG")}"
 jq -e --arg c "$CC" '.channels[$c]' <<<"$CFG" >/dev/null || { echo "unknown candidate channel '$CC'" >&2; exit 1; }
 [ "$BC" = none ] || jq -e --arg c "$BC" '.channels[$c]' <<<"$CFG" >/dev/null || { echo "unknown baseline channel '$BC'" >&2; exit 1; }
 read -r HOST REPO < <(ref_parts "$CHART")
-FROM=""; TO=""
+FROM=""; TO=""; RESOLVE=""
+if [ "${1:-}" = --resolve ]; then
+  RESOLVE="${2:-}"
+  printf '%s' "$RESOLVE" | grep -qE '^[A-Za-z0-9][A-Za-z0-9._+-]{0,79}$' || { echo "usage: versions --resolve <build>" >&2; exit 1; }
+fi
 if [ "${1:-}" = --between ]; then
   FROM="${2:-}"; TO="${3:-}"
   [ -n "$FROM" ] && [ -n "$TO" ] || { echo "usage: versions --between <from> <to>" >&2; exit 1; }
@@ -25,6 +35,7 @@ fi
 
 # Enough tags: quay pages newest-first until both channels have their builds; /v2 lists all.
 need() {
+  [ -n "$RESOLVE" ] && { echo false; return; }
   if [ -n "$FROM" ]; then awk -v f="$FROM" -v t="$TO" '$1==f{a=1} $1==t{b=1} END{print (a&&b) ? "true" : "false"}'; return; fi
   jq -r --arg c "$CC" --arg b "$BC" --slurp -R '
   split("\n") | map(select(length>0) | split(" ") | {name:.[0], ts:(.[1]|tonumber)}) as $t
@@ -44,6 +55,35 @@ if [ "$API" = quay ]; then
   done
 else
   TAGS="$(tags_oci "$HOST" "$REPO")" || { echo "OCI tag listing failed for $HOST/$REPO" >&2; exit 1; }
+fi
+
+if [ -n "$RESOLVE" ]; then
+  printf '%s\n' "$TAGS" | awk '{print $1}' | grep -qxF -- "$RESOLVE" && { jq -nc --arg b "$RESOLVE" '{build:$b}'; exit 0; }
+  CACHE="${QI_ENV_DIR:-${QI_WORK:-$HOME/work}/env}/app-versions.json"
+  known="$(jq -c 'if type == "object" then . else {} end' "$CACHE" 2>/dev/null || echo '{}')"
+  # Each channel's tags newest first, at most resolve_max_tags each; the candidate channel first.
+  order="$(printf '%s\n' "$TAGS" | jq -R --slurp -r --arg c "$CC" --argjson CFG "$CFG" '
+    split("\n") | map(select(length>0) | split(" ") | {name:.[0], ts:(.[1]|tonumber)}) as $t
+    | ([$c] + (($CFG.channels | keys) - [$c])) as $chs
+    | [$chs[] | select(. != "") as $ch | $CFG.channels[$ch] as $d | select($d)
+        | $t | map(select(.name | test($d.tag)))
+        | if $d.order == "semver" then sort_by(.name | split(".") | map(tonumber? // 0))
+          elif $d.order == "numeric-suffix" then sort_by(.name | capture("(?<n>[0-9]+)$").n | tonumber)
+          else sort_by(.ts) end
+        | reverse | .[:($CFG.resolve_max_tags // 50)][] | .name] | .[]')"
+  hit=""
+  while IFS= read -r tag; do
+    [ -n "$tag" ] || continue
+    av="$(jq -r --arg t "$tag" '.[$t] // empty' <<<"$known")"
+    if [ -z "$av" ]; then
+      av="$(app_version "$HOST" "$REPO" "$tag")" || { echo "no chart metadata for $tag" >&2; continue; }
+      known="$(jq -c --arg t "$tag" --arg v "$av" '. + {($t): $v}' <<<"$known")"
+    fi
+    [ "$av" = "$RESOLVE" ] && { hit="$tag"; break; }
+  done <<<"$order"
+  mkdir -p "$(dirname "$CACHE")" 2>/dev/null && printf '%s\n' "$known" > "$CACHE.tmp" && mv "$CACHE.tmp" "$CACHE"
+  [ -n "$hit" ] || { echo "no published chart has appVersion $RESOLVE" >&2; exit 1; }
+  jq -nc --arg b "$hit" '{build:$b}'; exit 0
 fi
 
 printf '%s\n' "$TAGS" | jq -R --slurp -c --arg c "$CC" --arg b "$BC" --arg f "$FROM" --arg to "$TO" --argjson CFG "$CFG" '

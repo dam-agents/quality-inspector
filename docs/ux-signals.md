@@ -34,7 +34,7 @@ nothing due — the next fetch asks again. Any other failure is an error (below)
 | Key | Each row |
 | --- | --- |
 | `period` | `{from, to}` |
-| `builds[]` | `version` (the id `bin/versions` and `env.sh up` use), `firstSeen` |
+| `builds[]` | `version` (the id the product reports; `env.sh resolve` finds the build to install), `firstSeen` |
 | `features[]` | `route` (a route pattern), `element` (a `data-testid` or `null` for the page), `users`, `uses` |
 | `friction[]` | `signal`, `route`, `element`, `build`, `users`, `events`, `views`, `rate`, `prevRate` (`null`: none last period) |
 | `funnels[]` | `flow`, `steps[]`: `step`, `users`, `medianMsFromStart` |
@@ -74,8 +74,15 @@ each with its numbers, `page` (its route in the UI map: pattern and an example p
 `evidence` (`video` for a click, a bounce or a dialog; `screenshot` for an error or a slow
 request), `evidence_dir`, and its trails with every step's page.
 
-Per build of the plan, under `env.sh lock modules`: `env.sh up <build>` — **the build the users
-ran**, never the candidate — then per candidate on it:
+Each entry's `install` is the build that is the reported one, as the profile installs it
+(`env.sh resolve` → `bin/versions --resolve`, [profile-contract.md](profile-contract.md); helm-k3s
+maps an `appVersion` such as `0.2.25-dev-1a2b3c4d5e6f` to its chart tag). `install: null` — no
+published build is it: never replay it on another build. Its field entry is
+`{class: "not-reproduced", saw: <install_note>}` with no judge, and one line in
+`work/MODULES.log`: `<ISO> WARN: module=ux-signals build=<build> not installable`.
+
+Per `install` of the plan, under `env.sh lock modules`: `env.sh up <install>` — **the build the
+users ran**, never the candidate — then per candidate on it:
 
 1. Write `tests/ux-<fingerprint>.e2e.ts` (tag `ux-<fingerprint>`) by
    [test-authoring.md](test-authoring.md): sign in as the owner, make what the trail needs
@@ -87,7 +94,8 @@ ran**, never the candidate — then per candidate on it:
    gives the user nothing to do.
 2. `suite.sh run ux-<fingerprint>-<build> --evidence full --tag ux-<fingerprint>`; copy the
    screenshot of the signal's step to `<evidence_dir>/shot.png` and, for `video`, the video to
-   `<evidence_dir>/video.webm`.
+   `<evidence_dir>/video.webm`. The field entry keeps the reported `build`, never `install`: the
+   register and the data speak of the same build.
 3. Classify it, by what the evidence shows, never by the numbers alone:
 
 | Class | When |

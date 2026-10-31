@@ -29,6 +29,12 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    field findings by itself — offer it, never set it unasked.
 3. Nothing to run — the UI map records the visible `data-testid` values from the next mapping on
    (`testids`); the module's "unused controls" need a map made by 3.52.0 or later.
+4. Nothing to run — a profile may implement `bin/versions --resolve <build>`
+   ([docs/profile-contract.md](docs/profile-contract.md)); the helm-k3s engine does: it maps a
+   build id the product reports (a chart `appVersion`, `0.2.25-dev-<sha12>`) to the chart tag it
+   installs, read from the registry's chart metadata and kept in `work/env/app-versions.json`. It
+   makes the same `/v2` manifest and blob requests as `helm pull`: no new egress rule. A build no
+   published chart has is kept signal-only, never replayed on another build.
 
 ## 3.51.0 — 2026-10-30
 

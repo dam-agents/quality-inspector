@@ -37,6 +37,10 @@
 #                                array of builds between the two, oldest first; exit 2 when
 #                                the profile does not implement it (no array), 1 when it
 #                                cannot look (docs/triage.md → Order of work, step 6)
+#   env.sh resolve <build>       read-only: the profile's `bin/versions --resolve` — {"build":
+#                                <installable id>, "how": exact|mapped|as-is}; `as-is` when the
+#                                profile does not implement it; exit 1 when no published build
+#                                is <build> (docs/profile-contract.md → `bin/versions --resolve`)
 #
 # `up` and `reset` keep their whole output in work/env/last-<cmd>.log (mode 600, never backed
 # up): the evidence of an environment failure (docs/nested-env.md → Failures).
@@ -166,6 +170,17 @@ cmd_between() { # <from> <to>
   [ "$rc" = 0 ] || { echo "env: bin/versions --between exited $rc" >&2; return 1; }
   printf '%s' "$out" | jq -ce 'if type == "array" then . else error("not an array") end' 2>/dev/null \
     || { echo "env: bin/versions ignores --between (no JSON array) — treated as not implemented" >&2; return 2; }
+}
+
+cmd_resolve() { # <build>
+  local out rc b
+  out="$(profile_run versions --resolve "$1")"; rc=$?
+  b="$(printf '%s' "$out" | jq -er 'if type == "object" and (.build | type) == "string" then .build else empty end' 2>/dev/null)"
+  if [ "$rc" = 0 ] && [ -n "$b" ]; then
+    jq -nc --arg b "$b" --arg r "$1" '{build:$b, how:(if $b == $r then "exact" else "mapped" end)}'
+  elif [ "$rc" = 2 ] || [ "$rc" = 0 ]; then
+    jq -nc --arg r "$1" '{build:$r, how:"as-is"}'  # not implemented: the reported id is the build
+  else return 1; fi
 }
 
 # An install needs room for images and data: refuse `up` below min_free_disk_gi free on
@@ -381,6 +396,7 @@ cmd_wait() { # <build> [<seconds>]
 
 case "${1:-}" in
   between) [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "usage: $0 between <from> <to>" >&2; exit 1; }; cmd_between "$2" "$3" ;;
+  resolve) [[ "${2:-}" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]{0,79}$ ]] || { echo "usage: $0 resolve <build>" >&2; exit 1; }; cmd_resolve "$2" ;;
   lock)   cmd_lock "${2:-}" ;;
   unlock) cmd_unlock "${2:-}" ;;
   init)   delegate init ;;
@@ -397,5 +413,5 @@ case "${1:-}" in
   up)     [ -n "${2:-}" ] || { echo "usage: $0 up <build>" >&2; exit 2; }; cmd_up "$2" ;;
   wait)   [ -n "${2:-}" ] || { echo "usage: $0 wait <build> [<seconds>]" >&2; exit 2; }; cmd_wait "$2" "${3:-}" ;;
   watch)  live_link "$(profile_field '.app.url')" ;;
-  *) echo "usage: $0 lock <owner>|unlock <owner>|init|up <build>|wait <build> [<seconds>]|reset|status|down|resume|where|keep <label> [<days>]|extend <label> <days>|release <label|name>|kept|between <from> <to>|watch" >&2; exit 2 ;;
+  *) echo "usage: $0 lock <owner>|unlock <owner>|init|up <build>|wait <build> [<seconds>]|reset|status|down|resume|where|keep <label> [<days>]|extend <label> <days>|release <label|name>|kept|between <from> <to>|resolve <build>|watch" >&2; exit 2 ;;
 esac

@@ -171,6 +171,12 @@ Every executable runs with cwd `$HOME/work`, and with:
   published strictly between the two (same channel), oldest first; `[]` when adjacent.
   Not implemented → exit 2 (output that is not an array counts the same); bisection is
   then skipped with that reason ([triage.md](triage.md) → Order of work, step 6).
+- `bin/versions --resolve <build>` — **optional** → stdout `{"build": "<id>"}`: the build `bin/env
+  up` installs for a build id the product reports itself (its usage data, `ux_signals` below) —
+  the id itself when it is one, else the published build that is it (helm-k3s: the newest channel
+  tag whose chart `appVersion` is `<build>`). Exit 1 when none is published — never a near build.
+  Not implemented → exit 2 (output without `build` counts the same): the reported id is used as
+  it is. `scripts/env.sh resolve <build>` calls it.
 - `bin/build-time <build>` → stdout one ISO-8601 UTC timestamp, the moment the build was
   published; non-zero when unknown. The change window of [change-awareness.md](change-awareness.md).
 
@@ -317,8 +323,11 @@ The profile declares the endpoint at the top level; absent → the module is off
 - `flows` — the funnels the usage report watches, by the `flow` names the endpoint uses.
 - `min_users` (3 or more, default 3), `min_rate` (0 to 1, default 0.05) — a `friction` row is a
   candidate only at or above both.
-- `builds[].version` and `friction[].build` are the build ids `bin/versions` and `bin/env up`
-  use: the module installs the build the users ran. `route` is the page's route pattern,
+- `builds[].version`, `friction[].build` and `trails[].build` are the ids the product reports
+  (DAM: its chart's `appVersion` — a release `X.Y.Z`, a main build `<appVersion>-dev-<sha12>`). The
+  module installs the build the users ran through `bin/versions --resolve` (above): a profile
+  whose reported ids are not its install ids implements it (helm-k3s does); without it the
+  reported id must be one `bin/env up` takes. `route` is the page's route pattern,
   `element` its `data-testid` — the UI map records the visible `data-testid` values to match.
 
 ## `SKILL.md` — what a tester should know

@@ -15,8 +15,10 @@
 //   node ux-signals.mjs check [--now ISO]      the pre-flight's: fetch when due by `ux_signals`
 //       (daily | weekly), score, then {due, period, scored, new, resolve, reason}
 //   node ux-signals.mjs plan <scored.json> [--max N] [--inventory FILE]
-//       -> [{fingerprint, signal, route, element, build, users, rate, …, evidence, trails}] the
-//          candidates not evaluated on their build yet, at most N (`ux_max_candidates`)
+//       -> [{fingerprint, signal, route, element, build, install, install_note, users, rate, …,
+//          evidence, trails}] the candidates not evaluated on their build yet, at most N
+//          (`ux_max_candidates`). `install`: the build env.sh up installs for the reported one
+//          (env.sh resolve); null when none is published — `install_note` says why
 //   node ux-signals.mjs report <scored.json>   -> <dir>/report/index.html + media/ (the usage report)
 //   node ux-signals.mjs handoff D-<k> [--sent] -> {id, channel, text, attachment, ref} for Design Desk's
 //          Slack intake; --sent records it in work/ux/HANDOFF.md. Exit 2: not eligible, or sent.
@@ -26,7 +28,7 @@
 // does not allow), 1 = the fetch failed. Never prints the API key.
 
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REPORTED, SIGNALS, fingerprint, quietBuild, routeKey } from './lib/ux-field.mjs';
@@ -266,7 +268,18 @@ function plan(file) {
     const hit = Object.entries(maps.get(build)?.routes ?? {}).find(([p]) => routeKey(p) === routeKey(route));
     return hit ? { pattern: hit[0], example: hit[1].example ?? null } : null;
   };
-  return fresh(scored).slice(0, max).map((c) => ({ ...c, page: pageOf(c.build, c.route),
+  // The reported build as the profile installs it (env.sh resolve → bin/versions --resolve).
+  const installs = new Map();
+  const installOf = (b) => {
+    if (!installs.has(b)) {
+      const r = spawnSync('bash', [join(here, 'env.sh'), 'resolve', b], { env: { ...process.env, WORK_DIR: WORK }, encoding: 'utf8', timeout: 120000 });
+      let x = null; try { x = JSON.parse(r.stdout); } catch { /* below */ }
+      installs.set(b, r.status === 0 && BUILD.test(String(x?.build ?? '')) ? { install: x.build, install_note: x.how === 'mapped' ? `build ${b} is chart ${x.build}` : null }
+        : { install: null, install_note: `build ${b} not installable: ${str(r.stderr, 200) || `env.sh resolve exited ${r.status}`}` });
+    }
+    return installs.get(b);
+  };
+  return fresh(scored).slice(0, max).map((c) => ({ ...c, ...installOf(c.build), page: pageOf(c.build, c.route),
     evidence_dir: join(dirname(file), 'evidence', c.fingerprint),
     trails: c.trails.map((id) => trails.get(id)).filter(Boolean).map((t) => ({ id: t.id, users: t.users,
       steps: t.steps.map((s) => ({ ...s, page: pageOf(c.build, s.route) })) })) }));
