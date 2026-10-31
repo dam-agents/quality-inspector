@@ -13,10 +13,12 @@ the registry; `bash "$HOME/scripts/modules.sh" status` prints it.
 | `edge-cases` | config | inside each issue run (`explorations`) | [explorations.md](explorations.md) |
 | `regression`, `security`, `discovery`, `benchmark`, `audit` | schedule | their own schedule | their docs |
 | `ui-sweep`, `validation`, `stress` | modules | the **modules run**, per their cadence | [ui-sweep.md](ui-sweep.md), [validation.md](validation.md), [stress.md](stress.md) |
+| `ux-signals` | modules | the **modules run**, when real-user data has something new (`daily` or `weekly` fetch) | [ux-signals.md](ux-signals.md) |
 | `feature-focus` | queue | the next modules run, once per queued area | **Feature focus** below |
 
 A `modules` module's cadence is `disabled` (default), `per-build` (once per candidate) or
-`weekly` (once per candidate, at most once in 7 days).
+`weekly` (once per candidate, at most once in 7 days). `ux-signals` is due by its data instead
+(`due` in the registry): `ux-signals.mjs check` decides in the pre-flight.
 
 ## Control
 
@@ -33,6 +35,7 @@ Only the operator, in the direct session, changes a module (CLAUDE.md → trust 
 | `categorize D-<k> <category>` | `modules.sh categorize D-<k> <category>` — a row in `work/design/CATEGORIES.md` (lower-case letters, digits, `-`, up to 30; `-` clears it) |
 | `recheck D-<k>` / `discuss D-<k>[: <question>]` | [ui-sweep.md](ui-sweep.md) → **5. Recheck** / **6. Discuss** — no `modules.sh` write |
 | `recheck VAL-<k>` | [validation.md](validation.md) → **Recheck** — no `modules.sh` write |
+| `send D-<k> to design` | [ux-signals.md](ux-signals.md) → **6. Handoff to Design Desk** — no `modules.sh` write |
 
 `modules.sh set`, `focus`, `dismiss`, `reopen` and `categorize` write only registry keys with valid values, an area name,
 a finding id with a reason or a category, and refuse to run outside the direct session (`lib/config.sh` →
@@ -76,16 +79,18 @@ tests — so share it only with people you trust to that degree; sharing is the 
 ## The modules run (schedule `quality-inspector-modules-nightly`)
 
 Worklist: `candidate`, `baseline`, `modules_due[]`, `previous` (each module's last
-candidate), `focus[]`, `inventory` (the candidate's UI map or `null`), `max_wallclock_min`.
+candidate), `focus[]`, `inventory` (the candidate's UI map or `null`), `max_wallclock_min`, and
+with `ux-signals` due `ux_signals` (`period`, `scored`, `new`, `resolve`).
 
 1. `env.sh lock modules` (busy → end, log it). Note the claim time.
 2. `env.sh reset`, `env.sh up <candidate>`, `suite.sh run smoke-<candidate> --tag smoke`.
    Failure → environment failure ([nested-env.md](nested-env.md) → **Failures**): append
-   `<ISO> ERROR: environment candidate=<c>` to `work/MODULES.log`, unlock, end.
+   `<ISO> ERROR: environment candidate=<c>` to `work/MODULES.log`, unlock, end. Only
+   `ux-signals` due → skip this step: it brings up its own builds.
 3. `inventory: null` → map the candidate now ([change-awareness.md](change-awareness.md) →
    **Building the context**, first command only).
-4. Each due module in this order — `ui-sweep`, `validation`, then the focus areas, `stress`
-   last — by its doc. Before each one: the wall-clock since the claim against
+4. Each due module in this order — `ui-sweep`, `validation`, then the focus areas, `stress`,
+   `ux-signals` last — by its doc. Before each one: the wall-clock since the claim against
    `max_wallclock_min`; over it → skip the rest, each logged `skip=budget` (the budget bounds
    the modules; bringing the product up and the closing reset come on top). After each:
    `modules.sh ran <id> <candidate> <counts…>`; a module whose script failed (exit 3: no
@@ -100,7 +105,9 @@ candidate), `focus[]`, `inventory` (the candidate's UI map or `null`), `max_wall
 
 Findings of a module never change an issue verdict, never become a comment or a label, never an
 issue on their own — only the operator's "create issue for …" opens one
-([skills/create-issue](../skills/create-issue/SKILL.md)) — and are never `verified`. Security findings keep their own private report
+([skills/create-issue](../skills/create-issue/SKILL.md)) — and are never `verified`. A design
+finding goes to Design Desk only on the operator's "send D-`<k>` to design", or by
+`ux_handoff: auto` for a judge-confirmed field finding ([ux-signals.md](ux-signals.md) → **6. Handoff to Design Desk**). Security findings keep their own private report
 ([security.md](security.md)).
 
 ## Feature focus
@@ -127,7 +134,8 @@ map. For each queued area, on the candidate:
 
 ## Cost
 
-Off, a module costs nothing: the Precheck declines the run. `ui-sweep`'s checks, `stress`
+Off, a module costs nothing: the Precheck declines the run. `ux-signals` costs nothing while
+its data has nothing new; a replay is ≈ 30–80k tokens per candidate ([ux-signals.md](ux-signals.md) → Cost). `ui-sweep`'s checks, `stress`
 and the dashboard are scripts (no tokens); the model review of `ui-sweep` is at most
 `ui_sweep_review_pages` screenshots per run (≈ 3–5k tokens each); `validation` runs without
 model steps; a focus is like one issue's explorations (100–300k tokens).

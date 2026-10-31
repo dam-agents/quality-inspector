@@ -701,18 +701,28 @@ mode_security() {
 # The testing modules of the `modules` run (docs/modules.md): each switched-on module once per
 # candidate (`weekly`: at most once in 7 days) keyed on `ran module=<id> candidate=` in
 # MODULES.log, plus the queued feature-focus areas. The decision lives in modules.sh due.
+# ux-signals is due by its data instead: ux-signals.mjs check fetches the period when its cadence
+# says so (a cache under work/ux/) and is due while a signal above the thresholds is not
+# evaluated on its build, or an open field finding has gone quiet (docs/ux-signals.md).
 mode_modules() {
-  local versions candidate baseline d inv budget
+  local versions candidate baseline d inv budget ux='null'
   d="$(bash "$SCRIPT_DIR/modules.sh" due 2>/dev/null)" || fail_out "modules.sh due failed"
   if [ "$(jq -r '(.on | length) + (.focus | length)' <<<"$d")" = 0 ]; then
     log "no testing module is switched on and no focus is queued"; runlog MODULES "skip=disabled"
     jq -nc --argjson logs "$(logs_json)" '{mode:"modules", nothing_to_do:true, logs:$logs}'; return
+  fi
+  if jq -e '.on | index("ux-signals")' <<<"$d" >/dev/null; then
+    ux="$(node "$SCRIPT_DIR/ux-signals.mjs" check 2>/dev/null)"
+    jq -e 'type == "object"' <<<"$ux" >/dev/null 2>&1 || ux='{"due":false,"error":"ux-signals.mjs check failed"}'
+    log "ux-signals: $(jq -r '.error // .off // .nodata // .reason // "?"' <<<"$ux")"
+    jq -e '.error' <<<"$ux" >/dev/null && runlog MODULES "ERROR: module=ux-signals $(jq -r '.error' <<<"$ux" | tr -s ' \n' ' ' | cut -c1-160)"
   fi
   env_busy_out MODULES
   versions="$(versions_json 2>/dev/null)" || fail_out "cannot resolve the candidate build"
   candidate="$(printf '%s' "$versions" | jq -r .candidate)"
   baseline="$(printf '%s' "$versions" | jq -r '.baseline // empty')"
   d="$(bash "$SCRIPT_DIR/modules.sh" due "$candidate" 2>/dev/null)" || fail_out "modules.sh due failed"
+  jq -e '.due == true' <<<"$ux" >/dev/null && d="$(jq -c '.due += ["ux-signals"]' <<<"$d")"
   if [ "$(jq -r '(.due | length) + (.focus | length)' <<<"$d")" = 0 ]; then
     log "candidate $candidate: every switched-on module already ran on it, no focus queued"; runlog MODULES "skip=same-candidate candidate=$candidate"
     jq -nc --arg c "$candidate" --argjson logs "$(logs_json)" '{mode:"modules", nothing_to_do:true, candidate:$c, logs:$logs}'; return
@@ -721,10 +731,11 @@ mode_modules() {
   budget="$(reg modules_max_wallclock_min)"; case "$budget" in (''|*[!0-9]*) budget=90;; esac
   log "candidate $candidate: due $(jq -r '.due | join(",")' <<<"$d")$(jq -r 'if (.focus|length) > 0 then " focus " + (.focus | join(",")) else "" end' <<<"$d")"
   runlog MODULES "due candidate=$candidate modules=$(jq -r '.due | join(",")' <<<"$d") focus=$(jq -r '.focus | length' <<<"$d")"
-  jq -nc --arg c "$candidate" --arg b "$baseline" --arg inv "$inv" --argjson d "$d" --argjson budget "$budget" --argjson logs "$(logs_json)" \
+  jq -nc --arg c "$candidate" --arg b "$baseline" --arg inv "$inv" --argjson d "$d" --argjson budget "$budget" --argjson ux "$ux" --argjson logs "$(logs_json)" \
     '{mode:"modules", nothing_to_do:false, candidate:$c, baseline:(if $b == "" then null else $b end),
       modules_due:$d.due, previous:$d.previous, focus:$d.focus,
-      inventory:(if $inv == "" then null else $inv end), max_wallclock_min:$budget, logs:$logs}'
+      inventory:(if $inv == "" then null else $inv end), max_wallclock_min:$budget, logs:$logs}
+      + (if $ux.due == true then {ux_signals: ($ux | {period, scored, new, resolve})} else {} end)'
 }
 
 # ============================================================= RADAR MODE ====

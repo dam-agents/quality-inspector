@@ -83,7 +83,7 @@ e2e_version e2e_web_version e2e_model audit_report log_level media_retention_day
 explorations max_explorations_per_ac auto_promote security_checks security_failed_logins
 confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi
 scenario_discovery scenario_channel profile_scenarios regression_channel max_scenarios_per_run max_scenarios_per_day work_repo test_catalog
-lend_model nested_target live_browser slack_channel slack_tests_per_day slack_report_visibility report_visibility github_login found_label fix_label
+lend_model nested_target live_browser slack_channel slack_tests_per_day slack_report_visibility report_visibility github_login found_label fix_label design_desk_channel
 $(jq -r '[.global, (.modules[] | select(.kind == "modules" or .kind == "queue") | .settings)] | add | keys[]' "$SCRIPT_DIR/lib/modules.json" 2>/dev/null)"
 
 if [ "$STRUCTURE" = 1 ]; then
@@ -194,6 +194,10 @@ if [ -f "$CONFIG" ]; then
   elif printf '%s' "$v" | grep -qE '^[CDG][A-Z0-9]{6,}$'; then ok cfg:scenario_channel "$v"
   else fail cfg:scenario_channel "'$v' is not a Slack conversation id" "set the C…/G…/D… id of a conversation this agent is bound to, or leave it empty"; fi
   enum profile_scenarios "enabled disabled"
+  v="$(cfg design_desk_channel)"
+  if [ -z "$v" ]; then ok cfg:design_desk_channel "empty — no design finding goes to Design Desk"
+  elif printf '%s' "$v" | grep -qE '^[CDG][A-Z0-9]{6,20}$'; then ok cfg:design_desk_channel "$v"
+  else fail cfg:design_desk_channel "'$v' is not a Slack conversation id" "set the C…/G…/D… id of the conversation Design Desk is bound to, or leave it empty"; fi
   v="$(cfg regression_channel)"
   if [ -z "$v" ]; then ok cfg:regression_channel "empty — the nightly summary stays in the chat UI; a black-box breach alert goes to slack_channel"
   elif printf '%s' "$v" | grep -qE '^[CDG][A-Z0-9]{6,}$'; then ok cfg:regression_channel "$v"
