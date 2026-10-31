@@ -88,8 +88,9 @@ retention_sweep() {
   # sweep's comparison; the findings keep their crops.
   while IFS= read -r d; do rm -rf "$d" && n=$((n+1)); done < <(ls -1dt "$WORK"/design/*/shots 2>/dev/null | tail -n +3 \
     | while IFS= read -r d; do [ -n "$(find "$d" -maxdepth 0 -mtime +"$MEDIA_DAYS" 2>/dev/null)" ] && printf '%s\n' "$d"; done)
-  # The design checks' screenshots (docs/design-checks.md): their findings went out in their own run.
-  while IFS= read -r d; do rm -rf "$d" && n=$((n+1)); done < <(find "$WORK/design-checks" -mindepth 2 -maxdepth 3 -type d \( -name shots -o -name crops \) -mtime +"$MEDIA_DAYS" 2>/dev/null)
+  # The design checks' screenshots and pull request builds' maps (docs/design-checks.md): their
+  # findings went out in their own run.
+  while IFS= read -r d; do rm -rf "$d" && n=$((n+1)); done < <(find "$WORK/design-checks" -mindepth 2 -maxdepth 3 -type d \( -name shots -o -name crops -o -name map \) -mtime +"$MEDIA_DAYS" 2>/dev/null)
   find "$WORK/design-checks/radar" -mindepth 2 -maxdepth 2 -type f -name '*.png' -mtime +"$MEDIA_DAYS" -delete 2>/dev/null
   [ "$n" -gt 0 ] && log "retention: removed $n media directories older than ${MEDIA_DAYS}d"
   return 0

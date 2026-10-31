@@ -12,6 +12,9 @@ old "$WORK_DIR/security/c1/report/media"; touch "$WORK_DIR/security/c1/artifact.
 # UI sweep shots: the two newest builds stay for the next comparison, older ones past the window go.
 mkdir -p "$WORK_DIR/design/b1/shots" "$WORK_DIR/design/b2/shots" "$WORK_DIR/design/b3/shots"
 touch -t 202001010000 "$WORK_DIR/design/b1/shots"; touch -t 202001020000 "$WORK_DIR/design/b2/shots"; touch -t 202001030000 "$WORK_DIR/design/b3/shots"
+# The design checks: an old pull request build's map and shots go, a fresh map stays.
+old "$WORK_DIR/design-checks/pr-812/b9/map"; old "$WORK_DIR/design-checks/pr-812/b9/shots"
+mkdir -p "$WORK_DIR/design-checks/pr-813/b10/map"
 out="$(bash "$SCRIPTS/preflight.sh" issues)"
 [ ! -d "$WORK_DIR/design/b1/shots" ] || { echo "  an old third sweep's shots kept"; FAILED=1; }
 [ -d "$WORK_DIR/design/b2/shots" ] && [ -d "$WORK_DIR/design/b3/shots" ] || { echo "  the two newest sweeps' shots deleted"; FAILED=1; }
@@ -20,5 +23,7 @@ out="$(bash "$SCRIPTS/preflight.sh" issues)"
 [ ! -d "$WORK_DIR/issues/1/report-a-c/media" ] || { echo "  delivered old media kept"; FAILED=1; }
 [ -d "$WORK_DIR/issues/2/report-b-c/media" ] || { echo "  undelivered evidence deleted"; FAILED=1; }
 [ ! -d "$WORK_DIR/security/c1/report/media" ] || { echo "  delivered old security media kept"; FAILED=1; }
-assert "sweep is logged" '.logs | map(select(test("retention: removed 4"))) | length == 1' "$out"
+[ ! -d "$WORK_DIR/design-checks/pr-812/b9/map" ] && [ ! -d "$WORK_DIR/design-checks/pr-812/b9/shots" ] || { echo "  an old pull request build's map or shots kept"; FAILED=1; }
+[ -d "$WORK_DIR/design-checks/pr-813/b10/map" ] || { echo "  a fresh pull request build's map deleted"; FAILED=1; }
+assert "sweep is logged" '.logs | map(select(test("retention: removed 6"))) | length == 1' "$out"
 exit $FAILED
