@@ -88,6 +88,9 @@ retention_sweep() {
   # sweep's comparison; the findings keep their crops.
   while IFS= read -r d; do rm -rf "$d" && n=$((n+1)); done < <(ls -1dt "$WORK"/design/*/shots 2>/dev/null | tail -n +3 \
     | while IFS= read -r d; do [ -n "$(find "$d" -maxdepth 0 -mtime +"$MEDIA_DAYS" 2>/dev/null)" ] && printf '%s\n' "$d"; done)
+  # The design checks' screenshots (docs/design-checks.md): their findings went out in their own run.
+  while IFS= read -r d; do rm -rf "$d" && n=$((n+1)); done < <(find "$WORK/design-checks" -mindepth 2 -maxdepth 3 -type d \( -name shots -o -name crops \) -mtime +"$MEDIA_DAYS" 2>/dev/null)
+  find "$WORK/design-checks/radar" -mindepth 2 -maxdepth 2 -type f -name '*.png' -mtime +"$MEDIA_DAYS" -delete 2>/dev/null
   [ "$n" -gt 0 ] && log "retention: removed $n media directories older than ${MEDIA_DAYS}d"
   return 0
 }
@@ -433,6 +436,11 @@ mode_audit() {
   if [ -z "$rx" ]; then check radar warn "not measured (radar.mjs check failed)"
   elif [ "$(jq -r .ok <<<"$rx")" != true ]; then check radar fail "work/PRSCAN.md: $(jq -r '.problems | join("; ")' <<<"$rx")"
   else check radar ok "ledger well-formed"; fi
+  # the design checks' ledgers (docs/design-checks.md): PRS.md and SENT.md, each Ref sent once
+  rx="$(node "$SCRIPT_DIR/design-outbox.mjs" check 2>/dev/null)"
+  if [ -z "$rx" ]; then check design_desk warn "not measured (design-outbox.mjs check failed)"
+  elif [ "$(jq -r .ok <<<"$rx")" != true ]; then check design_desk fail "work/design-checks: $(jq -r '.problems | join("; ")' <<<"$rx")"
+  else check design_desk ok "ledgers well-formed"; fi
 
   # coverage of the newest UI map by regression-tier tests — informational, never a fail
   local map cov=null
@@ -701,8 +709,22 @@ mode_security() {
 # The testing modules of the `modules` run (docs/modules.md): each switched-on module once per
 # candidate (`weekly`: at most once in 7 days) keyed on `ran module=<id> candidate=` in
 # MODULES.log, plus the queued feature-focus areas. The decision lives in modules.sh due.
+# The design check of pull requests (docs/design-checks.md) is due per pull request build instead:
+# those carrying design_label, updated in the last 30 days, read through `github.sh prs` (their
+# sanitized text alone) — the merged ones on the candidate, the open ones on their own builds from the
+# profile — design-check.mjs due.
+design_checks_due() { # <candidate>
+  local tmp out
+  [ -n "$TARGET" ] || { jq -nc '{due:[], waiting:[], logs:["target_repo is not configured — no pull request is read"]}'; return; }
+  tmp="$(mktemp /tmp/quality-inspector-design.XXXXXX)" || { jq -nc '{due:[], waiting:[], logs:["no temp file for the pull request listing"]}'; return; }
+  if ! bash "$SCRIPT_DIR/github.sh" prs --since "$(epoch2iso $((NOW_EPOCH - 30*86400)))" > "$tmp" 2>/dev/null; then
+    rm -f "$tmp"; jq -nc '{due:[], waiting:[], logs:["cannot list the target'"'"'s pull requests (github.sh prs) — no design check this run"]}'; return
+  fi
+  out="$(node "$SCRIPT_DIR/design-check.mjs" due "$tmp" --candidate "$1" 2>/dev/null)"; rm -f "$tmp"
+  jq -ce 'select(.due and .waiting)' <<<"$out" 2>/dev/null || jq -nc '{due:[], waiting:[], logs:["design-check.mjs due failed (work/design-checks/PRS.md)"]}'
+}
 mode_modules() {
-  local versions candidate baseline d inv budget
+  local versions candidate baseline d inv budget dc='{"due":[],"waiting":[],"logs":[]}' l
   d="$(bash "$SCRIPT_DIR/modules.sh" due 2>/dev/null)" || fail_out "modules.sh due failed"
   if [ "$(jq -r '(.on | length) + (.focus | length)' <<<"$d")" = 0 ]; then
     log "no testing module is switched on and no focus is queued"; runlog MODULES "skip=disabled"
@@ -713,6 +735,11 @@ mode_modules() {
   candidate="$(printf '%s' "$versions" | jq -r .candidate)"
   baseline="$(printf '%s' "$versions" | jq -r '.baseline // empty')"
   d="$(bash "$SCRIPT_DIR/modules.sh" due "$candidate" 2>/dev/null)" || fail_out "modules.sh due failed"
+  if jq -e '.on | index("design-check")' <<<"$d" >/dev/null; then
+    dc="$(design_checks_due "$candidate")"
+    while IFS= read -r l; do log "$l"; done < <(jq -r '.logs[], (.waiting[] | "PR #\(.pr) waits: \(.reason)")' <<<"$dc")
+    jq -e '.due | length > 0' <<<"$dc" >/dev/null && d="$(jq -c '.due += ["design-check"]' <<<"$d")"
+  fi
   if [ "$(jq -r '(.due | length) + (.focus | length)' <<<"$d")" = 0 ]; then
     log "candidate $candidate: every switched-on module already ran on it, no focus queued"; runlog MODULES "skip=same-candidate candidate=$candidate"
     jq -nc --arg c "$candidate" --argjson logs "$(logs_json)" '{mode:"modules", nothing_to_do:true, candidate:$c, logs:$logs}'; return
@@ -720,10 +747,10 @@ mode_modules() {
   inv="$WORK/inventory/$candidate/inventory.json"; [ -f "$inv" ] || inv=""
   budget="$(reg modules_max_wallclock_min)"; case "$budget" in (''|*[!0-9]*) budget=90;; esac
   log "candidate $candidate: due $(jq -r '.due | join(",")' <<<"$d")$(jq -r 'if (.focus|length) > 0 then " focus " + (.focus | join(",")) else "" end' <<<"$d")"
-  runlog MODULES "due candidate=$candidate modules=$(jq -r '.due | join(",")' <<<"$d") focus=$(jq -r '.focus | length' <<<"$d")"
-  jq -nc --arg c "$candidate" --arg b "$baseline" --arg inv "$inv" --argjson d "$d" --argjson budget "$budget" --argjson logs "$(logs_json)" \
+  runlog MODULES "due candidate=$candidate modules=$(jq -r '.due | join(",")' <<<"$d") focus=$(jq -r '.focus | length' <<<"$d") prs=$(jq -r '[.due[].prs[]] | join(",")' <<<"$dc")"
+  jq -nc --arg c "$candidate" --arg b "$baseline" --arg inv "$inv" --argjson d "$d" --argjson dc "$dc" --argjson budget "$budget" --argjson logs "$(logs_json)" \
     '{mode:"modules", nothing_to_do:false, candidate:$c, baseline:(if $b == "" then null else $b end),
-      modules_due:$d.due, previous:$d.previous, focus:$d.focus,
+      modules_due:$d.due, previous:$d.previous, focus:$d.focus, design_checks_due:$dc.due,
       inventory:(if $inv == "" then null else $inv end), max_wallclock_min:$budget, logs:$logs}'
 }
 
@@ -855,7 +882,8 @@ TITLE_JQ='
     elif .mode == "security" then "Run security checks" + on
     elif .mode == "modules" then
       "Run modules" + on + some([(.modules_due // [])[] | safe | select(.)]
-        + ((.focus // []) | length | if . > 0 then [count(.; "focus area")] else [] end))
+        + ((.focus // []) | length | if . > 0 then [count(.; "focus area")] else [] end)
+        + [(.design_checks_due // [])[] | (.prs // [])[] | numbers | "PR #" + tostring])
     elif .mode == "radar" then
       [(.prs_due // [])[] | (.pr | numbers | "PR #" + tostring) as $p
         | ({closed: "Close ", merged: "Track "}[.kind] // "Scan ") + $p] | few("Change radar")

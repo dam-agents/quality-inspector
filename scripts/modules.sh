@@ -10,7 +10,9 @@
 #                                           what the dashboard shows
 #   modules.sh due [<candidate>]           {"on":[<id>…], "due":[<id>…], "previous":{<id>:
 #                                           <candidate>|null}, "focus":[<area>…]} — the `modules`
-#                                           run's worklist; without a candidate nothing is due
+#                                           run's worklist; without a candidate nothing is due. A
+#                                           module with `due` in the registry is never due here:
+#                                           the pre-flight asks its own script
 #   modules.sh set <id|global> <key>=<value>…
 #                                          write each key of that module (or `global`) to
 #                                          work/CONFIG.md; refuses a key outside the module, a
@@ -114,11 +116,11 @@ cmd_status() {
 }
 
 cmd_due() {
-  local cand="${1:-}" due='[]' on='[]' prev='{}' id key cadence line last lc le
-  while IFS=$'\t' read -r id key; do
+  local cand="${1:-}" due='[]' on='[]' prev='{}' id key by cadence line last lc le
+  while IFS=$'\t' read -r id key by; do
     cadence="$(value_of "$key" "$(specs "$id" | jq -c --arg k "$key" '.[$k]')")"
     [ "$cadence" = disabled ] || on="$(jq -c --arg id "$id" '. + [$id]' <<<"$on")"
-    [ -n "$cand" ] || continue
+    [ -n "$cand" ] && [ "$by" = candidate ] || continue
     line="$(grep -- " ran module=$id " "$WORK/MODULES.log" 2>/dev/null | tail -1)"
     lc="$(printf '%s' "$line" | grep -o 'candidate=[^ ]*' | head -1 | cut -d= -f2)"
     prev="$(jq -c --arg id "$id" --arg c "$lc" '. + {($id): (if $c == "" then null else $c end)}' <<<"$prev")"
@@ -128,7 +130,7 @@ cmd_due() {
               if [ "$lc" != "$cand" ] && { [ -z "$line" ] || [ $((NOW_EPOCH - le)) -ge "$WEEK_S" ]; }; then
                 due="$(jq -c --arg id "$id" '. + [$id]' <<<"$due")"; fi ;;
     esac
-  done < <(jq -r '.modules[] | select(.kind == "modules") | [.id, .switch] | @tsv' "$REG")
+  done < <(jq -r '.modules[] | select(.kind == "modules") | [.id, .switch, (.due // "candidate")] | @tsv' "$REG")
   local focus; focus="$(focus_rows | while IFS= read -r r; do [ "$(cell "$r" 3)" = queued ] && cell "$r" 1; done | jq -R . | jq -sc .)"
   jq -nc --argjson d "$due" --argjson o "$on" --argjson p "$prev" --argjson f "${focus:-[]}" '{on:$o, due:$d, previous:$p, focus:$f}'
 }

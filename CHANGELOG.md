@@ -7,6 +7,26 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.52.0 — 2026-10-31
+
+**Upgrade:**
+1. Nothing to run — docs are re-read per run; off by default, both cost nothing. Two testing modules
+   join the modules run ([docs/design-checks.md](docs/design-checks.md)): the inconsistency radar
+   (`consistency_radar`; `weekly` is enough) and the design check of each pull request that carries
+   `design_label` (default `qa:design`) — on the first main build after its merge, or before it on its
+   own build where the profile names one (`bin/versions --prs`; the helm-k3s engine reads
+   `engine_config.pull_requests`, [docs/profile-contract.md](docs/profile-contract.md)) — (`design_checks`).
+   Offer them to the operator (`module consistency set consistency_radar=weekly`, `module design-check
+   set design_checks=enabled`); never switch them on yourself. The product's repository labels its UI
+   pull requests. Cost when on: about a minute per changed screen (a pull request's own build adds an
+   install, 15–25 min), the radar a few seconds per screen — no model step in either.
+2. Opt-in, off: `design_desk_findings: enabled` with `design_desk_channel` (the Slack conversation the
+   Design Desk agent listens in) and `design_desk_bot` (its bot's `U…` id) sends each design finding
+   once, as an automated test finding, at most `design_desk_max_per_run` (5) a run at or above
+   `design_desk_min_severity` (`medium`). Offer it only where a Design Desk agent runs; then
+   `bash "$HOME/scripts/verify-onboarding.sh" --config`. Up to 5 screenshots a run to look at (≈ 3–5k
+   tokens each).
+
 ## 3.51.0 — 2026-10-30
 
 **Upgrade:**

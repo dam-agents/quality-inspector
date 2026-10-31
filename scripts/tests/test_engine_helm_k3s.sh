@@ -74,6 +74,17 @@ assert "adjacent builds" '. == []' "$(vb quay 0.0.0-main.11 0.0.0-main.12)"
 vb oci 0.0.0-main.7 0.0.0-main.99 >/dev/null && { echo "  --between an unknown build must fail"; FAILED=1; }
 vb oci 1.0.0 0.0.0-main.10 >/dev/null && { echo "  --between two channels must fail"; FAILED=1; }
 vb oci 0.0.0-main.10 0.0.0-main.7 >/dev/null && { echo "  --between a reversed pair must fail"; FAILED=1; }
+# --prs (docs/design-checks.md): each pull request's newest build by pull_requests.tag, never another
+# pull request's (812 is not 8121); none -> null; without pull_requests -> exit 2.
+cp "$STUB_DIR/quay.json" "$SANDBOX/quay.json.orig"
+echo '{"tags":[{"name":"0.0.0-pr.8121.1","start_ts":650},{"name":"0.0.0-pr.812.3","start_ts":600},{"name":"0.0.0-main.12","start_ts":500},{"name":"0.0.0-pr.812.2","start_ts":450}],"has_additional":false}' > "$STUB_DIR/quay.json"
+PRC='.pull_requests = {tag: "^0\\.0\\.0-pr\\.{pr}\\.[0-9]+$", order: "numeric-suffix"}'
+vpr() { PATH="$SANDBOX/bin:$PATH" QI_ENGINE_CONFIG="$(cfg quay | jq -c "$1")" QI_PROFILE_CONFIG='{"img":"x","mock":""}' \
+        QI_CANDIDATE_CHANNEL="" QI_BASELINE_CHANNEL="" bash "$ENG/bin/versions" --prs "${@:2}" 2>/dev/null; }
+assert "--prs: the newest build of each pull request" '. == {"812":"0.0.0-pr.812.3","815":null}' "$(vpr "$PRC" 812 815)"
+vpr '.' 812 >/dev/null; assert_eq "--prs without pull_requests: exit 2" 2 "$?"
+vpr "$PRC" '1;x' >/dev/null; assert_eq "--prs refuses what is not a number" 1 "$?"
+cp "$SANDBOX/quay.json.orig" "$STUB_DIR/quay.json"
 # env.sh between: a profile whose bin/versions ignores --between counts as not implemented (exit 2).
 stub_profile
 bash "$SCRIPTS/env.sh" between a b >/dev/null 2>&1; assert_eq "no --between -> exit 2" 2 "$?"
@@ -227,6 +238,10 @@ c "$(cfg oci | jq -c '.channels.main.order = "time"')" | grep -q "^FAIL channel 
   || { echo "  check: order time needs quay"; FAILED=1; }
 c "$(cfg oci | jq -c '.credentials.users = {}')" | grep -q '^FAIL credentials.users.owner' \
   || { echo "  check: the owner account is required"; FAILED=1; }
+c "$(cfg oci | jq -c '.pull_requests = {tag: "^0-pr-[0-9]+$", order: "numeric-suffix"}')" | grep -q '^FAIL pull_requests: needs a tag regex with {pr}' \
+  || { echo "  check: a pull request tag needs {pr}"; FAILED=1; }
+c "$(cfg oci | jq -c '.pull_requests = {tag: "^0-pr-{pr}-[0-9]+$", order: "time"}')" | grep -q '^FAIL pull_requests: order time needs registry_api quay' \
+  || { echo "  check: a pull request order time needs quay"; FAILED=1; }
 out="$(c "$(cfg oci | jq -c '.kvm = true | .host_dirs = ["/var/lib/vm-images"]')")"; rc=$?
 assert_eq "check: kvm and host_dirs are known keys" "0 " "$rc $(grep -E '^FAIL|unknown key' <<<"$out")"
 c "$(cfg oci | jq -c '.kvm = "yes"')" | grep -q '^FAIL kvm must be true or false' \
