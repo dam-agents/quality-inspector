@@ -73,6 +73,7 @@ assert "resolve: a release id is its own tag" '. == {"build":"1.2.0"}' "$(rv 1.2
 assert "resolve: a main build is the newest tag whose chart has that appVersion" '. == {"build":"0.0.0-main.9"}' "$(rv 0.2.25-dev-1a2b3c4d5e6f)"
 assert "resolve: appVersions kept per tag" '.["0.0.0-main.10"] == "0.2.26-dev-ffffffffffff" and .["0.0.0-main.9"] == "0.2.25-dev-1a2b3c4d5e6f"' "$(cat "$SANDBOX/rv/app-versions.json")"
 assert "resolve: kept appVersions need no registry read" '. == {"build":"0.0.0-main.9"}' "$(STUB_MANIFEST_FAIL=1 rv 0.2.25-dev-1a2b3c4d5e6f)"
+( export STUB_MANIFEST_FAIL=1; rv 0.2.99-dev-000000000000 >/dev/null ); assert_eq "resolve: metadata it cannot read -> exit 3, not 'none published'" 3 "$?"
 rv 0.2.99-dev-000000000000 >/dev/null; assert_eq "resolve: no published chart has it -> exit 1, never a near build" 1 "$?"
 vb() { PATH="$SANDBOX/bin:$PATH" QI_ENGINE_CONFIG="$(cfg "$1")" QI_PROFILE_CONFIG='{"img":"x","mock":""}' \
        QI_CANDIDATE_CHANNEL="" QI_BASELINE_CHANNEL="" bash "$ENG/bin/versions" --between "$2" "$3" 2>/dev/null; }

@@ -40,7 +40,8 @@
 #   env.sh resolve <build>       read-only: the profile's `bin/versions --resolve` — {"build":
 #                                <installable id>, "how": exact|mapped|as-is}; `as-is` when the
 #                                profile does not implement it; exit 1 when no published build
-#                                is <build> (docs/profile-contract.md → `bin/versions --resolve`)
+#                                is <build>, 3 when it could not look (docs/profile-contract.md →
+#                                `bin/versions --resolve`)
 #
 # `up` and `reset` keep their whole output in work/env/last-<cmd>.log (mode 600, never backed
 # up): the evidence of an environment failure (docs/nested-env.md → Failures).
@@ -180,7 +181,8 @@ cmd_resolve() { # <build>
     jq -nc --arg b "$b" --arg r "$1" '{build:$b, how:(if $b == $r then "exact" else "mapped" end)}'
   elif [ "$rc" = 2 ] || [ "$rc" = 0 ]; then
     jq -nc --arg r "$1" '{build:$r, how:"as-is"}'  # not implemented: the reported id is the build
-  else return 1; fi
+  elif [ "$rc" = 1 ]; then return 1
+  else return 3; fi
 }
 
 # An install needs room for images and data: refuse `up` below min_free_disk_gi free on

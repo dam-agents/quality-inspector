@@ -174,7 +174,8 @@ Every executable runs with cwd `$HOME/work`, and with:
 - `bin/versions --resolve <build>` — **optional** → stdout `{"build": "<id>"}`: the build `bin/env
   up` installs for a build id the product reports itself (its usage data, `ux_signals` below) —
   the id itself when it is one, else the published build that is it (helm-k3s: the newest channel
-  tag whose chart `appVersion` is `<build>`). Exit 1 when none is published — never a near build.
+  tag whose chart `appVersion` is `<build>`). Exit 1 when none is published — never a near build;
+  exit 3 when it could not look (the registry did not answer).
   Not implemented → exit 2 (output without `build` counts the same): the reported id is used as
   it is. `scripts/env.sh resolve <build>` calls it.
 - `bin/build-time <build>` → stdout one ISO-8601 UTC timestamp, the moment the build was

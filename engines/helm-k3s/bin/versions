@@ -11,21 +11,23 @@
 #                                     is one, else the newest channel tag whose chart appVersion is
 #                                     <build>, of the newest `resolve_max_tags` (50) per channel.
 #                                     appVersions are kept in $QI_ENV_DIR/app-versions.json (a tag's
-#                                     chart never changes). Exit 1: no published chart matches.
+#                                     chart never changes). Exit 1: no published chart matches;
+#                                     exit 3: it could not look (a listing or a chart's metadata).
 set -u
 export LC_ALL=C
 . "$(dirname "$0")/../lib/common.sh"
 . "$ENGINE_DIR/lib/registry.sh"
-CFG="$(engine_config)" || exit 1
+RESOLVE=""; [ "${1:-}" = --resolve ] && RESOLVE="${2:-}"
+failed() { echo "$1" >&2; [ -n "$RESOLVE" ] && exit 3; exit 1; }
+CFG="$(engine_config)" || failed "no engine configuration"
 CHART="$(jq -r .chart <<<"$CFG")"; API="$(jq -r '.registry_api // "oci"' <<<"$CFG")"
 CC="${QI_CANDIDATE_CHANNEL:-$(jq -r '.default_candidate // empty' <<<"$CFG")}"
 BC="${QI_BASELINE_CHANNEL:-$(jq -r '.default_baseline // "none"' <<<"$CFG")}"
-jq -e --arg c "$CC" '.channels[$c]' <<<"$CFG" >/dev/null || { echo "unknown candidate channel '$CC'" >&2; exit 1; }
-[ "$BC" = none ] || jq -e --arg c "$BC" '.channels[$c]' <<<"$CFG" >/dev/null || { echo "unknown baseline channel '$BC'" >&2; exit 1; }
+jq -e --arg c "$CC" '.channels[$c]' <<<"$CFG" >/dev/null || failed "unknown candidate channel '$CC'"
+[ "$BC" = none ] || jq -e --arg c "$BC" '.channels[$c]' <<<"$CFG" >/dev/null || failed "unknown baseline channel '$BC'"
 read -r HOST REPO < <(ref_parts "$CHART")
-FROM=""; TO=""; RESOLVE=""
-if [ "${1:-}" = --resolve ]; then
-  RESOLVE="${2:-}"
+FROM=""; TO=""
+if [ -n "$RESOLVE" ]; then
   printf '%s' "$RESOLVE" | grep -qE '^[A-Za-z0-9][A-Za-z0-9._+-]{0,79}$' || { echo "usage: versions --resolve <build>" >&2; exit 1; }
 fi
 if [ "${1:-}" = --between ]; then
@@ -46,15 +48,15 @@ TAGS=""
 if [ "$API" = quay ]; then
   for p in $(seq 1 "$(jq -r '.max_pages // 30' <<<"$CFG")"); do
     page="$(curl -fsS --max-time 20 "https://quay.io/api/v1/repository/$REPO/tag/?limit=100&onlyActiveTags=true&page=$p")" \
-      || { echo "quay listing failed for $REPO" >&2; exit 1; }
+      || failed "quay listing failed for $REPO"
     rows="$(jq -r '.tags[]? | "\(.name) \(.start_ts // 0)"' <<<"$page")" \
-      || { echo "quay listing page $p is not JSON for $REPO" >&2; exit 1; }
+      || failed "quay listing page $p is not JSON for $REPO"
     TAGS="$TAGS$rows"$'\n'
     [ "$(printf '%s' "$TAGS" | need)" = true ] && break
     [ "$(jq -r '.has_additional // false' <<<"$page")" = true ] || break
   done
 else
-  TAGS="$(tags_oci "$HOST" "$REPO")" || { echo "OCI tag listing failed for $HOST/$REPO" >&2; exit 1; }
+  TAGS="$(tags_oci "$HOST" "$REPO")" || failed "OCI tag listing failed for $HOST/$REPO"
 fi
 
 if [ -n "$RESOLVE" ]; then
@@ -71,17 +73,18 @@ if [ -n "$RESOLVE" ]; then
           elif $d.order == "numeric-suffix" then sort_by(.name | capture("(?<n>[0-9]+)$").n | tonumber)
           else sort_by(.ts) end
         | reverse | .[:($CFG.resolve_max_tags // 50)][] | .name] | .[]')"
-  hit=""
+  hit=""; unread=0
   while IFS= read -r tag; do
     [ -n "$tag" ] || continue
     av="$(jq -r --arg t "$tag" '.[$t] // empty' <<<"$known")"
     if [ -z "$av" ]; then
-      av="$(app_version "$HOST" "$REPO" "$tag")" || { echo "no chart metadata for $tag" >&2; continue; }
+      av="$(app_version "$HOST" "$REPO" "$tag")" || { unread=$((unread + 1)); continue; }
       known="$(jq -c --arg t "$tag" --arg v "$av" '. + {($t): $v}' <<<"$known")"
     fi
     [ "$av" = "$RESOLVE" ] && { hit="$tag"; break; }
   done <<<"$order"
   mkdir -p "$(dirname "$CACHE")" 2>/dev/null && printf '%s\n' "$known" > "$CACHE.tmp" && mv "$CACHE.tmp" "$CACHE"
+  [ -n "$hit" ] || [ "$unread" = 0 ] || failed "the chart metadata of $unread tag(s) could not be read"
   [ -n "$hit" ] || { echo "no published chart has appVersion $RESOLVE" >&2; exit 1; }
   jq -nc --arg b "$hit" '{build:$b}'; exit 0
 fi

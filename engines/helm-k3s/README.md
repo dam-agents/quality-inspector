@@ -51,7 +51,7 @@ release `1.4.0`), else the newest tag of a channel, the candidate channel first,
 `appVersion` from each tag's manifest and config blob — the Chart.yaml Helm stores there — over
 the registry's `/v2`, the requests `helm pull` makes for an install, so it needs no egress of its
 own; at most `resolve_max_tags` tags per channel, each read once (`$QI_ENV_DIR/app-versions.json`).
-No match → exit 1, never a near build.
+No match → exit 1, never a near build; a listing or a chart's metadata it could not read → exit 3.
 
 ## Prerequisites
 

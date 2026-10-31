@@ -76,10 +76,12 @@ request), `evidence_dir`, and its trails with every step's page.
 
 Each entry's `install` is the build that is the reported one, as the profile installs it
 (`env.sh resolve` → `bin/versions --resolve`, [profile-contract.md](profile-contract.md); helm-k3s
-maps an `appVersion` such as `0.2.25-dev-1a2b3c4d5e6f` to its chart tag). `install: null` — no
+maps an `appVersion` such as `0.2.25-dev-1a2b3c4d5e6f` to its chart tag). `installable: false` — no
 published build is it: never replay it on another build. Its field entry is
 `{class: "not-reproduced", saw: <install_note>}` with no judge, and one line in
 `work/MODULES.log`: `<ISO> WARN: module=ux-signals build=<build> not installable`.
+`installable: null` — the lookup failed (the registry did not answer): skip the candidate this run,
+so it stays due, with `<ISO> ERROR: module=ux-signals build=<build> lookup failed` there.
 
 Per `install` of the plan, under `env.sh lock modules`: `env.sh up <install>` — **the build the
 users ran**, never the candidate — then per candidate on it:

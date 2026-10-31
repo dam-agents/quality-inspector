@@ -18,7 +18,8 @@
 //       -> [{fingerprint, signal, route, element, build, install, install_note, users, rate, …,
 //          evidence, trails}] the candidates not evaluated on their build yet, at most N
 //          (`ux_max_candidates`). `install`: the build env.sh up installs for the reported one
-//          (env.sh resolve); null when none is published — `install_note` says why
+//          (env.sh resolve); null when none is published (`installable: false`) or the lookup
+//          failed (`installable: null`, try again next run) — `install_note` says which
 //   node ux-signals.mjs report <scored.json>   -> <dir>/report/index.html + media/ (the usage report)
 //   node ux-signals.mjs handoff D-<k> [--sent] -> {id, channel, text, attachment, ref} for Design Desk's
 //          Slack intake; --sent records it in work/ux/HANDOFF.md. Exit 2: not eligible, or sent.
@@ -274,8 +275,10 @@ function plan(file) {
     if (!installs.has(b)) {
       const r = spawnSync('bash', [join(here, 'env.sh'), 'resolve', b], { env: { ...process.env, WORK_DIR: WORK }, encoding: 'utf8', timeout: 120000 });
       let x = null; try { x = JSON.parse(r.stdout); } catch { /* below */ }
-      installs.set(b, r.status === 0 && BUILD.test(String(x?.build ?? '')) ? { install: x.build, install_note: x.how === 'mapped' ? `build ${b} is chart ${x.build}` : null }
-        : { install: null, install_note: `build ${b} not installable: ${str(r.stderr, 200) || `env.sh resolve exited ${r.status}`}` });
+      const why = str(r.stderr, 200) || `env.sh resolve exited ${r.status}`;
+      installs.set(b, r.status === 0 && BUILD.test(String(x?.build ?? '')) ? { install: x.build, installable: true, install_note: x.how === 'mapped' ? `build ${b} is chart ${x.build}` : null }
+        : r.status === 1 ? { install: null, installable: false, install_note: `build ${b} not installable: ${why}` }
+        : { install: null, installable: null, install_note: `build ${b} could not be looked up: ${why}` });
     }
     return installs.get(b);
   };

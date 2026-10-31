@@ -40,7 +40,7 @@ J
 cat > "$QI_PROFILE_DIR/bin/versions" <<'S'
 #!/usr/bin/env bash
 if [ "${1:-}" = --resolve ]; then
-  case "$2" in 1.5.0) echo '{"build":"0.0.0-main.12"}';; *) echo "no published chart has appVersion $2" >&2; exit 1;; esac; exit 0
+  case "$2" in 1.5.0) echo '{"build":"0.0.0-main.12"}';; 1.3.0) echo "registry down" >&2; exit 3;; *) echo "no published chart has appVersion $2" >&2; exit 1;; esac; exit 0
 fi
 jq -c . "$STUB_DIR/versions.json"
 S
@@ -92,7 +92,10 @@ assert "the plan: the top candidate, its pages from the UI map, the chart its bu
    and .[0].build == "1.5.0" and .[0].install == "0.0.0-main.12" and .[0].install_note == "build 1.5.0 is chart 0.0.0-main.12"' "$r"
 r="$(node "$UXS" plan "$P1/scored.json" --inventory "$SANDBOX/inv.json")"
 assert "a build no published chart is: no install, said why (signal-only)" \
-  '.[1].build == "1.4.0" and .[1].install == null and (.[1].install_note | test("^build 1.4.0 not installable: .*no published chart has appVersion 1.4.0"))' "$r"
+  '.[1].build == "1.4.0" and .[1].install == null and .[1].installable == false and (.[1].install_note | test("^build 1.4.0 not installable: .*no published chart has appVersion 1.4.0"))' "$r"
+
+bash "$SCRIPTS/env.sh" resolve 1.4.0 >/dev/null 2>&1; assert_eq "env.sh resolve: none published -> 1" 1 "$?"
+bash "$SCRIPTS/env.sh" resolve 1.3.0 >/dev/null 2>&1; assert_eq "env.sh resolve: could not look -> 3, not 'none published'" 3 "$?"
 
 # ---------------------------------------------------------------- field findings
 mkdir -p "$P1/evidence" && printf 'png' > "$P1/evidence/a.png"
