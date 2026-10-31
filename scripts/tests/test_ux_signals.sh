@@ -3,7 +3,7 @@
 # profile's egress), no data as no error, the contract's floor,
 # scoring (trend, a jump after a new build, unused pages and controls), when the modules run is
 # due, field findings in the design register (judge, stable id, resolution after a quiet period
-# on a newer build), the Design Desk handoff message, and the modules pre-flight.
+# on a newer build), the handoff through the design outbox (each Ref once), and the modules pre-flight.
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 seed_work
@@ -116,19 +116,24 @@ assert "the slow request: not-reproduced" '.findings[1] | .id == "D-2" and .fiel
 r="$(node "$UXS" check --now 2026-10-31T09:00:00Z)"
 assert "nothing new once evaluated" '.due == false and .new == 0' "$r"
 
-# ---------------------------------------------------------------- handoff to Design Desk
-r="$(node "$UXS" handoff D-1)"
-assert "Design Desk's intake format, with the numbers in what happens" \
-  '(.text | split("\n")) as $l | $l[0] == "🧪 Automated test finding — Quality Inspector" and $l[1] == "Screen: /assets/:assetId — asset-save"
-   and ($l[2] | test("^What happens: Save does nothing on the first click — 12 users in the period, 30 % of visits \\(last period 5 %\\), a jump right after a new build$"))
-   and $l[4] == "Steps: 1. Open an asset 2. Click Save" and $l[5] == "Build: 1.5.0" and $l[6] == "Check: field:rage_click" and $l[7] == "Severity: high"
-   and $l[8] == "Ref: quality-inspector/D-1" and .channel == "C0DESK123" and (.attachment | endswith("evidence/a.png"))' "$r"
+# ---------------------------------------------------------------- handoff to Design Desk, through the design outbox
+OB="$SCRIPTS/design-outbox.mjs"
+r="$(node "$UXS" handoff D-1)"; F="$(jq -r .file <<<"$r")"; REF="$(jq -r '.refs[0]' <<<"$r")"
+assert "the finding goes to the outbox under a stable Ref" '.ids == ["D-1"] and (.refs[0] | test("^qi-field-[0-9a-f]{10}$")) and .refused == []' "$r"
+assert "the outbox's gate: off unless design_desk_findings" '.sending == false and .reason == "design_desk_findings is not enabled" and .ready == 1' "$(node "$OB" plan "$F")"
+printf -- '- design_desk_findings: enabled\n- design_desk_bot: U0DESKBOT1\n' >> "$WORK_DIR/CONFIG.md"
+assert "Design Desk's message, with the numbers in what happens" \
+  '.sending and .channel == "C0DESK123" and (.due[0] | .ref == "'"$REF"'" and .check == "field" and .severity == "high" and (.attachment | endswith("evidence/a.png"))
+   and ((.text | split("\n")) as $l | $l[0] == "🧪 Automated test finding — Quality Inspector" and $l[2] == "Screen: asset-save (/assets/:assetId)"
+   and ($l[3] | test("^What happens: Save does nothing on the first click — 12 users in the period, 30 % of visits \\(last period 5 %\\), a jump right after a new build$"))
+   and $l[5] == "Steps: 1. Open an asset 2. Click Save" and $l[6] == "Build: 1.5.0" and $l[7] == "Check: field" and $l[8] == "Severity: high"
+   and $l[9] == "Ref: '"$REF"'" and $l[10] == "<@U0DESKBOT1>"))' "$(node "$OB" plan "$F")"
 node "$UXS" handoff D-2 >/dev/null; assert_eq "a not-reproduced finding does not go to design" 2 "$?"
 printf -- '- ux_handoff: auto\n' >> "$WORK_DIR/CONFIG.md"
-assert "auto: the confirmed finding is due" '. == ["D-1"]' "$(node "$UXS" handoff-plan)"
-node "$UXS" handoff D-1 --sent >/dev/null
-node "$UXS" handoff D-1 >/dev/null; assert_eq "sent once per build" 2 "$?"
-assert "auto: nothing left" '. == []' "$(node "$UXS" handoff-plan)"
+assert "auto: the confirmed finding is due" '.ids == ["D-1"]' "$(node "$UXS" handoff --auto)"
+node "$OB" record "$REF" --status sent --check field --severity high --build 1.5.0 >/dev/null
+node "$UXS" handoff D-1 >/dev/null; assert_eq "a Ref goes once" 2 "$?"
+assert "auto: nothing left" '.ids == [] and .file == null' "$(node "$UXS" handoff --auto)"
 
 # ---------------------------------------------------------------- quiet on a newer build, then back
 cat > "$SANDBOX/week2.json" <<'J'
@@ -155,7 +160,7 @@ assert "back on a later build: the same id, open again; a second replay of it re
 assert "one signal on two builds: evaluated once, on the newest" '.due == false and .new == 0' "$(node "$UXS" check --now 2026-11-15T09:00:00Z)"
 assert "D-1 reopened with the new numbers" '.findings[0] | .id == "D-1" and .status == "open" and .resolved_build == null and .last_seen == "1.6.0" and .field.class == "ux-friction"' \
   "$(cat "$WORK_DIR/design/findings.json")"
-assert "a new build: it may go to design again" '. == ["D-1"]' "$(node "$UXS" handoff-plan)"
+assert "a new build: its Ref never goes again" '.ids == [] and (.refused == [])' "$(node "$UXS" handoff --auto)"
 
 # ---------------------------------------------------------------- the modules pre-flight
 rm -rf "$WORK_DIR/ux" "$WORK_DIR/design"

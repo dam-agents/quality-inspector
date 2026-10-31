@@ -2892,12 +2892,12 @@ function viewDesign() {
       fld ? h('div', { class: 'meta', title: 'Real users of the install that collects UI usage, in the period of the signal. Only rows with 3 or more users arrive.' },
         `👥 ${num(fld.users)} users · ${pctOf(fld.rate)} of visits${fld.prev_rate != null ? ` (last period ${pctOf(fld.prev_rate)})` : ''} · ${str(fld.class)}`,
         fld.regression ? h('span', { class: 'badge warn', title: 'The rate jumped right after a new build.' }, 'after a new build') : null,
-        d.desk.length ? h('span', { class: 'badge ok', title: `Sent to Design Desk for build ${str(d.desk.at(-1).build)}.` }, 'sent to design') : null) : null,
+        d.desk.length ? h('span', { class: 'badge ok', title: `${d.desk.at(-1).status === 'held' ? 'Held back from' : 'Sent to'} Design Desk on build ${str(d.desk.at(-1).build)}.` }, d.desk.at(-1).status === 'held' ? 'held from design' : 'sent to design') : null) : null,
       h('details', {}, h('summary', {}, 'Details'), h('dl', { class: 'dl' },
         h('dt', {}, 'Element'), h('dd', {}, str(d.target) || '–'), h('dt', {}, 'Source'), h('dd', {}, { sweep: 'UI sweep check', review: 'model review of the screenshot', noticed: 'noticed while testing', field: 'real users (UX signals), replayed by the agent' }[d.source] || str(d.source)),
         fld ? [h('dt', {}, 'Signal'), h('dd', {}, str(fld.signal)), h('dt', {}, 'Class'), h('dd', {}, `${str(fld.class)}${fld.ui ? '' : ' (not a UI defect)'}${fld.judged === false ? ' — the judge did not confirm it' : ''}`),
           h('dt', {}, 'Period'), h('dd', {}, fld.period ? `${str(fld.period.from).slice(0, 10)} to ${str(fld.period.to).slice(0, 10)}` : '–'),
-          h('dt', {}, 'Design Desk'), h('dd', {}, d.desk.length ? d.desk.map((x) => `build ${str(x.build)}, ${rel(x.utc)}`).join('; ') : 'not sent')] : null,
+          h('dt', {}, 'Design Desk'), h('dd', {}, d.desk.length ? d.desk.map((x) => `${x.status === 'held' ? 'held' : 'sent'} on build ${str(x.build)}, ${rel(x.utc)}`).join('; ') : 'not sent')] : null,
         h('dt', {}, 'First seen'), h('dd', {}, d.first_seen ? buildLink(d.first_seen) : '–'), h('dt', {}, 'Last seen'), h('dd', {}, d.last_seen ? buildLink(d.last_seen) : '–'),
         d.resolved_build ? [h('dt', {}, 'Resolved in'), h('dd', {}, buildLink(d.resolved_build))] : null)),
       S.at ? null : h('details', {}, h('summary', {}, '🤖 Manage: category, recheck, discuss, dismiss, report'), h('div', { class: 'actions', style: 'margin-top:6px' },
@@ -2916,7 +2916,7 @@ function viewDesign() {
           ? action('Reopen it', 'This cancels the dismissal. The next sweep then sets the status again.', `reopen ${id}`)
           : h('div', { class: 'action' }, h('b', {}, 'Dismiss it: not a defect'), h('p', {}, 'It goes out of the open list. It stays dismissed on all builds until you reopen it.'),
             h('div', { class: 'row' }, why, prepBtn('Dismiss', () => askAgent(`dismiss ${id} as ${why.value}`, `${ENT.design[1]} ${id}: dismiss it — ${why.selectedOptions[0]?.textContent || why.value}`)))),
-        d.status === 'open' && (!fld || (['bug', 'ux-friction', 'slow'].includes(fld.class) && fld.ui && fld.judged)) && !d.desk.some((x) => x.build === d.last_seen)
+        d.status === 'open' && (!fld || (['bug', 'ux-friction', 'slow'].includes(fld.class) && fld.ui && fld.judged)) && !d.desk.length
           ? action('Send it to Design Desk', 'The agent posts this finding with its screenshot to the Design Desk channel. Design Desk puts it on its queue as a UI bug.', `send ${id} to design`) : null,
         d.status !== 'dismissed' ? issueActions(id, d.severity === 'major' && d.status === 'open') : null)));
   })));

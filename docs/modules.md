@@ -115,11 +115,11 @@ and with `ux-signals` due `ux_signals` (`period`, `scored`, `new`, `resolve`).
    dashboard is the report of this run.
 
 Findings of a module never change an issue verdict, never become a comment or a label (a design
-finding reaches only the Design Desk, opt-in, [design-checks.md](design-checks.md)), never an
+finding reaches only the Design Desk, opt-in, [design-checks.md](design-checks.md); a register
+finding `D-<k>` only on the operator's "send D-`<k>` to design", or by `ux_handoff: auto` for a
+judge-confirmed field finding, [ux-signals.md](ux-signals.md) → **6. Handoff to Design Desk**), never an
 issue on their own — only the operator's "create issue for …" opens one
-([skills/create-issue](../skills/create-issue/SKILL.md)) — and are never `verified`. A design
-finding goes to Design Desk only on the operator's "send D-`<k>` to design", or by
-`ux_handoff: auto` for a judge-confirmed field finding ([ux-signals.md](ux-signals.md) → **6. Handoff to Design Desk**). Security findings keep their own private report
+([skills/create-issue](../skills/create-issue/SKILL.md)) — and are never `verified`. Security findings keep their own private report
 ([security.md](security.md)).
 
 ## Feature focus

@@ -190,7 +190,7 @@ take it out of a collection, and report it as a GitHub issue (`create issue for 
 `… for the architect` when `fix_label` is set). A design finding's card has "Manage":
 categorize it, dismiss it with a reason or reopen it, recheck it (`recheck D-<k>`), discuss it
 with the agent (`discuss D-<k>`, with the person's question when typed), report it, send it to
-Design Desk (`send D-<k> to design`, an open finding not sent for its build yet; a field finding
+Design Desk (`send D-<k> to design`, an open finding whose Ref has not gone yet; a field finding
 only when confirmed — [ux-signals.md](ux-signals.md) → **6. Handoff to Design Desk**); a field
 finding has no recheck.
 **Run it again**, wherever a result shows — each one time on the build that is up, never a

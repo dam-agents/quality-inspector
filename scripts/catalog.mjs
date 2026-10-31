@@ -39,6 +39,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { controlRe, esc, matchable, pageRe } from './lib/match.mjs';
 import { AGENT_RGB, agentBoxes, drawMarks, splitMark } from './lib/shot-mark.mjs';
+import { deskRef } from './lib/ux-field.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
@@ -537,15 +538,16 @@ const DESIGN_KEYS = ['id', 'source', 'check', 'severity', 'suspect', 'pattern', 
 const CATEGORY_RE = /^[a-z0-9][a-z0-9-]{0,29}$/;
 const categoryOf = new Map(rows(join(work, 'design', 'CATEGORIES.md')).filter(([id, c]) => /^D-\d+$/.test(id) && CATEGORY_RE.test(c ?? '')).map(([id, c]) => [id, c]));
 const dismissWhy = new Map(rows(join(work, 'design', 'DISMISSED.md')).filter(([id, , why]) => /^D-\d+$/.test(id) && /^(false-positive|wont-fix|duplicate|by-design)$/.test(why ?? '')).map(([id, , why]) => [id, why]));
-// A field finding's numbers and class (docs/ux-signals.md), and when it went to Design Desk (work/ux/HANDOFF.md).
-const sentTo = rows(join(work, 'ux', 'HANDOFF.md')).filter(([id, build, , utc]) => /^D-\d+$/.test(id) && build && utc);
+// A field finding's numbers and class (docs/ux-signals.md), and its Ref's row in the Design Desk
+// outbox's ledger (work/design-checks/SENT.md): sent, or held back.
+const deskRows = rows(join(work, 'design-checks', 'SENT.md')).filter(([ref, status, , , build, , utc]) => ref && /^(sent|held)$/.test(status ?? '') && build && utc);
 const fieldOf = (x) => (x && typeof x === 'object' ? { class: x.class ?? null, signal: x.signal ?? null, ui: x.ui !== false, users: x.users ?? null,
   rate: x.rate ?? null, prev_rate: x.prev_rate ?? null, trend: x.trend ?? null, regression: !!x.regression, build: x.build ?? null,
   period: x.period ? { from: x.period.from ?? null, to: x.period.to ?? null } : null, judged: x.judge ? x.judge.agree === true : null } : null);
 const design = (readJson(join(work, 'design', 'findings.json'))?.findings ?? []).filter((f) => f && /^D-\d+$/.test(String(f.id)))
   .map((f) => ({ ...Object.fromEntries(DESIGN_KEYS.map((k) => [k, f[k] ?? null])), category: categoryOf.get(f.id) ?? null,
     dismiss_reason: f.status === 'dismissed' ? dismissWhy.get(f.id) ?? null : null, crop: null, _crop: join(work, 'design', 'crops', `${f.id}.jpg`),
-    field: f.source === 'field' ? fieldOf(f.field) : null, desk: sentTo.filter(([id]) => id === f.id).map(([, build, , utc]) => ({ build, utc })) }));
+    field: f.source === 'field' ? fieldOf(f.field) : null, desk: f.fingerprint ? deskRows.filter(([ref]) => ref === deskRef(f)).map(([, status, , , build, , utc]) => ({ status, build, utc })) : [] }));
 // The issues opened from the dashboard's problems (skills/create-issue, work/FOUND.md): per problem
 // its issue's number and address — one issue may stand for several problems.
 const found = rows(join(work, 'FOUND.md')).filter(([ref, issue, url]) => ref && /^#\d+$/.test(issue ?? '') && /^https:\/\/\S+$/.test(url ?? ''))

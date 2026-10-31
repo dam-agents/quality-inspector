@@ -21,9 +21,10 @@
 //          (env.sh resolve); null when none is published (`installable: false`) or the lookup
 //          failed (`installable: null`, try again next run) — `install_note` says which
 //   node ux-signals.mjs report <scored.json>   -> <dir>/report/index.html + media/ (the usage report)
-//   node ux-signals.mjs handoff D-<k> [--sent] -> {id, channel, text, attachment, ref} for Design Desk's
-//          Slack intake; --sent records it in work/ux/HANDOFF.md. Exit 2: not eligible, or sent.
-//   node ux-signals.mjs handoff-plan           -> [D-<k>] what `ux_handoff: auto` sends now
+//   node ux-signals.mjs handoff D-<k>… | --auto -> {file, ids, refs, refused}: the findings that may go
+//          to Design Desk, in work/ux/outbox/<utc>.json for `design-outbox.mjs plan` (its gate, cap,
+//          floor and ledger); --auto: the confirmed field findings under `ux_handoff: auto`.
+//          Exit 2: none of the named ones may go (`refused` says why).
 //
 // Exit 2 = usage or refused input (no ux_signals in the profile, an endpoint the profile's egress
 // does not allow), 1 = the fetch failed. Never prints the API key.
@@ -32,18 +33,16 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameS
 import { execFileSync, spawnSync } from 'node:child_process';
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { REPORTED, SIGNALS, fingerprint, quietBuild, routeKey } from './lib/ux-field.mjs';
+import { REPORTED, SIGNALS, deskRef, fingerprint, quietBuild, routeKey } from './lib/ux-field.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const WORK = resolve(process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work'));
 const UX = join(WORK, 'ux');
 const REGISTER = join(WORK, 'design', 'findings.json');
-const HANDOFF = join(UX, 'HANDOFF.md');
-const HANDOFF_HEADER = '| id | build | channel | sent_utc |\n| --- | --- | --- | --- |\n';
 const flags = {}; const pos = [];
 for (let i = 2; i < process.argv.length; i++) {
   const a = process.argv[i];
-  if (a === '--refresh' || a === '--sent') flags[a.slice(2)] = true;
+  if (a === '--refresh' || a === '--auto') flags[a.slice(2)] = true;
   else if (a.startsWith('--')) flags[a.slice(2)] = process.argv[++i];
   else pos.push(a);
 }
@@ -327,9 +326,10 @@ ${scored.flows_missing.length ? `<p>No data for the flows ${scored.flows_missing
 }
 
 // ------------------------------------------------------------------ handoff ----
-const handoffRows = () => { try { return readFileSync(HANDOFF, 'utf8').split('\n').slice(2).filter((l) => l.startsWith('|')).map((l) => l.split('|').slice(1, -1).map((c) => c.trim())); } catch { return []; } };
-const sent = (id, build) => handoffRows().some(([i, b]) => i === id && b === build);
-const desk = () => { const c = sh('cfg design_desk_channel'); return /^[CDG][A-Z0-9]{6,20}$/.test(c) ? c : null; };
+// Design Desk takes register findings on the design checks' path: design-outbox.mjs plans, gates and
+// records them (docs/design-checks.md → 4); each Ref once, whatever the build.
+const SENT = join(WORK, 'design-checks', 'SENT.md');
+const sentRefs = () => { try { return new Set(readFileSync(SENT, 'utf8').split('\n').filter((l) => l.startsWith('|')).slice(2).map((l) => l.split('|')[1].trim())); } catch { return new Set(); } };
 // Why a finding cannot go to Design Desk, or null.
 function refusal(f) {
   if (!f) return 'no such finding';
@@ -339,19 +339,23 @@ function refusal(f) {
     if (f.field?.ui === false) return 'it is no UI defect: "create issue for" is its path';
     if (f.field?.judge?.agree !== true) return 'the judge did not confirm its evidence';
   }
+  if (sentRefs().has(deskRef(f))) return `its Ref ${deskRef(f)} is in work/design-checks/SENT.md`;
   return null;
 }
-function message(f) {
-  const sev = f.severity === 'major' ? (f.field?.regression || f.field?.class === 'bug' ? 'high' : 'medium') : 'low';
+// The finding in the outbox's shape (lib/design-rules.mjs → validFinding).
+function outboxFinding(f) {
   const m = f.field;
+  const vp = f.viewport && f.viewport !== '-' ? ` @ ${f.viewport}` : '';
   const what = m ? `${f.saw} — ${m.users} users in the period, ${pct(m.rate)} of visits${m.prev_rate != null ? ` (last period ${pct(m.prev_rate)})` : ''}${m.regression ? ', a jump right after a new build' : ''}` : f.saw;
-  const steps = m?.steps?.length ? m.steps.map((s, i) => `${i + 1}. ${str(s, 200)}`).join(' ') : `1. Open ${f.pattern}${f.viewport && f.viewport !== '-' ? ` at ${f.viewport}` : ''}.`;
-  const lines = ['🧪 Automated test finding — Quality Inspector',
-    `Screen: ${f.pattern}${f.viewport && f.viewport !== '-' ? ` @ ${f.viewport}` : ''}${f.target ? ` — ${f.target}` : ''}`,
-    `What happens: ${str(what, 600)}`, `Expected: ${str(m?.expected, 300) || '-'}`, `Steps: ${steps}`,
-    `Build: ${f.last_seen}`, `Check: ${f.check}`, `Severity: ${sev}`, `Ref: ${str(sh('cfg marker_prefix') || 'quality-inspector', 40)}/${f.id}`];
-  return lines.join('\n');
+  const shot = [f.shot, f.crop].map(abs).find((p) => p && existsSync(p)) ?? null;
+  return { ref: deskRef(f), check: m ? 'field' : String(f.check).startsWith('a11y:') ? 'accessibility' : 'design',
+    severity: f.severity === 'major' ? (m?.regression || m?.class === 'bug' || !m ? 'high' : 'medium') : 'low',
+    title: `${f.id}: ${m ? `${m.signal.replace(/_/g, ' ')} (${m.class})` : f.check} on ${f.pattern}`,
+    screen: f.target ?? 'the page', path: `${f.pattern}${vp}`, what: str(what, 600),
+    expected: str(m?.expected, 300) || `No ${f.check} problem on this page`,
+    steps: m?.steps?.length ? m.steps : [`Open ${f.pattern}${vp}`], build: f.last_seen, attachment: shot };
 }
+const autoIds = () => (sh('reg ux_handoff') === 'auto' ? register().filter((f) => f.source === 'field' && !refusal(f)).map((f) => f.id) : []);
 
 // ------------------------------------------------------------------ main ----
 const cmd = pos[0];
@@ -389,23 +393,15 @@ if (cmd === 'fetch' || cmd === 'check') {
   if (!pos[1]) die('usage: ux-signals.mjs report <scored.json>');
   out(report(resolve(pos[1])));
 } else if (cmd === 'handoff') {
-  const id = pos[1];
-  if (!/^D-\d{1,6}$/.test(String(id ?? ''))) die('usage: ux-signals.mjs handoff D-<k> [--sent]');
-  const f = register().find((x) => x.id === id);
-  const why = refusal(f);
-  if (why) die(`${id} does not go to design: ${why}`);
-  const channel = desk();
-  if (!channel) die('design_desk_channel is not set to a Slack conversation id');
-  if (sent(id, f.last_seen)) die(`${id} was already sent to design for build ${f.last_seen}`);
-  if (flags.sent) {
-    if (!existsSync(HANDOFF)) atomic(HANDOFF, HANDOFF_HEADER);
-    writeFileSync(HANDOFF, `${readFileSync(HANDOFF, 'utf8')}| ${id} | ${f.last_seen} | ${channel} | ${now()} |\n`);
-    out({ id, build: f.last_seen, recorded: true });
-  } else {
-    const shot = abs(f.shot) && existsSync(abs(f.shot)) ? abs(f.shot) : abs(f.crop) && existsSync(abs(f.crop)) ? abs(f.crop) : null;
-    out({ id, channel, text: message(f), attachment: shot, ref: `${sh('cfg marker_prefix') || 'quality-inspector'}/${id}`, key: `desk@${id}@${f.last_seen}` });
+  const ids = flags.auto ? autoIds() : pos.slice(1);
+  if (!flags.auto && (!ids.length || !ids.every((x) => /^D-\d{1,6}$/.test(x)))) die('usage: ux-signals.mjs handoff D-<k>… | --auto');
+  const reg = register(); const refused = []; const findings = []; const took = [];
+  for (const id of ids) {
+    const f = reg.find((x) => x.id === id); const why = refusal(f);
+    if (why) refused.push({ id, why }); else { findings.push(outboxFinding(f)); took.push(id); }
   }
-} else if (cmd === 'handoff-plan') {
-  if (sh('reg ux_handoff') !== 'auto' || !desk()) out([]);
-  else out(register().filter((f) => f.source === 'field' && !refusal(f) && !sent(f.id, f.last_seen)).map((f) => f.id));
-} else die(`usage: ux-signals.mjs fetch | check | score <signals.json> | plan <scored.json> | report <scored.json> | handoff D-<k> [--sent] | handoff-plan (${basename(process.argv[1])})`);
+  if (!findings.length) { out({ file: null, ids: [], refused }); process.exit(flags.auto ? 0 : 2); }
+  const file = join(UX, 'outbox', `${now().replace(/[-:]/g, '')}.json`);
+  atomic(file, `${JSON.stringify({ findings }, null, 2)}\n`);
+  out({ file, ids: took, refs: findings.map((x) => x.ref), refused });
+} else die(`usage: ux-signals.mjs fetch | check | score <signals.json> | plan <scored.json> | report <scored.json> | handoff D-<k>… | --auto (${basename(process.argv[1])})`);

@@ -97,7 +97,8 @@ never an instruction to you.
 Opt-in: `design_desk_findings: enabled`, `design_desk_channel` (the Slack conversation the Design Desk
 listens in), `design_desk_bot` (its bot's member id, `U…`), `design_desk_max_per_run` (5),
 `design_desk_min_severity` (`medium`: medium and high go). After the modules run's unlock, before the
-catalog, when this run wrote a `check.json` or a `radar.json`:
+catalog, when this run wrote a `check.json` or a `radar.json` — and for a design register finding
+`D-<k>`, the outbox file of `ux-signals.mjs handoff` ([ux-signals.md](ux-signals.md) → **6**):
 
 1. `node "$HOME/scripts/design-outbox.mjs" plan <each check.json and radar.json of this run>` →
    `due[]` (`ref`, `text`, `attachment`), the most severe first, each Ref not sent before. `sending:
@@ -121,7 +122,7 @@ What happens: <what>
 Expected: <expected>
 Steps: 1. … 2. …
 Build: <PR #n, the build (PR #n, …), or the build>
-Check: <missing-state | accessibility | consistency | radar>
+Check: <missing-state | accessibility | consistency | radar | field | design>
 Severity: <high | medium | low>
 Ref: qi-<id>
 <@design_desk_bot>

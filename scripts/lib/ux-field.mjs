@@ -1,8 +1,9 @@
 // ux-field.mjs — what ux-signals.mjs and design-findings.mjs both know about a real-user signal
-// (docs/ux-signals.md): its fingerprint, the route pattern it names, and when a field finding is
-// quiet long enough to be resolved.
+// (docs/ux-signals.md): its fingerprint, the route pattern it names, its Design Desk Ref, and when a
+// field finding is quiet long enough to be resolved.
 
 import { createHash } from 'node:crypto';
+import { refOf } from './design-rules.mjs';
 import { ID } from './url-pattern.mjs';
 
 export const SIGNALS = ['rage_click', 'dead_click', 'error_shown', 'js_error', 'nav_bounce', 'abandoned_dialog', 'slow_request'];
@@ -19,6 +20,9 @@ export const routeKey = (r) => {
 // The same signal on the same element of the same page is the same finding on every build.
 export const fingerprint = (signal, route, element) =>
   createHash('sha1').update(['field', signal, routeKey(route), element || '-'].join('|')).digest('hex').slice(0, 12);
+
+// A design register finding's Ref at the Design Desk (lib/design-rules.mjs): the same on every build.
+export const deskRef = (f) => refOf(f.source === 'field' ? 'field' : 'ui', f.fingerprint);
 
 // A finding last seen on `lastBuild` resolves when a newer build ran the whole period of `scored`
 // (its firstSeen at or before the period's start) and no passing row of the finding is in it.
