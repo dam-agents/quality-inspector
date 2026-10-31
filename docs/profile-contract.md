@@ -181,6 +181,13 @@ Every executable runs with cwd `$HOME/work`, and with:
   published strictly between the two (same channel), oldest first; `[]` when adjacent.
   Not implemented → exit 2 (output that is not an array counts the same); bisection is
   then skipped with that reason ([triage.md](triage.md) → Order of work, step 6).
+- `bin/versions --resolve <build>` — **optional** → stdout `{"build": "<id>"}`: the build `bin/env
+  up` installs for a build id the product reports itself (its usage data, `ux_signals` below) —
+  the id itself when it is one, else the published build that is it (helm-k3s: the newest channel
+  tag whose chart `appVersion` is `<build>`). Exit 1 when none is published — never a near build;
+  exit 3 when it could not look (the registry did not answer).
+  Not implemented → exit 2 (output without `build` counts the same): the reported id is used as
+  it is. `scripts/env.sh resolve <build>` calls it.
 - `bin/build-time <build>` → stdout one ISO-8601 UTC timestamp, the moment the build was
   published; non-zero when unknown. The change window of [change-awareness.md](change-awareness.md).
 - `bin/versions --prs <n>…` — **optional** → stdout `{"<n>": "<build>"|null}`, each pull request's
@@ -300,6 +307,43 @@ agent's files — never in chat. Its name's segment makes `scripts/lib/secrets.m
 value in every run artefact (it masks `PASSWORD`, `TOKEN`, `SECRET`, `KEY` and every
 `E2E_SANDBOX_` value), and `work/env/` is never in the `work_repo` backup, so a restore asks again. A test
 reads it from its environment (`process.env.E2E_<NAME>`) and never hard-codes a key.
+
+## `ux_signals` — how real users use the UI
+
+A product that counts how its users use its UI can serve the counts to the ux-signals module
+([ux-signals.md](ux-signals.md)), which turns them into verified design findings for Design Desk.
+The profile declares the endpoint at the top level; absent → the module is off.
+
+```json
+"ux_signals": {
+  "endpoint": "https://{profile.ux_signals_host}/api/usage/ui/signals",
+  "api_key_env": "E2E_DAM_USAGE_API_KEY",
+  "flows": ["upload", "share"],
+  "min_users": 3,
+  "min_rate": 0.05
+},
+"config": { "ux_signals_host": { "default": "", "about": "the install that collects UI usage (DAM: its DEV install)", "ask": true } },
+"operator_credentials": [{ "name": "DAM_USAGE_API_KEY", "what": "a read-only key of the UI usage API" }],
+"egress": [{ "host": "{profile.ux_signals_host}", "method": "GET", "path": "/api/usage/ui/signals", "why": "real-user UI signals" }]
+```
+
+- `endpoint` — `https`, no credentials, query or fragment; its host (or a path segment) may be
+  a `{profile.<key>}` the operator sets at onboarding, because the install that collects usage
+  is the instance's choice — not necessarily the production one (DAM collects it on DEV only).
+  Answers `GET ?from=<ISO>&to=<ISO>`
+  with the response of [ux-signals.md](ux-signals.md) → **The data**: aggregates only, rows of 3
+  users or more, no person's identity. `egress` lists exactly its host and path with `GET`.
+- `api_key_env` — `E2E_<NAME>` of an `operator_credentials` entry (above), with a `TOKEN`,
+  `SECRET` or `KEY` segment: sent as `Authorization: Bearer`, masked like every such value.
+- `flows` — the funnels the usage report watches, by the `flow` names the endpoint uses.
+- `min_users` (3 or more, default 3), `min_rate` (0 to 1, default 0.05) — a `friction` row is a
+  candidate only at or above both.
+- `builds[].version`, `friction[].build` and `trails[].build` are the ids the product reports
+  (DAM: its chart's `appVersion` — a release `X.Y.Z`, a main build `<appVersion>-dev-<sha12>`). The
+  module installs the build the users ran through `bin/versions --resolve` (above): a profile
+  whose reported ids are not its install ids implements it (helm-k3s does); without it the
+  reported id must be one `bin/env up` takes. `route` is the page's route pattern,
+  `element` its `data-testid` — the UI map records the visible `data-testid` values to match.
 
 ## `SKILL.md` — what a tester should know
 

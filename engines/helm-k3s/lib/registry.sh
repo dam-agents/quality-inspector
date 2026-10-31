@@ -57,3 +57,17 @@ created_at() { # <api> <host> <repo> <tag>
     jq -re '.annotations["org.opencontainers.image.created"] // empty' <<<"$body"
   fi
 }
+
+# The chart's appVersion of one tag: the manifest's config blob is the chart's Chart.yaml as
+# JSON (Helm's application/vnd.cncf.helm.config.v1+json) — the same two /v2 requests `helm pull`
+# makes, so no egress of its own. A blob may redirect to the registry's storage (-L).
+app_version() { # <host> <repo> <tag>
+  local h="$1" repo="$2" tag="$3" tok body digest
+  tok="$(oci_token "$h" "$repo")"
+  body="$(curl -fsS --max-time 20 ${tok:+-H "Authorization: Bearer $tok"} \
+    -H 'Accept: application/vnd.oci.image.manifest.v1+json' "https://$h/v2/$repo/manifests/$tag")" || return 1
+  digest="$(jq -re '.config.digest // empty' <<<"$body")" || return 1
+  case "$digest" in (sha256:[0-9a-f]*) ;; (*) return 1;; esac
+  body="$(curl -fsSL --max-time 20 ${tok:+-H "Authorization: Bearer $tok"} "https://$h/v2/$repo/blobs/$digest")" || return 1
+  jq -re '.appVersion // empty | tostring' <<<"$body"
+}

@@ -50,6 +50,10 @@ platform's Kit Update fetching this definition (`git fetch origin`, read-only,
   through read-only `kubectl get -o json`, for the fields [security.md](security.md) names.
 - The **profile**: its `SKILL.md` (user-facing knowledge) and `profile.json`; its `bin/`
   scripts only to diagnose an environment failure.
+- In the ux-signals module only: the counts of how real users use the product's UI, from the
+  endpoint the profile's `ux_signals` names, through `scripts/ux-signals.mjs` alone (`GET`, the
+  profile's egress rule for exactly that path) — read like an issue's text
+  ([ux-signals.md](ux-signals.md)). Never the product's logs, traces or a person's identity.
 - The `e2e` framework's own docs, this definition, `work/`.
 
 ## You never request or read

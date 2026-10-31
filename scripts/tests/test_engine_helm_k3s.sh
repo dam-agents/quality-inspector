@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # helm-k3s engine: channels pick the right builds from both registry APIs; --between lists the builds
-# between two, oldest first; a failed registry request or a page that is not JSON fails the command;
+# between two, oldest first; --resolve maps a reported build to a tag by the chart's appVersion; a failed registry request or a page that is not JSON fails the command;
 # values fill placeholders and overlays; `up` returns at once for the build already up with the
 # same values, and a failed upgrade never leaves a build recorded.
 . "$(dirname "$0")/lib.sh"
@@ -30,7 +30,11 @@ for a in "$@"; do case "$a" in
     else echo '{"tags":["1.0.0","1.2.0","1.10.0","0.0.0-main.7","0.0.0-main.9","0.0.0-main.10","0.0.0-main.8","latest"]}'; fi
     exit 0;;
   *"/v2/"*"/manifests/"*) [ "${STUB_MANIFEST_FAIL:-0}" = 1 ] && exit 22
-    echo '{"annotations":{"org.opencontainers.image.created":"2026-10-01T00:00:00Z"}}'; exit 0;;
+    d=sha256:00; case "$a" in *main.10) d=sha256:10;; *main.9) d=sha256:09;; esac
+    echo "{\"annotations\":{\"org.opencontainers.image.created\":\"2026-10-01T00:00:00Z\"},\"config\":{\"digest\":\"$d\"}}"; exit 0;;
+  *"/v2/"*"/blobs/sha256:10") echo '{"name":"chart","version":"0.0.0-main.10","appVersion":"0.2.26-dev-ffffffffffff"}'; exit 0;;
+  *"/v2/"*"/blobs/sha256:09") echo '{"name":"chart","version":"0.0.0-main.9","appVersion":"0.2.25-dev-1a2b3c4d5e6f"}'; exit 0;;
+  *"/v2/"*"/blobs/"*) echo '{"name":"chart","appVersion":"0.1.0"}'; exit 0;;
   *"/v2/") exit 0;;
 esac; done
 exit 22
@@ -63,6 +67,14 @@ bt() { PATH="$SANDBOX/bin:$PATH" QI_ENGINE_CONFIG="$(cfg oci)" QI_PROFILE_CONFIG
        STUB_MANIFEST_FAIL="$1" bash "$ENG/bin/build-time" 1.0.0 2>/dev/null; }
 assert_eq "oci publish time" 2026-10-01T00:00:00Z "$(bt 0)"
 bt 1 >/dev/null && { echo "  a failed manifest request must fail bin/build-time"; FAILED=1; }
+rv() { PATH="$SANDBOX/bin:$PATH" QI_ENGINE_CONFIG="$(cfg oci)" QI_PROFILE_CONFIG='{"img":"x","mock":""}' QI_ENV_DIR="$SANDBOX/rv" \
+       QI_CANDIDATE_CHANNEL="" QI_BASELINE_CHANNEL="" bash "$ENG/bin/versions" --resolve "$1" 2>/dev/null; }
+assert "resolve: a release id is its own tag" '. == {"build":"1.2.0"}' "$(rv 1.2.0)"
+assert "resolve: a main build is the newest tag whose chart has that appVersion" '. == {"build":"0.0.0-main.9"}' "$(rv 0.2.25-dev-1a2b3c4d5e6f)"
+assert "resolve: appVersions kept per tag" '.["0.0.0-main.10"] == "0.2.26-dev-ffffffffffff" and .["0.0.0-main.9"] == "0.2.25-dev-1a2b3c4d5e6f"' "$(cat "$SANDBOX/rv/app-versions.json")"
+assert "resolve: kept appVersions need no registry read" '. == {"build":"0.0.0-main.9"}' "$(STUB_MANIFEST_FAIL=1 rv 0.2.25-dev-1a2b3c4d5e6f)"
+( export STUB_MANIFEST_FAIL=1; rv 0.2.99-dev-000000000000 >/dev/null ); assert_eq "resolve: metadata it cannot read -> exit 3, not 'none published'" 3 "$?"
+rv 0.2.99-dev-000000000000 >/dev/null; assert_eq "resolve: no published chart has it -> exit 1, never a near build" 1 "$?"
 vb() { PATH="$SANDBOX/bin:$PATH" QI_ENGINE_CONFIG="$(cfg "$1")" QI_PROFILE_CONFIG='{"img":"x","mock":""}' \
        QI_CANDIDATE_CHANNEL="" QI_BASELINE_CHANNEL="" bash "$ENG/bin/versions" --between "$2" "$3" 2>/dev/null; }
 assert "oci between, numeric order" '. == ["0.0.0-main.8","0.0.0-main.9"]' "$(vb oci 0.0.0-main.7 0.0.0-main.10)"

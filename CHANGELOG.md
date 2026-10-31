@@ -7,6 +7,36 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.53.0 — 2026-10-31
+
+**Upgrade:**
+1. Nothing to run for an instance whose profile has no `ux_signals` entry: the new
+   `ux-signals` module stays off ([docs/ux-signals.md](docs/ux-signals.md)). It reads how real
+   users fare in the product's UI from the endpoint the profile names, replays the worst signals
+   on the build they ran, and keeps the judge-confirmed ones as design findings (source `field`).
+   When the profile has the entry, **offer** it to the operator once: `module ux-signals set
+   ux_signals=daily` (or `weekly`) switches it on ([docs/modules.md](docs/modules.md) →
+   **Control**). Before that: **operator-only** — the install that collects the data (DAM: its
+   DEV install, for GDPR), as the `profile.<key>` the profile's endpoint names (`- profile.<key>:
+   <host>` in `work/CONFIG.md`), the egress rule the profile's `egress` lists for the endpoint
+   (`GET`, that host and path), and the API key in the `E2E_<NAME>` line of
+   `work/env/credentials.env` (`bash "$HOME/scripts/env.sh" init` adds the empty line; fill it in
+   the agent's files, never in chat); then `bash "$HOME/scripts/verify-onboarding.sh" --config`.
+2. Nothing to run — the design register's findings go to the Design Desk on the path of 3.52.0:
+   "send D-`<k>` to design", the Design view's button and, with `ux_handoff: auto` (default
+   `manual`), the judge-confirmed field findings go through `design-outbox.mjs`, under its gate
+   (`design_desk_findings`, `design_desk_channel`, `design_desk_bot`, the cap and the floor), each
+   Ref once ([docs/ux-signals.md](docs/ux-signals.md) → **6. Handoff to Design Desk**). Offer
+   `ux_handoff: auto`, never set it unasked.
+3. Nothing to run — the UI map records the visible `data-testid` values from the next mapping on
+   (`testids`); the module's "unused controls" need a map made by 3.53.0 or later.
+4. Nothing to run — a profile may implement `bin/versions --resolve <build>`
+   ([docs/profile-contract.md](docs/profile-contract.md)); the helm-k3s engine does: it maps a
+   build id the product reports (a chart `appVersion`, `0.2.25-dev-<sha12>`) to the chart tag it
+   installs, read from the registry's chart metadata and kept in `work/env/app-versions.json`. It
+   makes the same `/v2` manifest and blob requests as `helm pull`: no new egress rule. A build no
+   published chart has is kept signal-only, never replayed on another build.
+
 ## 3.52.0 — 2026-10-31
 
 **Upgrade:**

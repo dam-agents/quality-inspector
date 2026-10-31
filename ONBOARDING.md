@@ -276,8 +276,9 @@ file → keep its values, show them once, and ask only for the keys it lacks. As
    testable (tokens per product AI step), and nothing for the live browser: it is detected from the shared browser's
    `DevToolsActivePort` ([docs/test-authoring.md](docs/test-authoring.md) → Watching live); set `live_browser`
    only to override it, or `disabled` to turn it off. Offer the testing modules ([docs/modules.md](docs/modules.md)), all off
-   by default — with a Design Desk agent in a bound Slack conversation, also `design_desk_findings`
-   (its conversation's `C…` id, its bot's `U…` id; [docs/design-checks.md](docs/design-checks.md)) —, and `dashboard_interactive: enabled` when the operator has Interactive artifacts on
+   by default — `ux_signals` only when the profile has a `ux_signals` entry; with a Design Desk agent
+   in a bound Slack conversation, also `design_desk_findings` (its conversation's `C…` id, its bot's
+   `U…` id; [docs/design-checks.md](docs/design-checks.md)) —, and `dashboard_interactive: enabled` when the operator has Interactive artifacts on
    in the platform (the dashboard's buttons then send commands to this chat). Name, never
    enable on your own, `report_visibility: public`: the dashboard then opens a report in one
    click, but anyone holding its link sees the videos and screenshots — only on the operator's word.
@@ -349,6 +350,10 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - design_check_max_prs: 1
 - design_check_max_pages: 6
 - modules_max_wallclock_min: 90
+- ux_signals: disabled
+- ux_period_days: 7
+- ux_max_candidates: 3
+- ux_handoff: manual
 - dashboard_interactive: disabled
 - design_label: qa:design
 - design_desk_findings: disabled

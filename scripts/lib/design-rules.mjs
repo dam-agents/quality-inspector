@@ -11,7 +11,8 @@
 import { createHash } from 'node:crypto';
 
 export const MARKER = '🧪 Automated test finding — Quality Inspector';
-export const CHECKS = ['missing-state', 'accessibility', 'consistency', 'radar'];
+// `field` and `design`: a design register finding (docs/ux-signals.md → 6), real-user or a sweep's.
+export const CHECKS = ['missing-state', 'accessibility', 'consistency', 'radar', 'field', 'design'];
 export const SEVERITIES = ['high', 'medium', 'low'];
 export const REF_RE = /^qi-[a-z0-9]+(?:-[a-z0-9]+){1,4}$/;
 export const sevRank = (s) => { const i = SEVERITIES.indexOf(s); return i < 0 ? SEVERITIES.length : i; };

@@ -35,6 +35,7 @@ pulls it again, so its registry must be reachable unless k3s keeps it pinned.
 | `values` | the Helm values, as JSON, with placeholders |
 | `overlays` | `[{when: <config key>, values: {…}}]` — merged into `values` when that profile key is set; `when: "@model"` — while the agent lends its model; `when: "@sandbox:<id>"` — while every `E2E_SANDBOX_<ID>_*` line of `credentials.env` is filled; `when: "@environment"` — while the product runs in a platform Environment; `tags` (a regex) — only for a build whose tag matches it, the builds that understand the overlay's values |
 | `max_pages` | quay pages to read at most (default 30) |
+| `resolve_max_tags` | newest tags per channel `bin/versions --resolve` looks at (default 50) |
 | `pull_requests` | `{tag: <regex with {pr}>, order, max_pages}` — what a pull request's build looks like, `{pr}` standing for its number (`^0\\.0\\.0-pr\\.{pr}\\.[0-9]+$`); `bin/versions --prs` reads at most `max_pages` (default 5) quay pages for them. Absent → `--prs` exits 2 |
 | `prune_below_gi` | after an `up`, the images no container uses (earlier builds') are removed while the k3s data volume has less free than this, in Gi (default 20); `reset` always removes them |
 | `kvm` | `true` — the product's pods open `/dev/kvm` from a user namespace (a VM runner) — see below |
@@ -44,6 +45,15 @@ pulls it again, so its registry must be reachable unless k3s keeps it pinned.
 `bin/versions --between <from> <to>` (bisection) reads the same tag listing — tags only —
 and returns the tags of the channel both builds match, in that channel's order. `bin/versions --prs
 <n>…` (the design check) returns each pull request's newest build by `pull_requests`.
+
+`bin/versions --resolve <build>` maps a build id the product itself reports (its usage data,
+[docs/ux-signals.md](../../docs/ux-signals.md)) to a chart tag: the tag itself when it is one (a
+release `1.4.0`), else the newest tag of a channel, the candidate channel first, whose chart's
+`appVersion` equals it (a main build `0.2.25-dev-1a2b3c4d5e6f` → `0.0.0-main.312`). It reads
+`appVersion` from each tag's manifest and config blob — the Chart.yaml Helm stores there — over
+the registry's `/v2`, the requests `helm pull` makes for an install, so it needs no egress of its
+own; at most `resolve_max_tags` tags per channel, each read once (`$QI_ENV_DIR/app-versions.json`).
+No match → exit 1, never a near build; a listing or a chart's metadata it could not read → exit 3.
 
 ## Prerequisites
 
