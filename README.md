@@ -220,7 +220,8 @@ configuration.
 | `explorations`, `max_explorations_per_ac` | defaults (`enabled`, `3`) | Agent-designed checks beyond the criteria, reported apart from the verdict ([docs/explorations.md](docs/explorations.md)). |
 | `security_checks`, `security_failed_logins` | defaults (`enabled`, `10`) | The security run ([docs/security.md](docs/security.md)); its schedule ships off. |
 | `max_wallclock_min_per_issue`, `max_model_steps_per_issue`, `min_free_disk_gi` | defaults | Per-issue budgets and the free disk an install needs. |
-| `ui_sweep`, `validation_checks`, `stress_checks` and their tunables, `focus_max_checks`, `modules_max_wallclock_min` | offered, default `disabled` | The testing modules of the nightly modules run; registry `scripts/lib/modules.json` ([docs/modules.md](docs/modules.md)). |
+| `ui_sweep`, `validation_checks`, `stress_checks`, `ux_signals` and their tunables (`ux_period_days`, `ux_max_candidates`, `ux_handoff`), `focus_max_checks`, `modules_max_wallclock_min` | offered, default `disabled` | The testing modules of the nightly modules run; registry `scripts/lib/modules.json` ([docs/modules.md](docs/modules.md)). |
+| `design_desk_channel` | asked (optional) with `ux_signals` | Design Desk's Slack conversation id, for "send D-<k> to design" ([docs/ux-signals.md](docs/ux-signals.md) → Handoff). |
 | `dashboard_interactive` | offered, default `disabled` | The dashboard's buttons send their command to the agent's chat (needs the platform's Interactive artifacts). |
 | `slack_channel`, `slack_tests_per_day` | asked (optional), default `3` | Slack test requests ([docs/slack.md](docs/slack.md)). |
 | `report_visibility` | default `private` | `public`: every report but the security run's gets a link anyone holding it opens, and the dashboard opens it in one click ([docs/reporting.md](docs/reporting.md) → Delivery). |

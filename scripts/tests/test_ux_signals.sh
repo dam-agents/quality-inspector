@@ -3,7 +3,7 @@
 # profile's egress), no data as no error, the contract's floor,
 # scoring (trend, a jump after a new build, unused pages and controls), when the modules run is
 # due, field findings in the design register (judge, stable id, resolution after a quiet period
-# on a newer build), and the Design Desk handoff message.
+# on a newer build), the Design Desk handoff message, and the modules pre-flight.
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 seed_work
@@ -144,15 +144,27 @@ assert "resolved by the build that ran the whole quiet period" \
   '[.findings[] | {id, status, resolved_build}] == [{"id":"D-1","status":"resolved","resolved_build":"1.6.0"},{"id":"D-2","status":"resolved","resolved_build":"1.6.0"}]' \
   "$(cat "$WORK_DIR/design/findings.json")"
 jq '.period = {"from":"2026-11-08T00:00:00Z","to":"2026-11-15T00:00:00Z"} | .builds += [{"version":"1.6.0","firstSeen":"2026-10-31T12:00:00Z"}]
-  | .friction = [.friction[0] | .route = "/assets/:id" | .build = "1.6.0"] | .trails = []' "$SANDBOX/week1.json" > "$SANDBOX/week3.json"
+  | .friction = [(.friction[0] | .route = "/assets/:id" | .build = "1.6.0"), (.friction[0] | .build = "1.5.0" | .users = 4)] | .trails = []' "$SANDBOX/week1.json" > "$SANDBOX/week3.json"
 node "$UXS" fetch --fixture "$SANDBOX/week3.json" --now 2026-11-15T05:00:00Z >/dev/null
 P3="$WORK_DIR/ux/2026-11-08_2026-11-15"
 node "$UXS" score "$P3/signals.json" --inventory "$SANDBOX/inv.json" >/dev/null
-printf '[{"signal":"rage_click","route":"/assets/:id","element":"asset-save","build":"1.6.0","class":"ux-friction","saw":"Users click Save twice","judge":{"agree":true}}]' > "$SANDBOX/field3.json"
+printf '[{"signal":"rage_click","route":"/assets/:id","element":"asset-save","build":"1.6.0","class":"ux-friction","saw":"Users click Save twice","judge":{"agree":true}},
+  {"signal":"rage_click","route":"/assets/:assetId","element":"asset-save","build":"1.5.0","class":"not-reproduced","saw":"Save works"}]' > "$SANDBOX/field3.json"
 r="$(node "$SCRIPTS/design-findings.mjs" merge --signals "$P3/scored.json" --field "$SANDBOX/field3.json" --no-render)"
-assert "back on a later build: the same id, open again" '.new == 0' "$r"
+assert "back on a later build: the same id, open again; a second replay of it rejected" '.new == 0 and (.notes | any(test("entry 2 rejected: .*one replay per finding")))' "$r"
+assert "one signal on two builds: evaluated once, on the newest" '.due == false and .new == 0' "$(node "$UXS" check --now 2026-11-15T09:00:00Z)"
 assert "D-1 reopened with the new numbers" '.findings[0] | .id == "D-1" and .status == "open" and .resolved_build == null and .last_seen == "1.6.0" and .field.class == "ux-friction"' \
   "$(cat "$WORK_DIR/design/findings.json")"
 assert "a new build: it may go to design again" '. == ["D-1"]' "$(node "$UXS" handoff-plan)"
+
+# ---------------------------------------------------------------- the modules pre-flight
+rm -rf "$WORK_DIR/ux" "$WORK_DIR/design"
+P="$(node "$UXS" fetch --fixture "$SANDBOX/week1.json" --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | jq -r .dir)"
+node "$UXS" score "$P/signals.json" --inventory "$SANDBOX/inv.json" >/dev/null
+assert "preflight.sh modules: due by its data, with the ux_signals key" \
+  '.nothing_to_do == false and .modules_due == ["ux-signals"] and .ux_signals.new == 2 and (.ux_signals.scored | endswith("/scored.json"))' \
+  "$(bash "$SCRIPTS/preflight.sh" modules)"
+printf -- '- ux_max_candidates: 0\n' >> "$WORK_DIR/CONFIG.md"
+assert "preflight.sh modules: nothing to evaluate -> idle" '.nothing_to_do == true and has("ux_signals") == false' "$(bash "$SCRIPTS/preflight.sh" modules)"
 
 exit $FAILED

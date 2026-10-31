@@ -276,7 +276,9 @@ file → keep its values, show them once, and ask only for the keys it lacks. As
    testable (tokens per product AI step), and nothing for the live browser: it is detected from the shared browser's
    `DevToolsActivePort` ([docs/test-authoring.md](docs/test-authoring.md) → Watching live); set `live_browser`
    only to override it, or `disabled` to turn it off. Offer the testing modules ([docs/modules.md](docs/modules.md)), all off
-   by default, and `dashboard_interactive: enabled` when the operator has Interactive artifacts on
+   by default — `ux_signals` only when the profile has a `ux_signals` entry, with
+   `design_desk_channel` (Design Desk's Slack conversation id, optional; [docs/ux-signals.md](docs/ux-signals.md) → Handoff) —
+   and `dashboard_interactive: enabled` when the operator has Interactive artifacts on
    in the platform (the dashboard's buttons then send commands to this chat). Name, never
    enable on your own, `report_visibility: public`: the dashboard then opens a report in one
    click, but anyone holding its link sees the videos and screenshots — only on the operator's word.
@@ -343,6 +345,11 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - stress_duration_s: 60
 - focus_max_checks: 12
 - modules_max_wallclock_min: 90
+- ux_signals: disabled
+- ux_period_days: 7
+- ux_max_candidates: 3
+- ux_handoff: manual
+- design_desk_channel:
 - dashboard_interactive: disabled
 
 - profile.chart_ref: oci://quay.io/dam-agents/charts/platform

@@ -251,6 +251,7 @@ const metrics = (c) => ({ signal: c.signal, users: c.users, events: c.events ?? 
 const evidence = (p) => (typeof p === 'string' && p && existsSync(abs(p)) ? rel(abs(p)) : null);
 if (flags.field) {
   const rv = readJson(flags.field);
+  const took = new Set();
   if (!Array.isArray(rv)) notes.push(`${flags.field} is not a JSON list: no field finding merged`);
   else rv.forEach((r, i) => {
     const bad = (why) => notes.push(`field entry ${i + 1} rejected: ${why}`);
@@ -260,6 +261,8 @@ if (flags.field) {
     if (!c) return bad(`${str(r.signal, 20)} on ${str(r.route, 80)} @ ${str(r.build, 40)} is no candidate of ${flags.signals}`);
     if (!CLASSES.includes(r.class)) return bad(`class '${str(r.class, 20)}' is not one of ${CLASSES.join(', ')}`);
     if (!str(r.saw, 300)) return bad('no saw');
+    if (took.has(key)) return bad(`${str(r.signal, 20)} on ${str(r.route, 80)} has an earlier entry in ${flags.field}: one replay per finding`);
+    took.add(key);
     const judge = r.judge && typeof r.judge === 'object' ? { agree: r.judge.agree === true, reason: str(r.judge.reason, 300) || null } : null;
     let cls = r.class;
     if (REPORTED.has(cls) && !judge?.agree) { notes.push(`field entry ${i + 1}: the judge did not confirm it — kept as not-reproduced`); cls = 'not-reproduced'; }

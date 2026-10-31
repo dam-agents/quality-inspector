@@ -35,7 +35,7 @@ nothing due — the next fetch asks again. Any other failure is an error (below)
 | --- | --- |
 | `period` | `{from, to}` |
 | `builds[]` | `version` (the id the product reports; `env.sh resolve` finds the build to install), `firstSeen` |
-| `features[]` | `route` (a route pattern), `element` (a `data-testid` or `null` for the page), `users`, `uses` |
+| `features[]` | `route` (a route pattern of `A–Z a–z 0–9 / _ . : ~ [ ] { } -`), `element` (a `data-testid` or `null` for the page), `users`, `uses` |
 | `friction[]` | `signal`, `route`, `element`, `build`, `users`, `events`, `views`, `rate`, `prevRate` (`null`: none last period) |
 | `funnels[]` | `flow`, `steps[]`: `step`, `users`, `medianMsFromStart` |
 | `trails[]` | `id`, `signal`, `route`, `element`, `build`, `users`, `steps[]`: `kind`, `route`, `element`, `dtMs` — a typical path that ended in the signal |
@@ -63,7 +63,9 @@ whole days into `work/ux/<from>_<to>/signals.json` and scores them into `scored.
 
 It is due while a candidate is not evaluated on its build yet (no field finding, or one last
 seen on another build — a dismissed one stays dismissed), or an open field finding went quiet
-(below **4. Register**). Otherwise the Precheck declines the run. A due run's worklist has
+(below **4. Register**). A signal on several builds of the period counts once, on the newest of
+them (`builds[].firstSeen`); `ux_max_candidates: 0` evaluates none. Otherwise the Precheck
+declines the run. A due run's worklist has
 `modules_due` with `ux-signals` and `ux_signals: {period, scored, new, resolve}`. A failed fetch
 is an `ERROR: module=ux-signals …` line in `work/MODULES.log` and nothing due.
 
@@ -113,7 +115,8 @@ users ran**, never the candidate — then per candidate on it:
 
 `env.sh up` fails → each candidate of that build `not-reproduced` with the reason, so it is not
 due every night; the run goes on with the next build. Write `work/ux/<period>/field.json`:
-`[{signal, route, element, build, class, ui, saw, expected, steps, shot, video, box, judge}]` —
+`[{signal, route, element, build, class, ui, saw, expected, steps, shot, video, box, judge}]`, one
+entry per finding (the merge rejects a second one of the same signal, route and element) —
 `saw` one sentence of what the user meets, `expected` what should happen, `steps` the user's
 steps in words, `box` the place on the shot or `null`. The numbers are never yours: the merge
 takes them from `scored.json`.

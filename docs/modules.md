@@ -86,7 +86,7 @@ with `ux-signals` due `ux_signals` (`period`, `scored`, `new`, `resolve`).
 2. `env.sh reset`, `env.sh up <candidate>`, `suite.sh run smoke-<candidate> --tag smoke`.
    Failure → environment failure ([nested-env.md](nested-env.md) → **Failures**): append
    `<ISO> ERROR: environment candidate=<c>` to `work/MODULES.log`, unlock, end. Only
-   `ux-signals` due → skip this step: it brings up its own builds.
+   `ux-signals` due → skip steps 2 and 3: it brings up its own builds and reads their UI maps.
 3. `inventory: null` → map the candidate now ([change-awareness.md](change-awareness.md) →
    **Building the context**, first command only).
 4. Each due module in this order — `ui-sweep`, `validation`, then the focus areas, `stress`,

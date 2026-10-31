@@ -120,7 +120,7 @@ function clean(raw, minUsers, notes) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('the response is not a JSON object');
   const list = (k, n) => (Array.isArray(raw[k]) ? raw[k].slice(0, n) : (notes.push(`${k}: missing or not a list`), []));
   const el = (e) => (e == null ? null : TESTID.test(String(e)) ? String(e) : undefined);
-  const route = (r) => (typeof r === 'string' && r.startsWith('/') && r.length <= 200 && !/\s/.test(r) ? r : null);
+  const route = (r) => (typeof r === 'string' && r.length <= 200 && /^\/[A-Za-z0-9/_.:~\[\]{}-]*$/.test(r) ? r : null);
   let dropped = 0;
   const keep = (rows, name, f) => rows.map((r, i) => {
     const x = r && typeof r === 'object' ? f(r) : null;
@@ -248,8 +248,15 @@ function score(file, s) {
 // ------------------------------------------------------------------ due / plan ----
 const register = () => readJson(REGISTER)?.findings ?? [];
 const fieldOf = () => new Map(register().filter((f) => f.source === 'field').map((f) => [f.fingerprint, f]));
-// Not evaluated on its build yet: no field finding, or one last seen on another build — but a dismissed one stays the operator's.
-const fresh = (scored) => { const by = fieldOf(); return scored.candidates.filter((c) => { const f = by.get(c.fingerprint); return !f || (f.status !== 'dismissed' && f.last_seen !== c.build); }); };
+// One candidate per fingerprint, the row of the newest build; not evaluated on it yet: no field
+// finding, or one last seen on another build — but a dismissed one stays the operator's.
+const fresh = (scored) => {
+  const by = fieldOf(); const seen = new Map((scored.builds ?? []).map((b) => [b.version, Date.parse(b.firstSeen)]));
+  const newest = new Map();
+  for (const c of scored.candidates) { const o = newest.get(c.fingerprint); if (!o || (seen.get(c.build) ?? -Infinity) > (seen.get(o.build) ?? -Infinity)) newest.set(c.fingerprint, c); }
+  return scored.candidates.filter((c) => newest.get(c.fingerprint) === c)
+    .filter((c) => { const f = by.get(c.fingerprint); return !f || (f.status !== 'dismissed' && f.last_seen !== c.build); });
+};
 const toResolve = (scored) => [...fieldOf().values()].filter((f) => f.status === 'open').map((f) => ({ id: f.id, build: quietBuild(f, scored) })).filter((x) => x.build);
 const newestScored = () => {
   const all = (() => { try { return readdirSync(UX); } catch { return []; } })().map((d) => join(UX, d, 'scored.json')).filter(existsSync);
@@ -367,7 +374,7 @@ if (cmd === 'fetch' || cmd === 'check') {
     score(f.file, s); file = join(f.dir, 'scored.json');
   }
   const scored = readJson(file);
-  const n = fresh(scored).length; const r = toResolve(scored).length;
+  const n = Math.min(fresh(scored).length, regInt('ux_max_candidates', 3)); const r = toResolve(scored).length;
   out({ due: n + r > 0, period: scored.period, scored: file, new: n, resolve: r,
     reason: n + r ? `${n} signal(s) not evaluated on their build, ${r} finding(s) quiet since a newer build` : 'nothing new above the thresholds' });
 } else if (cmd === 'score') {
