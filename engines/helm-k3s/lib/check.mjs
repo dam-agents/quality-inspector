@@ -23,7 +23,7 @@ const NAME = /^[a-z0-9_]+$/;
 const K8S = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 const KNOWN = ['chart', 'registry_api', 'release', 'namespace', 'app_port', 'traefik_port', 'apply_chart_crds',
   'channels', 'default_candidate', 'default_baseline', 'helm_version', 'credentials', 'prerequisites', 'values',
-  'overlays', 'max_pages', 'resolve_max_tags', 'prune_below_gi', 'kvm', 'host_dirs', 'environment_bridge'];
+  'overlays', 'max_pages', 'resolve_max_tags', 'prune_below_gi', 'kvm', 'host_dirs', 'environment_bridge', 'pull_requests'];
 
 const json = (s, what) => { try { return JSON.parse(s || '{}'); } catch { fail(`${what} is not JSON`); return null; } };
 const raw = json(process.env.QI_ENGINE_CONFIG, 'QI_ENGINE_CONFIG');
@@ -145,6 +145,18 @@ for (const [n, d] of Object.entries(obj(ch) ? ch : {})) {
   if (!d.tag.startsWith('^') || !d.tag.endsWith('$')) warn(`channel '${n}': tag regex is not anchored (^…$) — it may also match latest, -rc or signature tags`);
   if (!['semver', 'numeric-suffix', 'time'].includes(d.order)) fail(`channel '${n}': order '${d.order ?? ''}' is not semver, numeric-suffix or time`);
   if (d.order === 'time' && api !== 'quay') fail(`channel '${n}': order time needs registry_api quay`);
+}
+// A pull request's builds (bin/versions --prs, docs/design-checks.md): one tag regex with {pr}.
+const prs = cfg.pull_requests;
+if (prs !== undefined) {
+  if (!obj(prs) || !str(prs.tag) || !prs.tag.includes('{pr}')) fail('pull_requests: needs a tag regex with {pr} where the pull request number stands');
+  else {
+    try { new RegExp(prs.tag.replaceAll('{pr}', '1')); } catch { fail(`pull_requests: tag '${prs.tag}' is not a regex`); }
+    if (!prs.tag.startsWith('^') || !prs.tag.endsWith('$')) warn('pull_requests: tag regex is not anchored (^…$) — PR 12 would also match the builds of PR 123');
+  }
+  if (obj(prs) && !['semver', 'numeric-suffix', 'time'].includes(prs.order)) fail(`pull_requests: order '${prs.order ?? ''}' is not semver, numeric-suffix or time`);
+  if (obj(prs) && prs.order === 'time' && api !== 'quay') fail('pull_requests: order time needs registry_api quay');
+  if (obj(prs) && prs.max_pages !== undefined && !(Number.isInteger(prs.max_pages) && prs.max_pages >= 1 && prs.max_pages <= 30)) fail('pull_requests: max_pages is not 1–30');
 }
 if (!str(cfg.default_candidate)) fail('default_candidate: missing — an instance with an empty candidate_channel would have no candidate');
 else if (obj(ch) && !(cfg.default_candidate in ch)) fail(`default_candidate '${cfg.default_candidate}' is not a channel`);

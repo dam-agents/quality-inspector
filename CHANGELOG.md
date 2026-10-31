@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.52.0 — 2026-10-31
+## 3.53.0 — 2026-10-31
 
 **Upgrade:**
 1. Nothing to run for an instance whose profile has no `ux_signals` entry: the new
@@ -22,19 +22,40 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    (`GET`, that host and path), and the API key in the `E2E_<NAME>` line of
    `work/env/credentials.env` (`bash "$HOME/scripts/env.sh" init` adds the empty line; fill it in
    the agent's files, never in chat); then `bash "$HOME/scripts/verify-onboarding.sh" --config`.
-2. Nothing to run — Design Desk takes design findings through its Slack bug intake. To send them,
-   the operator sets `design_desk_channel: <the Slack conversation id Design Desk is bound to>`
-   in `work/CONFIG.md`; then "send D-`<k>` to design" works for any open design finding, and the
-   Design view gets its button. `ux_handoff: auto` (default `manual`) sends the judge-confirmed
-   field findings by itself — offer it, never set it unasked.
+2. Nothing to run — the design register's findings go to the Design Desk on the path of 3.52.0:
+   "send D-`<k>` to design", the Design view's button and, with `ux_handoff: auto` (default
+   `manual`), the judge-confirmed field findings go through `design-outbox.mjs`, under its gate
+   (`design_desk_findings`, `design_desk_channel`, `design_desk_bot`, the cap and the floor), each
+   Ref once ([docs/ux-signals.md](docs/ux-signals.md) → **6. Handoff to Design Desk**). Offer
+   `ux_handoff: auto`, never set it unasked.
 3. Nothing to run — the UI map records the visible `data-testid` values from the next mapping on
-   (`testids`); the module's "unused controls" need a map made by 3.52.0 or later.
+   (`testids`); the module's "unused controls" need a map made by 3.53.0 or later.
 4. Nothing to run — a profile may implement `bin/versions --resolve <build>`
    ([docs/profile-contract.md](docs/profile-contract.md)); the helm-k3s engine does: it maps a
    build id the product reports (a chart `appVersion`, `0.2.25-dev-<sha12>`) to the chart tag it
    installs, read from the registry's chart metadata and kept in `work/env/app-versions.json`. It
    makes the same `/v2` manifest and blob requests as `helm pull`: no new egress rule. A build no
    published chart has is kept signal-only, never replayed on another build.
+
+## 3.52.0 — 2026-10-31
+
+**Upgrade:**
+1. Nothing to run — docs are re-read per run; off by default, both cost nothing. Two testing modules
+   join the modules run ([docs/design-checks.md](docs/design-checks.md)): the inconsistency radar
+   (`consistency_radar`; `weekly` is enough) and the design check of each pull request that carries
+   `design_label` (default `qa:design`) — on the first main build after its merge, or before it on its
+   own build where the profile names one (`bin/versions --prs`; the helm-k3s engine reads
+   `engine_config.pull_requests`, [docs/profile-contract.md](docs/profile-contract.md)) — (`design_checks`).
+   Offer them to the operator (`module consistency set consistency_radar=weekly`, `module design-check
+   set design_checks=enabled`); never switch them on yourself. The product's repository labels its UI
+   pull requests. Cost when on: about a minute per changed screen (a pull request's own build adds an
+   install, 15–25 min), the radar a few seconds per screen — no model step in either.
+2. Opt-in, off: `design_desk_findings: enabled` with `design_desk_channel` (the Slack conversation the
+   Design Desk agent listens in) and `design_desk_bot` (its bot's `U…` id) sends each design finding
+   once, as an automated test finding, at most `design_desk_max_per_run` (5) a run at or above
+   `design_desk_min_severity` (`medium`). Offer it only where a Design Desk agent runs; then
+   `bash "$HOME/scripts/verify-onboarding.sh" --config`. Up to 5 screenshots a run to look at (≈ 3–5k
+   tokens each).
 
 ## 3.51.0 — 2026-10-30
 

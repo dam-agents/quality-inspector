@@ -127,6 +127,16 @@ this contract (`--live` also lists its builds).
   diff never reports it as new ([change-awareness.md](change-awareness.md)); the UI map keeps
   it. List only what the install cannot do — the same thing the SKILL.md says in words — never
   a failure to hide.
+- `design` (optional) — what the design checks need to know of the product's design system
+  ([design-checks.md](design-checks.md)): `retired_words`, `[{word, say}]` — words its glossary
+  struck (a word or phrase of up to 40 letters, digits, spaces, `'` and `-`; `say`: what to say
+  instead), copied from the product's own glossary, which the agent never reads; `dark_theme` — how
+  its dark theme turns on: `{"color_scheme": "dark"}` (default: it follows the system),
+  `{"local_storage": {"key", "value"}}`, `{"html_class": "<c>"}`, `{"html_attribute": {"name":
+  "data-<x>", "value"}}`, or `"none"`; `tokens` — `prefixes` (the custom properties that are design
+  tokens, e.g. `["--color-", "--text-", "--radius-"]`; default every one the page sets on `:root`) and
+  `spacing_step` (a token whose whole multiples count as tokens, e.g. `"--spacing"`). An invalid part
+  is left out with a note.
 - `environment` (optional) — the platform Environment the product may run in
   ([nested-env.md](nested-env.md) → **Where the product runs**); absent → always this VM.
   `endpoints`: `[{name, port}]`, the public addresses the Environment gets, `app` among them
@@ -180,6 +190,10 @@ Every executable runs with cwd `$HOME/work`, and with:
   it is. `scripts/env.sh resolve <build>` calls it.
 - `bin/build-time <build>` → stdout one ISO-8601 UTC timestamp, the moment the build was
   published; non-zero when unknown. The change window of [change-awareness.md](change-awareness.md).
+- `bin/versions --prs <n>…` — **optional** → stdout `{"<n>": "<build>"|null}`, each pull request's
+  newest build (the design check, [design-checks.md](design-checks.md)). Not implemented → exit 2
+  (an object that names anything but the numbers asked counts the same): open pull requests are then
+  checked after their merge, on a main build.
 
 **Acting commands** (only the agent calls them, under the environment lock):
 

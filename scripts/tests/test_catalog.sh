@@ -272,7 +272,7 @@ assert "hotspots: a tab walks where it led on its own page, a list row and a lin
     {"kind":"rows","name":"Quarterly plan","box":[0,0.8,0.5,0.1],"to":"/projects","items":["issue-42/AC-1","issue-42/EX-1"]}])
   and (.pages[] | select(.pattern == "/projects") | (.hotspots[1] | has("to") | not) and (.hotspots[2] | has("to") | not) and .hotspots[3].to == "/files" and [.hotspots[4:7][] | .to] == ["/files",null,null])' "$data"
 assert "collections" '.collections == [{"name":"Upload","members":["#42","S-7 AC-1"]}]' "$data"
-assert "control center: the modules' state" '(.modules.modules | length) == 13 and (.modules.modules[] | select(.id == "ui-sweep") | .state == "disabled") and .interactive == false and (.modules | has("generated_utc") | not)' "$data"
+assert "control center: the modules' state" '(.modules.modules | length) == 15 and (.modules.modules[] | select(.id == "ui-sweep") | .state == "disabled") and .interactive == false and (.modules | has("generated_utc") | not)' "$data"
 assert "design findings: register fields, a crop, nothing else" '(.design | length) == 2 and (.design[0] | .id == "D-1" and .saw == "Text of “Rename” button is clipped" and (.crop | test("^i[0-9]+$")) and (has("shot") | not) and (has("box") | not))
   and .design[1].status == "dismissed" and .design[1].crop == null' "$data"
 assert "findings: validation and stress as they are, security only counted" '.findings.validation.cases[0].message == "[value-intact] changed" and .findings.stress.checks[0].id == "STRESS-API-2"

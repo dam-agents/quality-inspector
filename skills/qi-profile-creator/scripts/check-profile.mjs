@@ -124,7 +124,7 @@ else {
 if (m !== null && !obj(m)) { fail('profile.json: not an object'); m = null; }
 
 if (m) {
-  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'security', 'canary', 'interfaces', 'validation', 'expected_requests', 'environment', 'config', 'sandbox', 'operator_credentials', 'ux_signals'];
+  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'security', 'canary', 'interfaces', 'validation', 'expected_requests', 'environment', 'config', 'sandbox', 'operator_credentials', 'design', 'ux_signals'];
   for (const k of Object.keys(m)) if (!TOP.includes(k)) warn(`profile.json: unknown key '${k}' — the core ignores it`);
   m.schema === 'qi-profile/v1' ? pass('schema qi-profile/v1') : fail(`schema '${m.schema ?? ''}' is not qi-profile/v1`);
   str(m.product) ? pass(`product: ${m.product}`) : fail('product: missing');
@@ -337,6 +337,19 @@ if (m) {
       if (it.cli !== undefined && !str(it.cli)) fail('interfaces.cli: must be the published CLI\'s command');
       if (it.openapi !== undefined && !/^\/\S*$/.test(String(it.openapi))) fail('interfaces.openapi: must be a path under app.url (/…)');
       if (fails === before) pass(`interfaces: cli ${it.cli ?? '-'}, openapi ${it.openapi ?? '-'}`);
+    }
+  }
+
+  // design: optional; the design checks' retired words, dark theme and tokens, read by the core's
+  // own parser (scripts/lib/design-rules.mjs → parseDesign), whose notes are this check's failures.
+  if (m.design !== undefined) {
+    const lib = core && join(core, 'scripts/lib/design-rules.mjs');
+    if (!obj(m.design)) fail('design: not an object');
+    else if (!lib || !existsSync(lib)) warn('design: not checked without the core');
+    else {
+      const d = (await import(pathToFileURL(lib).href)).parseDesign(m);
+      for (const n of d.notes) fail(n);
+      if (!d.notes.length) pass(`design: ${d.retired.length} retired word${d.retired.length === 1 ? '' : 's'}, dark theme ${d.dark.mode}, tokens ${d.tokens.prefixes.join(' ') || 'every :root custom property'}`);
     }
   }
 
