@@ -6,6 +6,9 @@
 #   versions                      -> {"candidate": <tag>, "baseline": <tag>|null}
 #   versions --between <from> <to> -> JSON array of the tags of one channel published strictly
 #                                     between the two, oldest first (bisection, docs/triage.md)
+#   versions --prs <n>…            -> {"<n>": <tag>|null} — each pull request's newest build, its
+#                                     tags matching engine_config.pull_requests.tag with {pr} = <n>
+#                                     (docs/design-checks.md); exit 2 when pull_requests is not set
 set -u
 export LC_ALL=C
 . "$(dirname "$0")/../lib/common.sh"
@@ -17,15 +20,29 @@ BC="${QI_BASELINE_CHANNEL:-$(jq -r '.default_baseline // "none"' <<<"$CFG")}"
 jq -e --arg c "$CC" '.channels[$c]' <<<"$CFG" >/dev/null || { echo "unknown candidate channel '$CC'" >&2; exit 1; }
 [ "$BC" = none ] || jq -e --arg c "$BC" '.channels[$c]' <<<"$CFG" >/dev/null || { echo "unknown baseline channel '$BC'" >&2; exit 1; }
 read -r HOST REPO < <(ref_parts "$CHART")
-FROM=""; TO=""
+FROM=""; TO=""; PRS=""; PAGES="$(jq -r '.max_pages // 30' <<<"$CFG")"
 if [ "${1:-}" = --between ]; then
   FROM="${2:-}"; TO="${3:-}"
   [ -n "$FROM" ] && [ -n "$TO" ] || { echo "usage: versions --between <from> <to>" >&2; exit 1; }
+elif [ "${1:-}" = --prs ]; then
+  shift
+  jq -e '.pull_requests.tag' <<<"$CFG" >/dev/null || { echo "engine_config.pull_requests is not set: this product names no build of a pull request" >&2; exit 2; }
+  for n in "$@"; do [[ "$n" =~ ^[1-9][0-9]{0,6}$ ]] || { echo "usage: versions --prs <pull request number>…" >&2; exit 1; }; done
+  [ $# -gt 0 ] || { echo '{}'; exit 0; }
+  PRS="$(printf '%s\n' "$@" | jq -R . | jq -sc 'unique')"
+  # A pull request with no build would page through the whole listing: its own, smaller cap.
+  PAGES="$(jq -r '.pull_requests.max_pages // 5' <<<"$CFG")"
 fi
 
-# Enough tags: quay pages newest-first until both channels have their builds; /v2 lists all.
+# Enough tags: quay pages newest-first until both channels have their builds (every pull request
+# its build); /v2 lists all.
 need() {
   if [ -n "$FROM" ]; then awk -v f="$FROM" -v t="$TO" '$1==f{a=1} $1==t{b=1} END{print (a&&b) ? "true" : "false"}'; return; fi
+  if [ -n "$PRS" ]; then
+    jq -r --argjson prs "$PRS" --slurp -R 'split("\n") | map(select(length>0) | split(" ")[0]) as $t
+      | all($prs[]; . as $n | ($CFG.pull_requests.tag | gsub("\\{pr\\}"; $n)) as $re | any($t[]; test($re)))' --argjson CFG "$CFG"
+    return
+  fi
   jq -r --arg c "$CC" --arg b "$BC" --slurp -R '
   split("\n") | map(select(length>0) | split(" ") | {name:.[0], ts:(.[1]|tonumber)}) as $t
   | def n($ch): if $ch == "none" then 0 else ($t | map(select(.name | test($CFG.channels[$ch].tag))) | length) end;
@@ -33,7 +50,7 @@ need() {
 }
 TAGS=""
 if [ "$API" = quay ]; then
-  for p in $(seq 1 "$(jq -r '.max_pages // 30' <<<"$CFG")"); do
+  for p in $(seq 1 "$PAGES"); do
     page="$(curl -fsS --max-time 20 "https://quay.io/api/v1/repository/$REPO/tag/?limit=100&onlyActiveTags=true&page=$p")" \
       || { echo "quay listing failed for $REPO" >&2; exit 1; }
     rows="$(jq -r '.tags[]? | "\(.name) \(.start_ts // 0)"' <<<"$page")" \
@@ -46,16 +63,18 @@ else
   TAGS="$(tags_oci "$HOST" "$REPO")" || { echo "OCI tag listing failed for $HOST/$REPO" >&2; exit 1; }
 fi
 
-printf '%s\n' "$TAGS" | jq -R --slurp -c --arg c "$CC" --arg b "$BC" --arg f "$FROM" --arg to "$TO" --argjson CFG "$CFG" '
+printf '%s\n' "$TAGS" | jq -R --slurp -c --arg c "$CC" --arg b "$BC" --arg f "$FROM" --arg to "$TO" --argjson prs "${PRS:-null}" --argjson CFG "$CFG" '
   split("\n") | map(select(length>0) | split(" ") | {name:.[0], ts:(.[1]|tonumber)}) as $t
-  | def ordered($ch): $CFG.channels[$ch] as $d
-      | $t | map(select(.name | test($d.tag)))
+  | def sorted($d): $t | map(select(.name | test($d.tag)))
       | if $d.order == "semver" then sort_by(.name | split(".") | map(tonumber? // 0))
         elif $d.order == "numeric-suffix" then sort_by(.name | capture("(?<n>[0-9]+)$").n | tonumber)
         else sort_by(.ts) end
       | reverse | map(.name);
+  def ordered($ch): sorted($CFG.channels[$ch]);
   def pos($o; $x): $o | to_entries | map(select(.value == $x)) | .[0].key;
-  if $f != "" then
+  if $prs != null then
+    reduce $prs[] as $n ({}; . + {($n): (sorted($CFG.pull_requests + {tag: ($CFG.pull_requests.tag | gsub("\\{pr\\}"; $n))})[0] // null)})
+  elif $f != "" then
     # The channel both builds belong to, the candidate channel first.
     ([$c] + ($CFG.channels | keys) | map(select(. as $ch | ($f | test($CFG.channels[$ch].tag)) and ($to | test($CFG.channels[$ch].tag)))) | .[0]) as $ch
     | if $ch == null then error("\($f) and \($to) are not builds of one channel") else . end

@@ -32,6 +32,7 @@ confirmed before writing files.
 | 17 | The main object a user creates, with a name and a description (a project, a document), and where in the UI; the namespace its pods run in when no engine names one | `security.entity`, `security.namespace`, `canary.thing` — one a user creates in one step, with nothing set up first (`canary.field` when the text shows in another field, `canary.none` when there is no such object) |
 | 18 | API calls the security run cannot make through the UI: create that object, mint and use an API key | `suite/lib/security-api.ts` (its exports: the core's `docs/security.md`) |
 | 19 | Main flows that leave the product (it answers in Slack, files a GitHub issue) and the throwaway accounts that would make them testable: what the product's connection asks for, the hosts, methods and paths, what the test person does there, how the product treats posts from apps and bots | `sandbox`, `sandbox/<name>.md`, `bin/sandbox`, `suite/` helpers, `ask` config keys, `egress` (Sandbox accounts, below) |
+| 20 | Its design system: the words its glossary struck, how its dark theme turns on, which CSS custom properties are design tokens; whether its CI publishes a build per pull request, and the tag's shape | `design`, `engine_config.pull_requests` (the core's `docs/design-checks.md`) |
 
 ## Where to look
 

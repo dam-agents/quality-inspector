@@ -15,12 +15,13 @@ assert "registry: unique ids, a doc each, switches are settings" \
   '(.modules | map(.id) | length) == (.modules | map(.id) | unique | length)
    and all(.modules[]; .doc | test("^docs/[a-z-]+\\.md$"))
    and all(.modules[] | select(.switch); .settings[.switch] != null)
-   and all(.modules[] | select(.kind == "modules"); .settings[.switch].type == "cadence")' "$(cat "$SCRIPTS/lib/modules.json")"
+   and all(.modules[] | select(.kind == "modules" and .target == null); .settings[.switch].type == "cadence")
+   and all(.modules[] | select(.target != null); .target == "pr" and .settings[.switch].values == ["disabled","enabled"])' "$(cat "$SCRIPTS/lib/modules.json")"
 
 # ---------------------------------------------------------------- status
 st="$(bash "$M" status)"
 assert "status lists every module with its defaults" \
-  '(.modules | length) == 12 and (.modules[] | select(.id == "ui-sweep") | .state == "disabled" and .settings.ui_sweep_review_pages.value == "10")
+  '(.modules | length) == 14 and (.modules[] | select(.id == "ui-sweep") | .state == "disabled" and .settings.ui_sweep_review_pages.value == "10")
    and (.modules[] | select(.id == "edge-cases") | .state == "enabled") and (.modules[] | select(.id == "issues") | .state == "on")
    and .global.dashboard_interactive.value == "disabled" and .focus == [] and .schedules_as_of == null' "$st"
 echo "- ui_sweep: hourly" >> "$WORK_DIR/CONFIG.md"
@@ -117,6 +118,9 @@ assert "weekly: not within 7 days" '(.due | index("stress")) == null' "$(bash "$
 printf '%s ran module=stress candidate=c0\n' "$(iso_ago $((8 * 1440)))" > "$WORK_DIR/MODULES.log.tmp"
 grep -v 'module=stress' "$WORK_DIR/MODULES.log" >> "$WORK_DIR/MODULES.log.tmp"; mv "$WORK_DIR/MODULES.log.tmp" "$WORK_DIR/MODULES.log"
 assert "weekly: due after 7 days on a new build" '(.due | index("stress")) != null' "$(bash "$M" due c2)"
+bash "$M" set design-check design_checks=enabled >/dev/null
+assert "a pull request module is on, never due by the candidate (docs/design-checks.md)" '(.on | index("design-check")) != null and (.due | index("design-check")) == null
+  and (.previous | has("design-check") | not)' "$(bash "$M" due c3)"
 
 # ---------------------------------------------------------------- schedules
 printf '[{"name":"quality-inspector-regression-nightly","enabled":false,"cron":"0 3 * * *","task":"SECRET TASK TEXT"},{"name":"quality-inspector-security-weekly","enabled":true,"cron":"0 4 * * 0"},{"bogus":1}]' \

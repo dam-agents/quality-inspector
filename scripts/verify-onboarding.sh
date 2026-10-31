@@ -84,6 +84,7 @@ explorations max_explorations_per_ac auto_promote security_checks security_faile
 confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi
 scenario_discovery scenario_channel profile_scenarios regression_channel max_scenarios_per_run max_scenarios_per_day work_repo test_catalog
 lend_model nested_target live_browser slack_channel slack_tests_per_day slack_report_visibility report_visibility github_login found_label fix_label
+design_label design_desk_findings design_desk_channel design_desk_bot design_desk_max_per_run design_desk_min_severity
 $(jq -r '[.global, (.modules[] | select(.kind == "modules" or .kind == "queue") | .settings)] | add | keys[]' "$SCRIPT_DIR/lib/modules.json" 2>/dev/null)"
 
 if [ "$STRUCTURE" = 1 ]; then
@@ -201,6 +202,18 @@ if [ -f "$CONFIG" ]; then
   case "$(cfg slack_channel)" in ('') ok cfg:slack_channel "none — Slack orders no issue test";;
     (*) printf '%s' "$(cfg slack_channel)" | grep -qE '^[CGD][A-Z0-9]{6,}$' && ok cfg:slack_channel "$(cfg slack_channel)" \
           || fail cfg:slack_channel "'$(cfg slack_channel)' is not a Slack chat id" "use the id describe_channel lists, e.g. C0123ABCD (docs/slack.md)";; esac
+  # Design findings to the Design Desk (docs/design-checks.md): off unless enabled, and then only with its conversation and bot.
+  enum design_desk_findings "enabled disabled"; enum design_desk_min_severity "high medium low"
+  for k in design_desk_channel:'^[CDG][A-Z0-9]{6,20}$':"the C…/G…/D… id of the conversation the Design Desk listens in" \
+           design_desk_bot:'^[UW][A-Z0-9]{6,20}$':"the Design Desk bot's member id (U…), for the mention"; do
+    n="${k%%:*}"; r="${k#*:}"; why="${r#*:}"; r="${r%%:*}"; v="$(cfg "$n")"
+    if [ -n "$v" ] && ! printf '%s' "$v" | grep -qE "$r"; then fail "cfg:$n" "'$v' is not $why" "set $why, or leave it empty"
+    elif [ -z "$v" ] && [ "$(cfg design_desk_findings)" = enabled ]; then fail "cfg:$n" "empty while design_desk_findings is enabled" "set $why, or disable design_desk_findings"
+    else ok "cfg:$n" "${v:-empty}"; fi
+  done
+  v="$(cfg design_desk_max_per_run)"
+  case "$v" in ('') ok cfg:design_desk_max_per_run default;; (*[!0-9]*) fail cfg:design_desk_max_per_run "'$v' is not a number" "set 1-20";;
+    (*) [ "$v" -ge 1 ] && [ "$v" -le 20 ] && ok cfg:design_desk_max_per_run "$v" || fail cfg:design_desk_max_per_run "'$v' is not 1-20" "set 1-20";; esac
   case "$(cfg live_browser)" in (''|disabled) ok cfg:live_browser "disabled or detected";;
     (http://127.0.0.1:[0-9]*|http://localhost:[0-9]*) ok cfg:live_browser "$(cfg live_browser)";;
     (*) fail cfg:live_browser "'$(cfg live_browser)' is not a CDP endpoint on this VM" "http://127.0.0.1:<port> as an override, empty to detect, or disabled (docs/test-authoring.md → Watching live)";; esac

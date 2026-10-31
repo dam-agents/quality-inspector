@@ -1,6 +1,6 @@
 {
   "schema": "qi-modules/v1",
-  "about": "The closed registry of testing modules (docs/modules.md). The only keys `modules.sh set` may write, with their only values; read by preflight.sh, catalog.mjs and verify-onboarding.sh.",
+  "about": "The closed registry of testing modules (docs/modules.md). The only keys `modules.sh set` may write, with their only values; read by preflight.sh, catalog.mjs and verify-onboarding.sh. A module with `target: pr` runs on pull request builds: the pre-flight, not `modules.sh due`, decides when it is due.",
   "cadences": ["disabled", "per-build", "weekly"],
   "modules": [
     { "id": "issues", "title": "Issue criteria", "kind": "core", "doc": "docs/issue-qa.md", "log": "ISSUES",
@@ -65,6 +65,19 @@
         "stress_checks": { "type": "cadence", "default": "disabled" },
         "stress_max_concurrency": { "type": "int", "min": 1, "max": 50, "default": 10 },
         "stress_duration_s": { "type": "int", "min": 1, "max": 300, "default": 60 } } },
+    { "id": "consistency", "title": "Inconsistency radar", "kind": "modules", "doc": "docs/design-checks.md", "log": "MODULES",
+      "switch": "consistency_radar",
+      "what": "Walks the main screens and finds patterns that look different for the same job: page headers, margins, buttons, empty states.",
+      "settings": {
+        "consistency_radar": { "type": "cadence", "default": "disabled" },
+        "consistency_max_pages": { "type": "int", "min": 5, "max": 100, "default": 40 } } },
+    { "id": "design-check", "title": "PR design check", "kind": "modules", "target": "pr", "doc": "docs/design-checks.md", "log": "MODULES",
+      "switch": "design_checks",
+      "what": "Checks the screens that a labelled pull request changes, on its own build: missing states, accessibility in light and dark, design tokens, retired words.",
+      "settings": {
+        "design_checks": { "type": "enum", "values": ["disabled", "enabled"], "default": "disabled" },
+        "design_check_max_prs": { "type": "int", "min": 1, "max": 5, "default": 1 },
+        "design_check_max_pages": { "type": "int", "min": 1, "max": 20, "default": 6 } } },
     { "id": "feature-focus", "title": "Feature focus", "kind": "queue", "doc": "docs/modules.md", "log": "MODULES",
       "what": "Tests one area of the product in depth, once, on request.",
       "settings": {
