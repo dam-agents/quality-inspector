@@ -15,12 +15,13 @@ assert "registry: unique ids, a doc each, switches are settings" \
   '(.modules | map(.id) | length) == (.modules | map(.id) | unique | length)
    and all(.modules[]; .doc | test("^docs/[a-z-]+\\.md$"))
    and all(.modules[] | select(.switch); .settings[.switch] != null)
-   and all(.modules[] | select(.kind == "modules"); .settings[.switch].type == "cadence")' "$(cat "$SCRIPTS/lib/modules.json")"
+   and all(.modules[] | select(.kind == "modules" and .due == null); .settings[.switch].type == "cadence")
+   and all(.modules[] | select(.due != null); .settings[.switch].values[0] == "disabled")' "$(cat "$SCRIPTS/lib/modules.json")"
 
 # ---------------------------------------------------------------- status
 st="$(bash "$M" status)"
 assert "status lists every module with its defaults" \
-  '(.modules | length) == 12 and (.modules[] | select(.id == "ui-sweep") | .state == "disabled" and .settings.ui_sweep_review_pages.value == "10")
+  '(.modules | length) == 13 and (.modules[] | select(.id == "ui-sweep") | .state == "disabled" and .settings.ui_sweep_review_pages.value == "10")
    and (.modules[] | select(.id == "edge-cases") | .state == "enabled") and (.modules[] | select(.id == "issues") | .state == "on")
    and .global.dashboard_interactive.value == "disabled" and .focus == [] and .schedules_as_of == null' "$st"
 echo "- ui_sweep: hourly" >> "$WORK_DIR/CONFIG.md"

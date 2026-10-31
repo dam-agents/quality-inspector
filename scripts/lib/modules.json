@@ -65,6 +65,14 @@
         "stress_checks": { "type": "cadence", "default": "disabled" },
         "stress_max_concurrency": { "type": "int", "min": 1, "max": 50, "default": 10 },
         "stress_duration_s": { "type": "int", "min": 1, "max": 300, "default": 60 } } },
+    { "id": "ux-signals", "title": "Real-user UX signals", "kind": "modules", "doc": "docs/ux-signals.md", "log": "MODULES",
+      "switch": "ux_signals", "due": "signals",
+      "what": "Reads how real users fare in the UI, replays the worst signals on the build they ran, and turns confirmed ones into design findings for Design Desk.",
+      "settings": {
+        "ux_signals": { "type": "enum", "values": ["disabled", "daily", "weekly"], "default": "disabled" },
+        "ux_period_days": { "type": "int", "min": 1, "max": 90, "default": 7 },
+        "ux_max_candidates": { "type": "int", "min": 0, "max": 20, "default": 3 },
+        "ux_handoff": { "type": "enum", "values": ["manual", "auto"], "default": "manual" } } },
     { "id": "feature-focus", "title": "Feature focus", "kind": "queue", "doc": "docs/modules.md", "log": "MODULES",
       "what": "Tests one area of the product in depth, once, on request.",
       "settings": {

@@ -156,6 +156,8 @@ const extract = () => {
     inputs: uniq(pick('input:not([type=hidden]):not([type=submit]),textarea,select,[role=combobox],[role=switch],[role=checkbox]', label)),
     links: uniq([...document.querySelectorAll('a[href]')].filter((e) => vis(e) && !inData(e)).map((e) => `${name(e)} → ${new URL(e.href, location.href).pathname}`).filter((s) => !s.startsWith(' →'))),
     hrefs: [...document.querySelectorAll('a[href]')].map((e) => e.href),
+    // The visible elements' data-testid values: what the product's usage signals name (docs/ux-signals.md).
+    testids: uniq([...document.querySelectorAll('[data-testid]')].filter(vis).map((e) => clean(e.getAttribute('data-testid'))).filter(Boolean)).slice(0, 300),
   };
 };
 

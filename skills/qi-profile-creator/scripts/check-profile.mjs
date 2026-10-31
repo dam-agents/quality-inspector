@@ -124,7 +124,7 @@ else {
 if (m !== null && !obj(m)) { fail('profile.json: not an object'); m = null; }
 
 if (m) {
-  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'security', 'canary', 'interfaces', 'validation', 'expected_requests', 'environment', 'config', 'sandbox', 'operator_credentials'];
+  const TOP = ['schema', 'product', 'app', 'issues', 'engine', 'engine_config', 'boundary', 'egress', 'requires', 'security', 'canary', 'interfaces', 'validation', 'expected_requests', 'environment', 'config', 'sandbox', 'operator_credentials', 'ux_signals'];
   for (const k of Object.keys(m)) if (!TOP.includes(k)) warn(`profile.json: unknown key '${k}' — the core ignores it`);
   m.schema === 'qi-profile/v1' ? pass('schema qi-profile/v1') : fail(`schema '${m.schema ?? ''}' is not qi-profile/v1`);
   str(m.product) ? pass(`product: ${m.product}`) : fail('product: missing');
@@ -265,6 +265,23 @@ if (m) {
         if (c.required !== undefined && typeof c.required !== 'boolean') { fail(`operator credential ${id}: required must be true or false`); ok = false; }
       }
       if (ok) pass(`operator_credentials: ${list.length} — ${list.map((c) => 'E2E_' + c.name).join(', ')}`);
+    }
+  }
+  // ux_signals — the real-user usage endpoint the ux-signals module reads (docs/ux-signals.md).
+  if (m.ux_signals !== undefined) {
+    const u = m.ux_signals; let ok = obj(u);
+    if (!ok) fail('ux_signals: must be an object');
+    else {
+      let url = null; try { url = new URL(String(u.endpoint)); } catch { /* below */ }
+      if (!url || url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) { fail('ux_signals.endpoint: an https URL with no credentials, query or fragment'); ok = false; }
+      else if (!(m.egress ?? []).some((e) => e?.host === url.hostname && String(e?.method ?? '').toUpperCase() === 'GET' && e?.path === url.pathname)) { fail(`ux_signals.endpoint: egress needs {"host": "${url.hostname}", "method": "GET", "path": "${url.pathname}"}`); ok = false; }
+      const key = String(u.api_key_env ?? '');
+      const creds = (Array.isArray(m.operator_credentials) ? m.operator_credentials : []).map((c) => `E2E_${c?.name}`);
+      if (!/^E2E_[A-Z][A-Z0-9_]{0,31}$/.test(key) || !/(^|_)(TOKEN|SECRET|KEY)(_|$)/.test(key.slice(4)) || !creds.includes(key)) { fail('ux_signals.api_key_env: E2E_<NAME> of an operator_credentials entry with a TOKEN, SECRET or KEY segment'); ok = false; }
+      if (u.min_users !== undefined && !(Number.isInteger(u.min_users) && u.min_users >= 3)) { fail('ux_signals.min_users: a whole number, 3 or more'); ok = false; }
+      if (u.min_rate !== undefined && !(typeof u.min_rate === 'number' && u.min_rate >= 0 && u.min_rate <= 1)) { fail('ux_signals.min_rate: a number from 0 to 1'); ok = false; }
+      if (u.flows !== undefined && !(Array.isArray(u.flows) && u.flows.every(str))) { fail('ux_signals.flows: a list of flow names'); ok = false; }
+      if (ok) pass(`ux_signals: ${url.hostname}${url.pathname}, key ${key}`);
     }
   }
   // egress placeholders name profile keys that exist.

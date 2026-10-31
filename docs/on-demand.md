@@ -78,6 +78,10 @@ A direct session's first request names it ([logging.md](logging.md) → **Sessio
   ([ui-sweep.md](ui-sweep.md) → **5. Recheck**). **"discuss D-<k>[: <question>]"** — talk about the
   finding, read-only ([ui-sweep.md](ui-sweep.md) → **6. Discuss**). Beside a scheduled run's chat, or
   from a dashboard viewer, both go to a fresh session ([persistence.md](persistence.md) → **Handoff**).
+- **"send D-<k> to design"** — that design finding to Design Desk through its Slack intake
+  ([ux-signals.md](ux-signals.md) → **6. Handoff to Design Desk**); the script's refusal is said as
+  it is. Beside a scheduled run's chat, or from a dashboard viewer, a fresh session
+  ([persistence.md](persistence.md) → **Handoff**).
 - **"run #N"**, **"run #N AC-<k>"** (or `IN-<k>`, `EX-<k>`), **"run S-<k>[ AC-<j>]"**, **"run P-<slug>[ AC-<j>]"** — a
   test run by hand, now, on the build that is up: `env.sh lock operator` (busy → say who holds
   it, end); `env.sh status` — no product up → `env.sh up <candidate>` and `wait` with the

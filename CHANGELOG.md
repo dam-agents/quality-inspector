@@ -7,6 +7,27 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.52.0 — 2026-10-31
+
+**Upgrade:**
+1. Nothing to run for an instance whose profile has no `ux_signals` entry: the new
+   `ux-signals` module stays off ([docs/ux-signals.md](docs/ux-signals.md)). It reads how real
+   users fare in the product's UI from the endpoint the profile names, replays the worst signals
+   on the build they ran, and keeps the judge-confirmed ones as design findings (source `field`).
+   When the profile has the entry, **offer** it to the operator once: `module ux-signals set
+   ux_signals=daily` (or `weekly`) switches it on ([docs/modules.md](docs/modules.md) →
+   **Control**). Before that: **operator-only** — the egress rule the profile's `egress` lists for
+   the endpoint (`GET`, that host and path), and the API key in the `E2E_<NAME>` line of
+   `work/env/credentials.env` (`bash "$HOME/scripts/env.sh" init` adds the empty line; fill it in
+   the agent's files, never in chat); then `bash "$HOME/scripts/verify-onboarding.sh" --config`.
+2. Nothing to run — Design Desk takes design findings through its Slack bug intake. To send them,
+   the operator sets `design_desk_channel: <the Slack conversation id Design Desk is bound to>`
+   in `work/CONFIG.md`; then "send D-`<k>` to design" works for any open design finding, and the
+   Design view gets its button. `ux_handoff: auto` (default `manual`) sends the judge-confirmed
+   field findings by itself — offer it, never set it unasked.
+3. Nothing to run — the UI map records the visible `data-testid` values from the next mapping on
+   (`testids`); the module's "unused controls" need a map made by 3.52.0 or later.
+
 ## 3.51.0 — 2026-10-30
 
 **Upgrade:**

@@ -20,7 +20,8 @@ pull request input is the Change radar's sanitized text, before the build ([rada
    buttons, tabs, fields and links (repeated data rows and cards excluded), where each sits in
    the screenshot and the page a link, navigation item or tab leads to (`boxes`, `navigates`, for
    the catalog's product map, where a list's first row per detail page stands for the list), its forms with their fields' types
-   and limits read from attributes (`forms`, for [validation.md](validation.md)), an accessibility snapshot, a
+   and limits read from attributes (`forms`, for [validation.md](validation.md)), the visible elements' `data-testid` values
+   (`testids`, for [ux-signals.md](ux-signals.md)), an accessibility snapshot, a
    screenshot, and the page's **signals** — console errors,
    failed same-origin requests, load timing. `node "$HOME/scripts/ui-diff.mjs" <old> <new>`
    turns two maps into pages added/removed and controls renamed, moved, removed or added —

@@ -8,6 +8,7 @@
 //       -> [{pattern, viewport, shot, reason}]   the shots to review: changed, then new, then most findings
 //   node design-findings.mjs merge <sweep.json> [--review <review.json>] [--no-render]
 //   node design-findings.mjs merge --noticed-only [--no-render]
+//   node design-findings.mjs merge --signals <scored.json> [--field <field.json>] [--no-render]
 //       -> {findings, open, resolved, dismissed, new, crops, notes}
 //   node design-findings.mjs recheck-plan D-<k>
 //       -> {id, status, source, check, severity, pattern, viewport, last_seen, sweep: {pattern, viewports} | null, review, note}
@@ -32,6 +33,12 @@
 // that changes nothing leaves findings.json untouched (not rewritten, `updated_utc` kept). Crops
 // of open findings render to work/design/crops/<id>.jpg by the suite's playwright-core (none
 // without it; --no-render skips).
+// Field findings (docs/ux-signals.md): --field is the agent's replay of the candidates of
+// --signals (ux-signals.mjs score) — [{signal, route, element, build, class, ui, saw, expected,
+// steps, shot, video, box, judge: {agree, reason}}]; one id per signal, route and element. The
+// numbers come from scored.json only; bug, ux-friction or slow without the judge's agreement is
+// kept as not-reproduced. --signals alone refreshes their numbers and resolves an open one once a
+// newer build ran a whole period without it passing the thresholds (lib/ux-field.mjs → quietBuild).
 
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -39,6 +46,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, s
 import { createRequire } from 'node:module';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { CLASSES, REPORTED, fingerprint as fieldFp, quietBuild } from './lib/ux-field.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const WORK = resolve(process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work'));
@@ -52,7 +60,7 @@ for (let i = 2; i < process.argv.length; i++) {
   else if (a.startsWith('--')) flags[a.slice(2)] = process.argv[++i];
   else pos.push(a);
 }
-const usage = 'usage: design-findings.mjs review-plan <sweep.json> [--max N] | merge <sweep.json> [--review FILE] [--no-render] | merge --noticed-only [--no-render] | recheck-plan D-<k>';
+const usage = 'usage: design-findings.mjs review-plan <sweep.json> [--max N] | merge <sweep.json> [--review FILE] [--no-render] | merge --noticed-only [--no-render] | merge --signals <scored.json> [--field FILE] [--no-render] | recheck-plan D-<k>';
 const die = (m) => { console.error(m ? `design-findings: ${m}` : usage); process.exit(2); };
 const regValue = (k) => { // a registry key through lib/config.sh → reg: out of range reads as its default
   try {
@@ -92,7 +100,7 @@ if (cmd === 'recheck-plan') {
   }, null, 2));
   process.exit(0);
 }
-if (!sweepPath && !(cmd === 'merge' && flags['noticed-only'])) die();
+if (!sweepPath && !(cmd === 'merge' && (flags['noticed-only'] || flags.signals))) die();
 const sweep = sweepPath ? readJson(sweepPath) : null;
 if (sweepPath && (!sweep || !Array.isArray(sweep.pages) || !BUILD.test(String(sweep.build ?? '')))) die(`${sweepPath} is not a sweep.json`);
 const sweepDir = sweepPath ? dirname(resolve(sweepPath)) : null;
@@ -233,6 +241,35 @@ for (const { kind, d, f, b } of vfiles.sort((x, y) => x.t - y.t || `${x.kind}/${
 }
 for (const { x, first, last } of noticed.values()) upsert('noticed', x, last, first);
 
+// Field findings: the agent's replay of a real-user signal; the numbers are scored.json's.
+const scored = flags.signals ? readJson(flags.signals) : null;
+if (flags.signals && scored?.schema !== 'qi-ux-scored/v1') die(`${flags.signals} is not a qi-ux-scored/v1 file`);
+if (flags.field && !scored) die('--field needs --signals <scored.json>');
+const candidate = new Map((scored?.candidates ?? []).map((c) => [`${c.fingerprint}|${c.build}`, c]));
+const metrics = (c) => ({ signal: c.signal, users: c.users, events: c.events ?? null, views: c.views ?? null, rate: c.rate, prev_rate: c.prev_rate ?? null,
+  trend: c.trend ?? null, regression: !!c.regression, build: c.build, period: scored.period });
+const evidence = (p) => (typeof p === 'string' && p && existsSync(abs(p)) ? rel(abs(p)) : null);
+if (flags.field) {
+  const rv = readJson(flags.field);
+  if (!Array.isArray(rv)) notes.push(`${flags.field} is not a JSON list: no field finding merged`);
+  else rv.forEach((r, i) => {
+    const bad = (why) => notes.push(`field entry ${i + 1} rejected: ${why}`);
+    if (!r || typeof r !== 'object') return bad('not an object');
+    const key = fieldFp(r.signal, r.route, r.element ?? null);
+    const c = candidate.get(`${key}|${r.build}`);
+    if (!c) return bad(`${str(r.signal, 20)} on ${str(r.route, 80)} @ ${str(r.build, 40)} is no candidate of ${flags.signals}`);
+    if (!CLASSES.includes(r.class)) return bad(`class '${str(r.class, 20)}' is not one of ${CLASSES.join(', ')}`);
+    if (!str(r.saw, 300)) return bad('no saw');
+    const judge = r.judge && typeof r.judge === 'object' ? { agree: r.judge.agree === true, reason: str(r.judge.reason, 300) || null } : null;
+    let cls = r.class;
+    if (REPORTED.has(cls) && !judge?.agree) { notes.push(`field entry ${i + 1}: the judge did not confirm it — kept as not-reproduced`); cls = 'not-reproduced'; }
+    upsert('field', { fingerprint: key, check: `field:${c.signal}`, severity: cls === 'bug' || (REPORTED.has(cls) && c.regression) ? 'major' : 'minor',
+      pattern: c.route, viewport: '-', target: c.element, saw: str(r.saw, 300), box: r.box == null ? null : okBox(r.box), shot: evidence(r.shot) }, c.build);
+    byFp.get(key).field = { ...metrics(c), class: cls, ui: r.ui !== false, expected: str(r.expected, 300) || null,
+      steps: (Array.isArray(r.steps) ? r.steps : []).map((x) => str(x, 200)).filter(Boolean).slice(0, 15), video: evidence(r.video), judge };
+  });
+}
+
 // Resolution: not seen again on a page+viewport this merge covered, by a check that ran there.
 const sweptPage = new Map(swept.map((p) => [`${p.pattern}|${p.viewport}`, p]));
 const ran = (p, check) => (String(check).startsWith('a11y:') ? p.axe === true : check === 'layout-shift' ? p.cls != null : true);
@@ -243,6 +280,16 @@ for (const f of reg.findings) {
   if (!covered || f.resolved_build || f.status === 'resolved') continue;
   f.resolved_build = build;
   if (f.status !== 'dismissed') f.status = 'resolved';
+}
+if (scored) {
+  for (const f of reg.findings) {
+    if (f.source !== 'field' || seenFp.has(f.fingerprint)) continue;
+    const c = candidate.get(`${f.fingerprint}|${f.last_seen}`);
+    if (c && f.field) f.field = { ...f.field, ...metrics(c) };
+    if (f.status === 'resolved' || f.resolved_build) continue;
+    const b = quietBuild(f, scored);
+    if (b) { f.resolved_build = b; if (f.status !== 'dismissed') f.status = 'resolved'; }
+  }
 }
 // Dismissed: exactly the ids of DISMISSED.md; one taken off it returns to what the sweeps say.
 const dismissed = new Set((() => { try { return readFileSync(join(DESIGN, 'DISMISSED.md'), 'utf8'); } catch { return ''; } })()

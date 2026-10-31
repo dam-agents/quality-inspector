@@ -10,7 +10,9 @@
 #                                           what the dashboard shows
 #   modules.sh due [<candidate>]           {"on":[<id>…], "due":[<id>…], "previous":{<id>:
 #                                           <candidate>|null}, "focus":[<area>…]} — the `modules`
-#                                           run's worklist; without a candidate nothing is due
+#                                           run's worklist; without a candidate nothing is due. A
+#                                           module with `due` in the registry is never due here:
+#                                           the pre-flight asks its own script
 #   modules.sh set <id|global> <key>=<value>…
 #                                          write each key of that module (or `global`) to
 #                                          work/CONFIG.md; refuses a key outside the module, a
@@ -128,7 +130,11 @@ cmd_due() {
               if [ "$lc" != "$cand" ] && { [ -z "$line" ] || [ $((NOW_EPOCH - le)) -ge "$WEEK_S" ]; }; then
                 due="$(jq -c --arg id "$id" '. + [$id]' <<<"$due")"; fi ;;
     esac
-  done < <(jq -r '.modules[] | select(.kind == "modules") | [.id, .switch] | @tsv' "$REG")
+  done < <(jq -r '.modules[] | select(.kind == "modules" and .due == null) | [.id, .switch] | @tsv' "$REG")
+  # A module due by its data, not by the candidate (ux-signals: ux-signals.mjs check, in the pre-flight).
+  while IFS=$'\t' read -r id key; do
+    [ "$(value_of "$key" "$(specs "$id" | jq -c --arg k "$key" '.[$k]')")" = disabled ] || on="$(jq -c --arg id "$id" '. + [$id]' <<<"$on")"
+  done < <(jq -r '.modules[] | select(.kind == "modules" and .due != null) | [.id, .switch] | @tsv' "$REG")
   local focus; focus="$(focus_rows | while IFS= read -r r; do [ "$(cell "$r" 3)" = queued ] && cell "$r" 1; done | jq -R . | jq -sc .)"
   jq -nc --argjson d "$due" --argjson o "$on" --argjson p "$prev" --argjson f "${focus:-[]}" '{on:$o, due:$d, previous:$p, focus:$f}'
 }

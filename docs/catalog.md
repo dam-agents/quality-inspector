@@ -155,7 +155,8 @@ result that is not a pass, and the Runs view a run's `summary` under its result.
 Views: Overview, Modules (each module's switches and settings, and what a job tests: the
 Nightly regression lists its test cases by issue and scenario), Findings (validation, stress,
 security counts, edge-case observations), Design (the design findings: crops, filters, "copy as
-Markdown" for the design team), Runs, Product map (the page shots with every control clickable, coloured by
+Markdown" for the design team; a field finding with its real-user numbers, class and whether it
+went to Design Desk — [ux-signals.md](ux-signals.md)), Runs, Product map (the page shots with every control clickable, coloured by
 its tests' worst verdict, dashed where no test names it; a drawn outline where a shot did not fit; a
 navigation item, tab, link or list row that leads to a mapped page opens that page, like a
 click-through wireframe, with a "back" to the page before), Catalog, Gallery, Coverage,
@@ -188,7 +189,10 @@ every test of its issue), retest the whole issue (`test #42`), promote or demote
 take it out of a collection, and report it as a GitHub issue (`create issue for #42 AC-1`, plus
 `… for the architect` when `fix_label` is set). A design finding's card has "Manage":
 categorize it, dismiss it with a reason or reopen it, recheck it (`recheck D-<k>`), discuss it
-with the agent (`discuss D-<k>`, with the person's question when typed), report it.
+with the agent (`discuss D-<k>`, with the person's question when typed), report it, send it to
+Design Desk (`send D-<k> to design`, an open finding not sent for its build yet; a field finding
+only when confirmed — [ux-signals.md](ux-signals.md) → **6. Handoff to Design Desk**); a field
+finding has no recheck.
 **Run it again**, wherever a result shows — each one time on the build that is up, never a
 verdict unless it says a full run:
 

@@ -287,6 +287,36 @@ value in every run artefact (it masks `PASSWORD`, `TOKEN`, `SECRET`, `KEY` and e
 `E2E_SANDBOX_` value), and `work/env/` is never in the `work_repo` backup, so a restore asks again. A test
 reads it from its environment (`process.env.E2E_<NAME>`) and never hard-codes a key.
 
+## `ux_signals` — how real users use the UI
+
+A product that counts how its users use its UI can serve the counts to the ux-signals module
+([ux-signals.md](ux-signals.md)), which turns them into verified design findings for Design Desk.
+The profile declares the endpoint at the top level; absent → the module is off.
+
+```json
+"ux_signals": {
+  "endpoint": "https://dam.example.com/api/usage/ui/signals",
+  "api_key_env": "E2E_DAM_USAGE_API_KEY",
+  "flows": ["upload", "share"],
+  "min_users": 3,
+  "min_rate": 0.05
+},
+"operator_credentials": [{ "name": "DAM_USAGE_API_KEY", "what": "a read-only key of the UI usage API" }],
+"egress": [{ "host": "dam.example.com", "method": "GET", "path": "/api/usage/ui/signals", "why": "real-user UI signals" }]
+```
+
+- `endpoint` — `https`, no credentials, query or fragment; answers `GET ?from=<ISO>&to=<ISO>`
+  with the response of [ux-signals.md](ux-signals.md) → **The data**: aggregates only, rows of 3
+  users or more, no person's identity. `egress` lists exactly its host and path with `GET`.
+- `api_key_env` — `E2E_<NAME>` of an `operator_credentials` entry (above), with a `TOKEN`,
+  `SECRET` or `KEY` segment: sent as `Authorization: Bearer`, masked like every such value.
+- `flows` — the funnels the usage report watches, by the `flow` names the endpoint uses.
+- `min_users` (3 or more, default 3), `min_rate` (0 to 1, default 0.05) — a `friction` row is a
+  candidate only at or above both.
+- `builds[].version` and `friction[].build` are the build ids `bin/versions` and `bin/env up`
+  use: the module installs the build the users ran. `route` is the page's route pattern,
+  `element` its `data-testid` — the UI map records the visible `data-testid` values to match.
+
 ## `SKILL.md` — what a tester should know
 
 Read at the AC freeze and when writing tests. It holds **user-facing** knowledge only:
