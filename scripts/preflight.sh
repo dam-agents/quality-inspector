@@ -710,16 +710,17 @@ mode_security() {
 # candidate (`weekly`: at most once in 7 days) keyed on `ran module=<id> candidate=` in
 # MODULES.log, plus the queued feature-focus areas. The decision lives in modules.sh due.
 # The design check of pull requests (docs/design-checks.md) is due per pull request build instead:
-# the open ones carrying design_label, updated in the last 30 days, read through `github.sh prs`
-# (their sanitized text alone), each with its build from the profile — design-check.mjs due.
-design_checks_due() {
+# those carrying design_label, updated in the last 30 days, read through `github.sh prs` (their
+# sanitized text alone) — the merged ones on the candidate, the open ones on their own builds from the
+# profile — design-check.mjs due.
+design_checks_due() { # <candidate>
   local tmp out
   [ -n "$TARGET" ] || { jq -nc '{due:[], waiting:[], logs:["target_repo is not configured — no pull request is read"]}'; return; }
   tmp="$(mktemp /tmp/quality-inspector-design.XXXXXX)" || { jq -nc '{due:[], waiting:[], logs:["no temp file for the pull request listing"]}'; return; }
   if ! bash "$SCRIPT_DIR/github.sh" prs --since "$(epoch2iso $((NOW_EPOCH - 30*86400)))" > "$tmp" 2>/dev/null; then
     rm -f "$tmp"; jq -nc '{due:[], waiting:[], logs:["cannot list the target'"'"'s pull requests (github.sh prs) — no design check this run"]}'; return
   fi
-  out="$(node "$SCRIPT_DIR/design-check.mjs" due "$tmp" 2>/dev/null)"; rm -f "$tmp"
+  out="$(node "$SCRIPT_DIR/design-check.mjs" due "$tmp" --candidate "$1" 2>/dev/null)"; rm -f "$tmp"
   jq -ce 'select(.due and .waiting)' <<<"$out" 2>/dev/null || jq -nc '{due:[], waiting:[], logs:["design-check.mjs due failed (work/design-checks/PRS.md)"]}'
 }
 mode_modules() {
@@ -735,7 +736,7 @@ mode_modules() {
   baseline="$(printf '%s' "$versions" | jq -r '.baseline // empty')"
   d="$(bash "$SCRIPT_DIR/modules.sh" due "$candidate" 2>/dev/null)" || fail_out "modules.sh due failed"
   if jq -e '.on | index("design-check")' <<<"$d" >/dev/null; then
-    dc="$(design_checks_due)"
+    dc="$(design_checks_due "$candidate")"
     while IFS= read -r l; do log "$l"; done < <(jq -r '.logs[], (.waiting[] | "PR #\(.pr) waits: \(.reason)")' <<<"$dc")
     jq -e '.due | length > 0' <<<"$dc" >/dev/null && d="$(jq -c '.due += ["design-check"]' <<<"$d")"
   fi
@@ -746,7 +747,7 @@ mode_modules() {
   inv="$WORK/inventory/$candidate/inventory.json"; [ -f "$inv" ] || inv=""
   budget="$(reg modules_max_wallclock_min)"; case "$budget" in (''|*[!0-9]*) budget=90;; esac
   log "candidate $candidate: due $(jq -r '.due | join(",")' <<<"$d")$(jq -r 'if (.focus|length) > 0 then " focus " + (.focus | join(",")) else "" end' <<<"$d")"
-  runlog MODULES "due candidate=$candidate modules=$(jq -r '.due | join(",")' <<<"$d") focus=$(jq -r '.focus | length' <<<"$d") prs=$(jq -r '[.due[].pr] | join(",")' <<<"$dc")"
+  runlog MODULES "due candidate=$candidate modules=$(jq -r '.due | join(",")' <<<"$d") focus=$(jq -r '.focus | length' <<<"$d") prs=$(jq -r '[.due[].prs[]] | join(",")' <<<"$dc")"
   jq -nc --arg c "$candidate" --arg b "$baseline" --arg inv "$inv" --argjson d "$d" --argjson dc "$dc" --argjson budget "$budget" --argjson logs "$(logs_json)" \
     '{mode:"modules", nothing_to_do:false, candidate:$c, baseline:(if $b == "" then null else $b end),
       modules_due:$d.due, previous:$d.previous, focus:$d.focus, design_checks_due:$dc.due,
@@ -882,7 +883,7 @@ TITLE_JQ='
     elif .mode == "modules" then
       "Run modules" + on + some([(.modules_due // [])[] | safe | select(.)]
         + ((.focus // []) | length | if . > 0 then [count(.; "focus area")] else [] end)
-        + [(.design_checks_due // [])[] | .pr | numbers | "PR #" + tostring])
+        + [(.design_checks_due // [])[] | (.prs // [])[] | numbers | "PR #" + tostring])
     elif .mode == "radar" then
       [(.prs_due // [])[] | (.pr | numbers | "PR #" + tostring) as $p
         | ({closed: "Close ", merged: "Track "}[.kind] // "Scan ") + $p] | few("Change radar")

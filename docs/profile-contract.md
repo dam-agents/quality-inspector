@@ -185,7 +185,8 @@ Every executable runs with cwd `$HOME/work`, and with:
   published; non-zero when unknown. The change window of [change-awareness.md](change-awareness.md).
 - `bin/versions --prs <n>…` — **optional** → stdout `{"<n>": "<build>"|null}`, each pull request's
   newest build (the design check, [design-checks.md](design-checks.md)). Not implemented → exit 2
-  (an object that names anything but the numbers asked counts the same); the pull requests then wait.
+  (an object that names anything but the numbers asked counts the same): open pull requests are then
+  checked after their merge, on a main build.
 
 **Acting commands** (only the agent calls them, under the environment lock):
 

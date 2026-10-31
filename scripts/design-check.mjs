@@ -5,95 +5,142 @@
 // at for its missing states (error, loading, empty, long text, a 390 px screen), for accessibility
 // (axe-core and the keyboard focus, light and dark theme) and for consistency with the design system
 // (colours and sizes that are no design token, words the product retired). Black-box: a pull request is
-// its labels and its build alone — never its diff, files or commits (docs/black-box.md).
+// its labels, its merge time and a build alone — never its diff, files or commits (docs/black-box.md).
 //
-//   node design-check.mjs due <prs.json>      -> {"due": [{pr, build, label, updated_at}], "waiting": [{pr, reason}], "logs"}
-//        <prs.json> is `github.sh prs` output; the open, non-draft pull requests carrying `design_label`
-//        (default qa:design), the 10 updated last, each with its newest build from the profile
-//        (`bin/versions --prs`); a build PRS.md already has waits; at most `design_check_max_prs` are due.
-//   node design-check.mjs done <pr> <build> --findings <n>   one PRS.md row (exit 2: bad input)
-//   node design-check.mjs run <pr-inventory.json> --against <base-inventory.json> --pr <n> --build <b>
-//        [--out DIR] [--max-pages N] [--pattern P]… [--base URL] [--dry-run]
-//        -> {check, pages, findings, high, medium, low, notes}; writes <out>/check.json and <out>/shots/
-//        (default out: work/design-checks/pr-<n>/<build>). The screens: --pattern, else the pages of the
-//        pull request's UI map that are new or whose controls differ from the base build's map, then
-//        those whose map screenshot differs, up to --max-pages (design_check_max_pages). --dry-run
-//        prints the plan with no browser and no network.
+//   node design-check.mjs due <prs.json> --candidate <c>
+//     -> {"due": [{kind, prs, build, against, label, updated_at}], "waiting": [{pr, reason}], "logs"}
+//        <prs.json> is `github.sh prs` output; the pull requests carrying `design_label` (default qa:design):
+//        - `merged`: merged in the last 30 days and never checked (no PRS.md row): one entry for all of
+//          them on the candidate <c> once it was published after their merge (bin/build-time), `against`
+//          the newest mapped build (work/inventory/) published before the first of those merges;
+//        - `pr-build`: open, not draft, the 10 updated last, each on its newest own build
+//          (`bin/versions --prs`) that PRS.md does not have, at most `design_check_max_prs` a run.
+//          A profile without builds of pull requests leaves them to their merge.
+//   node design-check.mjs done <pr>[,<pr>…] <build> --findings <n>   one PRS.md row per pull request
+//   node design-check.mjs run <inventory.json> --against <base-inventory.json> --pr <n> [--pr <n>]… --build <b>
+//        [--on-main] [--out DIR] [--max-pages N] [--pattern P]… [--base URL] [--dry-run]
+//        -> {check, pages, findings, high, medium, low, notes}; writes <out>/check.json and <out>/shots/.
+//        A pull request's own build: label `PR #<n>`, out work/design-checks/pr-<n>/<build>; --on-main
+//        (merged pull requests on a main build): label `<build> (PR #<n>, …)`, out
+//        work/design-checks/main/<build>. The screens: --pattern, else the pages of the map that are new
+//        or whose controls differ from the base build's map, then those whose map screenshot differs, up
+//        to --max-pages (design_check_max_pages). --dry-run prints the plan with no browser and no network.
 //
 // Exit 2: usage, or a base off localhost; exit 1: the owner cannot sign in (an environment failure);
 // exit 3: no browser — {error: "no browser: …"} on stdout. Signs in as the owner and only navigates,
 // presses Tab and answers the screen's own data requests in the browser (an error, a delay, empty
 // lists, longer names); it never clicks, types or submits.
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { append, now, rows } from './lib/design-ledger.mjs';
 import { WORK, axeSource, browserFn, compareShots, crop, msg, owner, playwright, profile, pwdVisible, regInt, settle, sh, signIn } from './lib/design-browser.mjs';
 import { changedPages, findRetired, offTokens, parseDesign, refOf, screenName, sevRank, valueText } from './lib/design-rules.mjs';
 
 const [cmd, ...argv] = process.argv.slice(2);
-const flags = { pattern: [] }; const pos = [];
+const flags = { pattern: [], pr: [] }; const pos = [];
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a === '--dry-run') flags.dry = true;
-  else if (a === '--pattern') flags.pattern.push(argv[++i]);
+  else if (a === '--on-main') flags.main = true;
+  else if (a === '--pattern' || a === '--pr') flags[a.slice(2)].push(argv[++i]);
   else if (a.startsWith('--')) flags[a.slice(2)] = argv[++i];
   else pos.push(a);
 }
-const usage = 'usage: design-check.mjs due <prs.json> | done <pr> <build> --findings N | run <pr-inventory.json> --against <base-inventory.json> --pr N --build B [--out DIR] [--max-pages N] [--pattern P]… [--base URL] [--dry-run]';
+const usage = 'usage: design-check.mjs due <prs.json> --candidate C | done <pr>[,<pr>…] <build> --findings N | run <inventory.json> --against <base-inventory.json> --pr N [--pr N]… --build B [--on-main] [--out DIR] [--max-pages N] [--pattern P]… [--base URL] [--dry-run]';
 const die = (m) => { console.error(`design-check: ${m}`); process.exit(2); };
 const out = (o) => console.log(JSON.stringify(o));
 const BUILD_RE = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,99}$/;
 const PR_RE = /^[1-9][0-9]{0,6}$/;
+const UTC = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/;
 const LOOKUP = 10;
+const MERGED_DAYS = 30;
+const prList = (xs) => xs.map((n) => `#${n}`).join(', ');
 
 // ------------------------------------------------------------------ due
 if (cmd === 'due') {
   if (!pos[0]) die(usage);
+  const cand = flags.candidate;
+  if (!BUILD_RE.test(cand ?? '')) die('due needs --candidate <build>');
   let listing;
   try { listing = JSON.parse(readFileSync(pos[0], 'utf8')); } catch (e) { die(`cannot read ${pos[0]}: ${msg(e)}`); }
   const label = sh('cfg design_label') || 'qa:design';
   const max = regInt('design_check_max_prs', 1, 1, 5);
-  const logs = [];
-  const prs = (listing.prs ?? []).filter((p) => p.state === 'open' && !p.draft && (p.labels ?? []).includes(label) && PR_RE.test(String(p.number)))
-    .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
-  if (prs.length > LOOKUP) logs.push(`${prs.length - LOOKUP} more open pull requests carry ${label}: only the ${LOOKUP} updated last are looked at`);
-  const look = prs.slice(0, LOOKUP);
-  if (!look.length) { out({ due: [], waiting: [], logs: [`no open pull request carries ${label}`] }); process.exit(0); }
-  const r = sh(`profile_run versions --prs ${look.map((p) => p.number).join(' ')}`, { status: true });
-  let builds = null;
-  try { builds = r.code === 0 ? JSON.parse(r.out) : null; } catch { builds = null; }
-  // A bin/versions that ignores --prs answers its candidate and baseline: that counts as not implemented.
-  const asked = new Set(look.map((p) => String(p.number)));
-  if (builds && (typeof builds !== 'object' || Array.isArray(builds) || Object.entries(builds).some(([k, v]) => !asked.has(k) || (v !== null && typeof v !== 'string')))) builds = null;
-  if (!builds) {
-    const why = r.code === 2 || (r.code === 0 && !builds) ? 'the profile names no build of a pull request (bin/versions --prs, docs/profile-contract.md)' : `the profile cannot list the builds of pull requests: ${r.err || `exit ${r.code}`}`;
-    out({ due: [], waiting: look.map((p) => ({ pr: p.number, reason: why })), logs: [why] }); process.exit(0);
+  let ledger;
+  try { ledger = rows('prs'); } catch (e) { die(msg(e)); }
+  const logs = []; const due = []; const waiting = [];
+  const mine = (listing.prs ?? []).filter((p) => (p.labels ?? []).includes(label) && PR_RE.test(String(p.number)));
+  const buildTime = (b) => { const t = sh(`profile_run build-time ${b}`); return UTC.test(t) ? t : null; };
+
+  // Merged, never checked: all of them on the candidate, once it carries every one.
+  const since = new Date(Date.now() - MERGED_DAYS * 86400000).toISOString().replace(/\.\d+Z$/, 'Z');
+  const merged = mine.filter((p) => p.state === 'merged' && UTC.test(p.merged_at ?? '') && p.merged_at >= since && !ledger.some((x) => x.pr === String(p.number)))
+    .sort((a, b) => a.merged_at.localeCompare(b.merged_at));
+  if (merged.length) {
+    const ct = buildTime(cand);
+    const carried = ct ? merged.filter((p) => p.merged_at <= ct) : [];
+    if (!ct) for (const p of merged) waiting.push({ pr: p.number, reason: `the publish time of ${cand} is unknown (bin/build-time)` });
+    else for (const p of merged.filter((x) => x.merged_at > ct)) waiting.push({ pr: p.number, reason: `merged after ${cand} was published: the next main build carries it` });
+    if (carried.length) {
+      // The base: the newest mapped build published before the first of these merges.
+      const first = carried[0].merged_at;
+      let maps = [];
+      try {
+        maps = readdirSync(join(WORK, 'inventory')).filter((b) => b !== cand && BUILD_RE.test(b) && existsSync(join(WORK, 'inventory', b, 'inventory.json')))
+          .sort((a, b) => statSync(join(WORK, 'inventory', b)).mtimeMs - statSync(join(WORK, 'inventory', a)).mtimeMs).slice(0, LOOKUP);
+      } catch { maps = []; }
+      const before = maps.map((b) => ({ b, t: buildTime(b) })).filter((x) => x.t && x.t < first).sort((a, b) => b.t.localeCompare(a.t))[0];
+      if (!before) for (const p of carried) waiting.push({ pr: p.number, reason: 'no UI map of a build published before its merge (the nightly regression maps each build)' });
+      else due.push({ kind: 'merged', prs: carried.map((p) => p.number), build: cand, against: before.b,
+        label: `${cand} (PR ${prList(carried.map((p) => p.number))})`, updated_at: carried[carried.length - 1].merged_at });
+    }
   }
-  let checked;
-  try { checked = new Set(rows('prs').map((x) => `${x.pr}|${x.build}`)); } catch (e) { die(msg(e)); }
-  const due = []; const waiting = [];
-  for (const p of look) {
-    const b = builds[String(p.number)];
-    if (!b) { waiting.push({ pr: p.number, reason: 'no build of this pull request yet' }); continue; }
-    if (!BUILD_RE.test(b)) { waiting.push({ pr: p.number, reason: `the profile named a build that is not a plain id: ${String(b).slice(0, 40)}` }); continue; }
-    if (checked.has(`${p.number}|${b}`)) { logs.push(`PR #${p.number}: build ${b} already checked`); continue; }
-    if (due.length >= max) { waiting.push({ pr: p.number, reason: `over design_check_max_prs (${max}) this run` }); continue; }
-    due.push({ pr: p.number, build: b, label: `PR #${p.number}`, updated_at: p.updated_at ?? null });
+
+  // Open, on their own builds — when the profile names builds of pull requests.
+  const open = mine.filter((p) => p.state === 'open' && !p.draft).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+  if (open.length > LOOKUP) logs.push(`${open.length - LOOKUP} more open pull requests carry ${label}: only the ${LOOKUP} updated last are looked at`);
+  const look = open.slice(0, LOOKUP);
+  if (look.length) {
+    const r = sh(`profile_run versions --prs ${look.map((p) => p.number).join(' ')}`, { status: true });
+    let builds = null;
+    try { builds = r.code === 0 ? JSON.parse(r.out) : null; } catch { builds = null; }
+    // A bin/versions that ignores --prs answers its candidate and baseline: that counts as not implemented.
+    const asked = new Set(look.map((p) => String(p.number)));
+    if (builds && (typeof builds !== 'object' || Array.isArray(builds) || Object.entries(builds).some(([k, v]) => !asked.has(k) || (v !== null && typeof v !== 'string')))) builds = null;
+    if (!builds && (r.code === 2 || r.code === 0)) logs.push(`the profile names no build of a pull request (bin/versions --prs): ${prList(look.map((p) => p.number))} ${look.length === 1 ? 'is' : 'are'} checked after the merge, on a main build`);
+    else if (!builds) for (const p of look) waiting.push({ pr: p.number, reason: `the profile cannot list the builds of pull requests: ${r.err || `exit ${r.code}`}` });
+    else {
+      const checked = new Set(ledger.map((x) => `${x.pr}|${x.build}`));
+      let n = 0;
+      for (const p of look) {
+        const b = builds[String(p.number)];
+        if (!b) { waiting.push({ pr: p.number, reason: 'no build of this pull request yet' }); continue; }
+        if (!BUILD_RE.test(b)) { waiting.push({ pr: p.number, reason: `the profile named a build that is not a plain id: ${String(b).slice(0, 40)}` }); continue; }
+        if (checked.has(`${p.number}|${b}`)) { logs.push(`PR #${p.number}: build ${b} already checked`); continue; }
+        if (n >= max) { waiting.push({ pr: p.number, reason: `over design_check_max_prs (${max}) this run` }); continue; }
+        n++;
+        due.push({ kind: 'pr-build', prs: [p.number], build: b, against: cand, label: `PR #${p.number}`, updated_at: p.updated_at ?? null });
+      }
+    }
   }
+  if (!mine.length) logs.push(`no pull request carries ${label}`);
   out({ due, waiting, logs }); process.exit(0);
 }
 
 // ------------------------------------------------------------------ done
 if (cmd === 'done') {
-  const [pr, build] = pos;
+  const prs = String(pos[0] ?? '').split(','); const build = pos[1];
   const n = Number(flags.findings);
-  if (!PR_RE.test(pr ?? '') || !BUILD_RE.test(build ?? '') || !Number.isInteger(n) || n < 0) die(usage);
+  if (!prs.every((x) => PR_RE.test(x)) || !BUILD_RE.test(build ?? '') || !Number.isInteger(n) || n < 0) die(usage);
+  const recorded = [];
   try {
-    if (rows('prs').some((x) => x.pr === pr && x.build === build)) { out({ pr: +pr, build, recorded: false, reason: 'already recorded' }); process.exit(0); }
-    append('prs', { pr, build, findings: n, checked_utc: now() });
+    for (const pr of prs) {
+      if (rows('prs').some((x) => x.pr === pr && x.build === build)) continue;
+      append('prs', { pr, build, findings: n, checked_utc: now() });
+      recorded.push(+pr);
+    }
   } catch (e) { console.error(`design-check: ${msg(e)}`); process.exit(1); }
-  out({ pr: +pr, build, recorded: true }); process.exit(0);
+  out({ prs: prs.map(Number), build, recorded }); process.exit(0);
 }
 
 if (cmd !== 'run' || !pos[0] || !flags.against) die(usage);
@@ -101,7 +148,8 @@ if (cmd !== 'run' || !pos[0] || !flags.against) die(usage);
 // ------------------------------------------------------------------ run: the plan
 const load = (f) => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch (e) { die(`cannot read the UI map ${f}: ${msg(e)}`); } };
 const inv = load(pos[0]); const baseInv = load(flags.against);
-if (!PR_RE.test(flags.pr ?? '')) die(`--pr '${flags.pr ?? ''}' is not a pull request number`);
+if (!flags.pr.length || !flags.pr.every((x) => PR_RE.test(x ?? ''))) die(`--pr '${flags.pr.join(' ')}' is not a pull request number`);
+if (flags.pr.length > 1 && !flags.main) die('several --pr only with --on-main (merged pull requests on one main build)');
 const build = flags.build;
 if (!BUILD_RE.test(build ?? '')) die(`--build '${build ?? ''}' is missing or not a plain build id`);
 const prof = profile();
@@ -112,8 +160,8 @@ try { base = new URL(flags.base ?? process.env.APP_URL ?? inv.base ?? prof.app?.
 if (!['localhost', '127.0.0.1'].includes(base.hostname)) { console.error(`refusing ${base.origin}: only the nested product on localhost`); process.exit(2); }
 const maxPages = flags['max-pages'] !== undefined ? Number(flags['max-pages']) : regInt('design_check_max_pages', 6, 1, 20);
 if (!Number.isInteger(maxPages) || maxPages < 1) die(`--max-pages '${flags['max-pages']}' is not a positive integer`);
-const outDir = resolve(flags.out ?? join(WORK, 'design-checks', `pr-${flags.pr}`, build));
-const label = `PR #${flags.pr}`;
+const outDir = resolve(flags.out ?? (flags.main ? join(WORK, 'design-checks', 'main', build) : join(WORK, 'design-checks', `pr-${flags.pr[0]}`, build)));
+const label = flags.main ? `${build} (PR ${prList(flags.pr)})` : `PR #${flags.pr[0]}`;
 const routes = inv.routes ?? {};
 let pages;
 if (flags.pattern.length) {
@@ -126,7 +174,7 @@ if (flags.pattern.length) {
 } else pages = changedPages(baseInv, inv);
 const VIEW = { desktop: { width: 1440, height: 900 }, phone: { width: 390, height: 844 } };
 if (flags.dry) {
-  out({ pr: +flags.pr, build, label, base: base.origin, out: outDir, max_pages: maxPages, dark_theme: design.dark, retired_words: design.retired.map((w) => w.word),
+  out({ prs: flags.pr.map(Number), build, label, base: base.origin, out: outDir, max_pages: maxPages, dark_theme: design.dark, retired_words: design.retired.map((w) => w.word),
     tokens: design.tokens, pages: pages.slice(0, maxPages), over: Math.max(0, pages.length - maxPages),
     notes: [...notes, ...(flags.pattern.length ? [] : ['a dry run compares the controls of the two maps only; the run also compares their screenshots'])] });
   process.exit(0);
@@ -502,7 +550,7 @@ for (const x of pageInfo.filter((i) => i.error)) notes.push(`${x.pattern}: ${x.e
 for (const f of findings.filter((x) => x.also?.length)) f.what = `${f.what} The same on ${f.also.length} more screen${f.also.length === 1 ? '' : 's'}: ${f.also.slice(0, 3).join(', ')}${f.also.length > 3 ? ', …' : ''}.`;
 findings.sort((a, b) => sevRank(a.severity) - sevRank(b.severity));
 const counts = Object.fromEntries(['high', 'medium', 'low'].map((s) => [s, findings.filter((f) => f.severity === s).length]));
-const result = { schema: 'qi-design-check/v1', pr: +flags.pr, build, label, against: baseInv.build ?? null, generated_utc: now(), base: base.origin,
+const result = { schema: 'qi-design-check/v1', prs: flags.pr.map(Number), build, label, against: baseInv.build ?? null, generated_utc: now(), base: base.origin,
   pages: pageInfo.map(({ light_bg, ...x }) => x), findings, counts, notes };
 const file = join(outDir, 'check.json');
 writeFileSync(`${file}.tmp`, `${JSON.stringify(result, null, 2)}\n`); renameSync(`${file}.tmp`, file);

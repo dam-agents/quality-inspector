@@ -88,48 +88,71 @@ if [ "${1:-}" = --prs ]; then
 fi
 jq -c --arg b "$QI_BASELINE_CHANNEL" 'if $b == "none" then .baseline = null else . end' "$STUB_DIR/versions.json"
 S
-cat > "$SANDBOX/prs.json" <<'J'
-{"prs":[
- {"number":812,"title":"t","body":"b","labels":["qa:design","ui"],"state":"open","draft":false,"updated_at":"2026-10-30T10:00:00Z","merged_at":null},
- {"number":815,"title":"t","body":"b","labels":["qa:design"],"state":"open","draft":false,"updated_at":"2026-10-30T12:00:00Z","merged_at":null},
- {"number":816,"title":"t","body":"b","labels":["qa:design"],"state":"open","draft":true,"updated_at":"2026-10-30T13:00:00Z","merged_at":null},
- {"number":817,"title":"t","body":"b","labels":["qa:design"],"state":"merged","draft":false,"updated_at":"2026-10-30T14:00:00Z","merged_at":"2026-10-30T14:00:00Z"},
- {"number":818,"title":"t","body":"b","labels":["ui"],"state":"open","draft":false,"updated_at":"2026-10-30T15:00:00Z","merged_at":null},
- {"number":819,"title":"t","body":"b","labels":["qa:design"],"state":"open","draft":false,"updated_at":"2026-10-30T09:00:00Z","merged_at":null}],"truncated":false}
-J
-out="$(node "$DC" due "$SANDBOX/prs.json")"
-assert "a profile whose bin/versions ignores --prs: every labelled pull request waits, with why" '.due == [] and ([.waiting[].pr] == [815,812,819]) and (.waiting[0].reason | test("names no build"))' "$out"
-out="$(STUB_PR_RC=2 node "$DC" due "$SANDBOX/prs.json")"
-assert "--prs not implemented (exit 2): the same" '.due == [] and (.logs[0] | test("names no build"))' "$out"
-out="$(STUB_PR_RC=1 node "$DC" due "$SANDBOX/prs.json")"
-assert "a failed lookup: waits, with the error" '.due == [] and (.logs[0] | test("cannot list"))' "$out"
+cat > "$QI_PROFILE_DIR/bin/build-time" <<'S'
+#!/usr/bin/env bash
+jq -er --arg b "$1" '.[$b] // empty' "$STUB_DIR/build-times.json" 2>/dev/null || { echo "unknown build" >&2; exit 1; }
+S
+C=0.0.0-main.bbb2222
+M1="$(iso_ago 600)"; M2="$(iso_ago 300)"
+jq -nc --arg m1 "$M1" --arg m2 "$M2" --arg old "$(iso_ago $((40 * 1440)))" '
+  def p($n; $labels; $state; $draft; $t; $m): {number: $n, title: "t", body: "b", labels: $labels, state: $state, draft: $draft, updated_at: $t, merged_at: $m};
+  {prs: [p(812; ["qa:design","ui"]; "open"; false; "2026-10-30T10:00:00Z"; null), p(815; ["qa:design"]; "open"; false; "2026-10-30T12:00:00Z"; null),
+         p(816; ["qa:design"]; "open"; true; "2026-10-30T13:00:00Z"; null), p(818; ["ui"]; "open"; false; "2026-10-30T15:00:00Z"; null),
+         p(819; ["qa:design"]; "open"; false; "2026-10-30T09:00:00Z"; null),
+         p(820; ["qa:design"]; "merged"; false; $m2; $m2), p(817; ["qa:design"]; "merged"; false; $m1; $m1),
+         p(821; ["qa:design"]; "merged"; false; $old; $old), p(822; ["ui"]; "merged"; false; $m1; $m1)], truncated: false}' > "$SANDBOX/prs.json"
+setmaps() { # the UI maps of earlier builds, the older first
+  rm -rf "$WORK_DIR/inventory"
+  for b in "$@"; do mkdir -p "$WORK_DIR/inventory/$b"; echo '{"routes":{}}' > "$WORK_DIR/inventory/$b/inventory.json"; done
+}
+times() { jq -nc --arg c "$1" --arg c0 "$(iso_ago 1440)" --arg c1 "$(iso_ago 400)" '{"0.0.0-main.10": $c0, "0.0.0-main.11": $c1} + (if $c == "" then {} else {"0.0.0-main.bbb2222": $c} end)' > "$STUB_DIR/build-times.json"; }
+setmaps 0.0.0-main.10 0.0.0-main.11; times "$(iso_ago 60)"
+due() { node "$DC" due "$SANDBOX/prs.json" --candidate "$C"; }
+out="$(due)"
+assert "merged: every labelled one of 30 days, together, on the candidate that carries them, against a map from before the first merge" \
+  '.due == [{"kind":"merged","prs":[817,820],"build":"0.0.0-main.bbb2222","against":"0.0.0-main.10","label":"0.0.0-main.bbb2222 (PR #817, #820)","updated_at":"'"$M2"'"}]' "$out"
+assert "a profile whose bin/versions ignores --prs: open ones wait for their merge, said once" \
+  '.waiting == [] and (.logs | map(select(test("#815, #812, #819 are checked after the merge"))) | length) == 1' "$out"
+assert "--prs not implemented (exit 2): the same" '(.logs | map(select(test("checked after the merge"))) | length) == 1' "$(STUB_PR_RC=2 due)"
+assert "a failed lookup: the open ones wait with the error; the merged go on" '([.waiting[].reason | test("cannot list")] == [true,true,true]) and (.due[0].kind == "merged")' "$(STUB_PR_RC=1 due)"
+times "$(iso_ago 450)"
+assert "merged after the candidate: waits for the next main build" '.due[0].prs == [817] and ([.waiting[] | select(.pr == 820) | .reason | test("merged after")] == [true])' "$(due)"
+times ""
+assert "the candidate's publish time unknown: they wait" '.due == [] and ([.waiting[].reason | test("publish time")] == [true,true])' "$(due)"
+times "$(iso_ago 60)"; setmaps 0.0.0-main.11
+assert "no map from before the first merge: they wait" '.due == [] and ([.waiting[].reason | test("no UI map")] == [true,true])' "$(due)"
+setmaps 0.0.0-main.10 0.0.0-main.11
 echo '{"812":"0.0.0-pr.812.3","815":"0.0.0-pr.815.1","819":null}' > "$STUB_DIR/pr-builds.json"
-out="$(node "$DC" due "$SANDBOX/prs.json")"
-assert "due: open, labelled, not draft; the updated last first; one a run by default" \
-  '.due == [{"pr":815,"build":"0.0.0-pr.815.1","label":"PR #815","updated_at":"2026-10-30T12:00:00Z"}]
+out="$(due)"
+pb() { jq -c '[.due[] | select(.kind == "pr-build")]'; }
+assert "pr-build: open, labelled, not draft; the updated last first; one a run by default; the merged entry first" \
+  '(.due | map(.kind)) == ["merged","pr-build"] and .due[1] == {"kind":"pr-build","prs":[815],"build":"0.0.0-pr.815.1","against":"0.0.0-main.bbb2222","label":"PR #815","updated_at":"2026-10-30T12:00:00Z"}
    and ([.waiting[] | [.pr, .reason]] == [[812,"over design_check_max_prs (1) this run"],[819,"no build of this pull request yet"]])' "$out"
 grep -qx 816 "$STUB_DIR/prs.calls" && { echo "  a draft was looked up"; FAILED=1; }
-grep -qxE '81[78]' "$STUB_DIR/prs.calls" && { echo "  a merged or unlabelled pull request was looked up"; FAILED=1; }
+grep -qxE '81[78]|82[012]' "$STUB_DIR/prs.calls" && { echo "  a merged or unlabelled pull request was looked up"; FAILED=1; }
 printf -- '- design_check_max_prs: 2\n' >> "$WORK_DIR/CONFIG.md"
-assert "design_check_max_prs" '[.due[].pr] == [815,812]' "$(node "$DC" due "$SANDBOX/prs.json")"
-assert "done: one ledger row" '.recorded == true' "$(node "$DC" done 815 0.0.0-pr.815.1 --findings 4)"
-assert "done twice: not again" '.recorded == false' "$(node "$DC" done 815 0.0.0-pr.815.1 --findings 4)"
-out="$(node "$DC" due "$SANDBOX/prs.json")"
-assert "a checked build is never due again" '[.due[].pr] == [812] and (.logs | map(select(test("PR #815: build 0.0.0-pr.815.1 already checked"))) | length) == 1' "$out"
+assert "design_check_max_prs" '[.[].prs[0]] == [815,812]' "$(due | pb)"
+assert "done: one ledger row per pull request" '.recorded == [817,820]' "$(node "$DC" done 817,820 "$C" --findings 4)"
+assert "done twice: not again" '.recorded == []' "$(node "$DC" done 817 "$C" --findings 4)"
+assert "a checked merged pull request is never due again" '(.due | map(.kind)) == ["pr-build","pr-build"]' "$(due)"
+node "$DC" done 815 0.0.0-pr.815.1 --findings 4 >/dev/null
+out="$(due)"
+assert "a checked build is never due again" '[.due[].prs[0]] == [812] and (.logs | map(select(test("PR #815: build 0.0.0-pr.815.1 already checked"))) | length) == 1' "$out"
 echo '{"812":"0.0.0-pr.812.3","815":"0.0.0-pr.815.2"}' > "$STUB_DIR/pr-builds.json"
-assert "a new push is a new build: due" '[.due[].pr] == [815,812]' "$(node "$DC" due "$SANDBOX/prs.json")"
+assert "a new push is a new build: due" '[.due[].prs[0]] == [815,812]' "$(due)"
 echo '{"812":"../../x","815":"0.0.0-pr.815.2"}' > "$STUB_DIR/pr-builds.json"
-assert "a build that is no plain id waits" '([.waiting[] | select(.pr == 812) | .reason | test("not a plain id")] == [true])' "$(node "$DC" due "$SANDBOX/prs.json")"
+assert "a build that is no plain id waits" '([.waiting[] | select(.pr == 812) | .reason | test("not a plain id")] == [true])' "$(due)"
 printf -- '- design_label: design:review\n' >> "$WORK_DIR/CONFIG.md"
-assert "design_label from the config" '.due == [] and .waiting == [] and (.logs[0] | test("design:review"))' "$(node "$DC" due "$SANDBOX/prs.json")"
-for bad in "0 b --findings 1" "8x b --findings 1" "812 ../b --findings 1" "812 b --findings -1" "812 b"; do
+assert "design_label from the config" '.due == [] and .waiting == [] and (.logs[0] | test("design:review"))' "$(due)"
+node "$DC" due "$SANDBOX/prs.json" >/dev/null 2>&1; assert_eq "due without --candidate is refused" 2 "$?"
+for bad in "0 b --findings 1" "8x b --findings 1" "812,x b --findings 1" "812 ../b --findings 1" "812 b --findings -1" "812 b"; do
   node "$DC" done $bad >/dev/null 2>&1; assert_eq "done '$bad' refused" 2 "$?"
 done
 assert "PRS.md: the ledger's shape" '. == "| 815 | 0.0.0-pr.815.1 | 4 |"' "$(jq -Rr 'select(startswith("| 815"))' "$WORK_DIR/design-checks/PRS.md" | sed -E 's/ \| [0-9TZ:-]+ \|$/ |/' | jq -R .)"
 
 # ---------------------------------------------------------------- run: the plans, no browser
 p="$(node "$DC" run "$SANDBOX/pr.json" --against "$SANDBOX/base.json" --pr 812 --build 0.0.0-pr.812.3 --dry-run)"
-assert "check plan: the changed screens, the label, the default out" '[.pages[].pattern] == ["/runs","/runs/:id","/agents"] and .label == "PR #812" and .max_pages == 6
+assert "check plan: the changed screens, the label, the default out" '[.pages[].pattern] == ["/runs","/runs/:id","/agents"] and .label == "PR #812" and .prs == [812] and .max_pages == 6
   and (.out | endswith("/design-checks/pr-812/0.0.0-pr.812.3")) and .base == "http://localhost:8080" and .dark_theme.mode == "color_scheme"' "$p"
 printf -- '- design_check_max_pages: 2\n' >> "$WORK_DIR/CONFIG.md"
 assert "check plan: design_check_max_pages" '(.pages | length) == 2 and .over == 1' "$(node "$DC" run "$SANDBOX/pr.json" --against "$SANDBOX/base.json" --pr 812 --build b1 --dry-run)"
@@ -139,6 +162,9 @@ node "$DC" run "$SANDBOX/pr.json" --against "$SANDBOX/base.json" --pr 812 --buil
 node "$DC" run "$SANDBOX/pr.json" --against "$SANDBOX/base.json" --pr 812 --build b1 --base http://staging.example.com --dry-run >/dev/null 2>&1; assert_eq "a non-local base is refused" 2 "$?"
 node "$DC" run "$SANDBOX/pr.json" --against "$SANDBOX/base.json" --pr 812 --build ../x --dry-run >/dev/null 2>&1; assert_eq "a build that is not a plain id is refused" 2 "$?"
 node "$DC" run "$SANDBOX/pr.json" --pr 812 --build b1 --dry-run >/dev/null 2>&1; assert_eq "no --against is refused" 2 "$?"
+assert "check plan on main: the build and its pull requests, out under main/" '.label == "0.0.0-main.12 (PR #817, #820)" and .prs == [817,820] and (.out | endswith("/design-checks/main/0.0.0-main.12"))' \
+  "$(node "$DC" run "$SANDBOX/pr.json" --against "$SANDBOX/base.json" --pr 817 --pr 820 --build 0.0.0-main.12 --on-main --dry-run)"
+node "$DC" run "$SANDBOX/pr.json" --against "$SANDBOX/base.json" --pr 817 --pr 820 --build b1 --dry-run >/dev/null 2>&1; assert_eq "several --pr only on main" 2 "$?"
 c="$(node "$CO" "$SANDBOX/pr.json" --build 0.0.0-main.12 --dry-run)"
 assert "radar plan: screens without a :param first, the default out" '[.pages[].pattern] == ["/","/agents","/runs","/runs/:id"] and .max_pages == 40 and (.out | endswith("/design-checks/radar/0.0.0-main.12"))' "$c"
 printf -- '- consistency_max_pages: 5\n' >> "$WORK_DIR/CONFIG.md"
@@ -209,6 +235,7 @@ seed_work
 printf -- '- design_checks: enabled\n' >> "$WORK_DIR/CONFIG.md"
 node -e 'const p = (n, labels, state, t) => ({ number: n, title: "PR " + n, body: "b", labels: labels.map((name) => ({ name })), state, draft: false, updated_at: t, pull_request: { merged_at: null } });
   console.log(JSON.stringify([p(812, ["qa:design"], "open", "2026-10-30T10:00:00Z"), p(813, [], "open", "2026-10-30T11:00:00Z")]));' > "$STUB_DIR/issues.json"
+rm -rf "$WORK_DIR/inventory"
 cat > "$QI_PROFILE_DIR/bin/versions" <<'S'
 #!/usr/bin/env bash
 [ "${1:-}" = --prs ] && { echo '{"812":"0.0.0-pr.812.3"}'; exit 0; }
@@ -216,7 +243,7 @@ jq -c . "$STUB_DIR/versions.json"
 S
 out="$(bash "$SCRIPTS/preflight.sh" modules)"
 assert "design-check on: the labelled pull request's build is due, named in the title" '.nothing_to_do == false and .modules_due == ["design-check"]
-  and .design_checks_due == [{"pr":812,"build":"0.0.0-pr.812.3","label":"PR #812","updated_at":"2026-10-30T10:00:00Z"}]
+  and .design_checks_due == [{"kind":"pr-build","prs":[812],"build":"0.0.0-pr.812.3","against":"0.0.0-main.bbb2222","label":"PR #812","updated_at":"2026-10-30T10:00:00Z"}]
   and .title == "Run modules on 0.0.0-main.bbb2222 (design-check, PR #812)"' "$out"
 grep -q 'prs=812' "$WORK_DIR/MODULES.log"; assert_eq "the pre-flight logs the pull requests" 0 "$?"
 ls /tmp/quality-inspector-design.* >/dev/null 2>&1 && { echo "  the listing's temp file stayed"; FAILED=1; }

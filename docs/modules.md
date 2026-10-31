@@ -13,12 +13,12 @@ the registry; `bash "$HOME/scripts/modules.sh" status` prints it.
 | `edge-cases` | config | inside each issue run (`explorations`) | [explorations.md](explorations.md) |
 | `regression`, `security`, `discovery`, `benchmark`, `audit` | schedule | their own schedule | their docs |
 | `ui-sweep`, `validation`, `stress` | modules | the **modules run**, per their cadence | [ui-sweep.md](ui-sweep.md), [validation.md](validation.md), [stress.md](stress.md) |
-| `consistency`, `design-check` | modules | the modules run: per its cadence; per labelled pull request build | [design-checks.md](design-checks.md) |
+| `consistency`, `design-check` | modules | the modules run: per its cadence; per labelled pull request | [design-checks.md](design-checks.md) |
 | `feature-focus` | queue | the next modules run, once per queued area | **Feature focus** below |
 
 A `modules` module's cadence is `disabled` (default), `per-build` (once per candidate) or
 `weekly` (once per candidate, at most once in 7 days); `design-check` is `disabled` or `enabled`
-and is due per pull request build (`target: pr` in the registry).
+and is due per labelled pull request (`due: pr` in the registry).
 
 ## Control
 
@@ -79,7 +79,7 @@ tests — so share it only with people you trust to that degree; sharing is the 
 
 Worklist: `candidate`, `baseline`, `modules_due[]`, `previous` (each module's last
 candidate), `focus[]`, `inventory` (the candidate's UI map or `null`), `max_wallclock_min`,
-`design_checks_due[]` (the pull request builds, [design-checks.md](design-checks.md)).
+`design_checks_due[]` (the labelled pull requests to check, [design-checks.md](design-checks.md)).
 
 1. `env.sh lock modules` (busy → end, log it). Note the claim time.
 2. `env.sh reset`, `env.sh up <candidate>`, `suite.sh run smoke-<candidate> --tag smoke`.
@@ -88,14 +88,14 @@ candidate), `focus[]`, `inventory` (the candidate's UI map or `null`), `max_wall
 3. `inventory: null` → map the candidate now ([change-awareness.md](change-awareness.md) →
    **Building the context**, first command only).
 4. Each due module on the candidate in this order — `ui-sweep`, `validation`, the focus areas,
-   `consistency`, `stress` last — by its doc. Before each one: the wall-clock since the claim against
+   `consistency`, `design-check`'s `merged` entry, `stress` last — by its doc. Before each one: the wall-clock since the claim against
    `max_wallclock_min`; over it → skip the rest, each logged `skip=budget` (the budget bounds
    the modules; bringing the product up and the closing reset come on top). After each:
    `modules.sh ran <id> <candidate> <counts…>`; a module whose script failed (exit 3: no
    browser; any other non-zero but the documented environment failure) gets
    `<ISO> ERROR: module=<id> candidate=<c> <reason>` in `work/MODULES.log` instead, never `ran`.
-5. `design-check` due → each `design_checks_due[]` entry on its own build
-   ([design-checks.md](design-checks.md) → **1**), under the same budget.
+5. Each `pr-build` entry of `design_checks_due[]` on its own build ([design-checks.md](design-checks.md)
+   → **1**), under the same budget.
 6. `env.sh reset` — form input and load must not reach the next run.
 7. `env.sh unlock modules`. Log `modules_run`. Chat summary: per module one line (counts by
    severity, the newest major findings by id); a stress `critical` or a new `major` design

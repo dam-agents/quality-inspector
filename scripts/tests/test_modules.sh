@@ -15,8 +15,8 @@ assert "registry: unique ids, a doc each, switches are settings" \
   '(.modules | map(.id) | length) == (.modules | map(.id) | unique | length)
    and all(.modules[]; .doc | test("^docs/[a-z-]+\\.md$"))
    and all(.modules[] | select(.switch); .settings[.switch] != null)
-   and all(.modules[] | select(.kind == "modules" and .target == null); .settings[.switch].type == "cadence")
-   and all(.modules[] | select(.target != null); .target == "pr" and .settings[.switch].values == ["disabled","enabled"])' "$(cat "$SCRIPTS/lib/modules.json")"
+   and all(.modules[] | select(.kind == "modules" and .due == null); .settings[.switch].type == "cadence")
+   and all(.modules[] | select(.due == "pr"); .settings[.switch].values == ["disabled","enabled"])' "$(cat "$SCRIPTS/lib/modules.json")"
 
 # ---------------------------------------------------------------- status
 st="$(bash "$M" status)"
