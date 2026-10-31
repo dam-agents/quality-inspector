@@ -7,6 +7,8 @@
 //       -> {period, dir, file, fetched, rows:{builds,features,friction,funnels,trails}, dropped, notes}
 //          work/ux/<from>_<to>/signals.json; a period already fetched is kept (fetched: false)
 //          unless --refresh. --fixture reads the response from a file instead of the network.
+//          A 404, an empty answer or one with no row: {period, nodata} — nothing written, no error.
+//          `{profile.<key>}` in the endpoint (and its egress rule) is the instance's value.
 //   node ux-signals.mjs score <signals.json> [--inventory FILE]
 //       -> <dir>/scored.json: candidates (rows that pass the thresholds), ranked; unused pages and
 //          elements of the UI map; the profile's flows
@@ -66,11 +68,22 @@ function settings() {
   const profile = readJson(join(sh('profile_dir'), 'profile.json')) ?? {};
   const u = profile.ux_signals;
   if (!u || typeof u !== 'object') return { off: 'the profile has no ux_signals entry' };
+  // The install that collects the data is the instance's (a DEV install, say): `{profile.<key>}` in the
+  // endpoint and in egress is that key's value, a plain name as egress-rules.sh takes it.
+  const pcfg = (() => { try { return JSON.parse(sh('profile_config') || '{}'); } catch { return {}; } })();
+  const unset = [];
+  const fill = (t) => String(t ?? '').replace(/\{profile\.([a-z0-9_]+)\}/g, (_, k) => {
+    const v = String(pcfg[k] ?? '');
+    if (/^[A-Za-z0-9.-]+(\/[A-Za-z0-9.-]+)*$/.test(v) && !/\/\.\.?\//.test(`/${v}/`)) return v;
+    unset.push(`profile.${k}`); return '';
+  });
+  const endpoint = fill(u.endpoint);
+  if (unset.length) return { off: `ux_signals.endpoint needs ${unset.join(', ')} set in work/CONFIG.md` };
   let url;
-  try { url = new URL(String(u.endpoint)); } catch { return { off: 'ux_signals.endpoint is not a URL' }; }
+  try { url = new URL(endpoint); } catch { return { off: 'ux_signals.endpoint is not a URL' }; }
   if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) return { off: 'ux_signals.endpoint must be https, with no credentials, query or fragment' };
   // Least privilege: the endpoint is read only where the profile's egress lists exactly it, GET.
-  const allowed = (profile.egress ?? []).some((e) => e && e.host === url.hostname && String(e.method ?? '').toUpperCase() === 'GET' && e.path === url.pathname);
+  const allowed = (profile.egress ?? []).some((e) => e && fill(e.host) === url.hostname && String(e.method ?? '').toUpperCase() === 'GET' && fill(e.path) === url.pathname);
   if (!allowed) return { off: `the profile's egress has no GET rule for ${url.hostname}${url.pathname}` };
   const key = String(u.api_key_env ?? '');
   if (!/^E2E_[A-Z][A-Z0-9_]{0,31}$/.test(key) || !/(^|_)(TOKEN|SECRET|KEY)(_|$)/.test(key.slice(4))) return { off: 'ux_signals.api_key_env must be E2E_<NAME> of an operator_credentials entry' };
@@ -151,11 +164,17 @@ async function fetchPeriod(s, at) {
     const u = new URL(s.url); u.searchParams.set('from', p.from); u.searchParams.set('to', p.to);
     try {
       const r = await fetch(u, { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(30000) });
+      if (r.status === 404) return { period: p, nodata: `GET ${s.url.hostname}${s.url.pathname} answered 404: the install collects no UI usage` };
       if (!r.ok) die(`GET ${s.url.hostname}${s.url.pathname} answered ${r.status}`, 1);
       const body = await r.text();
       if (body.length > 5 * 1024 * 1024) die('the response is larger than 5 MiB', 1);
-      raw = JSON.parse(body);
+      raw = body.trim() ? JSON.parse(body) : null;
     } catch (e) { die(`GET ${s.url.hostname}${s.url.pathname} failed: ${str(e.message, 160)}`, 1); }
+  }
+  // The feature switched off on the install: an empty answer, or one with no row at all.
+  const LISTS = ['builds', 'features', 'friction', 'funnels', 'trails'];
+  if (raw == null || (typeof raw === 'object' && !Array.isArray(raw) && LISTS.every((k) => !raw[k]?.length))) {
+    return { period: p, nodata: `GET ${s.url.hostname}${s.url.pathname} answered no data: the install collects no UI usage` };
   }
   const notes = [];
   let rows;
@@ -319,6 +338,7 @@ if (cmd === 'fetch' || cmd === 'check') {
   const s = settings();
   if (s.off) { out({ due: false, off: s.off }); process.exit(cmd === 'check' ? 0 : 2); }
   if (cmd === 'fetch') { out(await fetchPeriod(s, at)); process.exit(0); }
+  // No data is no error: the module is skipped with the reason (docs/ux-signals.md → The data).
   // check: fetch at most once a day (daily) or a week (weekly), then score the newest period.
   const cadence = sh('reg ux_signals');
   if (!['daily', 'weekly'].includes(cadence)) { out({ due: false, off: 'ux_signals is disabled' }); process.exit(0); }
@@ -327,6 +347,7 @@ if (cmd === 'fetch' || cmd === 'check') {
   let file = last;
   if (age >= (cadence === 'daily' ? 1 : 7) * 86400000) {
     const f = await fetchPeriod(s, at);
+    if (f.nodata) { out({ due: false, nodata: f.nodata, period: f.period }); process.exit(0); }
     score(f.file, s); file = join(f.dir, 'scored.json');
   }
   const scored = readJson(file);

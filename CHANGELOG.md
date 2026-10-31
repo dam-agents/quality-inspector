@@ -16,8 +16,10 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    on the build they ran, and keeps the judge-confirmed ones as design findings (source `field`).
    When the profile has the entry, **offer** it to the operator once: `module ux-signals set
    ux_signals=daily` (or `weekly`) switches it on ([docs/modules.md](docs/modules.md) →
-   **Control**). Before that: **operator-only** — the egress rule the profile's `egress` lists for
-   the endpoint (`GET`, that host and path), and the API key in the `E2E_<NAME>` line of
+   **Control**). Before that: **operator-only** — the install that collects the data (DAM: its
+   DEV install, for GDPR), as the `profile.<key>` the profile's endpoint names (`- profile.<key>:
+   <host>` in `work/CONFIG.md`), the egress rule the profile's `egress` lists for the endpoint
+   (`GET`, that host and path), and the API key in the `E2E_<NAME>` line of
    `work/env/credentials.env` (`bash "$HOME/scripts/env.sh" init` adds the empty line; fill it in
    the agent's files, never in chat); then `bash "$HOME/scripts/verify-onboarding.sh" --config`.
 2. Nothing to run — Design Desk takes design findings through its Slack bug intake. To send them,

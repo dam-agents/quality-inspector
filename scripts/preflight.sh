@@ -714,7 +714,7 @@ mode_modules() {
   if jq -e '.on | index("ux-signals")' <<<"$d" >/dev/null; then
     ux="$(node "$SCRIPT_DIR/ux-signals.mjs" check 2>/dev/null)"
     jq -e 'type == "object"' <<<"$ux" >/dev/null 2>&1 || ux='{"due":false,"error":"ux-signals.mjs check failed"}'
-    log "ux-signals: $(jq -r '.error // .off // .reason // "?"' <<<"$ux")"
+    log "ux-signals: $(jq -r '.error // .off // .nodata // .reason // "?"' <<<"$ux")"
     jq -e '.error' <<<"$ux" >/dev/null && runlog MODULES "ERROR: module=ux-signals $(jq -r '.error' <<<"$ux" | tr -s ' \n' ' ' | cut -c1-160)"
   fi
   env_busy_out MODULES

@@ -2804,7 +2804,7 @@ const CHECK_HELP = {
   overlap: 'Two controls cover more than a quarter of each other.', contrast: 'The contrast of a text is less than WCAG AA.', 'tap-target': 'A control is smaller than 24 px on a phone.',
   'layout-shift': 'The layout moves while the page loads (CLS more than 0.1).', 'console-error': 'The page writes an error to the browser console.', 'failed-request': 'The server sends an error (400 or more) for a request of the page.',
   a11y: 'An axe-core accessibility rule (WCAG 2 A/AA) fails.', review: 'The model found a problem in the screenshot: alignment, spacing, typography, layout, cut text or legibility.',
-  field: 'Real users of the production build had this problem: rage clicks, clicks that do nothing, errors, slow requests, or pages and dialogs that they left at once. The agent repeated their steps on the same build.',
+  field: 'Real users of the install that collects UI usage had this problem: rage clicks, clicks that do nothing, errors, slow requests, or pages and dialogs that they left at once. The agent repeated their steps on the same build.',
 };
 const checkHelp = (c) => CHECK_HELP[str(c)] || CHECK_HELP[str(c).replace(/^review:.*/, 'review').replace(/^a11y:.*/, 'a11y').replace(/^field:.*/, 'field')] || null;
 const DSTATUS_HELP = { open: 'The newest sweep of its page found it, and you did not dismiss it.', resolved: 'A newer build was swept, and the check does not find it now.', dismissed: 'You said that it is not a defect. It stays dismissed until you reopen it.' };
@@ -2889,7 +2889,7 @@ function viewDesign() {
         d.suspect ? h('span', { class: 'badge muted', title: 'The model was not sure. Examine the finding before you do an action.' }, 'suspect') : null, foundLinks(id)),
       h('div', { class: 'saw' }, str(d.saw)),
       h('div', { class: 'meta' }, pageLink(str(d.pattern)), d.viewport && d.viewport !== '-' ? ` @ ${str(d.viewport)}` : '', ` · ${str(d.check)}`, tip(checkHelp(d.check))),
-      fld ? h('div', { class: 'meta', title: 'Real users of the production build, in the period of the signal. Only rows with 3 or more users arrive.' },
+      fld ? h('div', { class: 'meta', title: 'Real users of the install that collects UI usage, in the period of the signal. Only rows with 3 or more users arrive.' },
         `👥 ${num(fld.users)} users · ${pctOf(fld.rate)} of visits${fld.prev_rate != null ? ` (last period ${pctOf(fld.prev_rate)})` : ''} · ${str(fld.class)}`,
         fld.regression ? h('span', { class: 'badge warn', title: 'The rate jumped right after a new build.' }, 'after a new build') : null,
         d.desk.length ? h('span', { class: 'badge ok', title: `Sent to Design Desk for build ${str(d.desk.at(-1).build)}.` }, 'sent to design') : null) : null,

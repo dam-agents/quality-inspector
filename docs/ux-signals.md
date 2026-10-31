@@ -12,12 +12,24 @@ never the product's code, logs or a person's identity ([black-box.md](black-box.
 Off when the profile has no `ux_signals` entry ([profile-contract.md](profile-contract.md) →
 `ux_signals`): `ux-signals.mjs check` answers `off` with the reason, and nothing runs.
 
+**The source is one install, not "production".** The product may collect usage only where the
+law and its users allow it — DAM, for one, collects it on its DEV install only (GDPR). Which
+install it is, is the instance's setting: the profile's endpoint names a `{profile.<key>}` (its
+host, say) that the operator sets at onboarding. "The build the users ran" below is that
+install's build, as the data's `build` names it — never assumed to be a release.
+
 ## The data
 
 `GET <endpoint>?from=<ISO>&to=<ISO>`, `Authorization: Bearer <the value of api_key_env>`, read
 by `scripts/ux-signals.mjs` only — never by you with `curl` or a browser. The endpoint must be
-`https` and listed in the profile's `egress` as exactly that host and path with `GET`; the key is
-an `operator_credentials` value in `work/env/credentials.env`, masked in every artefact.
+`https` and listed in the profile's `egress` as exactly that host and path with `GET` (each
+`{profile.<key>}` resolved to the instance's value, a plain name as for every egress rule; unset →
+`off`, naming the key); the key is an `operator_credentials` value in
+`work/env/credentials.env`, masked in every artefact.
+
+**No data is no error.** A `404`, an empty answer, or one with no row at all means the install
+has the collection switched off: `{nodata}` with that reason, one log line, nothing written,
+nothing due — the next fetch asks again. Any other failure is an error (below).
 
 | Key | Each row |
 | --- | --- |

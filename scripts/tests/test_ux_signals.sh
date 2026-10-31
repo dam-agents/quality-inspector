@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# The ux-signals module, offline on a fixture: the endpoint's guard and the contract's floor,
+# The ux-signals module, offline on a fixture: the endpoint's guard (the instance's install, the
+# profile's egress), no data as no error, the contract's floor,
 # scoring (trend, a jump after a new build, unused pages and controls), when the modules run is
 # due, field findings in the design register (judge, stable id, resolution after a quiet period
 # on a newer build), and the Design Desk handoff message.
@@ -8,9 +9,10 @@ command -v node >/dev/null || { echo "  node missing"; exit 1; }
 seed_work
 UXS="$SCRIPTS/ux-signals.mjs"
 PJ="$QI_PROFILE_DIR/profile.json"
-jq '.egress = [{"host":"dam.example.com","method":"GET","path":"/api/usage/ui/signals","why":"real-user UI signals"}]
+jq '.egress = [{"host":"{profile.ux_signals_host}","method":"GET","path":"/api/usage/ui/signals","why":"real-user UI signals"}]
+  | .config.ux_signals_host = {"default":"","about":"the install that collects UI usage","ask":true}
   | .operator_credentials = [{"name":"DAM_USAGE_API_KEY","what":"the usage API key"}]
-  | .ux_signals = {"endpoint":"https://dam.example.com/api/usage/ui/signals","api_key_env":"E2E_DAM_USAGE_API_KEY","flows":["upload","share"],"min_users":3,"min_rate":0.1}' \
+  | .ux_signals = {"endpoint":"https://{profile.ux_signals_host}/api/usage/ui/signals","api_key_env":"E2E_DAM_USAGE_API_KEY","flows":["upload","share"],"min_users":3,"min_rate":0.1}' \
   "$PJ" > "$SANDBOX/p.json" && mv "$SANDBOX/p.json" "$PJ"
 
 cat > "$SANDBOX/week1.json" <<'J'
@@ -34,12 +36,23 @@ cat > "$SANDBOX/inv.json" <<'J'
   "/admin":{"example":"/admin","title":"Admin"}}}
 J
 
-# ---------------------------------------------------------------- fetch: the guard and the floor
+# ---------------------------------------------------------------- fetch: the guard, no data, the floor
+r="$(node "$UXS" fetch --fixture "$SANDBOX/week1.json" --now 2026-10-31T05:00:00Z)"; rc=$?
+assert_eq "the install is the instance's: unset, the module is off" 2 "$rc"
+assert "the refusal names the config key" '.off == "ux_signals.endpoint needs profile.ux_signals_host set in work/CONFIG.md"' "$r"
+printf -- '- profile.ux_signals_host: dam-dev.example.com\n' >> "$WORK_DIR/CONFIG.md"
 jq 'del(.egress)' "$PJ" > "$SANDBOX/noegress.json"; cp "$PJ" "$SANDBOX/p.orig"; cp "$SANDBOX/noegress.json" "$PJ"
 r="$(node "$UXS" fetch --fixture "$SANDBOX/week1.json" --now 2026-10-31T05:00:00Z)"; rc=$?
 assert_eq "an endpoint the profile's egress does not list is refused" 2 "$rc"
-assert "the refusal names the missing GET rule" '.off | test("egress has no GET rule for dam.example.com/api/usage/ui/signals")' "$r"
+assert "the refusal names the missing GET rule" '.off | test("egress has no GET rule for dam-dev.example.com/api/usage/ui/signals")' "$r"
 cp "$SANDBOX/p.orig" "$PJ"
+: > "$SANDBOX/empty.json"; echo '{"period":{},"builds":[],"friction":[]}' > "$SANDBOX/none.json"
+for f in empty none; do
+  r="$(node "$UXS" fetch --fixture "$SANDBOX/$f.json" --now 2026-10-31T05:00:00Z)"; rc=$?
+  assert_eq "no data ($f) is no error" 0 "$rc"
+  assert "no data ($f): said, nothing written" '.nodata | test("no data: the install collects no UI usage")' "$r"
+done
+[ -e "$WORK_DIR/ux/2026-10-24_2026-10-31/signals.json" ] && { echo "  assertion failed: no data wrote a period"; FAILED=1; }
 r="$(node "$UXS" fetch --fixture "$SANDBOX/week1.json" --now 2026-10-31T05:00:00Z)"
 assert "the period's file, a row under 3 users dropped, a row off the contract left out" \
   '(.file | endswith("/ux/2026-10-24_2026-10-31/signals.json")) and .fetched and .rows.friction == 3 and .dropped == 1 and (.notes | any(test("friction\\[4\\]")))' "$r"

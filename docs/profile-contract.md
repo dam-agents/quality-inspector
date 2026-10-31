@@ -295,17 +295,21 @@ The profile declares the endpoint at the top level; absent → the module is off
 
 ```json
 "ux_signals": {
-  "endpoint": "https://dam.example.com/api/usage/ui/signals",
+  "endpoint": "https://{profile.ux_signals_host}/api/usage/ui/signals",
   "api_key_env": "E2E_DAM_USAGE_API_KEY",
   "flows": ["upload", "share"],
   "min_users": 3,
   "min_rate": 0.05
 },
+"config": { "ux_signals_host": { "default": "", "about": "the install that collects UI usage (DAM: its DEV install)", "ask": true } },
 "operator_credentials": [{ "name": "DAM_USAGE_API_KEY", "what": "a read-only key of the UI usage API" }],
-"egress": [{ "host": "dam.example.com", "method": "GET", "path": "/api/usage/ui/signals", "why": "real-user UI signals" }]
+"egress": [{ "host": "{profile.ux_signals_host}", "method": "GET", "path": "/api/usage/ui/signals", "why": "real-user UI signals" }]
 ```
 
-- `endpoint` — `https`, no credentials, query or fragment; answers `GET ?from=<ISO>&to=<ISO>`
+- `endpoint` — `https`, no credentials, query or fragment; its host (or a path segment) may be
+  a `{profile.<key>}` the operator sets at onboarding, because the install that collects usage
+  is the instance's choice — not necessarily the production one (DAM collects it on DEV only).
+  Answers `GET ?from=<ISO>&to=<ISO>`
   with the response of [ux-signals.md](ux-signals.md) → **The data**: aggregates only, rows of 3
   users or more, no person's identity. `egress` lists exactly its host and path with `GET`.
 - `api_key_env` — `E2E_<NAME>` of an `operator_credentials` entry (above), with a `TOKEN`,
