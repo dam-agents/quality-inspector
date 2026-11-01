@@ -216,13 +216,17 @@ for bad in "qi-x --status sent --check radar --severity low --build b" "qi-radar
 done
 out="$(plan)"
 assert "a sent or held Ref is never planned again" '.held.sent == 2 and ([.due[].ref] | index("qi-state-0000000003") == null and index("qi-a11y-0000000006") == null)' "$out"
-# An intent with no outcome may have gone out: never again. One that failed goes again.
+# An intent with no outcome may have gone out, a done whose record did not run went out: never
+# again. One that failed goes again.
 printf '%s\n' '{"ts":"2026-10-31T04:40:00Z","level":"info","event":"external_write","msg":"surface=slack action=intent issue=- key=design@qi-state-0000000004 target=C0DESK0001"}' \
   '{"ts":"2026-10-31T04:40:01Z","level":"info","event":"external_write","msg":"surface=slack action=intent issue=- key=design@qi-state-0000000008 target=C0DESK0001"}' \
   '{"ts":"2026-10-31T04:40:02Z","level":"error","event":"external_write","msg":"surface=slack action=failed issue=- key=design@qi-state-0000000008 target=C0DESK0001"}' \
+  '{"ts":"2026-10-31T04:40:03Z","level":"info","event":"external_write","msg":"surface=slack action=intent issue=- key=design@qi-a11y-0000000002 target=C0DESK0001"}' \
+  '{"ts":"2026-10-31T04:40:04Z","level":"info","event":"external_write","msg":"surface=slack action=done issue=- key=design@qi-a11y-0000000002 target=C0DESK0001"}' \
   > "$WORK_DIR/logs/events-2026-10-31.jsonl"
 out="$(plan)"
-assert "an unfinished send counts as sent; a failed one goes again" '.held.unsure == 1 and ([.due[].ref] == ["qi-state-0000000008","qi-a11y-0000000002"]) and (.logs | map(select(test("qi-state-0000000004"))) | length) == 1' "$out"
+assert "an unfinished send counts as sent; a failed one goes again" '.held.unsure == 1 and ([.due[].ref] | index("qi-state-0000000008") == 0) and (.logs | map(select(test("qi-state-0000000004"))) | length) == 1' "$out"
+assert "a done send with no SENT.md row counts as sent" '.held.sent == 3 and ([.due[].ref] == ["qi-state-0000000008","qi-focus-0000000007"]) and (.logs | map(select(test("qi-a11y-0000000002.*SENT.md has no row"))) | length) == 1' "$out"
 assert "check: the ledgers are well-formed" '.ok == true' "$(node "$OB" check)"
 printf '| qi-state-0000000003 | sent | missing-state | high | b | - | 2026-10-31T04:41:00Z |\n' >> "$WORK_DIR/design-checks/SENT.md"
 assert "check: a Ref recorded twice fails" '.ok == false and (.problems | map(select(test("recorded twice"))) | length) == 1' "$(node "$OB" check)"

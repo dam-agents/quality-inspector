@@ -441,7 +441,11 @@ async function states(page, p, seenData) {
   const fresh = !lists && normal.rows === 0 && data.some((d) => d.shape.empty && own(d));
   let emptyState = null;
   if (lists) emptyState = await variant(async (r) => { const res = await r.fetch(); let j; try { j = await res.json(); } catch { return r.fulfill({ response: res }); } return r.fulfill({ response: res, json: transform(j, 'empty') }); }, 'empty');
-  else if (fresh) emptyState = { ...normal, shot: await viewShot(page, p, 'empty') };
+  else if (fresh) {
+    // The screen again for its shot: about:blank is up since the loading check.
+    await open(page, p);
+    emptyState = { ...normal, shot: await viewShot(page, p, 'empty') };
+  }
   if (!lists && !fresh) info.empty = 'no list';
   else if (!emptyState) info.empty = 'the sign-in page came back';
   else if (emptyState.empty && (fresh || emptyState.empty.text !== normal.empty?.text)) info.empty = 'shown';
@@ -514,8 +518,9 @@ let state;
       await tokensAndWords(page, p, 'light').catch((e) => notes.push(`tokens on ${p.pattern} (light): ${msg(e)}`));
       await focusWalk(page, p).catch((e) => notes.push(`focus on ${p.pattern}: ${msg(e)}`));
       await open(page, p);
-      info.states = await states(page, p, seen).catch((e) => { notes.push(`states on ${p.pattern}: ${msg(e)}`); return null; });
+      // Read before the states: they leave a variant or about:blank on the page.
       info.light_bg = (await page.evaluate(probe, { mode: 'state' }).catch(() => null))?.bg ?? null;
+      info.states = await states(page, p, seen).catch((e) => { notes.push(`states on ${p.pattern}: ${msg(e)}`); return null; });
     } catch (e) { info.error = msg(e); page.off('response', onResp); }
   }
   await ctx.close();

@@ -78,7 +78,7 @@ stripped. Every script reads it through `scripts/lib/config.sh`, so the verifier
 - `work_repo` — a **private** `[<host>/]<owner>/<repo>`, never the target or its fork: the Stop hook backs `work/` up to it
   after every turn; unset = local-only. Never read back but by a restore ([docs/persistence.md](docs/persistence.md) → **Backup & restore**).
 - `explorations` (`enabled`), `max_explorations_per_ac` (`3`; `0` = none) — checks beyond the ACs, outside every verdict ([docs/explorations.md](docs/explorations.md)); invalid → default.
-- The testing modules: `ui_sweep`, `validation_checks`, `stress_checks`, `consistency_radar` (`disabled` | `per-build` | `weekly`), `design_checks` (`disabled`), `ux_signals` (`disabled` | `daily` | `weekly`; `ux_handoff` `manual` | `auto`), their tunables,
+- The testing modules: `ui_sweep`, `validation_checks`, `stress_checks`, `consistency_radar` (`disabled` | `per-build` | `weekly`), `design_checks` (`disabled` | `enabled`), `ux_signals` (`disabled` | `daily` | `weekly`; `ux_handoff` `manual` | `auto`), their tunables,
   `focus_max_checks`, `modules_max_wallclock_min`, `dashboard_interactive` (`disabled`) — types, ranges and defaults in
   `scripts/lib/modules.json`, read through `reg`, written only by `scripts/modules.sh set` ([docs/modules.md](docs/modules.md)); invalid → default.
 - `scenario_discovery` (`disabled` | `propose` | `run`), `scenario_channel` (Slack id for the digest;

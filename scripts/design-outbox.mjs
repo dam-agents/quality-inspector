@@ -6,8 +6,9 @@
 //   node design-outbox.mjs plan <check.json|radar.json>…
 //     -> {"sending": bool, "reason", "channel", "due": [{ref, check, severity, build, text, attachment}],
 //         "ready": n, "held": {sent, unsure, below_floor, over_cap, invalid}, "logs"}
-//        The findings of the files, each Ref once: not in SENT.md, no `intent` of it in the event logs
-//        without an outcome (a send that may have gone out counts as sent: never twice), at or above
+//        The findings of the files, each Ref once: not in SENT.md, and its last ledger line in the event
+//        logs not an `intent` (a send that may have gone out) or a `done` (its record did not run) —
+//        both count as sent, never twice; only a last `failed` lets it go again — at or above
 //        `design_desk_min_severity` (medium), the most severe first, at most `design_desk_max_per_run`
 //        (5). `text` is the exact message (lib/design-rules.mjs → formatMessage) ending in the mention
 //        of `design_desk_bot`; `attachment` the absolute path of its one screenshot or null. With
@@ -36,11 +37,12 @@ const usage = 'usage: design-outbox.mjs plan <check.json|radar.json>… | record
 const CHANNEL_RE = /^[CDG][A-Z0-9]{6,20}$/;
 const BOT_RE = /^[UW][A-Z0-9]{6,20}$/;
 
-// Refs whose send may have gone out: an `intent` in the event logs with no `done` or `failed` after it.
-function unsure() {
+// Refs whose send went out, or may have, by the event logs: Ref -> its last action, `intent` (no
+// outcome yet) or `done` (SENT.md missed its row). A last `failed` lets the Ref go again.
+function logged() {
   const last = new Map();
   let files = [];
-  try { files = readdirSync(join(WORK, 'logs')).filter((f) => /^events-\d{4}-\d\d-\d\d\.jsonl$/.test(f)).sort(); } catch { return new Set(); }
+  try { files = readdirSync(join(WORK, 'logs')).filter((f) => /^events-\d{4}-\d\d-\d\d\.jsonl$/.test(f)).sort(); } catch { return new Map(); }
   for (const f of files) {
     for (const l of readFileSync(join(WORK, 'logs', f), 'utf8').split('\n')) {
       if (!l.includes('key=design@')) continue;
@@ -49,7 +51,7 @@ function unsure() {
       if (m) last.set(m[2], m[1]);
     }
   }
-  return new Set([...last].filter(([, a]) => a === 'intent').map(([r]) => r));
+  return new Map([...last].filter(([, a]) => a !== 'failed'));
 }
 
 if (cmd === 'plan') {
@@ -63,7 +65,7 @@ if (cmd === 'plan') {
   if (floorRaw !== floor) logs.push(`design_desk_min_severity '${floorRaw}' is invalid — medium is used`);
   let sent;
   try { sent = new Set(rows('sent').map((r) => r.ref)); } catch (e) { die(msg(e), 1); }
-  const maybe = unsure();
+  const gone = logged();
   const held = { sent: 0, unsure: 0, below_floor: 0, over_cap: 0, invalid: 0 };
   const seen = new Set(); const list = [];
   for (const [fi, file] of pos.entries()) {
@@ -75,7 +77,8 @@ if (cmd === 'plan') {
       const bad = validFinding(f);
       if (bad.length) { held.invalid++; logs.push(`${file}: finding ${i} is invalid (${bad.join(', ')}) — not sent`); continue; }
       if (sent.has(f.ref)) { held.sent++; continue; }
-      if (maybe.has(f.ref)) { held.unsure++; logs.push(`${f.ref}: an earlier send has no outcome in the ledger — it counts as sent, never again`); continue; }
+      if (gone.get(f.ref) === 'done') { held.sent++; logs.push(`${f.ref}: the event log has its send but SENT.md has no row — it counts as sent, never again`); continue; }
+      if (gone.get(f.ref) === 'intent') { held.unsure++; logs.push(`${f.ref}: an earlier send has no outcome in the ledger — it counts as sent, never again`); continue; }
       if (sevRank(f.severity) > sevRank(floor)) { held.below_floor++; continue; }
       const att = f.attachment ? resolve(dirname(resolve(file)), f.attachment) : null;
       list.push({ f, order: [sevRank(f.severity), CHECKS.indexOf(f.check), fi, i], attachment: att && existsSync(att) ? att : null });
