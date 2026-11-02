@@ -219,6 +219,7 @@ configuration.
 | `audit_report`, `log_level`, `media_retention_days` | defaults | Audit, diagnostics, local evidence retention. |
 | `explorations`, `max_explorations_per_ac` | defaults (`enabled`, `3`) | Agent-designed checks beyond the criteria, reported apart from the verdict ([docs/explorations.md](docs/explorations.md)). |
 | `security_checks`, `security_failed_logins` | defaults (`enabled`, `10`) | The security run ([docs/security.md](docs/security.md)); its schedule ships off. |
+| `radar_window_days` | default `3` | The Change radar reads the pull requests updated in that many days, newest first ([docs/radar.md](docs/radar.md) → The window). |
 | `max_wallclock_min_per_issue`, `max_model_steps_per_issue`, `min_free_disk_gi` | defaults | Per-issue budgets and the free disk an install needs. |
 | `ui_sweep`, `validation_checks`, `stress_checks`, `consistency_radar`, `design_checks`, `ux_signals` and their tunables (`ux_period_days`, `ux_max_candidates`, `ux_handoff`), `focus_max_checks`, `modules_max_wallclock_min` | offered, default `disabled` | The testing modules of the nightly modules run; registry `scripts/lib/modules.json` ([docs/modules.md](docs/modules.md)). |
 | `design_label`, `design_desk_findings`, `design_desk_channel`, `design_desk_bot`, `design_desk_max_per_run`, `design_desk_min_severity` | offered, default `qa:design`, `disabled`, empty, empty, `5`, `medium` | The pull request label of the design check; opt-in: design findings to the Design Desk agent in Slack, each Ref once ([docs/design-checks.md](docs/design-checks.md)). |

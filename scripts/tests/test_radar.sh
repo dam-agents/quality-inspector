@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # The Change radar (docs/radar.md): a pull request's text sanitized (no code, path, link, diff line or
-# HTML comment; capped), the listing's fields alone through the issues endpoint, the ledger's due kinds
-# (new, changed by its text hash, merged, closed unmerged, unchanged, the per-run cap), matching to
-# recurring tests only, `record` (closed unmerged resolves its proposals, one another pull request
-# still holds stays), the maintenance kind `predicted` (its form, covered by a stronger row, replaced
-# by one, swept only once a build carries the merge), and `preflight.sh radar`.
+# HTML comment; capped), the listing's fields alone through the issues endpoint, newest first, the
+# ledger's due kinds (new, changed by its text hash, merged, closed unmerged, unchanged, plain — nothing
+# to judge —, the per-run cap, the window), matching to recurring tests only, `record` (closed unmerged
+# resolves its proposals, one another pull request still holds stays), the maintenance kind `predicted`
+# (its form, covered by a stronger row, replaced by one, swept only once a build carries the merge), and
+# `preflight.sh radar` (the window from radar_window_days, the plain rows it writes itself).
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 seed_work
@@ -50,8 +51,8 @@ cp "$SANDBOX/listing.json" "$STUB_DIR/issues.json"
 : > "$STUB_DIR/gh.calls"
 out="$(bash "$SCRIPTS/github.sh" prs --since 2026-10-20T00:00:00Z)"
 assert "github.sh prs: the sanitized pull requests, not cut" '(.prs | map(.number)) == [5,7,8] and (.prs[0].body | contains("http") | not) and .truncated == false and .last_updated_at == "2026-10-25T10:00:00Z"' "$out"
-grep -qF -- "-X GET repos/acme/widgets/issues -f state=all -f sort=updated -f direction=asc -f per_page=100 -f since=2026-10-20T00:00:00Z -f page=1" "$STUB_DIR/gh.calls" \
-  || { echo "  assertion failed: prs lists the target's issues endpoint, oldest update first, since the watermark"; FAILED=1; }
+grep -qF -- "-X GET repos/acme/widgets/issues -f state=all -f sort=updated -f direction=desc -f per_page=100 -f since=2026-10-20T00:00:00Z -f page=1" "$STUB_DIR/gh.calls" \
+  || { echo "  assertion failed: prs lists the target's issues endpoint, newest update first, since the window's start"; FAILED=1; }
 grep -E 'pulls|/files|/commits|/reviews|\.diff|\.patch|/comments' "$STUB_DIR/gh.calls" && { echo "  assertion failed: prs requested a pull request surface"; FAILED=1; }
 bash "$SCRIPTS/github.sh" prs --since yesterday >/dev/null 2>&1; assert_eq "prs --since <not an ISO time>: exit 2" 2 "$?"
 bash "$SCRIPTS/github.sh" prs --since 2026-10-20T00:00:00Z extra >/dev/null 2>&1; assert_eq "prs with an extra argument: exit 2" 2 "$?"
@@ -85,15 +86,19 @@ prs() { jq -sc '{prs: ., truncated: false, last_updated_at: null}' > "$SANDBOX/p
   pr 104 "Bump a dependency" open 2026-10-25T04:00:00Z
   pr 105 "Settings: Usage tab and personal tokens" open 2026-10-25T05:00:00Z; } | prs
 out="$(R scan "$SANDBOX/prs.json")"
-assert "scan: closed unmerged before any scan skipped, the rest new, oldest first" '[.due[] | "\(.pr):\(.kind)"] == ["101:new","102:new","104:new","105:new"] and .inventory == "c5"' "$out"
+assert "scan: newest first, closed unmerged before any scan skipped, no candidate and no proposal plain, never due" \
+  '[.due[] | "\(.pr):\(.kind)"] == ["105:new","102:new","101:new"] and .plain == [{"pr":104,"kind":"new","state":"open","text_hash":.plain[0].text_hash}] and .inventory == "c5"' "$out"
 assert "a feature name names its recurring members only; a control names a page's tests" \
-  '.due[0].candidates | map(.test) == ["#42 AC-1","S-7"] and .[0] == {"test":"#42 AC-1","tier":"regression","score":1,"reasons":[{"via":"feature","feature":"api-keys","term":"API keys"}]} and .[1].score == 0.5' "$out"
+  '.due[] | select(.pr == 101) | .candidates | map(.test) == ["#42 AC-1","S-7"] and .[0] == {"test":"#42 AC-1","tier":"regression","score":1,"reasons":[{"via":"feature","feature":"api-keys","term":"API keys"}]} and .[1].score == 0.5' "$out"
 assert "a control only one page shows names the block that uses it; a retired test and an ad-hoc file are out" \
-  '.due[1].candidates | map(.test) == ["#43 AC-1"] and .[0].score == 0.75 and (.[0].reasons | map(.via + ":" + .term) | sort) == ["control:Download","page:Reports"]' "$out"
-assert "no match: no candidate" '.due[2].candidates == []' "$out"
+  '.due[] | select(.pr == 102) | .candidates | map(.test) == ["#43 AC-1"] and .[0].score == 0.75 and (.[0].reasons | map(.via + ":" + .term) | sort) == ["control:Download","page:Reports"]' "$out"
 assert "an alias and a control together; a quarantined test counts; shared chrome (Save) does not" \
-  '.due[3].candidates | map(.test) == ["#42 AC-1","S-7"] and .[0].score == 0.9 and .[1].score == 0.75 and .[1].tier == "quarantined"' "$out"
-assert "a new entry carries its text and lint, never more" '.due[0] | has("title") and has("body") and (.injection_suspect == false) and (has("url") | not)' "$out"
+  '.due[] | select(.pr == 105) | .candidates | map(.test) == ["#42 AC-1","S-7"] and .[0].score == 0.9 and .[1].score == 0.75 and .[1].tier == "quarantined"' "$out"
+assert "a new entry carries its text and lint, never more; a plain one no text" \
+  '(.due[0] | has("title") and has("body") and (.injection_suspect == false) and (has("url") | not)) and (.plain[0] | has("title") | not)' "$out"
+assert "one line per due entry, one for the skipped and the plain ones" \
+  '(.logs | map(select(test("^PR #"))) | length) == 3 and (.logs | any(test("^1 pull request\\(s\\) closed unmerged before any scan"))) and (.logs | any(test("^1 pull request\\(s\\) with no candidate test and no proposal — not due")))' "$out"
+[ -e "$W/PRSCAN.md" ] && { echo "  assertion failed: a scan without --record wrote the ledger"; FAILED=1; }
 # A test's own step string the map does not show: named by a completed issue (radar.mjs issues).
 printf "await app.open('/settings');\nawait screen.getByLabel('Channel ID').fill(x);\n// AC-1 begin\nawait expect(screen.getByText('Connected')).toBeVisible();\n// AC-1 end\n" > "$W/suite/tests/issue-60.e2e.ts"
 jq -nc '{issues:[{number:3810,title:"Slack: link accounts instead of a channel ID",spec:"The Channel ID field is gone; run /dam bind."},{number:3811,title:"Bump a dependency",spec:""},{title:"no number"}]}' > "$SANDBOX/changes.json"
@@ -103,19 +108,27 @@ assert "issues: a step string names the test, outside its blocks; no candidate, 
 echo '{"error":"x"}' > "$SANDBOX/changes-err.json"
 R issues "$SANDBOX/changes-err.json" >/dev/null 2>&1; assert_eq "issues: a failed changes.sh is exit 2" 2 "$?"
 rm -f "$W/suite/tests/issue-60.e2e.ts"
-assert "since: 14 days back with no ledger" '.since | test("^20[0-9-]{8}T[0-9:]{8}Z$")' "$(R since)"
-assert "the cap: the first over it and every later one wait" '[.due[].pr] == [101] and .deferred == 4' "$(QI_RADAR_MAX=1 R scan "$SANDBOX/prs.json")"
+lo="$(iso_ago 4321)"; hi="$(iso_ago 4319)"
+assert "since: the window's start, 3 days back" ".since > \"$lo\" and .since < \"$hi\"" "$(R since)"
+lo="$(iso_ago 10081)"; hi="$(iso_ago 10079)"
+assert "since --days 7: 7 days back" ".since > \"$lo\" and .since < \"$hi\"" "$(R since --days 7)"
+for d in 0 31 x; do R since --days "$d" >/dev/null 2>&1; assert_eq "since --days $d: exit 2" 2 "$?"; done
+out1="$(QI_RADAR_MAX=1 R scan "$SANDBOX/prs.json")"
+assert "the cap: the newest is due, the older ones wait; a plain one and a merge never wait" \
+  '[.due[].pr] == [105] and .deferred == 2 and [.plain[].pr] == [104] and (.logs | any(test("^2 new or changed pull request\\(s\\) over the cap \\(1 a run\\)")))' "$out1"
+out1="$(R scan "$SANDBOX/prs.json" --since 2026-10-25T02:00:00Z)"
+assert "the window: one updated before its start is dropped, one line for all" \
+  '[.due[].pr] == [105,102] and .dropped == 1 and (.logs | map(select(test("updated before 2026-10-25T02:00:00Z — outside the window, dropped"))) | length) == 1' "$out1"
+R scan "$SANDBOX/prs.json" --since yesterday >/dev/null 2>&1; assert_eq "scan --since <not an ISO time>: exit 2" 2 "$?"
 R scan "$SANDBOX/nothing.json" >/dev/null 2>&1; assert_eq "scan of no listing: exit 2" 2 "$?"
 jq -c '.prs' "$SANDBOX/prs.json" > "$SANDBOX/bare.json"
 R scan "$SANDBOX/bare.json" >/dev/null 2>&1; assert_eq "scan of a bare array (no truncated flag): exit 2" 2 "$?"
-jq -c '.truncated = true | .last_updated_at = "2026-10-25T05:00:00Z"' "$SANDBOX/prs.json" > "$SANDBOX/cut.json"
-assert "a cut listing with something due: no advance" '.truncated and .advance == null and .stalled == false' "$(R scan "$SANDBOX/cut.json")"
-jq -c '.prs = [] | .truncated = true | .last_updated_at = "2026-10-25T05:00:00Z"' "$SANDBOX/prs.json" > "$SANDBOX/cut0.json"
-assert "a cut listing with nothing due: advance past its start" '.advance == "2026-10-25T05:00:00Z" and .stalled == false' "$(R scan "$SANDBOX/cut0.json" --since 2026-10-25T04:00:00Z)"
-assert "a cut listing whose last item has the start's time: stalled, no advance" '.advance == null and .stalled' "$(R scan "$SANDBOX/cut0.json" --since 2026-10-25T05:00:00Z)"
+jq -c '.truncated = true | .last_updated_at = "2026-10-25T01:00:00Z"' "$SANDBOX/prs.json" > "$SANDBOX/cut.json"
+assert "a cut listing: the entries as before, one line for what was not listed" \
+  '.truncated and [.due[].pr] == [105,102,101] and (.logs | any(test("^listing cut at its page limit \\(oldest listed update 2026-10-25T01:00:00Z\\)")))' "$(R scan "$SANDBOX/cut.json")"
 
 # ---------------------------------------------------------------- record and the lifecycle
-h() { jq -r --argjson n "$1" '.due[] | select(.pr == $n) | .text_hash' <<<"$out"; }
+h() { jq -r --argjson n "$1" '(.due + .plain)[] | select(.pr == $n) | .text_hash' <<<"$out"; }
 p1="$(M open '#42 AC-1' --kind predicted --build c5 --proposal review --basis-file "$(B 'PR #101: Rename the API keys tab')" | jq -r .id)"
 p2="$(M open '#43 AC-1' --kind predicted --build c5 --proposal review --basis-file "$(B 'PR #102: The download button on reports moves')" | jq -r .id)"
 assert_eq "two predicted rows" "M-1 M-2" "$p1 $p2"
@@ -123,7 +136,6 @@ assert "record #101 with its proposal" '.proposals == ["M-1"] and .resolved == [
 R record 102 --hash "$(h 102)" --state open --updated-at 2026-10-25T02:00:00Z --proposal M-2 >/dev/null
 R record 104 --hash "$(h 104)" --state open --updated-at 2026-10-25T04:00:00Z >/dev/null
 R record 105 --hash "$(h 105)" --state open --updated-at 2026-10-25T05:00:00Z --proposal M-1 >/dev/null
-assert "since: the ledger's newest update" '.since == "2026-10-25T05:00:00Z"' "$(R since)"
 before="$(cat "$W/PRSCAN.md")"
 R record 101 --hash nothex --state open --updated-at 2026-10-25T01:00:00Z 2>/dev/null; assert_eq "a malformed hash: exit 2" 2 "$?"
 R record 101 --hash "$(h 101)" --state merged --updated-at 2026-10-25T01:00:00Z 2>/dev/null; assert_eq "merged without --merged-at: exit 2" 2 "$?"
@@ -134,13 +146,13 @@ assert_eq "refusals leave the ledger as it was" "$before" "$(cat "$W/PRSCAN.md")
 [ -e "$W/PRSCAN.md.lock" ] && { echo "  a refused record left its lock"; FAILED=1; }
 
 # Unchanged: not due; a changed text, a merge, a close unmerged are.
-assert "a second scan of the same text: nothing due" '.due == []' "$(R scan "$SANDBOX/prs.json")"
+assert "a second scan of the same text: nothing due, nothing plain" '.due == [] and .plain == [] and (.logs | any(test("^4 pull request\\(s\\) unchanged since their scan")))' "$(R scan "$SANDBOX/prs.json")"
 { pr 101 "Rename the API keys tab" merged 2026-10-25T06:00:00Z 2026-10-25T06:00:00Z
   pr 102 "The download button on reports moves" closed 2026-10-25T07:00:00Z
   pr 104 "Bump a dependency, and the Usage tab" open 2026-10-25T08:00:00Z
   pr 105 "Settings: Usage tab and personal tokens" closed 2026-10-25T09:00:00Z; } | prs
 out="$(R scan "$SANDBOX/prs.json")"
-assert "merged, closed, changed text, closed" '[.due[] | "\(.pr):\(.kind)"] == ["101:merged","102:closed","104:changed","105:closed"]' "$out"
+assert "closed, changed text, closed, merged — newest first" '[.due[] | "\(.pr):\(.kind)"] == ["105:closed","104:changed","102:closed","101:merged"] and .plain == []' "$out"
 assert "a merged or closed entry carries no text" '[.due[] | select(.kind != "changed") | has("title") or has("candidates")] | any | not' "$out"
 assert "merged keeps its proposals" '.proposals == ["M-1"]' "$(R record 101 --hash "$(h 101)" --state merged --merged-at 2026-10-25T06:00:00Z --updated-at 2026-10-25T06:00:00Z --keep)"
 before="$(cat "$W/PRSCAN.md")"; echo 1 > "$W/MAINTENANCE.md.lock"
@@ -175,37 +187,46 @@ assert "check: a malformed ledger row, a closed one holding a proposal" '.ok == 
 
 # ---------------------------------------------------------------- preflight.sh radar
 rm -f "$W/PRSCAN.md"
-node -e 'console.log(JSON.stringify([
-  {number:201, title:"Rename the API keys tab", body:"See src/a.ts", labels:[], state:"open", updated_at:"2026-10-25T01:00:00Z", pull_request:{merged_at:null}},
-  {number:202, title:"Docs", body:"", labels:[], state:"open", updated_at:"2026-10-25T02:00:00Z", pull_request:{merged_at:null}},
-  {number:7, title:"An issue", body:"", labels:[], state:"open", updated_at:"2026-10-25T02:00:00Z"}]))' > "$STUB_DIR/issues.json"
+t1="$(iso_ago 120)"; t2="$(iso_ago 60)"
+node -e 'const [t1, t2] = process.argv.slice(1); console.log(JSON.stringify([
+  {number:201, title:"Rename the API keys tab", body:"See src/a.ts", labels:[], state:"open", updated_at:t1, pull_request:{merged_at:null}},
+  {number:202, title:"Docs", body:"", labels:[], state:"open", updated_at:t2, pull_request:{merged_at:null}},
+  {number:7, title:"An issue", body:"", labels:[], state:"open", updated_at:t2}]))' "$t1" "$t2" > "$STUB_DIR/issues.json"
 printf -- '- regression_channel: C0123ABCD\n' >> "$W/CONFIG.md"
 left() { ls /tmp /private/tmp 2>/dev/null | grep -c '^quality-inspector-radar\.'; }
 n0="$(left)"
+: > "$STUB_DIR/gh.calls"
 out="$(bash "$SCRIPTS/preflight.sh" radar)"
 assert "radar: the pull requests due, with candidates; the digest's channel" \
-  '.mode == "radar" and .nothing_to_do == false and ([.prs_due[].pr] == [201,202]) and .prs_due[0].candidates[0].test == "#42 AC-1" and .channel == "C0123ABCD" and .inventory == "c5"' "$out"
-assert "radar: the session title names ids alone" '.title == "Scan PR #201 · Scan PR #202"' "$out"
+  '.mode == "radar" and .nothing_to_do == false and ([.prs_due[].pr] == [201]) and .prs_due[0].candidates[0].test == "#42 AC-1" and .channel == "C0123ABCD" and .inventory == "c5"' "$out"
+assert "radar: the session title names ids alone" '.title == "Scan PR #201"' "$out"
 assert "radar: the body arrives sanitized" '.prs_due[0].body | contains("src/") | not' "$out"
 assert_eq "radar: no listing left in /tmp" "$n0" "$(left)"
-grep -qE '^[0-9T:Z-]+ since=[0-9T:Z-]+ due=2 new=2 deferred=0 truncated=false$' "$W/RADAR.log" || { echo "  assertion failed: the RADAR.log line: $(tail -1 "$W/RADAR.log")"; FAILED=1; }
-for n in 201 202; do R record "$n" --hash "$(jq -r --argjson n "$n" '.prs_due[] | select(.pr == $n) | .text_hash' <<<"$out")" --state open \
-  --updated-at "$(jq -r --argjson n "$n" '.prs_due[] | select(.pr == $n) | .updated_at' <<<"$out")" >/dev/null; done
+assert "radar: the pre-flight writes the row of a pull request with nothing to judge, and only that" '[.prs[] | .pr + ":" + .state] == ["202:open"]' "$(R list)"
+grep -qE '^[0-9T:Z-]+ since=[0-9T:Z-]+ due=1 new=1 plain=1 deferred=0 truncated=false$' "$W/RADAR.log" || { echo "  assertion failed: the RADAR.log line: $(tail -1 "$W/RADAR.log")"; FAILED=1; }
+since="$(grep -o 'since=[0-9T:Z-]*' "$STUB_DIR/gh.calls" | head -1 | cut -d= -f2)"
+[[ "$since" > "$(iso_ago 4321)" && "$since" < "$(iso_ago 4319)" ]] || { echo "  assertion failed: the listing starts 3 days back (radar_window_days), not at '$since'"; FAILED=1; }
+grep -q 'direction=desc' "$STUB_DIR/gh.calls" || { echo "  assertion failed: the listing is newest first"; FAILED=1; }
+R record 201 --hash "$(jq -r '.prs_due[0].text_hash' <<<"$out")" --state open --updated-at "$t1" >/dev/null
 out="$(bash "$SCRIPTS/preflight.sh" radar)"
-assert "radar: nothing changed, nothing to do" '.nothing_to_do == true and .title == "Change radar: nothing to do"' "$out"
-grep -q 'since=2026-10-25T02:00:00Z' "$STUB_DIR/gh.calls" || { echo "  assertion failed: the next listing starts at the ledger's newest update"; FAILED=1; }
-# A cut listing with nothing due moves the next listing past it.
-node -e 'const f = process.argv[1]; const items = JSON.parse(require("fs").readFileSync(f, "utf8"));
-  require("fs").writeFileSync(f, JSON.stringify(items.concat(Array.from({ length: 97 }, (_, i) => ({ number: 300 + i, title: "x", body: "", labels: [], state: "open", updated_at: "2026-10-25T03:00:00Z" })))));' "$STUB_DIR/issues.json"
+assert "radar: nothing changed, nothing to do" '.nothing_to_do == true and .title == "Change radar: nothing to do" and (.logs | any(test("^2 pull request\\(s\\) unchanged")))' "$out"
+# The window: radar_window_days, read through the registry (out of range reads as the default).
+printf -- '- radar_window_days: 7\n' >> "$W/CONFIG.md"
+: > "$STUB_DIR/gh.calls"; bash "$SCRIPTS/preflight.sh" radar >/dev/null
+since="$(grep -o 'since=[0-9T:Z-]*' "$STUB_DIR/gh.calls" | head -1 | cut -d= -f2)"
+[[ "$since" > "$(iso_ago 10081)" && "$since" < "$(iso_ago 10079)" ]] || { echo "  assertion failed: radar_window_days 7 starts the listing 7 days back, not at '$since'"; FAILED=1; }
+sed -i.bak 's/^- radar_window_days: 7$/- radar_window_days: 99/' "$W/CONFIG.md" && rm -f "$W/CONFIG.md.bak"
+: > "$STUB_DIR/gh.calls"; bash "$SCRIPTS/preflight.sh" radar >/dev/null
+since="$(grep -o 'since=[0-9T:Z-]*' "$STUB_DIR/gh.calls" | head -1 | cut -d= -f2)"
+[[ "$since" > "$(iso_ago 4321)" && "$since" < "$(iso_ago 4319)" ]] || { echo "  assertion failed: radar_window_days 99 reads as the default 3, not '$since'"; FAILED=1; }
+# A cut listing: one line for the part not listed, never an error; what it holds is scanned as usual.
+node -e 'const [f, t] = process.argv.slice(1); const items = JSON.parse(require("fs").readFileSync(f, "utf8"));
+  require("fs").writeFileSync(f, JSON.stringify(items.concat(Array.from({ length: 97 }, (_, i) => ({ number: 300 + i, title: "x", body: "", labels: [], state: "open", updated_at: t, pull_request: { merged_at: null } })))));' "$STUB_DIR/issues.json" "$(iso_ago 180)"
 out="$(QI_PRS_PAGES=1 bash "$SCRIPTS/preflight.sh" radar)"
-assert "radar: a cut listing with nothing due — nothing to do, the next run starts past it" '.nothing_to_do and (.logs | any(test("starts at 2026-10-25T03:00:00Z")))' "$out"
-assert "since: the cut mark" '.since == "2026-10-25T03:00:00Z"' "$(R since)"
-R advance 2026-10-25T03:00:00Z >/dev/null 2>&1; assert_eq "advance to a mark not later than the start: exit 2" 2 "$?"
-assert "since: the refused mark changed nothing" '.since == "2026-10-25T03:00:00Z"' "$(R since)"
-# The same cut listing again: every item at or before the start, no later mark — an error, never a quiet run.
-out="$(QI_PRS_PAGES=1 bash "$SCRIPTS/preflight.sh" radar)"
-assert "radar: a cut listing inside one second is an error" '.nothing_to_do and (.error | test("cut inside 2026-10-25T03:00:00Z")) and .title == "Change radar: pre-flight error"' "$out"
-grep -q 'truncated=true$' "$W/RADAR.log" || { echo "  assertion failed: the RADAR.log line names the cut"; FAILED=1; }
+assert "radar: a cut listing with nothing to judge — nothing to do, one line, no error" \
+  '.nothing_to_do and .error == null and (.logs | any(test("^listing cut at its page limit"))) and (.logs | any(test("^97 pull request\\(s\\) with no candidate test and no proposal — ledger rows written \\(97\\)")))' "$out"
+grep -q 'plain=97 deferred=0 truncated=true$' "$W/RADAR.log" || { echo "  assertion failed: the RADAR.log line names the cut: $(tail -1 "$W/RADAR.log")"; FAILED=1; }
+assert "check: the rows the pre-flight wrote are well-formed" '.ok' "$(R check)"
 out="$(STUB_GH_FAIL=1 bash "$SCRIPTS/preflight.sh" radar)"
 assert "radar: a failed listing is an error, never a quiet run" '(.error | test("pull requests")) and .title == "Change radar: pre-flight error"' "$out"
 assert_eq "radar: no listing left after a failure" "$n0" "$(left)"

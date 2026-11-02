@@ -323,6 +323,7 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - max_explorations_per_ac: 3
 - security_checks: enabled
 - security_failed_logins: 10
+- radar_window_days: 3
 - scenario_discovery: disabled
 - scenario_channel:
 - profile_scenarios: enabled

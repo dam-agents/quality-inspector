@@ -8,7 +8,7 @@
 #   github.sh check                        -> exit 0 when the target's issues are readable
 #   github.sh list                         -> issues carrying qa_label, open and closed, as JSON
 #   github.sh prs [--since <iso>]          -> {"prs": [...], "truncated", "last_updated_at"}: the pull requests
-#                                             the issues listing names, updated since <iso>, oldest first —
+#                                             the issues listing names, updated since <iso>, newest first —
 #                                             their text alone, sanitized (lib/pr-text.mjs; the Change radar,
 #                                             docs/radar.md); `truncated` past QI_PRS_PAGES (10) pages
 #   github.sh issue <n>                    -> the issue as JSON; a pull request is refused
@@ -133,10 +133,10 @@ case "$cmd" in
       (--since) since="${2:-}"; [[ "$since" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] && [ $# -eq 2 ] || usage ;;
       (*) usage ;;
     esac
-    f=(-f state=all -f sort=updated -f direction=asc -f per_page=100); [ -n "$since" ] && f+=(-f since="$since")
+    f=(-f state=all -f sort=updated -f direction=desc -f per_page=100); [ -n "$since" ] && f+=(-f since="$since")
     # The issues listing names pull requests too; no /pulls endpoint is ever requested. Pages join
     # on stdin, never as an argument (one argument holds 128 KiB). Past PRS_PAGES pages the listing
-    # is cut: `truncated`, and the update time of its last item, issue or pull request.
+    # is cut: `truncated`, and the update time of its last item, issue or pull request — the oldest listed.
     all=""; truncated=false
     for page in $(seq 1 "$PRS_PAGES"); do
       c="$(api -X GET "repos/$RP/issues" "${f[@]}" -f page="$page")" || exit 1
