@@ -119,6 +119,9 @@ assert "the cap: the newest is due, the older ones wait; a plain one and a merge
 out1="$(R scan "$SANDBOX/prs.json" --since 2026-10-25T02:00:00Z)"
 assert "the window: one updated before its start is dropped, one line for all" \
   '[.due[].pr] == [105,102] and .dropped == 1 and (.logs | map(select(test("updated before 2026-10-25T02:00:00Z — outside the window, dropped"))) | length) == 1' "$out1"
+jq -c '.prs += [{number:106, title:"Settings: Usage tab", body:"", labels:[], state:"open", draft:false, updated_at:null, merged_at:null}]' "$SANDBOX/prs.json" > "$SANDBOX/untimed.json"
+assert "one with no update time: skipped, never due, one line" \
+  '[.due[].pr] == [105,102] and ([.plain[].pr] | index(106) | not) and (.logs | any(test("^1 pull request\\(s\\) with no update time in the listing — skip")))' "$(R scan "$SANDBOX/untimed.json" --since 2026-10-25T02:00:00Z)"
 R scan "$SANDBOX/prs.json" --since yesterday >/dev/null 2>&1; assert_eq "scan --since <not an ISO time>: exit 2" 2 "$?"
 R scan "$SANDBOX/nothing.json" >/dev/null 2>&1; assert_eq "scan of no listing: exit 2" 2 "$?"
 jq -c '.prs' "$SANDBOX/prs.json" > "$SANDBOX/bare.json"

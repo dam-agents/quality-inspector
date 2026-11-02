@@ -28,7 +28,8 @@
 //   `plain`: --record writes its ledger row here, as `record` would, and it is never due. The rest are
 //   due; at most QI_RADAR_MAX (10) `new` / `changed` a run, the newest — the others are `deferred`, and
 //   a later run reads them while they stay inside the window. One updated before --since (the window's
-//   start) is `dropped`, one log line for all. `truncated`: the listing held more items than
+//   start) is `dropped`, one log line for all; one with no update time is skipped, since no row can
+//   hold it (one log line). `truncated`: the listing held more items than
 //   `github.sh prs` pages, so the oldest part of the window was not listed (one log line).
 // record: one ledger row per pull request, written under its mutex. The proposals are those the run
 //   opened or updated for it (open `predicted` rows only); --keep adds the row's earlier ones (a
@@ -92,9 +93,10 @@ function scan() {
   const max = Number.parseInt(process.env.QI_RADAR_MAX ?? '10', 10) || 10;
   const ledger = new Map(load().map((r) => [r.pr, r]));
   const ctx = context();
-  const due = []; const plain = []; const logs = []; let deferred = 0; let dropped = 0; let reads = 0; let unchanged = 0; let unseen = 0;
+  const due = []; const plain = []; const logs = []; let deferred = 0; let dropped = 0; let reads = 0; let unchanged = 0; let unseen = 0; let untimed = 0;
   for (const pr of prs.slice().sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || b.number - a.number)) {
-    if (since && !(String(pr.updated_at) >= since)) { dropped++; continue; }
+    if (!UTC_RE.test(pr.updated_at ?? '')) { untimed++; continue; }
+    if (since && pr.updated_at < since) { dropped++; continue; }
     const row = ledger.get(String(pr.number)); const hash = hashOf(pr);
     let kind = null;
     if (!row) kind = pr.state === 'closed' ? null : 'new';
@@ -122,6 +124,7 @@ function scan() {
   if (plain.length) logs.push(`${plain.length} pull request(s) with no candidate test and no proposal — ${note}`);
   if (deferred) logs.push(`${deferred} new or changed pull request(s) over the cap (${max} a run) — a later run reads them, newest first, while they stay inside the window`);
   if (dropped) logs.push(`${dropped} pull request(s) updated before ${since} — outside the window, dropped`);
+  if (untimed) logs.push(`${untimed} pull request(s) with no update time in the listing — skip`);
   const last = UTC_RE.test(listing.last_updated_at ?? '') ? listing.last_updated_at : null;
   if (listing.truncated) logs.push(`listing cut at its page limit${last ? ` (oldest listed update ${last})` : ''} — the pull requests updated before it are not read`);
   out({ due, plain: plain.map(({ pr, kind, state, text_hash }) => ({ pr, kind, state, text_hash })), deferred, dropped, truncated: listing.truncated, inventory: ctx.inventory, logs });

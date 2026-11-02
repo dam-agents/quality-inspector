@@ -68,8 +68,8 @@ test — an exploration, a rerun, an unsaved scenario, a retired test — is nev
 
 Every run lists the pull requests updated in the last `radar_window_days` days (default 3, 1–30;
 registry `scripts/lib/modules.json`, [modules.md](modules.md) → Control), newest first; no
-watermark — the ledger tells what was read. At most 10 `new` / `changed` a run, the newest; the
-rest (`deferred`) wait while they stay inside the window. One last updated before the window's start
+watermark — the ledger tells what was read. At most 10 due `new` / `changed` entries a run, the
+newest; the rest (`deferred`) wait while they stay inside the window. One last updated before the window's start
 is never read: a build carries its change. A listing cut at 1000 items (`truncated`) leaves out the
 oldest part of the window: one log line, never an error.
 
