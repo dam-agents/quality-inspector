@@ -50,7 +50,9 @@ that wakes the run: give it (**Telling the operator**), with the owner the evide
 the mode's log, `work/LESSONS.md`, `bash "$HOME/scripts/verify-onboarding.sh" --config` for a
 configuration cause; `hit B-<k> --owner <owner> --build none` when it is not `unknown` —, write its notes
 file, then end the run: nothing of the mode runs without its worklist. A worklist with `error` and no
-`blockers` (the register did not take it) is the old contract: log the error in one line and end.
+`blockers` (the register did not take it) is the old contract: log the error in one line and end. A
+mode switched off with its row open keeps the row until the operator's "close B-<k>"; the audit names
+it after 7 days.
 
 ## Diagnosis — before you give up on a failure
 

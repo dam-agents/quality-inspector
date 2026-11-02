@@ -188,6 +188,8 @@ B told B-1 >/dev/null
 PF discovery >/dev/null
 assert "the discovery worklist resolves B-2" '.blockers == []' "$(B list --open)"
 assert "B-2 was never told: no notice" '.notices == []' "$(B status)"
+printf '| id | scope |\n| --- | --- |\n| B-9 | preflight | - | unknown | issues | x | none | 2 | open | t | t | t | f | - |\n' > "$W/BLOCKERS.md"
+assert "an open row the register cannot list: said, never a silent pass" '.logs | any(test("^WARN: the issues pre-flight passes, but blockers.mjs list failed"))' "$(PF issues)"
 printf 'not a register\n' > "$W/BLOCKERS.md"
 out="$(STUB_GH_FAIL=1 PF issues)"
 assert "a register that cannot take the error: no blockers key, so the Precheck wakes the run" '(has("blockers") | not) and .nothing_to_do == true

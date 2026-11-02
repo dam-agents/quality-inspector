@@ -95,9 +95,11 @@ preflight_blocker() {
 # preflight_passed: the mode built its worklist — its open `preflight` row is resolved (the `resolved`
 # notice is due when the operator was told). A grep first: most runs have no such row.
 preflight_passed() {
-  local id
+  local l id
   grep -qE "^\| B-[0-9]+ \| preflight \| - \| [a-z]+ \| $MODE \| [^|]* \| [^|]* \| [0-9]+ \| open \|" "$WORK/BLOCKERS.md" 2>/dev/null || return 0
-  id="$(node "$SCRIPT_DIR/blockers.mjs" list --open 2>/dev/null | jq -r --arg m "$MODE" 'first(.blockers[] | select(.scope == "preflight" and .stage == $m) | .id) // empty' 2>/dev/null)"
+  l="$(node "$SCRIPT_DIR/blockers.mjs" list --open 2>/dev/null)" \
+    || { log "WARN: the $MODE pre-flight passes, but blockers.mjs list failed — its preflight row stays open"; return 0; }
+  id="$(jq -r --arg m "$MODE" 'first(.blockers[] | select(.scope == "preflight" and .stage == $m) | .id) // empty' <<<"$l" 2>/dev/null)"
   [ -n "$id" ] || return 0
   if node "$SCRIPT_DIR/blockers.mjs" resolve "$id" >/dev/null 2>&1; then log "blocker $id resolved: the $MODE pre-flight builds its worklist again"
   else log "WARN: blocker $id: the $MODE pre-flight passes, but blockers.mjs resolve failed"; fi
