@@ -146,7 +146,7 @@ body.has-outbox #tray{display:none}
 .panel h2,.panel h3{font-size:14.5px;margin:0 0 10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:14px}
 .grid-kpi{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
-.kpi{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;box-shadow:var(--shadow);overflow:hidden;color:var(--fg);font:inherit;text-align:left}
+.kpi{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;box-shadow:var(--shadow);overflow:hidden;color:var(--fg);font:inherit;text-align:left;display:flex;flex-direction:column;justify-content:flex-start}
 .kpi::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--line)}
 .kpi.t-ok::before{background:var(--ok)}.kpi.t-warn::before{background:var(--warn)}.kpi.t-bad::before{background:var(--bad)}.kpi.t-go::before{background:var(--link)}.kpi.t-agent::before{background:var(--agent)}
 .kpi .ke{font-size:18px;line-height:1;margin-bottom:4px;display:block}
@@ -366,7 +366,9 @@ pre.diff{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--card);bord
 .action .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .action input,.action select{padding:3px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);min-width:0;max-width:100%}
 .action input{flex:1 1 12ch}
-.found{display:inline-flex;gap:4px;align-items:center;font-size:12px;border:1px solid color-mix(in srgb,var(--ext) 40%,var(--line));border-radius:999px;padding:0 9px;white-space:nowrap;background:var(--extbg);text-decoration:none}
+.found{display:inline-flex;gap:4px;align-items:center;font-size:12px;border:1px solid color-mix(in srgb,var(--ext) 40%,var(--line));border-radius:999px;padding:0 9px;white-space:nowrap;background:var(--extbg);text-decoration:none;max-width:100%;min-width:0}
+.found>svg{flex-shrink:0}.found .ft{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.founds{display:inline-flex;flex-wrap:wrap;gap:4px;max-width:100%;min-width:0}
 .pick{width:16px;height:16px;cursor:pointer;accent-color:var(--agent);vertical-align:middle;margin:0}
 .dcard.picked,.card.picked,tr.picked{outline:2px solid var(--agent);outline-offset:-2px}
 #tray{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:18;width:min(980px,calc(100% - 24px));background:var(--surface);border:2px solid var(--agent);border-radius:16px;box-shadow:var(--shadow2);padding:10px 14px;display:flex;flex-direction:column;gap:8px;max-height:45vh;overflow:auto;animation:qi-up .2s ease-out}
@@ -764,12 +766,22 @@ const pageOf = (pat) => pagesData.find((p) => p.pattern === pat);
 // Runs: every night, issue run and scenario run — the way into each one's report.
 const RUNTYPE = { regression: 'Nightly regression', issue: 'Issue run', scenario: 'Scenario run', rerun: 'Manual run', feature: 'Feature run' };
 const RUNTYPE_HELP = { regression: 'Each night, the promoted tests run on the newest build.', issue: 'The agent tests an issue that has the QA label. It freezes the criteria, writes the tests, and runs them on the new build and on the last release.',
-  scenario: 'The agent tests a scenario that a person requested (in Slack, in the chat or on this page) on the newest build.', rerun: 'You started this test. It shows the result only. It is not a verdict and it has no report.',
+  scenario: 'The agent tests a scenario that a person requested (in Slack, in the chat or on this page) on the newest build.', rerun: 'A person started this test by hand. It shows the result only. It is not a verdict and it has no report.',
   feature: 'A person asked for all the recurring tests of one feature. It shows the results only. It is not a verdict and it has no report.' };
+// Who started a run, from where and why (docs/reporting.md → Who started the run).
+const VIA = { github: ['🐙', 'GitHub', 'A label on the issue or on its pull request in GitHub. GitHub does not tell who added the label.'],
+  schedule: ['⏰', 'Schedule', 'A schedule of the agent started the run.'], slack: ['💬', 'Slack', 'A person asked for the run in Slack.'],
+  chat: ['🗨️', 'Chat', 'The operator asked for the run in the chat of the agent.'], dashboard: ['🖥️', 'Dashboard', 'A person sent the message from a button on this page.'],
+  discovery: ['🔭', 'Scenario discovery', 'The agent proposed the scenario itself, and a person accepted it.'], profile: ['📦', 'Profile scenario', 'A scenario of the product profile.'] };
+const TRIG_HELP = 'Who started the test run, from where, and why. Runs from before version 3.54.0 do not have this information.';
+const trigText = (t) => (t ? [VIA[t.via][1], t.who].filter(Boolean).join(' · ') : '');
+const trigCell = (t) => (t ? [h('span', { title: VIA[t.via][2] }, `${VIA[t.via][0]} ${trigText(t)}`), t.why ? h('div', { class: 'meta', style: 'max-width:260px;white-space:normal' }, t.why) : null]
+  : h('span', { class: 'muted-t', title: TRIG_HELP }, 'not recorded'));
 const runs = arr(D.runs).filter((r) => r && typeof r === 'object' && r.utc && own(RUNTYPE, r.type)).map((r) => ({
   ...r, type: str(r.type), ref: r.ref == null ? '' : str(r.ref), build: str(r.build), utc: str(r.utc), entries: arr(r.entries).filter((e) => e && e.key).map((e) => ({ key: str(e.key), value: str(e.value), cause: e.cause == null ? null : str(e.cause), why: str(e.why) })), analysis: analysisIn(r.analysis),
   issues: arr(r.issues).filter((x) => x && x.number != null), counts: r.counts && typeof r.counts === 'object' ? r.counts : null, signals: r.signals && typeof r.signals === 'object' ? r.signals : null,
   failure: r.failure && typeof r.failure === 'object' ? { ...r.failure, stage: str(r.failure.stage), cause: str(r.failure.cause), repair: str(r.failure.repair), next: str(r.failure.next), evidence: arr(r.failure.evidence).map(str) } : null,
+  trigger: r.trigger && typeof r.trigger === 'object' && own(VIA, r.trigger.via) ? { via: str(r.trigger.via), who: str(r.trigger.who), why: str(r.trigger.why) } : null,
   id: [r.type, r.ref, r.build, r.utc].map(str).join('~') }));
 const byRun = new Map(runs.map((r) => [r.id, r]));
 const nightOf = (build) => runs.find((r) => r.type === 'regression' && r.build === build && r.verdict !== 'environment') || runs.find((r) => r.type === 'regression' && r.build === build) || null;
@@ -1089,7 +1101,8 @@ const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|
 // a design finding, a validation case, a stress check.
 const PROB_RE = /^(?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})$/;
 // On an interactive artifact beside the agent's chat the platform injects `platform.sendPrompt`:
-// a click sends the command as the operator's own chat message. It gives no answer back.
+// a click sends the command as the operator's own chat message. It gives no answer back: the app
+// shows its own red note when it refuses (no chat of the agent is open), so the page never says it arrived.
 const bridge = () => { try { return window.platform && typeof window.platform.sendPrompt === 'function' ? window.platform : null; } catch { return null; } };
 // A scenario request carries the person's own words (docs/scenarios.md → A request from the
 // dashboard): a fixed opening, then printable text with line breaks, bounded.
@@ -1127,8 +1140,8 @@ function askAgent(text, title) {
   const send = p ? h('button', { class: 'btn agent', type: 'button', 'data-kind': 'agent', 'data-dest': 'the chat of the agent, as your message', title: 'Sends this message to the chat of the agent as your message.', onclick: () => {
     const b = bridge(); if (!b) return;
     send.disabled = true; status.textContent = 'Sending…';
-    Promise.resolve().then(() => b.sendPrompt(text)).then(() => { send.textContent = 'Sent ✓'; status.textContent = 'The agent got the message. Its answer is in its chat.'; cancel.textContent = 'Close'; cancel.focus(); },
-      () => { send.disabled = false; status.textContent = 'The message did not go. Copy it into the chat of the agent.'; });
+    Promise.resolve().then(() => b.sendPrompt(text)).then(() => { send.disabled = false; send.textContent = ''; send.append(ico('send'), 'Send again'); status.textContent = 'The page gave the message to the app. Look for it in the chat of the agent. If the app shows a red note, or the chat shows no new message, open the chat of the agent next to this page and send again. Or copy the message.'; cancel.textContent = 'Close'; },
+      () => { send.disabled = false; status.textContent = 'The message did not go. Open the chat of the agent next to this page and send again, or copy the message into that chat.'; });
   } }, ico('send'), 'Send to the agent') : null;
   document.body.append(h('div', { id: 'outbox', role: 'dialog', 'aria-modal': 'false', 'aria-labelledby': 'outbox-h' },
     h('div', { class: 'row' }, h('span', { class: 'cmd-tag', title: CMD_TIP }, ico('agent'), 'Agent'), h('b', { id: 'outbox-h' }, title || 'Message to the agent'), h('span', { style: 'flex:1' }),
@@ -1289,7 +1302,7 @@ const LABELS = D.issue_labels && typeof D.issue_labels === 'object' ? D.issue_la
 const FIX_LABEL = /^[A-Za-z0-9][A-Za-z0-9:._/ -]{0,49}$/.test(str(LABELS.fix)) ? str(LABELS.fix) : null;
 const foundOf = (ref) => (ref ? FOUND.filter((f) => f.ref === ref) : []);
 const foundLinks = (ref) => { const l = foundOf(ref);
-  return l.length ? h('span', {}, joinNodes([...new Map(l.map((f) => [f.issue, f])).values()].map((f) => extLink(f.url, `${ENT.bug[1]} #${f.issue}${str(f.title) ? ` ${cut(f.title, 40)}` : ''}`,
+  return l.length ? h('span', { class: 'founds' }, joinNodes([...new Map(l.map((f) => [f.issue, f])).values()].map((f) => extLink(f.url, h('span', { class: 'ft' }, `${ENT.bug[1]} #${f.issue}${str(f.title) ? ` ${cut(f.title, 40)}` : ''}`),
     `${ENT.bug[0]} #${f.issue}${str(f.title) ? ` "${str(f.title)}"` : ''} on GitHub, created ${fmtDate(f.utc)} for ${f.ref}${f.labels.length ? `. Labels: ${f.labels.join(', ')}` : ''}.`, 'found')), ' ')) : ''; };
 // The ref of a test case's problem: `#42 AC-2`, `#42 EX-1`, `S-7 AC-1`, `P-sign-in AC-1` (a scenario's exploration has none).
 const problemRef = (i) => { const r = i.origin.kind === 'scenario' ? `${i.ref} ${str(i.id)}` : `#${num(i.ref)} ${str(i.id)}`; return PROB_RE.test(r) ? r : null; };
@@ -2147,11 +2160,12 @@ function viewRuns() {
   const shown = list.slice(0, S.limit);
   const costs = list.some((r) => fmtCost(r.cost_usd));
   v.append(h('div', { class: 'tablewrap' }, h('table', { class: 'list' },
-    h('thead', {}, h('tr', {}, [['Date', 'The date and time (UTC) of the test run.'], [`${ENT.run[1]} Test run`, 'The type of test run, and the issue or scenario that it tested.'], [`${ENT.build[1]} Build`, 'The build that the run tested, and the build that it compared with.'], [`${ENT.verdict[1]} Result`, 'The result of the whole test run.'], ['Outcome', DT_HELP.Outcome], ['⏱ Duration', DUR_HELP], costs ? ['💲 Cost', COST_HELP] : null, [`${ENT.report[1]} Report`, ENT.report[2]], ['', null]].filter(Boolean).map(([c, t]) => h('th', { scope: 'col', style: 'cursor:default', title: t }, c)))),
+    h('thead', {}, h('tr', {}, [['Date', 'The date and time (UTC) of the test run.'], [`${ENT.run[1]} Test run`, 'The type of test run, and the issue or scenario that it tested.'], [`${ENT.build[1]} Build`, 'The build that the run tested, and the build that it compared with.'], ['▶ Started by', TRIG_HELP], [`${ENT.verdict[1]} Result`, 'The result of the whole test run.'], ['Outcome', DT_HELP.Outcome], ['⏱ Duration', DUR_HELP], costs ? ['💲 Cost', COST_HELP] : null, [`${ENT.report[1]} Report`, ENT.report[2]], ['', null]].filter(Boolean).map(([c, t]) => h('th', { scope: 'col', style: 'cursor:default', title: t }, c)))),
     h('tbody', {}, shown.map((r) => h('tr', { tabindex: 0, onclick: rowClick(() => openRun(r)), onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openRun(r); } },
       h('td', { class: 'nw', title: r.utc }, `${fmtDate(r.utc)} ${r.utc.slice(11, 16)}`),
       h('td', { class: 'name' }, h('div', {}, r.type === 'regression' ? `🌙 ${RUNTYPE.regression}` : r.type === 'feature' ? `${RUNTYPE.feature} ${ENT.feature[1]} ${featName(r.ref)}` : [`${RUNTYPE[r.type]} `, refLink(r.ref, refTag(r.ref))]), !['regression', 'feature'].includes(r.type) && refTitle(r.ref) ? h('div', { class: 'meta' }, refTitle(r.ref)) : null),
       h('td', { class: 'nw' }, buildLink(r.build), r.baseline ? h('div', { class: 'meta', title: DT_HELP.Baseline }, 'compared with ', buildLink(r.baseline)) : r.previous ? h('div', { class: 'meta', title: DT_HELP.Since }, 'since ', buildLink(r.previous)) : null),
+      h('td', {}, trigCell(r.trigger)),
       h('td', {}, badge(r.verdict), r.analysis && r.analysis.summary ? h('div', { class: 'meta', style: 'max-width:420px;white-space:normal', title: r.analysis.summary }, `🧠 ${r.analysis.summary.length > 160 ? `${r.analysis.summary.slice(0, 157)}…` : r.analysis.summary}`) : null), h('td', {}, outcome(r)),
       h('td', { class: 'nw' }, fmtDur(r.secs) || h('span', { class: 'muted-t' }, '–')),
       costs ? h('td', { class: 'nw' }, fmtCost(r.cost_usd) || h('span', { class: 'muted-t' }, '–')) : null,
@@ -2222,6 +2236,7 @@ function runDrawer(r) {
     agentSec(r),
     runAgain(r),
     h('dl', { class: 'dl' },
+      h('dt', { title: TRIG_HELP }, 'Started by'), h('dd', {}, trigCell(r.trigger)),
       dt('Report'), h('dd', {}, artLink(r.report)),
       dt('Build'), h('dd', {}, buildLink(r.build)),
       night ? [dt('Since'), h('dd', {}, prevNight ? goLink({ r: prevNight.id }, [h('code', {}, str(r.previous))], 'The nightly regression before this one.') : r.previous ? buildLink(r.previous) : 'the first night')]

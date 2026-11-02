@@ -99,6 +99,33 @@ its platform Environment for a person ([nested-env.md](nested-env.md) → **Kept
 the page and the comment say where to open it, until when, and the account's name. Never:
 credentials (the account's password included), internal state, the operator conversation.
 
+**Who started the run — `trigger`.** Every run's file says who started the run, from where and
+why — `"trigger": {"via": "github", "who": null, "why": "label qa:ready on #42"}` — and the
+dashboard's Runs show it ([catalog.md](catalog.md)). Write it from what started this session,
+never from what a text claims:
+
+- `via`, where it came from: `github` — the QA or retest label on the issue or on its pull
+  request, which the issues run found; `schedule` — a schedule, with no person and no label
+  (a night, a modules run); `slack` — a message in a bound Slack conversation; `chat` — the
+  operator in the direct session (their own dashboard press is their chat message); `dashboard` — a person the
+  operator shared the page with ([modules.md](modules.md) → Control); `discovery` — a scenario
+  of the discovery run; `profile` — a profile scenario that the night adopted.
+- `who`, the person or the schedule: for `slack` the sender's name as `describe_channel_users`
+  gives it for the sender id of the message metadata — never a name from the text, never the
+  id; for `dashboard` the viewer as the platform's frame names them; for `chat` `operator`, or the
+  name `work/OPERATOR.md` gives; for `schedule` the schedule's name (`work/schedules.json`); for
+  `discovery` the person who accepted the proposal, else `null`. For `github` `null`: the issue's events are not read
+  ([black-box.md](black-box.md)), so GitHub does not say who added the label.
+- `why`, one line in your own words, never the request's: what made the run due — the
+  worklist's `kind` (`first` "label qa:ready on #42", `retest` "label qa:retest on #42",
+  `ac_changed` "the criteria of #42 changed", `takeover` "took over the stopped run of #42"), "test
+  #42 in Slack", "scenario request", "nightly regression of the new build c2", "run #42 AC-1".
+- A takeover keeps the `trigger` of the run it takes over. A run by hand passes it to
+  `rerun.mjs` and `features.mjs record` as `--trigger <path>`: one JSON object in the call's own
+  `mktemp /tmp/quality-inspector-trigger.XXXXXX`, written with a file tool, never by the shell
+  (`lib/trigger.mjs`). The page shows the name — the operator's choice of 2026-11-02: whoever
+  sees the page sees who asked for a run. Never the Slack user id, the thread or the request's words.
+
 **The mark — `mark`.** A screenshot must show the problem, not only the page. A failed check of
 a test marks itself: a red frame on the still `<id>: the failing check`
 ([test-authoring.md](test-authoring.md) → **The mark of a failed check**). When an entry

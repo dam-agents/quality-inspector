@@ -11,7 +11,7 @@
 // value or a token in the data -> exit 1, {"refused", "notes", "hash", "changed": false}, no page.
 //
 // Test-related content only — the page may be shared: never a scenario's request text, its
-// requester or thread, a verdicts file's `notes`, LESSONS.md, the operator
+// requester's id or thread (a run's `trigger` names the person who started it), a verdicts file's `notes`, LESSONS.md, the operator
 // conversation, a security finding, or anything of work/env/. The agent's `analysis` of a run and its
 // sentence on a result (`explanation`, `note`) are written for the page (docs/reporting.md → The agent's
 // analysis) and travel; the secrets scan holds them like everything else. `hash` covers the data without its
@@ -220,6 +220,17 @@ const analysisOf = (v) => {
   const out = { summary: said(a.summary, 1200), problems, next: said(a.next) };
   return out.summary || problems.length || out.next ? out : null;
 };
+// Who started a run, from where, and why (docs/reporting.md → **Who started the run**): `via` from a
+// closed set, `who` a person's or a schedule's name (never a requester's id or thread), `why` the agent's
+// one line. A field that is not text, or that repeats a request, is left out; a file without `trigger`
+// says nothing.
+const VIA = new Set(['github', 'schedule', 'slack', 'chat', 'dashboard', 'discovery', 'profile']);
+const triggerOf = (v) => {
+  const t = v?.trigger;
+  if (!t || typeof t !== 'object' || !VIA.has(t.via)) return null;
+  const who = txt(t.who, 80);
+  return { via: t.via, who: who && !/[\u0000-\u001f\u007f<>]/.test(who) && !requesters.some((r) => who.includes(r)) ? who : null, why: said(t.why, 200) };
+};
 const whyOf = (e) => (CAUSE_OF.has(e?.verdict) || e?.verdict === 'inconclusive' || e?.verdict === 'healed' || e?.verdict === 'superseded' ? said(e.explanation) ?? said(e.note) : null);
 const withWhy = (o, w) => (w ? { ...o, why: w } : o); // only a result the agent explained carries `why`
 const WORST = ['regression', 'failed', 'needs-review', 'flaky', 'inconclusive', 'partial', 'blocked', 'not-testable', 'passed', 'verified'];
@@ -234,7 +245,7 @@ function readVerdicts(dir, okey, run, ref) {
     // A scenario's file has no top verdict: its worst criterion stands for the run.
     const worst = (v.acs ?? []).map((e) => e?.verdict).filter(Boolean).sort((a, b) => rank(a) - rank(b))[0] ?? null;
     runs.push({ type: run, ref, build, baseline: v.baseline ?? null, utc, verdict: v.verdict ?? worst, report: artRef(dir), secs: secsOf(v, utc), cost_usd: costOf(v),
-      analysis: analysisOf(v),
+      analysis: analysisOf(v), trigger: triggerOf(v),
       entries: [...(v.acs ?? []), ...(v.intents ?? []), ...(v.explorations ?? [])].filter((e) => e?.id && e.verdict).map((e) => withWhy({ key: `${okey}/${e.id}`, value: e.verdict, cause: causeOf(e) }, whyOf(e))) });
     // An intent test (docs/intent.md) runs in the same candidate run as the criteria.
     for (const ac of [...(v.acs ?? []), ...(v.intents ?? [])]) {
@@ -265,7 +276,7 @@ for (const stem of ls(join(work, 'reruns')).filter((x) => /^(issue-\d+|scenario-
       .map(([id, r]) => ({ key: `${stem}/${id}`, value: r.status, cause: causeOf(r, false) }));
     for (const e of entries) addHist(e.key, { build: v.build ?? null, run: 'rerun', value: e.value, utc, cause: e.cause });
     const worst = entries.map((e) => e.value).sort((a, b) => rank(a) - rank(b))[0] ?? null;
-    runs.push({ type: 'rerun', ref: stemRef(stem), build: v.build ?? null, utc, verdict: worst, report: null, secs: secsOf(v, utc), cost_usd: costOf(v),
+    runs.push({ type: 'rerun', ref: stemRef(stem), build: v.build ?? null, utc, verdict: worst, report: null, secs: secsOf(v, utc), cost_usd: costOf(v), trigger: triggerOf(v),
       label: /^[A-Za-z0-9._-]{1,120}$/.test(String(v.label)) ? v.label : null, entries,
       // What it ran (rerun.mjs's <ref>), for the page's "Run the same tests again".
       scope: typeof v.ref === 'string' && RERUN_REF.test(v.ref) ? v.ref : null });
@@ -283,7 +294,7 @@ for (const dir of ls(join(work, 'reruns')).filter((x) => /^feature-[a-z0-9][a-z0
       .map(([k, r]) => ({ key: k, value: r.status, cause: causeOf(r, false) }));
     for (const e of entries) addHist(e.key, { build: v.build ?? null, run: 'feature', value: e.value, utc, cause: e.cause });
     const worst = entries.map((e) => e.value).sort((a, b) => rank(a) - rank(b))[0] ?? null;
-    runs.push({ type: 'feature', ref: dir.slice(8), build: v.build ?? null, utc, verdict: worst, report: null, secs: secsOf(v, utc), cost_usd: costOf(v),
+    runs.push({ type: 'feature', ref: dir.slice(8), build: v.build ?? null, utc, verdict: worst, report: null, secs: secsOf(v, utc), cost_usd: costOf(v), trigger: triggerOf(v),
       label: /^[A-Za-z0-9._-]{1,120}$/.test(String(v.label)) ? v.label : null, entries });
   }
 }
@@ -326,6 +337,7 @@ for (const line of (read(join(work, 'REGRESSION.log')) ?? '').split('\n')) {
   const env = line.match(/^(\S+) ERROR: environment candidate=(\S+)/);
   if (env) {
     runs.push({ type: 'regression', ref: null, build: env[2], utc: env[1], verdict: 'environment', report: null, secs: span(due.get(env[2]), env[1]), cost_usd: null, entries: [],
+      trigger: triggerOf(readJson(join(work, 'regression', env[2], 'environment.json'))),
       failure: envFailure(join(work, 'regression', env[2], 'environment.json'), env[1]) });
     due.delete(env[2]); continue;
   }
@@ -346,7 +358,7 @@ for (const line of (read(join(work, 'REGRESSION.log')) ?? '').split('\n')) {
     previous: ctx.previous ?? nights.at(-2)?.build ?? null, window: ctx.window ?? null,
     issues: (ctx.issues ?? []).filter((x) => x?.number != null).slice(0, 60).map((x) => ({ number: x.number, title: x.title ?? null })),
     ui_diff: typeof ctx.ui_diff === 'string' ? ctx.ui_diff.slice(0, 4000) : null, signals,
-    report: artRef(join(work, 'regression', m[2])), analysis: analysisOf(v),
+    report: artRef(join(work, 'regression', m[2])), analysis: analysisOf(v), trigger: triggerOf(v),
     entries: [...(nightOutcomes.get(m[2]) ?? new Map())].map(([key, value]) => withWhy({ key, value, cause: nightCauses.get(m[2])?.get(key) ?? null }, nightWhy.get(m[2])?.get(key))) });
 }
 // A run whose file says nothing of its length: the events log (docs/logging.md, 14 days) — an issue

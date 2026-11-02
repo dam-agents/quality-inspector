@@ -13,7 +13,7 @@
 //   node features.mjs merge <from> <into>               -> {"feature": <into>, "members"}  (<from> is gone)
 //   node features.mjs drop <feature>                    -> {"feature", "dropped": true}
 //   node features.mjs check                             -> {"ok", "problems": [], "warnings": []}
-//   node features.mjs record <label> <feature> --build <candidate>
+//   node features.mjs record <label> <feature> --build <candidate> [--trigger <path>]
 //     -> {"file", "feature", "build", "results": {"issue-42/AC-1": {"status", "error"}, "issue-42/IN-1": …}}
 //
 // <feature> is an id: [a-z0-9][a-z0-9-]{0,39}. A member is `#N`, `#N AC-k`, `#N IN-k`, `S-k`, `S-k AC-j`,
@@ -31,6 +31,7 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { withMutex, writeAtomic } from './lib/mutex.mjs';
+import { takeTrigger } from './lib/trigger.mjs';
 import { takeWords } from './lib/words.mjs';
 
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
@@ -211,8 +212,12 @@ switch (cmd) {
   case 'record': {
     need(2);
     const label = args[0];
-    const bi = args.indexOf('--build'); const build = bi >= 0 ? args[bi + 1] : null;
-    if (!/^[A-Za-z0-9._-]{1,120}$/.test(label ?? '') || !build || !/^[A-Za-z0-9._+-]{1,80}$/.test(build)) die('usage: features.mjs record <label> <feature> --build <candidate>');
+    const opt = (k) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] ?? '' : undefined; };
+    const build = opt('build') ?? null;
+    if (!/^[A-Za-z0-9._-]{1,120}$/.test(label ?? '') || !build || !/^[A-Za-z0-9._+-]{1,80}$/.test(build)) die('usage: features.mjs record <label> <feature> --build <candidate> [--trigger <path>]');
+    // Who started the run, from where and why (docs/reporting.md → **Who started the run**), from its file.
+    let trigger;
+    try { trigger = opt('trigger') !== undefined ? takeTrigger(opt('trigger')) : undefined; } catch (e) { die(e.message); }
     const f = resolved(find(load(), idArg(args[1])));
     let report;
     try { report = JSON.parse(readFileSync(join(runsRoot, label, 'report.json'), 'utf8')); } catch { die(`no report.json for run ${label}`); }
@@ -232,7 +237,7 @@ switch (cmd) {
     const dir = join(work, 'reruns', `feature-${f.id}`);
     mkdirSync(dir, { recursive: true });
     const file = join(dir, `${label}.json`);
-    writeAtomic(file, `${JSON.stringify({ label, feature: f.id, name: f.name, build, utc: now(), results, skipped: f.skipped }, null, 2)}\n`);
+    writeAtomic(file, `${JSON.stringify({ label, feature: f.id, name: f.name, build, utc: now(), trigger, results, skipped: f.skipped }, null, 2)}\n`);
     out({ file, feature: f.id, build, results, skipped: f.skipped });
     break;
   }

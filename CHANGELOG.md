@@ -7,6 +7,13 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.54.0 — 2026-11-02
+
+**Upgrade:**
+Nothing to run — docs are re-read per run. Each new run's file records who started it, from
+where and why (`trigger`, [docs/reporting.md](docs/reporting.md) → **Who started the run**), and
+the dashboard's Runs show it, a person's name included; an older run shows "not recorded".
+
 ## 3.53.1 — 2026-11-01
 
 **Upgrade:**

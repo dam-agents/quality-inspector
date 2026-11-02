@@ -114,8 +114,8 @@ build after it, and that build is the candidate (`deploy_gate: enabled`, the def
    Judge each IN the same way, into `intents[]` and `intent_verdict`, never into the issue
    verdict ([intent.md](intent.md) → Verdict). Judge each EX per [explorations.md](explorations.md)
    → **Run and judge** — never into an AC verdict. Write
-   `verdicts-<ac_hash>-<candidate>.json` ([reporting.md](reporting.md) → Verdicts file), its
-   `analysis` last ([reporting.md](reporting.md) → **The agent's analysis**).
+   `verdicts-<ac_hash>-<candidate>.json` ([reporting.md](reporting.md) → Verdicts file) with its
+   `trigger` (→ **Who started the run**), its `analysis` last ([reporting.md](reporting.md) → **The agent's analysis**).
 8. **Report.** In a platform Environment (`env.sh where`), with an AC `failed` or `blocked`
    by the product: `env.sh keep issue-<n>` first and put its `url`, `account` and
    `expires_utc` into the verdicts file as `environment`; with none such, `env.sh release

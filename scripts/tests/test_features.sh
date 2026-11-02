@@ -100,6 +100,15 @@ out="$(F record feature-model-switch-c3-1200 model-switch --build c3)"
 assert "record: member criteria only, statuses, the message one line" '.results == {"issue-42/AC-1":{"status":"passed","error":null},"issue-51/AC-1":{"status":"failed","error":"expected Models"},"issue-51/AC-3":{"status":"blocked","error":null}}' "$out"
 assert "record: written under work/reruns/feature-<id>/" '.feature == "model-switch" and .build == "c3"' "$(cat "$W/reruns/feature-model-switch/feature-model-switch-c3-1200.json")"
 F record feature-missing model-switch --build c3 2>/dev/null; assert_eq "record: no such run, exit 2" 2 "$?"
+# Who started the run (docs/reporting.md → Who started the run): from the call's own file, which is then gone.
+tf="$(mktemp "$SANDBOX/quality-inspector-trigger.XXXXXX")"; printf '{"via":"slack","who":"Jana  O\x27Brien","why":"test feature model-switch\\nin Slack"}' > "$tf"
+F record feature-model-switch-c3-1200 model-switch --build c3 --trigger "$tf" >/dev/null
+assert "record: the trigger from its file, one line each" '.trigger == {"via":"slack","who":"Jana O\u0027Brien","why":"test feature model-switch in Slack"}' "$(cat "$W/reruns/feature-model-switch/feature-model-switch-c3-1200.json")"
+[ ! -e "$tf" ] || { echo "  the trigger file is removed once read"; FAILED=1; }
+tf="$(mktemp "$SANDBOX/quality-inspector-trigger.XXXXXX")"; printf '{"via":"email"}' > "$tf"
+F record feature-model-switch-c3-1200 model-switch --build c3 --trigger "$tf" 2>/dev/null; assert_eq "record: an unknown via, exit 2" 2 "$?"
+tf="$(mktemp "$SANDBOX/quality-inspector-words.XXXXXX")"; printf '{"via":"chat"}' > "$tf"
+F record feature-model-switch-c3-1200 model-switch --build c3 --trigger "$tf" 2>/dev/null; assert_eq "record: a trigger only from a trigger file, exit 2" 2 "$?"
 # An intent test (docs/intent.md) is a member like a criterion; a scenario has none.
 assert "add: an intent test as a member" '.added' "$(F add purpose '#42' IN-1)"
 F add purpose 'S-7 IN-1' 2>/dev/null; assert_eq "a scenario has no intent test: exit 2" 2 "$?"

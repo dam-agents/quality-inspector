@@ -87,7 +87,8 @@ A direct session's first request names it ([logging.md](logging.md) → **Sessio
   it, end); `env.sh status` — no product up → `env.sh up <candidate>` and `wait` with the
   pre-flight's candidate; `bash "$HOME/scripts/suite.sh" run rerun-<test>-<candidate>-<HHMM> --evidence full
   --tag <issue-N|scenario-K|profile-slug>[ --tag ac-<k>|in-<k>]` (an `EX-<k>`: `--tag issue-N-ex --tag ex-<k>`) as a
-  background task, then `wait`; `node "$HOME/scripts/rerun.mjs" <label> <ref> --build <candidate>`;
+  background task, then `wait`; `node "$HOME/scripts/rerun.mjs" <label> <ref> --build <candidate> --trigger <path>`
+  ([reporting.md](reporting.md) → **Who started the run**);
   `env.sh unlock operator`. Answer with each criterion's result (`passed`, `failed` with its
   message, `blocked`) and the run's screenshots of a failure. It is never a verdict: no
   criteria, no verdicts file, no comment, no tier or `work/QA.md` change. Then the catalog

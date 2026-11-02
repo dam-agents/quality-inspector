@@ -24,7 +24,7 @@ printf '# Upload a <b>file</b>\n\n## AC-1 — Upload\nThen the file is listed\n'
 printf '2026-10-09T03:00:00Z ERROR: environment candidate=c2\n2026-10-10T03:00:00Z ran candidate=c2 unchanged=0 relearned=0 healed=1 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n2026-10-12T02:10:00Z due candidate=c3 tests=1\n2026-10-12T03:00:00Z ran candidate=c3 unchanged=1 relearned=0 healed=0 needs_review=0 superseded=0 flaky=0 regression=0 blocked=0 drift=0\n' > "$W/REGRESSION.log"
 mkdir -p "$W/issues/42" "$W/scenarios/S-7" "$W/scenarios/P-sign-in" "$W/regression/c2" "$W/suite/tests" "$W/security/c1"
 jq -n '{mode:"regression",verdict:"environment",candidate:"c2",utc:"2026-10-09T03:00:00Z",stage:"up",exit:4,cause:"The image pull was refused.",
-  evidence:["pull refused","x"],repair:"Reset and up again: the same refusal.",next:"The operator adds the registry to the egress."}' > "$W/regression/c2/environment.json"
+  evidence:["pull refused","x"],repair:"Reset and up again: the same refusal.",next:"The operator adds the registry to the egress.",trigger:{via:"evil",who:"x"}}' > "$W/regression/c2/environment.json"
 cat > "$W/issues/42/criteria-abc.md" <<'C'
 # #42 — Rename <b>projects</b>
 source: done-when        frozen_utc: 2026-10-02T13:40:02Z        ac_hash: abc
@@ -63,7 +63,7 @@ requires: viewer
 C
 cat > "$W/issues/42/verdicts-abc-c1.json" <<'J'
 {"issue":42,"title":"Rename <b>projects</b>","ac_hash":"abc","candidate":"c1","baseline":"b1","candidate_run":"cand","baseline_run":"base",
- "verdict":"partial","generated_utc":"2026-10-02T14:00:00Z",
+ "verdict":"partial","generated_utc":"2026-10-02T14:00:00Z","trigger":{"via":"github","who":null,"why":"label qa:ready on #42"},
  "acs":[{"id":"AC-1","name":"renamed","verdict":"verified"},{"id":"AC-2","name":"internal","testable":false,"verdict":"not-testable"}],
  "explorations":[{"id":"EX-1","verdict":"observation","note":"NOTE-SECRET"}],
  "notes":["NOTE-SECRET in the notes"]}
@@ -71,14 +71,14 @@ J
 echo abc123 > "$W/issues/42/artifact.id"
 echo 'http://share.example/a/plain' > "$W/issues/42/artifact.url" # not https: the reference stays
 cat > "$W/regression/c2/verdicts.json" <<'J'
-{"mode":"regression","candidate":"c2","acs":[{"issue":42,"id":"AC-1","verdict":"healed","explanation":"The tab moved to the side bar."}],
+{"mode":"regression","candidate":"c2","trigger":{"via":"schedule","who":"Regression run","why":"nightly regression of the new build c2"},"acs":[{"issue":42,"id":"AC-1","verdict":"healed","explanation":"The tab moved to the side bar."}],
  "analysis":{"summary":"One check was repaired.","next":null,"problems":[{"title":"The tab moved","about":["#42 AC-1","rm -rf /","#42"],"cause":"bogus","certainty":"high",
    "what":"The tab is not in the top bar.","where":"/projects","why":"The new build moved it.","fix":"Nothing: the agent repaired the check.","extra":"dropped"},{"what":"no title: dropped"}]},
  "context":{"previous":"c1","issues":[{"number":40,"title":"Projects get tabs"}],"ui_diff":"- renamed tab \"Tasks\" → \"To-dos\" on /projects","signals":{"console_errors_new":["E1"],"slow_tests":[]}}}
 J
 printf '# S-7 — upload a <i>large</i> file\n\n## AC-1 — the upload finishes\nquote: REQUEST-SECRET the owner uploads a large file\nGiven a 50 MB file\nWhen the owner uploads it\nThen it is listed\nsurface: ui\ntestable: yes\n' > "$W/scenarios/S-7/criteria-s1.md"
 echo 'REQUEST-SECRET please test the upload, my boss asked' > "$W/scenarios/S-7/request.md"
-echo '{"scenario":"S-7","candidate":"c1","started_utc":"2026-10-04T09:45:00Z","generated_utc":"2026-10-04T10:00:00Z","cost_usd":1.234,"acs":[{"id":"AC-1","verdict":"passed"}],"notes":["NOTE-SECRET"]}' > "$W/scenarios/S-7/verdicts-s1-c1.json"
+echo '{"scenario":"S-7","candidate":"c1","started_utc":"2026-10-04T09:45:00Z","generated_utc":"2026-10-04T10:00:00Z","cost_usd":1.234,"trigger":{"via":"slack","who":"Jana Nováková","why":"scenario request"},"acs":[{"id":"AC-1","verdict":"passed"}],"notes":["NOTE-SECRET"]}' > "$W/scenarios/S-7/verdicts-s1-c1.json"
 echo 'https://claude.ai/artifact/s7' > "$W/scenarios/S-7/artifact.id"
 echo '{"candidate":"c1","counts":{"critical":0,"high":2,"medium":1},"findings":[{"id":"SEC-SECRET","explanation":"SEC-SECRET recipe"}]}' > "$W/security/c1/verdicts.json"
 # A report's share link (docs/reporting.md → Delivery step 1): the night's links; the security run's never.
@@ -258,6 +258,8 @@ assert "an environment failure: its step, cause, repair, next step and evidence"
   and .runs[1].failure == null' "$data"
 assert "a run's length: a night from its due line, an issue run from issue_done, a scenario from its file with its cost" '[.runs[] | [.secs, .cost_usd]]
   == [[3000,null],[null,null],[null,null],[900,1.23],[2220,null]]' "$data"
+assert "who started each run: from where, who and why; an unknown source dropped, a file without one says nothing" '[.runs[] | .trigger]
+  == [null,{"via":"schedule","who":"Regression run","why":"nightly regression of the new build c2"},null,{"via":"slack","who":"Jana Nováková","why":"scenario request"},{"via":"github","who":null,"why":"label qa:ready on #42"}]' "$data"
 assert "a night: its entries, change context and signal counts, its report" '.runs[1] | .entries == [{"key":"issue-42/AC-1","value":"healed","cause":null,"why":"The tab moved to the side bar."}] and .previous == "c1"
   and .issues == [{"number":40,"title":"Projects get tabs"}] and (.ui_diff | test("To-dos")) and .signals == {"console_errors_new":1,"slow_tests":0} and .report == "https://share.example/a/Night2Slug" and .counts.healed == 1' "$data"
 assert "an issue run: its verdicts and report; a scenario run: its link" '(.runs[4] | .entries == [{"key":"issue-42/AC-1","value":"verified","cause":null},{"key":"issue-42/AC-2","value":"not-testable","cause":null},{"key":"issue-42/EX-1","value":"observation","cause":null}]
@@ -367,7 +369,7 @@ assert "activity: a failed listing is unknown, not empty" '.activity.waiting == 
 # Managing from the page: a run by hand joins the history (its raw result, never its message), the
 # found issues, the design triage, the labels a new issue gets; the commands' closed set.
 mkdir -p "$W/reruns/scenario-7"
-echo '{"label":"rerun-scenario-7-c3-1200","ref":"S-7 AC-1","build":"c3","utc":"2026-10-14T12:00:00Z","results":{"AC-1":{"status":"failed","error":"RERUN-ERROR-SECRET"},"bogus":{"status":"failed"}}}' > "$W/reruns/scenario-7/rerun-scenario-7-c3-1200.json"
+echo '{"label":"rerun-scenario-7-c3-1200","ref":"S-7 AC-1","build":"c3","utc":"2026-10-14T12:00:00Z","trigger":{"via":"dashboard","who":"U0SECRETUSER","why":"run S-7 AC-1"},"results":{"AC-1":{"status":"failed","error":"RERUN-ERROR-SECRET"},"bogus":{"status":"failed"}}}' > "$W/reruns/scenario-7/rerun-scenario-7-c3-1200.json"
 printf '| ref | issue | url | build | labels | created_utc |\n| --- | --- | --- | --- | --- | --- |\n| S-7 AC-1 | #101 | https://github.com/acme/widgets/issues/101 | c3 | qa:found,architect:fix | 2026-10-14T13:00:00Z | The upload / never ends |\n| D-1 | #101 | https://github.com/acme/widgets/issues/101 | c3 | qa:found,architect:fix | 2026-10-14T13:00:00Z |\n| D-9 | #x | javascript:alert(1) | c3 | - | - |\n' > "$W/FOUND.md"
 printf '| id | category | updated_utc |\n| --- | --- | --- |\n| D-1 | layout | 2026-10-14T13:00:00Z |\n| D-2 | Not A Slug | 2026-10-14T13:00:00Z |\n' > "$W/design/CATEGORIES.md"
 printf '| id | dismissed_utc | reason |\n| --- | --- | --- |\n| D-2 | 2026-10-14T13:00:00Z | duplicate |\n' > "$W/design/DISMISSED.md"
@@ -375,7 +377,8 @@ printf -- '- fix_label: architect:fix\n' >> "$W/CONFIG.md"
 node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a build with the triage and a run by hand" 0 "$?"
 data="$(page_data)"
 assert "a run by hand: in the history and the runs, its raw result only" '(.items[] | select(.key == "scenario-7/AC-1") | .history[-1] == {"build":"c3","run":"rerun","value":"failed","utc":"2026-10-14T12:00:00Z","cause":null})
-  and ([.runs[] | select(.type == "rerun")] | length == 1 and .[0].ref == "S-7" and .[0].scope == "S-7 AC-1" and .[0].entries == [{"key":"scenario-7/AC-1","value":"failed","cause":null}] and .[0].report == null)' "$data"
+  and ([.runs[] | select(.type == "rerun")] | length == 1 and .[0].ref == "S-7" and .[0].scope == "S-7 AC-1" and .[0].entries == [{"key":"scenario-7/AC-1","value":"failed","cause":null}] and .[0].report == null
+    and .[0].trigger == {"via":"dashboard","who":null,"why":"run S-7 AC-1"})' "$data"
 assert "found issues: a row per problem, a non-https address dropped" '[.found[] | .ref + ":" + (.issue|tostring)] == ["S-7 AC-1:101","D-1:101"] and .found[0].labels == ["qa:found","architect:fix"] and .found[0].title == "The upload / never ends" and .found[1].title == null' "$data"
 assert "design triage: a category, a dismissal reason, a malformed category dropped" '(.design[] | select(.id == "D-1") | .category == "layout" and .dismiss_reason == null)
   and (.design[] | select(.id == "D-2") | .category == null)' "$data"
