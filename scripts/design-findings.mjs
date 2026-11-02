@@ -42,11 +42,12 @@
 
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CLASSES, REPORTED, fingerprint as fieldFp, quietBuild } from './lib/ux-field.mjs';
+import { mtime, now, readJson } from './lib/util.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const WORK = resolve(process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work'));
@@ -68,10 +69,7 @@ const regValue = (k) => { // a registry key through lib/config.sh → reg: out o
       { env: { ...process.env, WORK, LIB: join(here, 'lib') }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   } catch { return ''; }
 };
-const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
 const ls = (p) => { try { return readdirSync(p).sort(); } catch { return []; } };
-const mtime = (p) => { try { return statSync(p).mtimeMs; } catch { return 0; } };
-const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 const atomic = (p, s) => { mkdirSync(dirname(p), { recursive: true }); writeFileSync(`${p}.tmp`, s); renameSync(`${p}.tmp`, p); };
 // Paths in the register are relative to work/ when they lie in it: the backup restores them anywhere.
 const rel = (p) => { if (!p) return null; const r = relative(WORK, resolve(p)); return r.startsWith('..') || isAbsolute(r) ? resolve(p) : r; };

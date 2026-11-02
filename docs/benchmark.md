@@ -1,8 +1,7 @@
 # The benchmark — measuring this agent
 
-A verdict is only worth something if the agent that gives it is right. The benchmark runs
-the whole issue pipeline on cases whose right answer the operator knows, and scores it.
-It is how "did the model upgrade help?", "did the new `e2e` break judgment?" and "is a
+The benchmark runs the whole issue pipeline on cases whose right answer the operator knows,
+and scores it: "did the model upgrade help?", "did the new `e2e` break judgment?", "is a
 `verified` from this agent trustworthy?" get numbers instead of impressions.
 
 ## Cases — `work/benchmark/cases.json` (the operator's)
@@ -64,8 +63,8 @@ instance's `verified` verdicts until the cause is fixed.
 
 ## Rules
 
-- The benchmark never touches the production state: no QA rows, no suite tiers, no
-  comments; its tests are not promoted and never replay nightly.
+- The benchmark never touches the production state (step 4); its tests are never promoted
+  nor replayed nightly.
 - A miss is analysed, never "fixed" by editing the case's expectation without the
   operator. A case that turns out to be wrong is the operator's to change.
 - Results are append-only. A run whose `missing` is above 0 is reported as incomplete,

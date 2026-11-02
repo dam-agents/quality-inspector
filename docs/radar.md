@@ -1,9 +1,8 @@
 # Change radar — pull request text, before the build
 
-A pull request often says what it changes before a build carries it. The Change radar reads the
-target's pull requests every few hours and warns the operator about the **recurring** tests a
-change will likely affect, as maintenance proposals of kind `predicted`
-([maintenance.md](maintenance.md)). It never changes a test, a criterion, a tier or a verdict, and it
+The Change radar reads the target's pull requests every few hours and warns the operator, before a
+build carries the change, about the **recurring** tests it will likely affect — maintenance
+proposals of kind `predicted` ([maintenance.md](maintenance.md)). It never changes a test, a criterion, a tier or a verdict, and it
 never writes to GitHub. Schedule `quality-inspector-radar-3h` (off by default); a run needs at least
 one recurring test (`work/SUITE.md` tier `regression`, `promotable` or `quarantined`).
 
@@ -33,8 +32,8 @@ The worklist ([CLAUDE.md](../CLAUDE.md) → Worklist keys): `prs_due[]` — `pr`
 1. **`new` / `changed`** — judge each candidate: does the text say the change alters what the test
    checks (a renamed or moved control, a changed flow, a removed feature)? A word in common is not
    enough; a candidate you cannot tie to a sentence is dropped. For each one that holds:
-   `kind=basis; mktemp "/tmp/quality-inspector-$kind.XXXXXX"`, write `PR #<n>: <title>` there with the
-   file tool (the sanitized title, never the body), then
+   write `PR #<n>: <title>` (the sanitized title, never the body) to a `kind=basis` file
+   ([maintenance.md](maintenance.md) → **The queue**), then
    `node "$HOME/scripts/maintenance.mjs" open "<test>" --kind predicted --build <inventory, else none> --proposal review --basis-file <f>`.
    Write what the text says per test — your words, no quote over 15 words — to
    `work/maintenance/M-<k>.md`. A result with `covered_by` opens nothing: a stronger proposal of the
@@ -85,8 +84,7 @@ ledger's format (`radar`).
 
 - **Open pull request** — the row stays open; the operator may "keep" or "retire" it at any time.
 - **Merged** — the nightly regression of a build that carries it decides: a triage row of the test,
-  or an `obsolete`, `moved` or `renamed` row ([maintenance.md](maintenance.md) → Predicted from the
-  change context), replaces it (`replaced`); a test that passes plain unchanged, or that the triage
-  absorbs, is resolved by `maintenance.mjs sweep --built <the candidate's build time>` once the pull
-  request merged at or before it.
+  or an `obsolete`, `moved` or `renamed` row, replaces it (`replaced`); a plain `unchanged` or
+  absorbed test resolves it by the sweep ([maintenance.md](maintenance.md) → Predicted from the
+  change context, Closing by itself).
 - **Closed unmerged** — resolved by `record`, as above.

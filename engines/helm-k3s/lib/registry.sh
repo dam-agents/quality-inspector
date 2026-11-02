@@ -17,16 +17,6 @@ oci_token() { # <host> <repo>
   curl -fsS --max-time 20 "$realm?service=$service&scope=repository:$repo:pull" | jq -r '.token // .access_token // empty'
 }
 
-# "<tag> <epoch>" lines, newest first, at most <pages> pages of 100.
-tags_quay() { # <repo> <pages>
-  local repo="$1" pages="${2:-30}" p body
-  for p in $(seq 1 "$pages"); do
-    body="$(curl -fsS --max-time 20 "https://quay.io/api/v1/repository/$repo/tag/?limit=100&onlyActiveTags=true&page=$p")" || return 1
-    jq -r '.tags[]? | "\(.name) \(.start_ts // 0)"' <<<"$body" || return 1
-    [ "$(jq -r '.has_additional // false' <<<"$body")" = true ] || break
-  done
-}
-
 # "<tag> 0" lines — /v2 carries no times; every page, following the Link header. A failed page
 # fails the listing: curl's status is checked before jq (callers run without pipefail).
 tags_oci() { # <host> <repo>

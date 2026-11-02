@@ -16,7 +16,7 @@ confirmed before writing files.
 | 1 | Product name as users know it; one sentence of what it does for them | `product`, `SKILL.md` intro |
 | 2 | Port (and base path) the UI answers on inside the VM | `app.url` (`http://localhost:<port>`), the engine's port |
 | 3 | What ships: a Helm chart, images and a compose file, a package, a binary — and its reference | Phase 2 choice; `engine_config.chart` or `bin/` |
-| 4 | Build channels: names, tag pattern, ordering, which is the default candidate and baseline | `channels`, the defaults, README → Channels |
+| 4 | Build channels: names, tag pattern, ordering, which is the default candidate and baseline | `channels`, the defaults, engine README → Configuration |
 | 5 | Prerequisites a fresh cluster or host needs (CRDs, operators, a database, ingress) | `prerequisites`, or `bin/env up` |
 | 6 | How a fresh install gets a signed-in-able **owner** account without a person | values with `{{user:owner.…}}`, or `bin/env up` |
 | 7 | Further accounts, by the contract's role names: `member`, `viewer` (only a truly read-only user), `outsider` (The owner account, below); whether the product must change to create them | more `credentials.users` / `E2E_USER_<ROLE>_*` |
@@ -60,17 +60,15 @@ confirmed before writing files.
 - **Order**: `semver` for releases; `numeric-suffix` for a counter at the tag's end;
   `time` (helm-k3s, quay.io only) for commit-hash tags. Hash tags elsewhere need their
   publish time — own `bin/versions` (references/custom-bin.md).
-- **Bisection** (optional, `bin/versions --between` in `docs/profile-contract.md` → The
-  bin/ contract) needs nothing more: helm-k3s and the `versions` template answer it from
-  the same sorted listing. An own script without it exits 2.
+- **Bisection** (`bin/versions --between`, optional) needs nothing more: helm-k3s and the
+  `versions` template answer it from the same sorted listing.
 - **Confirm against the registry**, not the CI file: list the tags (quay.io's
   `/api/v1/repository/<repo>/tag/`, `/v2/<repo>/tags/list` with an anonymous token,
   `crane ls`, `oras repo tags`, `skopeo list-tags`) and check that each anchored regex
   (`^…$`) picks the newest real build and never `latest`, `-rc`, `-debug`, `sha256-….sig`
   or attestation tags.
 - Never list builds through the target repository's GitHub API (releases, tags): the
-  agent's egress denies every path under the target, and builds come from where they are
-  published.
+  agent's egress denies it; builds come from where they are published.
 
 ## The owner account
 
@@ -86,10 +84,10 @@ profile); `bin/env up` must leave that account able to sign in. Best first:
    owner with the generated credentials, and the brief flags it as brittle across
    resets.
 
-A product that offers SSO only needs option 2. Each further account takes a role name
-of the contract (`docs/profile-contract.md` → The bin/ contract: `member`, `viewer`,
-`outsider`) — explorations and the security run find accounts by those names only — and
-is one more user with the same mechanism. Without them, `SKILL.md` says ACs about other
+A product that offers SSO only needs option 2. Each further account takes a role name of
+the contract (`docs/profile-contract.md` → The bin/ contract) — explorations and the
+security run find accounts by those names only — and is one more user with the same
+mechanism. Without them, `SKILL.md` says ACs about other
 users are `testable: no — single user`.
 
 - **`viewer` only for a read-only user.** The security run replays every write as
@@ -146,30 +144,26 @@ whether the flow should be testable end to end; if so, per service (the core's
   a key file as one base64 line named `…_B64`. Names that are no secret (an organization
   and repository) are `ask` config keys, so the egress can name them as `{profile.<key>}`.
 - **Egress** — each request the product and the test person make, by method and path. On a
-  GitHub host only the core's closed set passes (its `docs/black-box.md` → Sandbox
-  accounts): a sandbox repository's API paths `/repos/{profile.<key>}/<rest>`, git's four
-  smart-HTTP requests to it, and the OAuth sign-in's exact requests on the web host, each
-  with its own method. Copy those rows from there; anything else there is `refused`, a
-  GitHub App's `/app/…` and `/installation/…` endpoints included — prefer a fine-grained
-  token scoped to the sandbox repository (`GET /user` the kit already allows). Every GitHub
-  row the kit does not already allow lands by hand; the hosts a third-party page loads its scripts and styles from (the
-  sign-in pages' `github.githubassets.com`, `GET /assets/*`) land by prompt.
-- **A GitHub sign-in** — a sandbox user of its own (login, password and a TOTP secret as
-  credentials; no passkey, no e-mail device check), and an OAuth App registered in the
-  sandbox organization, its callback on the nested product's `localhost` URL. The product
-  gets the App's client through the install (an overlay value), so a test never types a
-  sandbox value. A `suite/` helper drives the pages and computes the TOTP code (RFC 6238 —
-  check it against the RFC's test vectors).
+  GitHub host only the core's closed set passes — copy its rows from the core's
+  `docs/black-box.md` → Sandbox accounts (repository paths as `/repos/{profile.<key>}/<rest>`);
+  anything else there is `refused`, a GitHub App's `/app/…` and `/installation/…` endpoints
+  included, so prefer a fine-grained token scoped to the sandbox repository (`GET /user` the
+  kit already allows). Every GitHub row the kit does not already allow lands by hand; the
+  hosts a third-party page loads its scripts and styles from (the sign-in pages'
+  `github.githubassets.com`, `GET /assets/*`) land by prompt.
+- **A GitHub sign-in** — as the contract's `sandbox` → Egress says (a sandbox user with a
+  TOTP secret, no passkey, no e-mail device check; an OAuth App in the sandbox organization).
+  The product gets the App's client through the install (an overlay value), so a test never
+  types a sandbox value; the helper's TOTP code is RFC 6238 — check it against the RFC's test
+  vectors.
 - **Chat services** — the test person posts through an app or user of its own, never the
   product's: the product ignores its own app's messages, so nothing would answer. Find out
   how the product treats posts from apps and bots — loop guards that drop a run of bot
   posts in one conversation, rate limits — and shape the helpers around it (one thread per
   request; replies read without the test person's own posts).
-- **Install-time values** — a service the product configures per install (a Slack app's
-  tokens in its Helm values) takes them in the engine's values as
-  `{{sandbox:<id>.<NAME>}}`, inside an overlay `when: "@sandbox:<id>"`, so an instance
-  without the account installs as before (helm-k3s README → Placeholders). The overlay is
-  on only while every credential of the account is filled.
+- **Install-time values** — as the contract's `sandbox` says (`{{sandbox:<id>.<NAME>}}`
+  inside an overlay `when: "@sandbox:<id>"`, on only while every credential of the account is
+  filled), so an instance without the account installs as before.
 - **The nested product's own way out** — it reaches the sandbox through the VM's gateway,
   which may terminate TLS: the product trusts the gateway's CA (`{{gateway_ca}}`), and a
   product with an egress policy of its own names the gateway's address (`{{gateway_ip}}`)
@@ -235,9 +229,9 @@ implementation for this product:
 - `urls` — sites that describe the internals: architecture or design docs, a component
   catalogue built from the code, hosted source maps. `{repo}` stands for the target. Each
   needs an explicit deny from the operator — the README lists them.
-- `packages` — the product's npm scopes or package names (`@acme`, `acme-cli`): the
-  agent refuses to read their files under any `node_modules/`, for example a published
-  CLI the suite installs. Without the list nothing is refused there.
+- `packages` — the product's npm scopes or package names (`@acme`, `acme-cli`), for
+  example of a published CLI the suite installs; without them nothing under
+  `node_modules/` is refused.
 
 ## Config keys
 

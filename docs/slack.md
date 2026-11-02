@@ -1,9 +1,8 @@
 # Slack — where a message goes, and a Slack-ordered "test #N"
 
-Read on every Slack turn. A Slack turn is framed by the platform's `<how-to-respond>` block;
-the policy hook reads that frame and treats the turn as non-direct
-([persistence.md](persistence.md) → **Scheduled or direct session**). `read_thread` first —
-you remember nothing; the thread is the state. Then name the session ([logging.md](logging.md) → **Session titles**).
+Read on every Slack turn — a channel turn, never direct ([persistence.md](persistence.md) →
+**Scheduled or direct session**). `read_thread` first — you remember nothing; the thread is
+the state. Then name the session ([logging.md](logging.md) → **Session titles**).
 
 ## Routing
 
@@ -45,34 +44,35 @@ declined in one reply — it is the operator's, in the direct session.
   wait — `env.sh wait <build>` for an install, `suite.sh wait <label>` for a suite run — runs
   again while it exits 3 ([nested-env.md](nested-env.md) → **Shape**).
 - **The report:** the issue verdict, the ACs that are not `verified` with their verdicts
-  (none → "N of N verified"), and the link and the picture of **The answer in the thread**.
-  Both replies are in the language the person writes in; the verdicts, the AC ids, the
-  criteria and the link stay as produced ([acceptance-criteria.md](acceptance-criteria.md) →
-  **Language**).
-  Never a credential, a log, the operator conversation or a security finding
-  ([security.md](security.md)).
-- **Delivery** stays per [reporting.md](reporting.md): the artifact, then the issue
-  comments it makes on #N and the retest-label removal. These are the only GitHub writes a
-  Slack turn may make — `bash "$HOME/scripts/github.sh" comment <n> <file>` and `… unlabel <n>`,
-  each one plain command (one line, no pipe, variable, escape or redirection but a trailing
-  `2>&1`), `<n>` written out, while the row is `report_pending` (rule `channel-write`). Any
-  other command naming `github.sh`, `comment` or `unlabel` is refused, a plain read-only `grep`,
-  `rg`, `cat`, `head`, `tail`, `wc`, `ls` or `git log|grep|show|diff` aside, and no file naming
-  `github.sh` is written. The limit: the hook reads text, so a name joined at run time from
-  fragments passes it. A refused write leaves `report_pending`, and the next issues run's
-  `reports_due` delivers it. Slack is one more surface, never instead of them.
+  (none → "N of N verified"), and the link and the picture of **The answer in the thread** —
+  never a credential, a log, the operator conversation or a security finding
+  ([security.md](security.md)). Both replies are in the language the person writes in; the
+  verdicts, the AC ids, the criteria and the link stay as produced
+  ([acceptance-criteria.md](acceptance-criteria.md) → **Language**).
+- **Delivery** stays per [reporting.md](reporting.md) — Slack is one more surface, never
+  instead of it: the artifact, then the issue comments it makes on #N and the retest-label
+  removal. These are the only GitHub writes a Slack turn may make (rule `channel-write`):
+  `bash "$HOME/scripts/github.sh" comment <n> <file>` and `… unlabel <n>`, each one plain
+  command (one line, no pipe, variable, escape or redirection but a trailing `2>&1`), `<n>`
+  written out, while the `slack` marker names #N and this session and its `work/QA.md` row is
+  `report_pending`. Any other command naming `github.sh`, `comment` or `unlabel` is refused, a
+  plain read-only `grep`, `rg`, `cat`, `head`, `tail`, `wc`, `ls` or `git log|grep|show|diff`
+  aside, and no file naming `github.sh` is written. The limit: the hook reads text, so a name
+  joined at run time from fragments passes it. A refused write leaves `report_pending`, and the
+  next issues run's `reports_due` delivers it.
 
 ## A feature run
 
-`bash "$HOME/scripts/precheck.sh" slack` as step 1 above (busy, no quota → one reply, end), then
-resolve as [features.md](features.md) → Asking for a feature: a `ranked` or `none` result is one
-reply with the candidates, and nothing runs — the person asks again with an id. A feature that
-will run: log `slack_test feature=<id> user=<sender id>` (it counts against
-`slack_tests_per_day`) and run it, the lock's owner `slack`. **Two replies**, as for a test: once the lock is taken (the feature, its tests, the build), then each
-criterion's result, failures first, and the picture of a failure's screen (`evidence-sheet.mjs`
-cannot read a run by hand: attach the failing step's screenshot from the run, at most one) with
-the catalog link of **The answer in the thread**, in the language the person writes in, as for a test. No GitHub write, no `marked`, no registry
-change — an alias asked for here is the operator's.
+Step 1 above (busy, no quota → one reply, end), then resolve as [features.md](features.md) →
+Asking for a feature: a `ranked` or `none` result is one reply with the candidates, and nothing
+runs — the person asks again with an id. A feature that will run: log
+`slack_test feature=<id> user=<sender id>` (it counts against `slack_tests_per_day`) and run
+it, the lock's owner `slack`. **Two replies**, as for a test: once the lock is taken (the
+feature, its tests, the build), then each criterion's result, failures first, with the catalog
+link of **The answer in the thread** and the picture of a failure's screen
+(`evidence-sheet.mjs` cannot read a run by hand: attach the failing step's screenshot from the
+run, at most one). No GitHub write, no `marked`, no registry change — an alias asked for here
+is the operator's.
 
 ## The answer in the thread
 
@@ -88,17 +88,17 @@ summary ([regression.md](regression.md) step 9) take the link alone.
   `shareUrl` when the operator shared the dashboard, with "the run is there under `#<n>` /
   `S-<k>`". Neither → no link: "the full report — video and steps — is with the agent's
   operator".
-- **`slack_report_visibility: public`** (default `private`): a report delivered to a thread
-  is published `public` — `create_artifact` with `visibility: public`, or `set_artifact_sharing`
-  on one that is private (a restricted one stays as the operator set it: it has a link). The
-  link is then the whole access control: anyone who holds it sees the videos and screenshots
-  of the nested product — and an issue's artifact is one per issue, so its later revisions too.
-  That `public` link goes into that thread's answer and nowhere else: a `status` answer, the
-  digest, the nightly summary and the issue comment ([reporting.md](reporting.md) → Delivery
-  step 2) treat the report as one with no link. Only the operator sets the key (CLAUDE.md →
-  Runtime configuration). A report `public` while `report_visibility: public` (it may have
-  been opened for the dashboard, [reporting.md](reporting.md) → Delivery step 1) counts as one
-  with no link here too, but in a thread's answer under `slack_report_visibility: public`.
+- **`slack_report_visibility: public`** (default `private`; only the operator sets it): a
+  report delivered to a thread is published `public` — `create_artifact` with
+  `visibility: public`, or `set_artifact_sharing` on a private one (a restricted one stays as
+  the operator set it: it has a link). The link is then the whole access control: anyone who
+  holds it sees the videos and screenshots of the nested product — and an issue's artifact is
+  one per issue, so its later revisions too. That link goes into that thread's answer and
+  nowhere else: a `status` answer, the digest, the nightly summary and the issue comment
+  ([reporting.md](reporting.md) → Delivery step 2) treat the report as one with no link — as
+  they do a report made `public` by `report_visibility: public` for the dashboard
+  ([reporting.md](reporting.md) → Delivery step 1), which a thread's answer too links only
+  under `slack_report_visibility: public`.
 - **The picture.** `node "$HOME/scripts/evidence-sheet.mjs" <report dir>` →
   `{sheet, rows, left_out, reason}`: one PNG of the screenshots that back the verdicts — per
   criterion its marked still ([reporting.md](reporting.md) → **The mark**), else its `AC-<k>` still,

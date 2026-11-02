@@ -7,6 +7,7 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { withMutex, writeAtomic } from './mutex.mjs';
+import { now } from './util.mjs';
 
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 export const DIR = join(work, 'design-checks');
@@ -18,7 +19,7 @@ export const TABLES = {
 };
 const header = (t) => `| ${t.cols.join(' | ')} |`;
 export const UTC_RE = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/;
-export const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+export { now };
 
 // rows(<table>) -> [{col: value}]; [] when the file is missing; throws on a changed header.
 export function rows(name) {

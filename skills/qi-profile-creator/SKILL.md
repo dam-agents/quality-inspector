@@ -70,12 +70,10 @@ Phases in order. Write no profile files before the person approves the Phase 1 b
    else ask for the definition's repository and `git clone --depth 1` it into a scratch
    directory. Read `docs/profile-contract.md`, list `engines/*/README.md`, note `VERSION`.
 3. **Find the product and the profile's home.** Always `.quality-inspector/qi-profile-<product-slug>/`
-   — the directory name is the skill name, and `.quality-inspector/` is the one directory of
-   a repository the agent's egress opens, so a profile anywhere else cannot be installed.
-   Default: the current repository. Ask when the working directory is not the product's
-   repository, or when the profile belongs elsewhere (a product the team does not own → a
-   separate profiles repository, same `.quality-inspector/` directory). No symlink or
-   submodule in it (`docs/profile-contract.md` → Where it lives).
+   (the directory name is the skill name; no symlink or submodule — `docs/profile-contract.md`
+   → Where it lives). Default: the current repository. Ask when the working directory is not
+   the product's repository, or when the profile belongs elsewhere (a product the team does
+   not own → a separate profiles repository, same `.quality-inspector/` directory).
 4. **An existing profile → update mode.** Read all of it, run the checker (Phase 4) to see
    where it stands, and change only what was asked. Keep `config` key names stable: an
    instance's `work/CONFIG.md` holds `profile.<key>` bullets, and a renamed key is unknown
@@ -125,21 +123,17 @@ that remain.
   helper, the security run's `lib/security-api.ts` — brief row 18). The core's suite
   skeleton wins on every path it already has, so never put tests, the sign-in setup or
   `e2e.config.ts` there.
-- **`scenarios/`** — the product team's flows, one `<slug>.md` each (or `<slug>.feature`
-  when the team writes Gherkin), in the form of
-  [profile-contract.md](../../docs/profile-contract.md) → `scenarios/`: a title, then
-  `## AC-<k> — <name>` blocks with Given/When/Then in a user's words. Offer one golden-path
-  scenario per main area from the brief; the team owns and extends them, and a PR that
-  changes how an area works updates its scenario. The nightly run adopts each one. A
-  scenario asserts only what no other test checks; what the product's own suite already
-  keeps true goes in `SKILL.md`'s `## Tested elsewhere` list and is at most a Given
-  ([profile-contract.md](../../docs/profile-contract.md) → `scenarios/`).
-- **`sandbox`** — only when brief row 19 has a flow: the throwaway accounts the operator
-  creates at onboarding, in the form of [profile-contract.md](../../docs/profile-contract.md)
-  → `sandbox` and [references/discovery.md](references/discovery.md) → Sandbox accounts —
-  a `sandbox/<name>.md` guide per account, the credential names, the names as `ask` config
-  keys, narrow egress naming them as `{profile.<key>}`, `bin/sandbox check`, the test
-  person's helpers in `suite/`, and the README's Sandbox accounts section.
+- **`scenarios/`** — the product team's flows, one `<slug>.md` (or Gherkin `<slug>.feature`)
+  each, in the form and under the rules of [profile-contract.md](../../docs/profile-contract.md)
+  → `scenarios/` (Given/When/Then in a user's words; tested once — what the product's own
+  suite keeps true goes in `SKILL.md`'s `## Tested elsewhere` list). Offer one golden-path
+  scenario per main area from the brief; the team owns and extends them.
+- **`sandbox`** — only when brief row 19 has a flow, in the form of
+  [profile-contract.md](../../docs/profile-contract.md) → `sandbox` and
+  [references/discovery.md](references/discovery.md) → Sandbox accounts: a `sandbox/<name>.md`
+  guide per account, the credential names, the names as `ask` config keys, narrow egress
+  naming them as `{profile.<key>}`, `bin/sandbox check`, the test person's helpers in
+  `suite/`, and the README's Sandbox accounts section.
 - **Channels** are named in the README (operators choose them), build names in
   `SKILL.md` (testers read them in reports).
 - **What the profile needs from elsewhere.** A change the product must make first (a chart
@@ -157,13 +151,13 @@ node scripts/check-profile.mjs --core "$QI_CORE" <profile-dir>
 ```
 
 It checks the contract (manifest, commands, SKILL.md frontmatter, leftover template
-markers, literal secrets, black-box hints, plain files only — no symlink or submodule),
-runs the engine's own offline check, and classifies every `egress` rule through the core's
-`scripts/egress-rules.sh` the way onboarding hands it to the operator: `by prompt`,
-`by hand` (no prompt ever appears — under a kit deny), `by the kit` (redundant — drop it)
-or `refused` (a `FAIL`: on a GitHub host only the sandbox shapes pass). A rule naming an
+markers, literal secrets, black-box hints, plain files only), runs the engine's own offline
+check, and classifies every `egress` rule through the core's `scripts/egress-rules.sh` the
+way onboarding hands it to the operator ([references/discovery.md](references/discovery.md)
+→ Egress): `by prompt`, `by hand` (keep those few), `by the kit` (redundant — drop it) or
+`refused` (a `FAIL`). A rule naming an
 `ask` key needs `--set <key>=<a sample value>` to be classified. Fix every `FAIL`; judge
-every `WARN` — fix it or tell the person why it stays; keep the `by hand` rows few. Then
+every `WARN` — fix it or tell the person why it stays. Then
 the read-only live check, which lists builds from the real registry (needs the network
 and `curl`, `jq`, `node`):
 
@@ -192,19 +186,16 @@ third-party page (its labels and button names are assumptions until then).
    - add a skill source — this repository, `path` `.quality-inspector` — and assign the
      profile skill to the agent; the kit's egress already opens that directory, so the
      profile needs no rule of its own;
-   - the egress, as `scripts/egress-rules.sh` lists it (`docs/black-box.md` → Egress
-     rules; run it as in [references/discovery.md](references/discovery.md) → Egress): a
-     `prompt` row is approved when its prompt appears, a `by-hand` row the operator adds in
-     the agent's network settings — given in words (host, method, path, why), never as
-     platform commands;
+   - the egress, as `scripts/egress-rules.sh` lists it (run it as in
+     [references/discovery.md](references/discovery.md) → Egress): a `prompt` row is approved
+     when its prompt appears, a `by-hand` row the operator adds in the agent's network
+     settings — in words (host, method, path, why), never as platform commands;
    - a deny for every `boundary.urls` entry;
    - the `profile.<key>` values onboarding will ask for;
-   - with sandbox accounts: each guide in `sandbox/`, and that the operator writes the
-     credentials straight into the instance's `work/env/credentials.env` (the lines
-     `scripts/sandbox.sh template` adds) — never into chat;
-   - with `operator_credentials`: what each value is for, and that `env.sh init` seeds its
-     empty `E2E_<NAME>` line for the operator to fill in `work/env/credentials.env` — never
-     into chat;
+   - with sandbox accounts, each guide in `sandbox/`; with `operator_credentials`, what each
+     value is for. Either way the operator fills the empty lines (`scripts/sandbox.sh
+     template` / `env.sh init` add them) straight into the instance's
+     `work/env/credentials.env` — never into chat;
    - the minimum quality-inspector version, and the order to merge in when a core change
      or a product change must land first.
 3. Say in three lines what the QA agent will treat as untestable (the "cannot do" list),
