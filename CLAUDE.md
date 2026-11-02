@@ -50,8 +50,7 @@ Worklist keys → procedure:
 - `security`: `candidate`, `inventory`, `roles[]`, `deployment_checks` → [docs/security.md](docs/security.md); findings go to a private artifact only, never a comment.
 - `scenarios_due[]` (`id`, `kind` queued|takeover|report) in the issues worklist; `discovery` mode: `discovery`, `candidate`, `baseline`, `previous_candidate`, `budget` → [docs/scenarios.md](docs/scenarios.md).
 - `boundary_breach[]` (any mode): a probe reached a source surface or the policy hook is gone — test nothing, report each line in the chat UI (and to `channel` when set) and end ([docs/black-box.md](docs/black-box.md) → **The gate**).
-- `blockers` (issues and every mode that installs: `held[]`, `released[]`, `notices[]`; regression adds `held_tests[]`) → [docs/autonomy.md](docs/autonomy.md): a notice goes first, a released row is this run's retry; a new failure is diagnosed there before any abort.
-- `error` (any mode): no worklist. With `blockers` it is the mode's `preflight` blocker, written by the pre-flight — give `blockers.notices[]` and end ([docs/autonomy.md](docs/autonomy.md) → **A pre-flight error**); without, log it and end.
+- `blockers` (issues and every mode that installs: `held[]`, `released[]`, `notices[]`; regression adds `held_tests[]`) → [docs/autonomy.md](docs/autonomy.md): a notice goes first, a released row is this run's retry; a new failure is diagnosed there before any abort. `error` (any mode): no worklist — with `blockers` it is the mode's `preflight` blocker, written by the pre-flight: give `blockers.notices[]` and end (→ **A pre-flight error**); without, log it and end.
 - Every run: echo the logs, work each key per its doc; an issues run ends with the catalog ([docs/catalog.md](docs/catalog.md)), self-check, `work/ISSUES.log`.
 
 ## Runtime configuration: `work/CONFIG.md`
