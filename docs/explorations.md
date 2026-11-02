@@ -13,7 +13,8 @@ second layer with its own frozen oracle, its own tests and its own report sectio
   `blocked`, with severity `info | minor | major`, reported only under "Beyond the criteria".
 - Observations never produce an issue comment of their own and never file an issue; the
   issue comment carries at most the renderer's one summary line. A `major` observation is
-  named in the chat summary; the operator decides what follows.
+  named in the chat summary, is a lead for the next discovery run, and — reproduced — is proposed
+  as a found issue with its words ([autonomy.md](autonomy.md) → **Initiative**); the operator decides.
 
 ## The frozen oracle — `work/issues/<n>/explorations-<ac_hash>.md`
 
@@ -121,7 +122,8 @@ What you happen to see outside the ACs while exploring, authoring or reading a r
 screenshots — an error page, a console error on screen, a broken layout, a wrong count — is
 one `noticed` item in `verdicts-<ac_hash>-<candidate>.json`:
 `"noticed": [{"where": "<page or step>", "saw": "<what a user sees>", "shot": "<screenshot path>" | null}]`.
-It costs nothing extra: no test, no re-run, no chase, no verdict. `render-report.mjs` lists
+It costs nothing extra in this run: no test, no re-run, no chase, no verdict — the next discovery
+run takes it as a lead ([scenarios.md](scenarios.md) → **Discovery**). `render-report.mjs` lists
 it as "Noticed in passing — not tested" and adds one count line to `comment.md`; the design
 findings register takes it in too ([ui-sweep.md](ui-sweep.md) → Register). Something
 that looks like a security weakness is never a `noticed` item: it goes to the operator's

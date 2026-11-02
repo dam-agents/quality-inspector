@@ -35,8 +35,9 @@
 ## The regression run
 
 The worklist carries `candidate`, `previous_candidate` (the build last regression-tested,
-`null` the first time), `replay`, `tests[]`, `assert_drift[]` (`null` when the check could
-not run — say so, never treat it as clean), `profile_scenarios`, `channel`, and
+`null` the first time), `replay`, `tests[]`, `held_tests[]` (tests and adoptions a `tests` blocker
+holds — not run tonight, named in `notes`; [autonomy.md](autonomy.md)), `assert_drift[]` (`null` when the check could
+not run — say so, never treat it as clean), `profile_scenarios`, `channel`, `blockers`, and
 `confirm_regressions` / `bisect_max_steps` ([triage.md](triage.md) → Order of work, steps 5–6).
 
 - `profile_scenarios` — `{files, adopt[], retire[], deferred[]}`, or `null` with
@@ -54,8 +55,8 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
 
 1. `env.sh lock regression` (busy → end the run, log it).
 2. `env.sh reset`, `env.sh up <candidate>`, `suite.sh run smoke-<candidate> --tag smoke`.
-   Failure → environment failure: diagnose and try the one repair of
-   [nested-env.md](nested-env.md) → Failures. Still failing → **the night without results**:
+   Failure → environment failure: diagnose and repair per [nested-env.md](nested-env.md) →
+   Failures, then register its cause ([autonomy.md](autonomy.md)). Still failing → **the night without results**:
    1. Write `work/regression/<candidate>/environment.json` — `{"mode": "regression",
       "verdict": "environment", "candidate", "utc", "stage", "exit", "cause", "evidence", "repair", "next", "trigger"}`:
       `utc` the write's time (the ERROR line's too); `stage` the step that failed — `reset`,
@@ -98,7 +99,8 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
 6. **Triage** every result that is not plain `unchanged` per [triage.md](triage.md):
    re-run without cache, look, check the context, decide, heal or retire where the rules
    allow, rework the steps before a block ([triage.md](triage.md) → **Reworking the steps before a
-   block**). Re-run every healed or reworked file strictly. Every `needs-review`, `superseded`, quarantine,
+   block**); a `blocked` criterion whose cause outside the product will stop it again is a `tests`
+   blocker ([autonomy.md](autonomy.md)). Re-run every healed or reworked file strictly. Every `needs-review`, `superseded`, quarantine,
    failed rework and third heal in a month is a proposal ([maintenance.md](maintenance.md) → What opens a proposal).
 7. **Report**: write `work/regression/<candidate>/verdicts.json` with `"mode": "regression"`
    — one entry per criterion that was not `unchanged`, each with `issue`, `id`, `name`,
@@ -128,7 +130,8 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
    `previous_candidate` on `ran candidate=`.
 9. `env.sh unlock regression`. Summary in the chat UI: regressions first, each with its
    evidence link; then what needs review; then one line of what was absorbed; then the open
-   maintenance proposals (`M-<k>`, test, kind, proposal; none → no line); then the
+   maintenance proposals (`M-<k>`, test, kind, proposal; none → no line); then the open blockers
+   (`B-<k>`, owner, days open; none → no line); then the
    profile scenarios adopted, rejected and retired; then the `deferred[]` ids that wait, with
    `max_scenarios_per_run` (none → no line). With `channel` set, the same summary
    as one `send_channel_message` to it — every night, also when all is `unchanged`, so a

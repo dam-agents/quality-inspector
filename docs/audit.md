@@ -18,7 +18,8 @@ when `audit_report: disabled` (still append the log line).
    **coverage** of the newest UI map (`warn` while pages are uncovered, never `fail`;
    [change-awareness.md](change-awareness.md) → Coverage), `features`, `maintenance` and `radar` (the
    registry's, the queue's and `work/PRSCAN.md`'s format; members that do not run; proposals open over 14 days —
-   [features.md](features.md), [maintenance.md](maintenance.md), [radar.md](radar.md)), `design_desk` (the design checks'
+   [features.md](features.md), [maintenance.md](maintenance.md), [radar.md](radar.md)), `blockers` (`work/BLOCKERS.md`'s
+   format; a cause open over 7 days, with its owner; a notice not given — [autonomy.md](autonomy.md)), `design_desk` (the design checks'
    ledgers, a Ref sent twice — [design-checks.md](design-checks.md)), and `criteria_injection` (the
    week's criteria files of issues and scenarios and intent files of issues holding URLs, code fences or HTML comments;
    the week's `issue_injection_suspect` and `scenario_injection_suspect` events) — a `warn`

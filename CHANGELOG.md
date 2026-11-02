@@ -7,6 +7,23 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.55.0 — 2026-11-02
+
+**Upgrade:**
+1. Nothing to run — docs are re-read per run, and `work/BLOCKERS.md` is made by the first
+   `scripts/blockers.mjs open`. From now on a failure the agent cannot repair is registered with its
+   owner and its one repair, and the pre-flight holds the work it stops (installs, report retries, a
+   recurring test) with a growing back-off, released early by a change of the kit, `work/CONFIG.md`,
+   the profile or the credentials file ([docs/autonomy.md](docs/autonomy.md)). Every worklist that
+   installs, and the issues one, carries `blockers`; the nightly one `held_tests[]`. Seed the register
+   from `work/LESSONS.md` only by the next failure that meets it — never by hand.
+2. **Offer** `blocker_alerts: enabled` (default `disabled`) when `regression_channel` or `slack_channel`
+   is set: one message there when a cause stops the agent's work and one when it is resolved; then
+   `bash "$HOME/scripts/verify-onboarding.sh" --config`.
+3. Nothing to run — the analysis' problems carry a `severity` (`critical` | `high` | `medium` |
+   `low`; [docs/reporting.md](docs/reporting.md) → **The agent's analysis**); the report and the
+   dashboard show it, an older run shows none.
+
 ## 3.54.0 — 2026-11-02
 
 **Upgrade:**

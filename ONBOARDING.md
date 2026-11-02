@@ -266,7 +266,8 @@ file → keep its values, show them once, and ask only for the keys it lacks. As
    say that the nightly regression run adopts and replays them (`profile_scenarios`,
    default `enabled`), and with a channel connected ask `regression_channel` for the
    nightly summary and a black-box breach alert (empty: the alert goes to `slack_channel`, the
-   summary stays in chat).
+   summary stays in chat). With a channel set, offer `blocker_alerts`, default `disabled`: one
+   message when a cause stops the agent's work and one when it is resolved ([docs/autonomy.md](docs/autonomy.md)).
 9. **`e2e_model`** — `bash "$HOME/scripts/verify-onboarding.sh" --models` probes the configured
    model and the ones the connection lists: keep the configured one when it answers, else offer
    those that do and write the operator's pick. None answers → checklist item 7 (the
@@ -327,6 +328,7 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - scenario_channel:
 - profile_scenarios: enabled
 - regression_channel:
+- blocker_alerts: disabled
 - max_scenarios_per_run: 3
 - max_scenarios_per_day: 10
 - lend_model: disabled

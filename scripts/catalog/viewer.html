@@ -612,8 +612,13 @@ const itemCause = (i) => causeB(i.latest, i.verdict && i.verdict.cause);
 // The agent's reading of a run (docs/reporting.md → The agent's analysis): what ran, why the result is
 // what it is, each problem with what happened, where, the probable cause and the repair.
 const CERTAINTY = { high: 'The evidence shows it directly.', medium: 'It agrees with the evidence. Another reason is possible.', low: 'A hypothesis. Examine it before you act on it.' };
+// How much a problem costs: the users for a product defect, the testing for a test or environment problem.
+const PROBLEM_SEV = { critical: ['bad', 'Users lose data, or no user can do the main task. For the testing: no test can run.'],
+  high: ['bad', 'A main function fails for many users, or its workaround is difficult. For the testing: the tests of a feature cannot run.'],
+  medium: ['warn', 'A function fails, but the user has a different way to do the task. For the testing: some criteria cannot run.'],
+  low: ['muted', 'A small problem: how it looks, or a rare case. For the testing: a small repair.'] };
 const analysisIn = (a) => (a && typeof a === 'object' ? { summary: str(a.summary), next: str(a.next),
-  problems: arr(a.problems).filter((p) => p && str(p.title)).map((p) => ({ title: str(p.title), cause: own(CAUSE, str(p.cause)) ? str(p.cause) : null, certainty: own(CERTAINTY, str(p.certainty)) ? str(p.certainty) : null,
+  problems: arr(a.problems).filter((p) => p && str(p.title)).map((p) => ({ title: str(p.title), cause: own(CAUSE, str(p.cause)) ? str(p.cause) : null, severity: own(PROBLEM_SEV, str(p.severity)) ? str(p.severity) : null, certainty: own(CERTAINTY, str(p.certainty)) ? str(p.certainty) : null,
     about: arr(p.about).map(str), what: str(p.what), where: str(p.where), why: str(p.why), fix: str(p.fix) })) } : null);
 // "#42 AC-1", "P-slug AC-2", "S-7": the test cases of the catalog that a problem is about.
 const casesOf = (refs) => refs.flatMap((m) => { const [ref, id] = m.trim().split(/\s+/); return ALL.filter((i) => i.ref === ref && (!id || str(i.id) === id)); });
@@ -642,7 +647,7 @@ function pageWhy(r) {
 function problemCard(p) {
   const cs = casesOf(p.about);
   return h('div', { class: 'problem' },
-    h('h4', {}, p.cause ? causeB('failed', p.cause) : null, p.title),
+    h('h4', {}, p.cause ? causeB('failed', p.cause) : null, p.severity ? h('span', { class: `badge ${PROBLEM_SEV[p.severity][0]}`, style: 'margin-right:6px', title: `Severity ${p.severity}: ${PROBLEM_SEV[p.severity][1]}` }, p.severity) : null, p.title),
     cs.length ? h('div', { class: 'meta', style: 'display:flex;gap:6px;flex-wrap:wrap' }, 'About: ', joinNodes(cs.map((i) => itemLink(i, false)), ' ')) : p.about.length ? h('div', { class: 'meta' }, `About: ${p.about.join(', ')}`) : null,
     h('dl', { class: 'dl' },
       p.what ? [h('dt', { title: 'What the test did and what it saw.' }, 'What happened'), h('dd', {}, p.what)] : null,

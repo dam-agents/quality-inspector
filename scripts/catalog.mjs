@@ -210,11 +210,12 @@ const causeOf = (e, judged = true) => (!CAUSE_OF.has(e?.verdict ?? e?.status) ? 
 const txt = (x, n = 600) => (typeof x === 'string' && x.trim() ? x.trim().slice(0, n) : null);
 const said = (x, n) => { const t = txt(x, n); return t && !quotesRequest(t) ? t : null; }; // the agent's own text
 const CERTAINTY = new Set(['high', 'medium', 'low']);
+const PROBLEM_SEVERITY = new Set(['critical', 'high', 'medium', 'low']);
 const analysisOf = (v) => {
   const a = v?.analysis;
   if (!a || typeof a !== 'object') return null;
   const problems = (Array.isArray(a.problems) ? a.problems : []).filter((p) => p && typeof p === 'object' && said(p.title, 120)).slice(0, 20).map((p) => ({
-    title: said(p.title, 120), cause: CAUSES.includes(p.cause) ? p.cause : null, certainty: CERTAINTY.has(p.certainty) ? p.certainty : null,
+    title: said(p.title, 120), cause: CAUSES.includes(p.cause) ? p.cause : null, severity: PROBLEM_SEVERITY.has(p.severity) ? p.severity : null, certainty: CERTAINTY.has(p.certainty) ? p.certainty : null,
     about: (Array.isArray(p.about) ? p.about : []).map((r) => txt(r, 80)).filter((r) => r && /^(#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)( (AC|IN|EX)-\d+)?$/.test(r)).slice(0, 30),
     what: said(p.what), where: said(p.where), why: said(p.why), fix: said(p.fix) }));
   const out = { summary: said(a.summary, 1200), problems, next: said(a.next) };

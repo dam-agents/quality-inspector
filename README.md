@@ -53,6 +53,12 @@ library for evidence, the skill catalog for profiles, sub-agents for independent
   In the direct session the operator can watch exploration live in the Browser Panel
   (`live_browser`), and the nested product can call the agent's own model by placeholder
   instead of a mock (`lend_model`).
+- **On its own** — a failure is diagnosed (what is known first, then hypotheses and checks), what is
+  the agent's is repaired, and the rest goes to a register of blockers with its owner and the one
+  repair: the pre-flight then holds that work with a growing back-off instead of failing the same way
+  every hour, and the operator is told once (`blocker_alerts`). Every problem carries a severity, a
+  confirmed defect comes with the words that file it, and what a run saw in passing feeds the next
+  discovery (docs/autonomy.md).
 - Scripts only detect, and the profile only sets up the nested product; every judgment and every
   external write is the agent's, per `docs/`. `CLAUDE.md` is the small always-loaded
   core; the definition is versioned (`VERSION` + `CHANGELOG.md`).
@@ -207,6 +213,7 @@ configuration.
 | `scenario_discovery`, `scenario_channel` | asked, default `disabled` / empty | Opt-in: weekly scenario proposals (`propose`), also tested (`run`); the Slack conversation for their digest. |
 | `max_scenarios_per_run`, `max_scenarios_per_day` | defaults (`3`, `10`) | Proposals per discovery run, also profile scenarios adopted a night; scenario runs a day. |
 | `profile_scenarios`, `regression_channel` | default `enabled`; asked when a channel is connected, default empty | The profile's `scenarios/` (the product team's flows) are adopted and replayed nightly; the Slack conversation for the nightly summary and a black-box breach alert (else `slack_channel`). |
+| `blocker_alerts` | default `disabled`; offered when a channel is set | One message there when a cause stops the agent's work (with its owner and the one repair) and one when it is resolved ([docs/autonomy.md](docs/autonomy.md)). |
 | `auto_promote` | default `disabled` | `verified`: tests whose every criterion was verified join the nightly regression without the operator's "promote". |
 | `marker_prefix` | default `quality-inspector` | Dedup marker; **immutable once a comment exists**. |
 | `qa_label`, `retest_label` | defaults | The gates (`qa:ready`, `qa:retest`). The QA label goes on an issue or on the pull request that closes it. |
@@ -244,7 +251,7 @@ configuration.
   **public comments** on the target's issues; on the operator's "create issue for …" only, **new issues**
   on the target about found problems, labelled `found_label` (and `fix_label` for the software
   architect) — [`skills/create-issue`](skills/create-issue/SKILL.md); optionally a Slack channel bound to the agent (replies
-  in request threads; with `scenario_channel`, one weekly digest post; with `regression_channel`, one nightly summary post and a black-box breach alert; with `slack_channel`,
+  in request threads; with `scenario_channel`, one weekly digest post; with `regression_channel`, one nightly summary post and a black-box breach alert (and, with `blocker_alerts: enabled`, one post when a blocker opens and one when it is resolved); with `slack_channel`,
   issue tests people order there; with `design_desk_findings`, up to `design_desk_max_per_run` design findings a run to the Design Desk's conversation); with `work_repo`, pushes of the `work/` backup to that
   private repository. The platform runtime's session state (`PLATFORM_RUNTIME_URL`) frees a
   dead run's environment lock at once; without it the lock waits `lock_ttl_min`.

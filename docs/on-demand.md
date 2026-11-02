@@ -17,6 +17,8 @@ A direct session's first request names it ([logging.md](logging.md) → **Sessio
   `retest`; `retest_label_present` when the issue carries `retest_label`), then follow [issue-qa.md](issue-qa.md). The QA label is not required for an
   operator request; say so in the report notes. Neither is the deploy gate: when the pre-flight
   logs #N as waiting, tell the operator its reason before you start ([issue-qa.md](issue-qa.md) → The deploy gate).
+  Nor is a held `env` blocker: name it and its cause first, then try — the install passes and you
+  resolve it, or fails and it is a hit ([autonomy.md](autonomy.md)).
 - **"answer #N Q-<k>: <what applies>"** — record the decision as one dated line in
   `work/OPERATOR.md` ([persistence.md](persistence.md) → Operator preferences), never in a frozen
   file; offer "test #N" to freeze and test the decided variant now
@@ -34,6 +36,11 @@ A direct session's first request names it ([logging.md](logging.md) → **Sessio
 - **"promote #N --with-explorations"** — not available in this version: explorations are
   never replayed nightly ([explorations.md](explorations.md)); say so, then "promote #N".
 - **"demote #N"** — tier back to `exploratory`, `promoted_utc` `-`.
+- **"show blockers"**, **"retry B-<k>"**, **"close B-<k>"** — what stops the agent's work
+  ([autonomy.md](autonomy.md)): `blockers.mjs list --open` with each `work/blockers/B-<k>.md`;
+  `blockers.mjs retry B-<k>` after the operator's fix that no file shows (egress, disk, a
+  platform repair) — the next run tries again; `blockers.mjs close B-<k>` when it is no longer
+  to be held (a closed cause that strikes again opens a new row).
 - **"accept M-<k>"**, **"rewrite M-<k>"**, **"retire M-<k>"**, **"keep M-<k>"**, **"show maintenance"** —
   a test maintenance proposal ([maintenance.md](maintenance.md) → The operator decides);
   "accept the review of #N" / "reject …" name that test's open `needs-review` proposal.

@@ -306,17 +306,22 @@ worklist carries `discovery`, `candidate`, `baseline`, `previous_candidate` and 
      their "Done when", written by the product team.
    - The profile's `SKILL.md`; the titles of existing criteria files and every
      `SCENARIOS.md` row — never propose a `spec_hash` that exists.
+   - **Leads** ([autonomy.md](autonomy.md) → **Initiative**): the `noticed[]` items and the
+     `major` explorations of the verdicts files (`work/issues/*/verdicts-*.json`,
+     `work/scenarios/*/verdicts-*.json`) written since this log's last `ran` line.
 3. **Draft** at most `budget` proposals, one user goal each, as a `request.md` with
    Given/When/Then and its **basis** — where the expected outcome comes from:
    `issue #<n>: "<quoted Done when line>"`, `ui: <route> — "<control>"` (an uncovered page
    or a nav item without a golden path; the outcome the control's own label promises),
-   `profile: "<quoted SKILL.md line>"`, or `heuristic: <name> of S-<k>` — a row of
+   `profile: "<quoted SKILL.md line>"`, `heuristic: <name> of S-<k>` — a row of
    [explorations.md](explorations.md) → Heuristic catalogue applied to a saved scenario,
-   its Expected column the outcome. An outcome you know only because you watched the
+   its Expected column the outcome —, or `lead: <where> — <heuristic>`: a lead's page or step
+   with the heuristic whose Expected the lead broke (an error page or console error:
+   `error-visibility`; lost state: `persistence`), never what the screen showed. An outcome you know only because you watched the
    product do it is no basis: it freezes today's behaviour, right or wrong. Never a flow
    already tested elsewhere ([test-authoring.md](test-authoring.md) → **Tested once**). Prefer
-   completed issues no test covers, then nav items without a golden path, then uncovered
-   pages with an action, then heuristics.
+   completed issues no test covers, then leads, then nav items without a golden path, then
+   uncovered pages with an action, then heuristics.
 4. Each one: `scenarios.sh new discovery`, then the pipeline steps 3–4 with the basis as the
    oracle and no reply. Accepted → `proposed`.
 5. `run` only, each `proposed` one: `scenarios.sh admit` (stop at `admit: false`),
