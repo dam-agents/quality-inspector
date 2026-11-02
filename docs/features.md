@@ -78,10 +78,11 @@ The operator's "run #N" procedure ([on-demand.md](on-demand.md)) with the featur
 ```bash
 bash "$HOME/scripts/suite.sh" run feature-<id>-<candidate>-<HHMM> --evidence full <tags>   # <tags> from resolve
 bash "$HOME/scripts/suite.sh" wait feature-<id>-<candidate>-<HHMM>
-node "$HOME/scripts/features.mjs" record feature-<id>-<candidate>-<HHMM> <id> --build <candidate>
+node "$HOME/scripts/features.mjs" record feature-<id>-<candidate>-<HHMM> <id> --build <candidate> --trigger <path>
 ```
 
-then `env.sh unlock operator` (or `slack`). A member that names one criterion runs its whole file; `record`
+with `<path>` the run's `trigger` ([reporting.md](reporting.md) → **Who started the run**), then
+`env.sh unlock operator` (or `slack`). A member that names one criterion runs its whole file; `record`
 keeps the members' criteria only. Answer per criterion — `passed`, `failed` with its message,
 `blocked` — failures first with the run's screenshots, then the skipped members with their
 reasons. Log `feature_run feature=<id> build=<candidate> passed=<n> failed=<n> blocked=<n>`

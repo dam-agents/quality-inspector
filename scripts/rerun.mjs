@@ -4,8 +4,10 @@
 // view (docs/catalog.md) and as the evidence a found issue can cite (skills/create-issue). A run by
 // hand is never a verdict: no criteria file, no verdicts file, no comment, no tier changes.
 //
-//   node rerun.mjs <label> <ref> --build <candidate>
+//   node rerun.mjs <label> <ref> --build <candidate> [--trigger <path>]
 //     <ref>: #42, #42 AC-2, #42 IN-1, #42 EX-1, S-7, S-7 AC-1, P-<slug>, P-<slug> AC-1
+//     --trigger: who started the run, from where and why (docs/reporting.md → **Who started the
+//     run**), in the call's own `mktemp /tmp/quality-inspector-trigger.XXXXXX` file (lib/trigger.mjs)
 //     -> {"file", "ref", "build", "results": {"AC-1": {"status", "error"}}}
 //
 // Reads work/suite/.e2e/runs/<label>/report.json; writes work/reruns/<test>/<label>.json, where
@@ -14,19 +16,26 @@
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { takeTrigger } from './lib/trigger.mjs';
 
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 const runsRoot = process.env.QI_RUNS_ROOT ?? join(work, 'suite', '.e2e', 'runs');
 const [label, ...rest] = process.argv.slice(2);
-const bi = rest.indexOf('--build');
-const build = bi >= 0 ? rest[bi + 1] : null;
-const ref = rest.filter((_, k) => k !== bi && k !== bi + 1).join(' ').trim().replace(/\s+/g, ' ');
+const opts = {}; const words = [];
+for (let k = 0; k < rest.length; k++) {
+  const o = /^--(build|trigger)$/.exec(rest[k]);
+  if (o) opts[o[1]] = rest[++k] ?? ''; else words.push(rest[k]);
+}
+const build = opts.build ?? null;
+const ref = words.join(' ').trim().replace(/\s+/g, ' ');
 // An intent test (IN-k, docs/intent.md) belongs to an issue only.
 const m = /^(?:#(?<n>\d{1,7})(?: (?<i>(?:AC|IN|EX)-\d{1,3}))?|S-(?<s>\d{1,6})(?: (?<si>(?:AC|EX)-\d{1,3}))?|P-(?<p>[a-z0-9][a-z0-9-]{0,40})(?: (?<pi>(?:AC|EX)-\d{1,3}))?)$/.exec(ref);
 const die = (msg) => { console.error(`rerun: ${msg}`); process.exit(2); };
 if (!label || !/^[A-Za-z0-9._-]{1,120}$/.test(label) || !m || !build || !/^[A-Za-z0-9._+-]{1,80}$/.test(build)) {
-  die('usage: rerun.mjs <label> <#N[ AC-k|IN-k|EX-k]|S-k[ AC-k|EX-k]|P-slug[ AC-k|EX-k]> --build <candidate>');
+  die('usage: rerun.mjs <label> <#N[ AC-k|IN-k|EX-k]|S-k[ AC-k|EX-k]|P-slug[ AC-k|EX-k]> --build <candidate> [--trigger <path>]');
 }
+let trigger;
+try { trigger = opts.trigger !== undefined ? takeTrigger(opts.trigger) : undefined; } catch (e) { die(e.message); }
 const g = m?.groups ?? {};
 const stem = g.n ? `issue-${g.n}` : g.s ? `scenario-${g.s}` : `profile-${g.p}`;
 const only = g.i ?? g.si ?? g.pi ?? null;
@@ -50,6 +59,6 @@ const utc = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 const dir = join(work, 'reruns', stem);
 mkdirSync(dir, { recursive: true });
 const file = join(dir, `${label}.json`);
-writeFileSync(`${file}.tmp`, `${JSON.stringify({ label, ref, build, utc, results }, null, 2)}\n`);
+writeFileSync(`${file}.tmp`, `${JSON.stringify({ label, ref, build, utc, trigger, results }, null, 2)}\n`);
 renameSync(`${file}.tmp`, file);
 console.log(JSON.stringify({ file, ref, build, results }));

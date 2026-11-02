@@ -144,7 +144,8 @@ line) — their words like any other: what a Check states is the oracle, a Do is
    `regression` > `failed` > `needs-review` > `blocked` (`flaky` counts as blocked) >
    `passed`; `not-testable` when nothing was testable. Write the verdicts file as in
    [reporting.md](reporting.md) → Verdicts file, with `"mode": "scenario"`, `"scenario"`,
-   `"source"`, `"spec_hash"` and `"request_file"` in place of `issue` and `ac_hash`, and its
+   `"source"`, `"spec_hash"` and `"request_file"` in place of `issue` and `ac_hash`, its `trigger`
+   ([reporting.md](reporting.md) → **Who started the run**: the requester's name, never the id) and its
    `analysis` ([reporting.md](reporting.md) → **The agent's analysis**; written again when step 10
    changes a verdict — never with the request's words); in a platform Environment with a
    criterion `failed` or `blocked` by the product, first `env.sh keep scenario-s-<k>` and its

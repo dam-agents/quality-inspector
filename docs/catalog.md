@@ -36,7 +36,8 @@ The operator may share the page beyond themselves, so it carries only what conce
   scenario run with its `analysis` too; each with its length — the run file's `minutes`, else its `started_utc` to its time;
   else a night from its `due` line, an issue run from its `issue_done minutes=`, a scenario run
   from its `scenario_run` ([logging.md](logging.md)) — and its `cost_usd` only when the file
-  states it (never estimated); each with its build and report reference (a link when the report has one —
+  states it (never estimated); each with who started it, from where and why (its file's `trigger`, [reporting.md](reporting.md) →
+  **Who started the run** — a person's name included; "not recorded" without one); each with its build and report reference (a link when the report has one —
   `artifact.url`, its share link, e.g. under `report_visibility: public`
   ([reporting.md](reporting.md) → Delivery step 1), or an `https://` `artifact.id` — opened in a
   new tab; else a "private" mark that says where to find it, Artifacts in the app: a private
@@ -63,7 +64,7 @@ The operator may share the page beyond themselves, so it carries only what conce
   status`), the focus queue and the areas; the design findings register with each finding's crop
   ([ui-sweep.md](ui-sweep.md)) with the operator's category and dismissal reason; the newest validation results and stress checks; of the newest
   security run only its counts by severity and its report's reference.
-- **Never:** a scenario's request text, requester or thread; a verdicts file's `notes` (the agent's
+- **Never:** a scenario's request text, requester id or thread (the requester's name shows only as a run's `trigger`); a verdicts file's `notes` (the agent's
   `analysis`, `explanation` and a criterion's `note` are written for the page, [reporting.md](reporting.md)
   → **The agent's analysis** — the builder drops a field of them that names a requester or thread, or
   repeats 6 words in a row of a request or a profile scenario's source, and a `notes` entry counts them); a run by hand's error text; `work/LESSONS.md`; the operator conversation; a security finding or anything else

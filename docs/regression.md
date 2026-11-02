@@ -57,7 +57,7 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
    Failure → environment failure: diagnose and try the one repair of
    [nested-env.md](nested-env.md) → Failures. Still failing → **the night without results**:
    1. Write `work/regression/<candidate>/environment.json` — `{"mode": "regression",
-      "verdict": "environment", "candidate", "utc", "stage", "exit", "cause", "evidence", "repair", "next"}`:
+      "verdict": "environment", "candidate", "utc", "stage", "exit", "cause", "evidence", "repair", "next", "trigger"}`:
       `utc` the write's time (the ERROR line's too); `stage` the step that failed — `reset`,
       `up`, `smoke` or `canary` ([nested-env.md](nested-env.md) → **The injection canary**);
       `exit` its exit code (`null` for a test); `cause` one or two sentences — what failed and
@@ -106,7 +106,7 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, an
    `blocked` ([triage.md](triage.md) → **Cause**), `explanation`, `because_issue` when an issue explains
    it, `heal` `{from, to}` for a repair (a `reworked` one: the replaced and the new step), `regressed_between` `{from, to, builds_between}`
    for a confirmed regression, and `before_shot` (the previous map's screenshot of the
-   page). Add `context` `{previous, window, issues[{number,title}], ui_diff, iface_diff, signals}`
+   page). Add `trigger` ([reporting.md](reporting.md) → **Who started the run**) and `context` `{previous, window, issues[{number,title}], ui_diff, iface_diff, signals}`
    (`ui_diff`, `iface_diff`: the diffs' `--md` text; `signals`: `{console_errors_new,
    failed_requests_new, slower_pages, slow_tests}` — the UI diff's lists plus `slow_tests` from
    `node "$HOME/scripts/perf-trend.mjs" regression-<candidate>`, each item made a

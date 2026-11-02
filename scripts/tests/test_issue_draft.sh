@@ -104,7 +104,13 @@ cp "$R/issue-42-candidate/report.json" "$R/rerun-issue-42-c3-1200/report.json"
 node "$SCRIPTS/rerun.mjs" rerun-issue-42-c3-1200 '#42' >/dev/null 2>&1; assert_eq "rerun: --build is required" 2 "$?"
 out="$(node "$SCRIPTS/rerun.mjs" rerun-issue-42-c3-1200 '#42 AC-1' --build c3)"
 assert "rerun: the record" '.ref == "#42 AC-1" and .results == {"AC-1":{"status":"failed","error":"expected heading Apollo-2 to be visible"}}' "$out"
-assert "rerun: kept under the test's stem" '.label == "rerun-issue-42-c3-1200" and .build == "c3" and (.utc | test("Z$"))' "$(cat "$W/reruns/issue-42/rerun-issue-42-c3-1200.json")"
+assert "rerun: kept under the test's stem" '.label == "rerun-issue-42-c3-1200" and .build == "c3" and (.utc | test("Z$")) and (has("trigger") | not)' "$(cat "$W/reruns/issue-42/rerun-issue-42-c3-1200.json")"
+# Who started it (docs/reporting.md → Who started the run): from the call's own trigger file only.
+export QI_WORDS_DIR="$SANDBOX"
+tf="$(mktemp "$SANDBOX/quality-inspector-trigger.XXXXXX")"; printf '{"via":"chat","who":"operator","why":"run #42 AC-1"}' > "$tf"
+node "$SCRIPTS/rerun.mjs" rerun-issue-42-c3-1200 '#42 AC-1' --build c3 --trigger "$tf" >/dev/null
+assert "rerun: the trigger in the record" '.trigger == {"via":"chat","who":"operator","why":"run #42 AC-1"} and .ref == "#42 AC-1"' "$(cat "$W/reruns/issue-42/rerun-issue-42-c3-1200.json")"
+node "$SCRIPTS/rerun.mjs" rerun-issue-42-c3-1200 '#42 AC-1' --build c3 --trigger "$SANDBOX/elsewhere.json" 2>/dev/null; assert_eq "rerun: a trigger file that is not the call's own, exit 2" 2 "$?"
 out="$(node "$D" '#42 AC-1')"
 assert "a run by hand is the newest failure a draft cites" '.build == "c3"' "$out"
 grep -q 'manual run' "$(jq -r .dir <<<"$out")/body.md" || { echo "  the draft names the run by hand"; FAILED=1; }
