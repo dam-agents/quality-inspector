@@ -57,6 +57,12 @@ The operator may share the page beyond themselves, so it carries only what conce
   build; `null` with `profile_scenarios: disabled`), the time budget
   (`max_wallclock_min_per_issue`), each schedule's name, switch and cron from
   `work/schedules.json`, and the last 14 days of runs drawn from the runs above.
+- **Blockers** (Overview → Needs attention, first, also with no test case yet; not as of an older
+  build): the open rows of `work/BLOCKERS.md` (`blockers.mjs list --open`, [autonomy.md](autonomy.md))
+  — id, scope, the tests it stops, owner, since (days open at the page's build), hits, the build, the
+  retry time, and the owner's general repair (the operator's words "retry B-<k>" where the fix is
+  theirs or the platform's); the signature as the agent's own text (dropped like the analysis when it
+  repeats a request). Never a row's notes file (`work/blockers/`) or its `told`.
 - **Requests:** the scenarios still queued, running, awaiting delivery or rejected — id,
   source, state, the frozen title, the build and verdict once there are any, the time of the
   row's last update; never the request's words. Under them, every profile scenario still to adopt, as in Activity.
@@ -67,7 +73,7 @@ The operator may share the page beyond themselves, so it carries only what conce
 - **Never:** a scenario's request text, requester id or thread (the requester's name shows only as a run's `trigger`); a verdicts file's `notes` (the agent's
   `analysis`, `explanation` and a criterion's `note` are written for the page, [reporting.md](reporting.md)
   → **The agent's analysis** — the builder drops a field of them that names a requester or thread, or
-  repeats 6 words in a row of a request or a profile scenario's source, and a `notes` entry counts them); a run by hand's error text; `work/LESSONS.md`; the operator conversation; a security finding or anything else
+  repeats 6 words in a row of a request or a profile scenario's source, and a `notes` entry counts them); a run by hand's error text; `work/LESSONS.md`; a blocker's notes file; the operator conversation; a security finding or anything else
   of `work/security/`; anything of `work/env/`; a credential value or a token (the builder refuses the page). A new field follows
   the same rule; `scripts/tests/test_catalog.sh` holds it.
 

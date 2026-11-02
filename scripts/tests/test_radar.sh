@@ -207,7 +207,8 @@ out="$(QI_PRS_PAGES=1 bash "$SCRIPTS/preflight.sh" radar)"
 assert "radar: a cut listing inside one second is an error" '.nothing_to_do and (.error | test("cut inside 2026-10-25T03:00:00Z")) and .title == "Change radar: pre-flight error"' "$out"
 grep -q 'truncated=true$' "$W/RADAR.log" || { echo "  assertion failed: the RADAR.log line names the cut"; FAILED=1; }
 out="$(STUB_GH_FAIL=1 bash "$SCRIPTS/preflight.sh" radar)"
-assert "radar: a failed listing is an error, never a quiet run" '(.error | test("pull requests")) and .title == "Change radar: pre-flight error"' "$out"
+assert "radar: a failed listing is an error, never a quiet run; the second in a row wakes the run for its blocker" '(.error | test("pull requests")) and .nothing_to_do == false
+  and (.blockers.notices | map({id, kind, stage})) == [{"id":"B-1","kind":"opened","stage":"radar"}] and .title == "Change radar: pre-flight error · Report blocker B-1"' "$out"
 assert_eq "radar: no listing left after a failure" "$n0" "$(left)"
 printf '| test | issue | tier | assert_hash | promoted_utc |\n| --- | --- | --- | --- | --- |\n| tests/issue-44.e2e.ts | 44 | retired | h | - |\n' > "$W/SUITE.md"
 : > "$STUB_DIR/gh.calls"

@@ -3,7 +3,8 @@
 # cause), the backoff and what releases a row early (CONFIG.md, the profile, the credentials file), the
 # notices (opened, resolved, never twice), the operator's retry and close (direct session only), the
 # refusals and check; then the pre-flight's hold of the work — issues, reports, queued scenarios, the
-# nightly replay and the modes that install — and the audit's `blockers` check.
+# nightly replay and the modes that install —, the pre-flight's own errors as `preflight` rows, and the
+# audit's `blockers` check.
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 seed_work
@@ -158,6 +159,40 @@ B hit B-3 --build 0.0.0-main.bbb2222 --test '#7' >/dev/null
 out="$(PF regression)"
 assert "every test held: an idle night" '.nothing_to_do == true and (.held_tests | map(.id)) == ["#7","#12"]' "$out"
 grep -q 'skip=held tests=2' "$W/REGRESSION.log"; assert_eq "the night's log line" 0 "$?"
+
+# ---------------------------------------------------------------- the pre-flight's own errors
+# A mode that cannot build its worklist is its `preflight` row: one failed listing tells no one (the
+# Precheck declines it), the second in a row wakes the run for the notice, the told ones decline again,
+# and the mode's next worklist resolves it.
+mv "$W/BLOCKERS.md" "$W/BLOCKERS.keep"; rm -f "$SANDBOX"/quality-inspector-signature.*
+out="$(STUB_GH_FAIL=1 PF issues)"
+assert "a failed listing: B-1, one hit, no notice, nothing to do" '.nothing_to_do == true and (.error | test("listing failed")) and .blockers.notices == []
+  and (.logs | any(test("^pre-flight error: blocker B-1, hit 1 — the operator is told when the next run fails too$"))) and .title == "Issues run: pre-flight error"' "$out"
+assert "its row: the issues stage, owner unknown, no build" '[.blockers[] | {id, scope, owner, stage, build, hits, signature}] == [{"id":"B-1","scope":"preflight","owner":"unknown","stage":"issues","build":"none","hits":1,"signature":"issue listing failed for the target repository"}]' "$(B list --open)"
+ls "$SANDBOX"/quality-inspector-signature.* >/dev/null 2>&1 && { echo "  a signature file was left behind"; FAILED=1; }
+assert "it holds nothing" '.held == [] and .released == [] and .env == null and .delivery == null' "$(B status)"
+out="$(STUB_VERSIONS_FAIL=1 PF issues)"
+assert "another error of the same mode: a hit of B-1; its notice wakes the run" '.nothing_to_do == false and (.blockers.notices | map({id, kind})) == [{"id":"B-1","kind":"opened"}]
+  and .title == "Issues run: pre-flight error · Report blocker B-1"' "$out"
+assert "B-1 names the newest error" '.blockers[0] | .hits == 2 and .signature == "cannot resolve product builds: registry down"' "$(B list --open)"
+B told B-1 >/dev/null
+assert "told: the next failures decline again" '.nothing_to_do == true and .blockers.notices == []' "$(STUB_GH_FAIL=1 PF issues)"
+out="$(STUB_VERSIONS_FAIL=1 PF discovery)"
+assert "another mode: a row of its own" '.nothing_to_do == true and (.error | test("product builds"))' "$out"
+assert "B-2: the discovery stage" '[.blockers[] | {id, stage, hits}] == [{"id":"B-1","stage":"issues","hits":3},{"id":"B-2","stage":"discovery","hits":1}]' "$(B list --open)"
+out="$(PF issues)"
+assert "the worklist builds again: B-1 resolved, its notice wakes the run" '.nothing_to_do == false and (.blockers.notices | map({id, kind})) == [{"id":"B-1","kind":"resolved"}]
+  and (.logs | any(test("^blocker B-1 resolved: the issues pre-flight builds its worklist again$")))' "$out"
+assert "B-2 waits for its own mode" '[.blockers[] | .id] == ["B-2"]' "$(B list --open)"
+B told B-1 >/dev/null
+PF discovery >/dev/null
+assert "the discovery worklist resolves B-2" '.blockers == []' "$(B list --open)"
+assert "B-2 was never told: no notice" '.notices == []' "$(B status)"
+printf 'not a register\n' > "$W/BLOCKERS.md"
+out="$(STUB_GH_FAIL=1 PF issues)"
+assert "a register that cannot take the error: no blockers key, so the Precheck wakes the run" '(has("blockers") | not) and .nothing_to_do == true
+  and (.logs | any(test("not in the blocker register")))' "$out"
+mv "$W/BLOCKERS.keep" "$W/BLOCKERS.md"
 
 # The audit: a cause open over a week, a notice not given.
 set_cell B-3 10 2026-01-02T03:00:00Z

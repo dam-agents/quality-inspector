@@ -2,9 +2,10 @@
 // blockers.mjs — the register of what stops the agent's work, work/BLOCKERS.md (docs/autonomy.md → The
 // register): one row per cause — the product does not install or start (`env`), the platform refuses a
 // report's delivery (`delivery`), recurring tests cannot reach their frozen block for a reason outside the
-// product (`tests`) —, whose fix it is, how often it struck and when the agent tries again. The pre-flight
-// holds the work a standing blocker stops (scripts/preflight.sh → blockers_status), so a known failure
-// costs one try per backoff step instead of one per run, and the operator is told once.
+// product (`tests`), a mode's pre-flight ends in an error (`preflight`, written by scripts/preflight.sh
+// itself) —, whose fix it is, how often it struck and when the agent tries again. The pre-flight holds the
+// work a standing blocker stops (scripts/preflight.sh → blockers_load), so a known failure costs one try per
+// backoff step instead of one per run, and the operator is told once.
 //
 //   node blockers.mjs open --scope <scope> [--test <id>]… --owner <owner> --stage <stage> --build <build> --signature-file <path>
 //     -> {"id", "opened": bool, "hits", "retry_utc", "notes"}   an open row of the same scope and signature takes the hit instead
@@ -17,19 +18,23 @@
 //   node blockers.mjs status           -> {"open", "held": [], "released": [], "notices": [], "env", "delivery", "tests": {<test>: <B-k>}}
 //   node blockers.mjs check            -> {"ok", "problems": []}
 //
-// <scope>: env | delivery | tests (one --test per recurring test it stops: #N, S-k, P-<slug>). <owner>: whose
+// <scope>: env | delivery | tests (one --test per recurring test it stops: #N, S-k, P-<slug>) | preflight. <owner>: whose
 // fix it is — agent | operator | profile | product | platform | unknown. <stage>: where it stopped, one short
 // word (up, reset, smoke, canary, upload, comment, label, replay, adopt …). The signature — the failure's key
 // line, read from <path>, the call's own `mktemp /tmp/quality-inspector-signature.XXXXXX` written with a file
 // tool, since it may quote an install log (lib/words.mjs) — is compared with digit runs and long hex folded,
-// so a build id or a count does not make a new cause.
+// so a build id or a count does not make a new cause. A `preflight` row is one per stage (the mode): its
+// pre-flight fails, whatever the error says — each hit keeps the newest error as the signature.
 // Hold and release: an open row holds its scope while now < retry_utc, its last hit plus 2^(hits−1) hours less
 // a quarter of an hour (so the hourly run after it is free), at most a day — a week for owner `profile`, whose
 // repair shows as a change of its files. It is released early once the kit's VERSION, work/CONFIG.md, the
 // profile's files or work/env/credentials.env (its size and time, never its text) changed since that hit.
 // `status` says which (`released[].reason`); `env`, `delivery` and `tests` name the rows that hold.
+// A `preflight` row holds nothing — the pre-flight tries at every occurrence — so `status` leaves it out of
+// `held` and `released`; the pre-flight resolves it once that mode's worklist builds again.
 // Notices (docs/autonomy.md → Telling the operator): `opened` is due for an open row not told yet whose owner
-// is not the agent, or that struck twice; `resolved` for a resolved or closed row that was told it opened.
+// is not the agent, or that struck twice — a `preflight` row only once it struck twice, so one failed listing
+// tells no one; `resolved` for a resolved or closed row that was told it opened.
 // `retry` and `close` are the operator's, in the direct session only (lib/config.sh → direct_session).
 // Every write holds the register's mutex (lib/mutex.mjs). Exit 2: usage or a malformed value, the file left
 // as it was; exit 1: locked.
@@ -48,7 +53,7 @@ const FILE = join(work, 'BLOCKERS.md');
 const TITLE = '# Blockers — what stops the agent\'s work, whose fix it is, when it tries again (docs/autonomy.md)';
 const COLS = ['id', 'scope', 'tests', 'owner', 'stage', 'signature', 'build', 'hits', 'state', 'first_utc', 'last_utc', 'retry_utc', 'fp', 'told'];
 const HEADER = `| ${COLS.join(' | ')} |`;
-const SCOPES = ['env', 'delivery', 'tests'];
+const SCOPES = ['env', 'delivery', 'tests', 'preflight'];
 const OWNERS = ['agent', 'operator', 'profile', 'product', 'platform', 'unknown'];
 const STATES = ['open', 'resolved', 'closed'];
 const TOLD = ['-', 'opened', 'resolved'];
@@ -121,7 +126,7 @@ function strike(b, build, ms) {
   b.retry_utc = utc(ms + backoff(+b.hits, b.owner));
 }
 const nextId = (list) => `B-${Math.max(0, ...list.map((b) => +(/^B-(\d+)$/.exec(b.id)?.[1] ?? 0))) + 1}`;
-const notice = (b) => (b.state === 'open' && b.told === '-' && (b.owner !== 'agent' || +b.hits >= 2) ? 'opened'
+const notice = (b) => (b.state === 'open' && b.told === '-' && ((b.owner !== 'agent' && b.scope !== 'preflight') || +b.hits >= 2) ? 'opened'
   : b.state !== 'open' && b.told === 'opened' ? 'resolved' : null);
 const view = (b) => ({ id: b.id, scope: b.scope, tests: testsOf(b), owner: b.owner, stage: b.stage, signature: b.signature,
   build: b.build, hits: +b.hits || 0, state: b.state, first_utc: b.first_utc, last_utc: b.last_utc, retry_utc: b.retry_utc, told: b.told });
@@ -151,8 +156,9 @@ function main() {
       if (!signature) die('the signature is empty');
       locked(() => {
         const list = load(); const ms = Date.now();
-        const same = list.find((b) => b.state === 'open' && b.scope === scope && sameCause(b.signature) === sameCause(signature));
-        if (same) { merge(same, tests); strike(same, build, ms); save(list); out({ id: same.id, opened: false, hits: +same.hits, retry_utc: same.retry_utc, notes: `work/blockers/${same.id}.md` }); return; }
+        const same = list.find((b) => b.state === 'open' && b.scope === scope
+          && (scope === 'preflight' ? b.stage === stage : sameCause(b.signature) === sameCause(signature)));
+        if (same) { if (scope === 'preflight') same.signature = signature; merge(same, tests); strike(same, build, ms); save(list); out({ id: same.id, opened: false, hits: +same.hits, retry_utc: same.retry_utc, notes: `work/blockers/${same.id}.md` }); return; }
         const b = { id: nextId(list), scope, tests: '-', owner, stage, signature, build, hits: '0', state: 'open', first_utc: utc(ms), told: '-' };
         merge(b, tests); strike(b, build, ms); list.push(b); save(list);
         out({ id: b.id, opened: true, hits: 1, retry_utc: b.retry_utc, notes: `work/blockers/${b.id}.md` });
@@ -211,7 +217,7 @@ function main() {
       const list = load(); const now = Date.now(); const fp = fingerprint();
       const held = []; const released = []; const tests = {};
       let env = null; let delivery = null;
-      for (const b of list.filter((x) => x.state === 'open')) {
+      for (const b of list.filter((x) => x.state === 'open' && x.scope !== 'preflight')) {
         const changed = changedParts(b.fp, fp);
         const due = !UTC_RE.test(b.retry_utc) || Date.parse(b.retry_utc) <= now;
         if (!changed.length && !due) {

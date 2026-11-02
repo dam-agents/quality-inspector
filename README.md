@@ -56,7 +56,9 @@ library for evidence, the skill catalog for profiles, sub-agents for independent
 - **On its own** — a failure is diagnosed (what is known first, then hypotheses and checks), what is
   the agent's is repaired, and the rest goes to a register of blockers with its owner and the one
   repair: the pre-flight then holds that work with a growing back-off instead of failing the same way
-  every hour, and the operator is told once (`blocker_alerts`). Every problem carries a severity, a
+  every hour, and the operator is told once (`blocker_alerts`) and sees it first on the dashboard. A
+  pre-flight that cannot build its worklist (a GitHub listing refused) is a blocker of its own: told at
+  the second failure in a row, never a silent decline. Every problem carries a severity, a
   confirmed defect comes with the words that file it, and what a run saw in passing feeds the next
   discovery (docs/autonomy.md).
 - Scripts only detect, and the profile only sets up the nested product; every judgment and every

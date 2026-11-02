@@ -29,6 +29,9 @@
 // `features` (work/FEATURES.md) and `maintenance` (the open rows of work/MAINTENANCE.md) are the
 // agent's groups of recurring tests and the proposals waiting for the operator (docs/features.md,
 // docs/maintenance.md); a feature run (work/reruns/feature-<id>/) is a run of type `feature`.
+// `blockers` are the open rows of work/BLOCKERS.md (`blockers.mjs list --open`, docs/autonomy.md): what
+// stops the agent's work, its scope, owner, since, hits and retry time, the signature as the agent's own
+// text — never a row's notes file (work/blockers/), which holds the evidence and the diagnosis.
 
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -544,6 +547,20 @@ try {
   modules = JSON.parse(execFileSync('bash', [join(HERE, 'modules.sh'), 'status'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
   delete modules.generated_utc; // the hash covers state, not the time it was read
 } catch { notes.push('module state unavailable (modules.sh status failed)'); }
+// What stops the agent's work (docs/autonomy.md → The register).
+const BLOCKER_SCOPES = new Set(['env', 'delivery', 'tests', 'preflight']);
+const BLOCKER_OWNERS = new Set(['agent', 'operator', 'profile', 'product', 'platform', 'unknown']);
+const utcOr = (x) => (/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(String(x ?? '')) ? x : null);
+let blockers = [];
+try {
+  blockers = (JSON.parse(execFileSync(process.execPath, [join(HERE, 'blockers.mjs'), 'list', '--open'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })).blockers ?? [])
+    .filter((b) => b && /^B-\d{1,6}$/.test(String(b.id)) && BLOCKER_SCOPES.has(b.scope) && BLOCKER_OWNERS.has(b.owner))
+    .map((b) => ({ id: b.id, scope: b.scope, owner: b.owner,
+      tests: (Array.isArray(b.tests) ? b.tests : []).filter((t) => /^(#\d{1,7}|S-\d{1,6}|P-[a-z0-9][a-z0-9-]{0,40})$/.test(String(t))),
+      stage: /^[a-z][a-z-]{0,19}$/.test(String(b.stage)) ? b.stage : null, signature: said(b.signature, 160),
+      build: /^[A-Za-z0-9._+-]{1,80}$/.test(String(b.build)) && b.build !== 'none' ? b.build : null,
+      hits: Number.isInteger(b.hits) && b.hits > 0 ? b.hits : null, first_utc: utcOr(b.first_utc), retry_utc: utcOr(b.retry_utc) }));
+} catch { notes.push('blockers unavailable (blockers.mjs list --open failed)'); }
 const newestOf = (dir, file) => ls(join(work, dir)).map((b) => join(work, dir, b, file)).filter(existsSync)
   .sort((a, b) => mtime(a) - mtime(b)).at(-1) ?? null;
 const DESIGN_KEYS = ['id', 'source', 'check', 'severity', 'suspect', 'pattern', 'viewport', 'target', 'saw', 'first_seen', 'last_seen', 'status', 'resolved_build'];
@@ -755,10 +772,10 @@ for (const f of ls(thumbsDir).filter((x) => x.endsWith('.jpg') || x.endsWith('.w
 // one where its sharp copy did not fit.
 const images = {};
 let used = 0; let dropped = 0; let seq = 0; let sharpN = 0; let sharpDropped = 0;
-const base = Buffer.byteLength(JSON.stringify({ items, pages, nights, runs, modules, design, findings, found, features, maintenance }, (k, v) => (k.startsWith('_') ? undefined : v)))
+const base = Buffer.byteLength(JSON.stringify({ items, pages, nights, runs, modules, design, findings, found, features, maintenance, blockers }, (k, v) => (k.startsWith('_') ? undefined : v)))
   + Buffer.byteLength(read(join(HERE, 'catalog', 'viewer.html')) ?? '');
 const budget = Math.max(0, Math.min(IMG_BUDGET, PAGE_MAX - base));
-if (quoted.size) notes.push(`${quoted.size} text(s) of the agent's analysis left out: they repeat a scenario request or name its requester`);
+if (quoted.size) notes.push(`${quoted.size} text(s) of the agent's own left out: they repeat a scenario request or name its requester`);
 if (budget < IMG_BUDGET) notes.push(`image budget cut to ${Math.round(budget / 1024)} KiB by the size of the data`);
 const embed = (path, sharp = false) => {
   if (!path || !existsSync(path)) return null;
@@ -797,7 +814,7 @@ const data = {
   agent: { display_name: cfg('display_name') || 'Quality Inspector', version: (read(join(HERE, '..', 'VERSION')) ?? '').trim() || null },
   product, target: target || null,
   issue_url: target ? `https://${host}/${target.split('/').slice(-2).join('/')}/issues/{n}` : null,
-  builds, collections, features, maintenance, items, pages, uncovered_nav: uncoveredNav, nights, runs,
+  builds, collections, features, maintenance, blockers, items, pages, uncovered_nav: uncoveredNav, nights, runs,
   modules, design, findings, activity, areas, found,
   // The labels a new issue gets: found_label always, fix_label (the software architect's) on request.
   issue_labels: { found: cfg('found_label') || 'qa:found', fix: cfg('fix_label') || null },

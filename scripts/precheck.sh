@@ -80,9 +80,10 @@ OUT="$(bash "$PREFLIGHT" "$MODE" 2>/dev/null)" \
   || allow "precheck: the pre-flight exited non-zero for mode '$MODE' — fall back to the manual procedure in docs/."
 
 # One jq exec decides everything: an unparsable result is a broken pre-flight (allow),
-# a reported `error` is a failed READ (allow — see below), nothing_to_do is a decline.
+# a reported `error` outside the blocker register is a failed READ (allow — see below),
+# nothing_to_do is a decline.
 VERDICT="$(printf '%s' "$OUT" | jq -r '
-  if (.error // "") != "" then "allow-error"
+  if (.error // "") != "" and (.blockers | type) != "object" then "allow-error"
   elif .nothing_to_do == true then "decline"
   else "allow" end' 2>/dev/null)"
 
@@ -95,7 +96,11 @@ case "$VERDICT" in
     # allow-error is deliberate: a pre-flight that could not even list has NOT
     # answered "nothing changed". Declining would hide an outage inside the decline
     # counter, where it reads exactly like a quiet week. The turn runs, sees the
-    # error field, and reports it — a failed read is never an answer.
+    # error field, and reports it — a failed read is never an answer. An error the
+    # pre-flight registered (`blockers` present) is not hidden: it is the mode's
+    # `preflight` row of work/BLOCKERS.md, on the dashboard, and its second hit in a row
+    # wakes the turn once for the notice (nothing_to_do false) — so the rest decline
+    # (docs/autonomy.md → The register).
     if [ "${#OUT}" -le "$MAX_CONTEXT" ]; then
       printf '%s\n' "$OUT"
     else

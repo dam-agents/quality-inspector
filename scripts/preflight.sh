@@ -6,7 +6,8 @@
 #   - NO external writes at all (list/GET calls only),
 #   - NO git commit/push,
 #   - local writes only: one line per call in work/<RUNTYPE>.log, the audit-mode
-#     log retention sweep, and the daily media retention sweep (retention_sweep).
+#     log retention sweep, the daily media retention sweep (retention_sweep), and
+#     a mode's own `preflight` row of work/BLOCKERS.md (fail_out, preflight_passed).
 #
 #   preflight.sh <mode>   -> one JSON object on stdout; everything else to stderr.
 #   .nothing_to_do == true  -> the agent ends the run immediately.
@@ -63,11 +64,43 @@ fi
 
 runlog() { mkdir -p "$WORK" 2>/dev/null && printf '%s %s\n' "$NOW_ISO" "$2" >> "$WORK/$1.log" 2>/dev/null || true; }
 
-fail_out() {  # nothing-to-do JSON with an error; the agent just logs it
+# A scheduled mode that cannot build its worklist (docs/autonomy.md → The register): the error is the
+# `preflight` row of the mode, a hit each failing occurrence. The run wakes only for a notice due — the
+# second hit in a row, never one failed listing — so the Precheck declines the rest; an error the
+# register did not take (no `blockers` key) still wakes every run, as before the register.
+fail_out() {
   runlog "$(printf '%s' "$MODE" | tr '[:lower:]' '[:upper:]')" "ERROR: $1"
-  jq -nc --arg mode "$MODE" --arg err "$1" --argjson logs "$(logs_json)" \
-    '{mode:$mode, nothing_to_do:true, error:$err, logs:$logs}'
+  case "$MODE" in (issues|regression|discovery|security|modules|radar|benchmark) preflight_blocker "$1";; esac
+  if [ -n "$PF_BLK" ]; then
+    jq -nc --arg mode "$MODE" --arg err "$1" --argjson b "$PF_BLK" --argjson logs "$(logs_json)" \
+      '{mode:$mode, nothing_to_do:($b.notices | length == 0), error:$err, blockers:$b, logs:$logs}'
+  else
+    jq -nc --arg mode "$MODE" --arg err "$1" --argjson logs "$(logs_json)" \
+      '{mode:$mode, nothing_to_do:true, error:$err, logs:$logs}'
+  fi
   exit 0
+}
+# preflight_blocker <error>: open or hit the mode's row (blockers.mjs reads the signature from a file of
+# its own, lib/words.mjs); PF_BLK = the worklist's `blockers`, empty when the register did not take it.
+PF_BLK=""
+preflight_blocker() {
+  local f o
+  f="$(mktemp "${QI_WORDS_DIR:-/tmp}/quality-inspector-signature.XXXXXX" 2>/dev/null)" && printf '%s' "$1" > "$f" \
+    && o="$(node "$SCRIPT_DIR/blockers.mjs" open --scope preflight --owner unknown --stage "$MODE" --build none --signature-file "$f" 2>/dev/null)" \
+    && PF_BLK="$(node "$SCRIPT_DIR/blockers.mjs" status 2>/dev/null | jq -ce '{held, released, notices}' 2>/dev/null)" || PF_BLK=""
+  rm -f "${f:-}"
+  if [ -z "$PF_BLK" ]; then log "WARN: the error is not in the blocker register (blockers.mjs) — every run wakes for it"; return 0; fi
+  log "$(jq -r '"pre-flight error: blocker \(.id), hit \(.hits)" + (if .hits < 2 then " — the operator is told when the next run fails too" else "" end)' <<<"$o")"
+}
+# preflight_passed: the mode built its worklist — its open `preflight` row is resolved (the `resolved`
+# notice is due when the operator was told). A grep first: most runs have no such row.
+preflight_passed() {
+  local id
+  grep -qE "^\| B-[0-9]+ \| preflight \| - \| [a-z]+ \| $MODE \| [^|]* \| [^|]* \| [0-9]+ \| open \|" "$WORK/BLOCKERS.md" 2>/dev/null || return 0
+  id="$(node "$SCRIPT_DIR/blockers.mjs" list --open 2>/dev/null | jq -r --arg m "$MODE" 'first(.blockers[] | select(.scope == "preflight" and .stage == $m) | .id) // empty' 2>/dev/null)"
+  [ -n "$id" ] || return 0
+  if node "$SCRIPT_DIR/blockers.mjs" resolve "$id" >/dev/null 2>&1; then log "blocker $id resolved: the $MODE pre-flight builds its worklist again"
+  else log "WARN: blocker $id: the $MODE pre-flight passes, but blockers.mjs resolve failed"; fi
 }
 
 # Media retention, at most once a UTC day: raw e2e runs past the window go; a report keeps
@@ -189,6 +222,7 @@ mode_issues() {
           node "$SCRIPT_DIR/lib/scan-issues.mjs" "$tmp" "$WORK/QA.md" "$WORK/logs" 2>/dev/null)"
   rm -f "$tmp"
   [ -n "$scan" ] || fail_out "the issue scan failed (node scripts/lib/scan-issues.mjs)"
+  preflight_passed
   due="$(jq -c .due <<<"$scan")"; reports="$(jq -c .reports <<<"$scan")"; deferred="$(jq -r .deferred <<<"$scan")"
   waiting="$(jq -c '.waiting // []' <<<"$scan")"
   while IFS= read -r l; do log "$l"; done < <(jq -r '.logs[]' <<<"$scan")
@@ -303,6 +337,7 @@ mode_regression() {
     fi
   fi
   versions="$(versions_json none 2>/dev/null)" || fail_out "cannot resolve the candidate build"
+  preflight_passed
   candidate="$(printf '%s' "$versions" | jq -r .candidate)"
   last="$(grep -o 'ran candidate=[^ ]*' "$WORK/REGRESSION.log" 2>/dev/null | tail -1 | cut -d= -f2)"
   if [ "$last" = "$candidate" ]; then
@@ -716,6 +751,7 @@ mode_discovery() {
   env_busy_out DISCOVERY
   blockers_load; env_held_out DISCOVERY
   versions="$(versions_json 2>/dev/null)" || fail_out "cannot resolve product builds"
+  preflight_passed
   candidate="$(printf '%s' "$versions" | jq -r .candidate)"
   baseline="$(printf '%s' "$versions" | jq -r '.baseline // empty')"
   last="$(grep -o 'ran candidate=[^ ]*' "$WORK/DISCOVERY.log" 2>/dev/null | tail -1 | cut -d= -f2)"
@@ -744,6 +780,7 @@ mode_discovery() {
 # ========================================================== BENCHMARK MODE ====
 mode_benchmark() {
   local d; d="$(bash "$SCRIPT_DIR/benchmark.sh" due 2>/dev/null)" || fail_out "benchmark due-check failed"
+  preflight_passed
   log "$(jq -r .reason <<<"$d")"
   runlog BENCHMARK "due=$(jq -r .due <<<"$d") cases=$(jq -r .cases <<<"$d")"
   jq -nc --argjson d "$d" --argjson logs "$(logs_json)" '{mode:"benchmark", nothing_to_do:($d.due | not), cases:$d.cases, last_run:$d.last_run, logs:$logs}'
@@ -760,6 +797,7 @@ mode_security() {
   blockers_load; env_held_out SECURITY
   local versions candidate last inv roles dep eng
   versions="$(versions_json none 2>/dev/null)" || fail_out "cannot resolve the candidate build"
+  preflight_passed
   candidate="$(printf '%s' "$versions" | jq -r .candidate)"
   last="$(grep -o 'ran candidate=[^ ]*' "$WORK/SECURITY.log" 2>/dev/null | tail -1 | cut -d= -f2)"
   if [ "$last" = "$candidate" ]; then
@@ -819,6 +857,7 @@ mode_modules() {
   candidate="$(printf '%s' "$versions" | jq -r .candidate)"
   baseline="$(printf '%s' "$versions" | jq -r '.baseline // empty')"
   d="$(bash "$SCRIPT_DIR/modules.sh" due "$candidate" 2>/dev/null)" || fail_out "modules.sh due failed"
+  preflight_passed
   jq -e '.due == true' <<<"$ux" >/dev/null && d="$(jq -c '.due += ["ux-signals"]' <<<"$d")"
   if jq -e '.on | index("design-check")' <<<"$d" >/dev/null; then
     dc="$(design_checks_due "$candidate")"
@@ -870,6 +909,7 @@ mode_radar() {
     node "$SCRIPT_DIR/radar.mjs" advance "$n" >/dev/null 2>&1 && log "the next listing starts at $n" \
       || fail_out "radar.mjs advance failed: the next run would read the same cut listing"
   fi
+  preflight_passed
   runlog RADAR "since=$since due=$(jq '.due | length' <<<"$scan") $(jq -r '[.due | group_by(.kind)[] | "\(.[0].kind)=\(length)"] | join(" ")' <<<"$scan") deferred=$(jq .deferred <<<"$scan") truncated=$(jq .truncated <<<"$scan")"
   # The worklist goes to jq on stdin: ten bodies of 2000 characters stay clear of one argument's limit.
   jq -c --arg since "$since" --arg ch "$(cfg regression_channel)" --argjson logs "$(logs_json)" \
@@ -947,9 +987,10 @@ TITLE_JQ='
               audit: "Weekly audit", benchmark: "Benchmark run", security: "Security run",
               modules: "Modules run", radar: "Change radar"}[.mode] // "Pre-flight";
   def issue: .issue | numbers | "issue #" + tostring;
+  def notices: [(.blockers.notices // [])[] | (.id | safe) as $b | select($b) | ({resolved: "Report resolved "}[.kind] // "Report ") + "blocker " + $b];
   . + {title: ((
     if (.boundary_breach // []) != [] then "Report black-box breach"
-    elif (.error // "") != "" then runname + ": pre-flight error"
+    elif (.error // "") != "" then [runname + ": pre-flight error"] + notices | few("")
     elif .mode == "slack" then null
     elif .nothing_to_do == true then runname + ": nothing to do"
     elif .mode == "issues" then runname as $run |
@@ -959,7 +1000,7 @@ TITLE_JQ='
        + [(.reports_due // [])[] | "Deliver report for " + issue]
        + [(.scenarios_due // [])[] | (.id | safe) as $s | select($s)
          | ({takeover: "Resume ", report: "Deliver report for "}[.kind] // "Test ") + "scenario " + $s]
-       + [(.blockers.notices // [])[] | (.id | safe) as $b | select($b) | ({resolved: "Report resolved "}[.kind] // "Report ") + "blocker " + $b]) | few($run)
+       + notices) | few($run)
     elif .mode == "regression" then
       "Run regression" + on + some(
         (if .replay then [count(.tests | length; "test")] else [] end)

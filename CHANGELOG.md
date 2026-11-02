@@ -7,6 +7,17 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.56.0 — 2026-11-02
+
+**Upgrade:**
+Nothing to run — docs are re-read per run, and the kit's `scripts/precheck.sh` and
+`scripts/preflight.sh` come with it. A pre-flight that cannot build its worklist (for example "issue
+listing failed for the target repository") now opens or hits the `preflight` row of its mode in
+`work/BLOCKERS.md`: the Precheck declines the occurrence until the second failure in a row, which wakes
+the run once for the `opened` notice; the mode's next worklist resolves the row
+([docs/autonomy.md](docs/autonomy.md) → **A pre-flight error**). The dashboard shows the open blockers
+first in Overview → Needs attention ([docs/catalog.md](docs/catalog.md) → Content).
+
 ## 3.55.0 — 2026-11-02
 
 **Upgrade:**

@@ -575,6 +575,7 @@ const ENT = {
   collection: ['Collection', '🗂️', 'Your own group of test cases (work/CATALOG.md).'],
   feature: ['Feature', '🧭', 'A group of recurring test cases by what the product does, for example "Model switching" (work/FEATURES.md). The agent keeps it. You can run all its tests.'],
   maintenance: ['Maintenance proposal', '🛠️', 'A proposal of the agent for a recurring test that the product moved away from (M-1, M-2…): what changed, the evidence, and what to do with the test. You decide.'],
+  blocker: ['Blocker', '⛔', 'A cause that stops the work of the agent (B-1, B-2…): its scope, the owner of the repair, and when the agent tries again. The agent stops only the work that the cause stops.'],
   module: ['Testing module', '🧩', 'A type of testing that you can switch on and off: UI sweep, validation, stress and others.'],
   verdict: ['Verdict', '🏷️', 'The result of a test case on one build.'],
   tier: ['Tier', '🪜', 'The status of a test case: written once, verified, nightly, quarantined or retired.'],
@@ -756,6 +757,26 @@ const MAINT_KIND = { 'needs-review': 'The check failed or was judged, and the ag
 const MAINT_PROP = { heal: 'apply the repair that the agent prepared', rewrite: 'write the test again for the current product', retire: 'stop the test (it stays in the catalog)', 're-promote': 'promote the test again, as it is now', review: 'look at it: the agent has no repair' };
 const maintenance = arr(D.maintenance).filter((m) => m && MAINT_RE.test(str(m.id)) && own(MAINT_KIND, str(m.kind))).map((m) => ({ ...m, id: str(m.id), test: str(m.test), kind: str(m.kind), proposal: str(m.proposal), basis: str(m.basis), build: str(m.build) }));
 const maintOf = (i) => { const r = i.origin.kind === 'scenario' ? i.ref : `#${num(i.ref)}`; return maintenance.filter((m) => m.test === r || m.test === `${r} ${str(i.id)}`); };
+// The open rows of the blocker register (docs/autonomy.md → The register): what stops the work of the agent,
+// who repairs it and when the agent tries again. The repair is the owner's general action: the agent's notes
+// on a blocker stay off the page ("show blockers" in the chat gives them).
+const BLOCKER_SCOPE = {
+  env: ['Environment', 'The product does not install or start in the machine of the agent. No new test runs until it does.'],
+  delivery: ['Reports', 'The platform does not accept the reports. They wait. Nothing is lost.'],
+  tests: ['Tests', 'These recurring tests stop before their check for a cause outside the product. They do not run until the cause is repaired.'],
+  preflight: ['Scheduled run', 'A scheduled run cannot make its list of work. For example, it cannot read the issues. That run does nothing until it can.'],
+};
+const BLOCKER_OWNER = {
+  agent: ['the agent', 'The agent repairs it. It tries again at the retry time.'],
+  operator: ['you', 'Change the setting, the network access, the disk, the account or the model that the cause names. Then tell the agent "retry {id}".'],
+  profile: ['the product profile', 'Repair the values, the scripts or the SKILL.md of the product profile in its repository. The agent tries again when the profile changes.'],
+  product: ['the product', 'This is a defect of the build. Tell the team of the product. The agent tries again at the retry time.'],
+  platform: ['the platform', 'The machine, the gateway or the artifact service does not work correctly. When it works again, tell the agent "retry {id}".'],
+  unknown: ['not known', 'The agent did not find the cause yet. Tell the agent "show blockers" to see what it examined.'],
+};
+const blockers = arr(D.blockers).filter((b) => b && /^B-\d{1,6}$/.test(str(b.id)) && own(BLOCKER_SCOPE, str(b.scope)) && own(BLOCKER_OWNER, str(b.owner)))
+  .map((b) => ({ id: str(b.id), scope: str(b.scope), owner: str(b.owner), tests: arr(b.tests).map(str), stage: str(b.stage), signature: str(b.signature), build: str(b.build),
+    hits: +b.hits || 0, first_utc: str(b.first_utc), retry_utc: str(b.retry_utc) }));
 
 // Pins (this browser only).
 const PIN_KEY = `qi-catalog:${str(D.target)}:pins`;
@@ -1702,11 +1723,32 @@ function kpi(icon, label, val, patch, tone, help) {
   btn ? h('span', { class: 'kgo' }, ico(fn || isPanel(patch) ? 'panel' : 'arrow')) : null,
   h('span', { class: 'ke', 'aria-hidden': 'true' }, icon), h('b', {}, String(val)), h('span', { class: 'kl' }, label));
 }
+// One open blocker: its id and scope, the tests it stops, the owner, how long it is open, the cause, when
+// the agent tries again, and the repair. "Now" is the time of the page's build.
+function blockerItem(b) {
+  const now = D.generated_utc && !isNaN(new Date(D.generated_utc)) ? new Date(D.generated_utc).getTime() : Date.now();
+  const first = new Date(b.first_utc); const days = isNaN(first) ? null : Math.max(0, Math.floor((now - first) / 86400000));
+  const retry = new Date(b.retry_utc);
+  const when = b.scope === 'preflight' ? 'The agent tries again at each scheduled run.'
+    : !isNaN(retry) && retry.getTime() > now ? `The agent tries again at ${fmtDate(b.retry_utc)} ${b.retry_utc.slice(11, 16)} UTC, or immediately when the kit, the configuration, the profile or the credentials change.`
+      : 'The agent tries again at the next run.';
+  return h('li', {}, h('b', { title: ENT.blocker[2] }, `${ENT.blocker[1]} ${b.id}`), ' ',
+    h('span', { class: 'badge bad', title: BLOCKER_SCOPE[b.scope][1] }, BLOCKER_SCOPE[b.scope][0], b.scope === 'preflight' && b.stage ? `: ${b.stage}` : ''), ' ',
+    b.tests.length ? joinNodes(b.tests.map((t) => refLink(t)), ' ') : null,
+    h('span', { class: 'meta' }, [`owner: ${BLOCKER_OWNER[b.owner][0]}`, days == null ? null : days === 0 ? 'open less than one day' : `open ${days} day${days === 1 ? '' : 's'}`,
+      b.hits ? `${b.hits} failure${b.hits === 1 ? '' : 's'}` : null, b.build ? `build ${b.build}` : null].filter(Boolean).join(' · ')),
+    h('div', { class: 'meta', style: 'flex-basis:100%' }, b.signature ? ['Cause: ', h('code', {}, b.signature), '. '] : null, BLOCKER_SCOPE[b.scope][1], ' ', when),
+    h('div', { style: 'flex-basis:100%' }, h('b', {}, 'Repair: '), BLOCKER_OWNER[b.owner][1].split('{id}').join(b.id)));
+}
+const blockerList = () => (blockers.length && !S.at ? h('ul', { class: 'att' }, blockers.map(blockerItem)) : null);
+const BLOCKER_TIP = `${ENT.blocker[2]} The agent shows them first. "show blockers" in the chat gives its notes.`;
 function viewOverview() {
   const v = $('#view');
   v.append(guide());
   const act = activityBlock(); if (act) v.append(act);
-  if (!items.length) { v.append(h('div', { class: 'empty' }, h('span', { class: 'em' }, '🌱'), h('p', {}, 'No test cases in the catalog yet.'), h('p', {}, 'Test cases show here after the first issue run.'),
+  const bl = blockerList();
+  if (!items.length) { if (bl) v.append(h('section', { class: 'panel' }, h('h2', {}, `🚨 Needs attention (${blockers.length})`, tip(BLOCKER_TIP)), bl));
+    v.append(h('div', { class: 'empty' }, h('span', { class: 'em' }, '🌱'), h('p', {}, 'No test cases in the catalog yet.'), h('p', {}, 'Test cases show here after the first issue run.'),
     modList.length ? h('p', {}, goLink({ v: 'modules' }, 'Testing modules', null, 'btn')) : null)); return; }
   const t = (x) => items.filter((i) => i.tier === x).length;
   const origins = new Set(items.map((i) => `${i.origin.kind}:${i.ref}`));
@@ -1737,10 +1779,10 @@ function viewOverview() {
       goLink({ v: 'modules' }, str(m.title) || str(m.id), str(m.what) || null, 'linkish'),
       m.last_run && m.last_run.utc ? h('span', { class: 'meta' }, ` · ${rel(m.last_run.utc)}`) : null))),
       h('p', { class: 'meta' }, openD.length ? goLink({ v: 'design' }, `${ENT.design[1]} ${openD.length} open design finding(s), ${openD.filter((d) => d.severity === 'major').length} major`, ENT.design[2], 'linkish') : 'No open design finding.')) : null,
-    h('section', { class: 'panel' }, h('h2', {}, `🚨 Needs attention (${att.length})`, tip('Test cases that failed, have a regression, are flaky, need review or changed after promotion. The worst are first. Select them (☐) to report them in one bug issue. Click a name to open the panel of the test case.')),
-      causeSummary(att),
+    h('section', { class: 'panel' }, h('h2', {}, `🚨 Needs attention (${att.length + (bl ? blockers.length : 0)})`, tip(`Test cases that failed, have a regression, are flaky, need review or changed after promotion. The worst are first. Select them (☐) to report them in one bug issue. Click a name to open the panel of the test case.${bl ? ` Above them, the blockers: ${BLOCKER_TIP}` : ''}`)),
+      bl, causeSummary(att),
       att.length ? h('ul', { class: 'att' }, att.slice(0, 14).map((i) => h('li', {}, pickBox(problemRef(i)), badge(i.latest || (i.flags.includes('drift') ? 'drift' : '')), ' ', itemCause(i), ' ',
-      itemLink(i), ofRef(i), i.evidence ? reportBtn(i.evidence) : null, foundLinks(problemRef(i))))) : h('p', { class: 'celebrate' }, h('span', { class: 'em' }, '🎉'), 'Nothing needs attention. All green!'),
+      itemLink(i), ofRef(i), i.evidence ? reportBtn(i.evidence) : null, foundLinks(problemRef(i))))) : bl ? null : h('p', { class: 'celebrate' }, h('span', { class: 'em' }, '🎉'), 'Nothing needs attention. All green!'),
       att.length > 14 ? goLink({ v: 'catalog', f: { flag: ['needs attention'] }, q: '' }, `All ${att.length}`, null, 'linkish') : null),
     maintenance.length ? h('section', { class: 'panel' }, h('h2', {}, `${ENT.maintenance[1]} Test maintenance (${maintenance.length})`, tip(`${ENT.maintenance[2]} Open a test case to see the actions.`)),
       h('ul', { class: 'att' }, maintenance.slice().reverse().slice(0, 12).map((m) => h('li', {}, h('b', { title: MAINT_KIND[m.kind] }, `${ENT.maintenance[1]} ${m.id}`), ' ', maintTest(m),
