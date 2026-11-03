@@ -9,11 +9,10 @@ parts and leave the product's part as `TODO(profile)`.
 
 - `#!/usr/bin/env bash`, `set -u`, `export LC_ALL=C`; `curl`, `jq` and the runtime you
   use listed in `requires.commands`.
-- A profile installed through the platform arrives as plain files, without exec bits: the
-  core starts each `bin/<cmd>` through the interpreter its `#!` line names (bash when it
-  has none). So every script has its `#!` line, an interpreter other than bash is in
-  `requires.commands`, and nothing in `bin/` is a symlink. Keep the exec bit in git anyway
-  (`chmod +x`) — it is what lets you run the script by hand.
+- The core starts each `bin/<cmd>` through its `#!` line (the contract's plain-file rule),
+  so every script has one, an interpreter other than bash is in `requires.commands`, and
+  nothing in `bin/` is a symlink. Keep the exec bit in git anyway (`chmod +x`) to run it by
+  hand.
 - Settings from `QI_PROFILE_CONFIG` (`jq -r '.<key> // empty'`), never from
   `work/CONFIG.md` directly. Product facts every instance shares stay in the script.
 - State in `$QI_ENV_DIR` only (mode 700): `credentials.env`, a `STATE.json` with the
@@ -33,12 +32,11 @@ parts and leave the product's part as `TODO(profile)`.
   `numeric-suffix`; `--between` answers from the same sorted listing. Fill in the channel
   table, its list of names and the repository.
 - Builds come from where they are published — a registry, a package index — never from
-  the target repository's GitHub API, which the agent's egress denies.
+  the target repository's GitHub API ([discovery.md](discovery.md) → Builds and channels).
 - `build-time` reads the image's `org.opencontainers.image.created` annotation or its
   config's `created`, through a multi-arch index when there is one, and prints it as
   ISO-8601 UTC. A build without a recorded time exits non-zero: never print "now".
-- Both are read-only and called by the scheduled pre-flight inside a two-minute budget.
-  `/v2` lists tags in name order, so the template reads every page: a repository with
+- Both are read-only, called by the pre-flight inside a two-minute budget. `/v2` lists tags in name order, so the template reads every page: a repository with
   thousands of tags (one per commit) takes most of a minute on some registries. The
   checker warns above 30 seconds; then list through an API that returns newest first
   (quay.io's), or publish the QA builds to a repository of their own.

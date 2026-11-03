@@ -2,9 +2,8 @@
 
 Runs a product that ships as a **Helm chart in an OCI registry** on its node (the inspector's
 VM, or a platform Environment that runs the product): k3s, the profile's prerequisites, then
-the chart at the build under test. A profile uses
-it with `"engine": "helm-k3s"` and describes its product in `engine_config` — no scripts
-of its own ([docs/profile-contract.md](../../docs/profile-contract.md) → Engines).
+the chart at the build under test. A profile uses it with `"engine": "helm-k3s"` and
+describes its product in `engine_config` — no scripts of its own ([docs/profile-contract.md](../../docs/profile-contract.md) → Engines).
 
 Needs a vm-backend agent (root), `k3s`, `curl`, `jq` and `node` in the image; installs
 `helm` into `~/.local/bin`. k3s and helm run at the lowest CPU priority (`nice 19`, the
@@ -74,8 +73,7 @@ any other `url` does.
 
 The device comes from the platform that hosts the node (nested virtualization), never from
 the engine; the profile ships the cluster's device plugin as a `manifest` prerequisite and
-names its resource in `values`. The node is this VM or the platform Environment that runs the
-product. An Environment gets the device on the same terms as this VM: with `kvm: true`, `env.sh up`
+names its resource in `values`. With `kvm: true`, `env.sh up`
 uses an Environment only when this VM has `/dev/kvm` and the Environment has it too; else the
 product stays in this VM under `nested_target: auto`, and `up` fails under `environment`
 ([docs/nested-env.md](../../docs/nested-env.md) → **Where the product runs**). With `kvm: true`, `up`:
@@ -131,11 +129,11 @@ held in that key. In `values` only: `{{user:<name>.username|password}}`,
 → The `bin/` contract), empty when not lent; `{{proxy:https|http|no}}` — the gateway proxy
 for pods that must reach the outside (the lent model's host), `no` with the cluster's own
 ranges added; `{{gateway_ca}}` — the PEM of the CA the gateway presents (the file
-`NODE_EXTRA_CA_CERTS` or `SSL_CERT_FILE` names), empty when neither does; `{{env_url:<endpoint>}}`, `{{env_scheme}}` — see **Environment**; `{{gateway_ip}}` — the
+`NODE_EXTRA_CA_CERTS` or `SSL_CERT_FILE` names), empty when neither does;
+`{{env_url:<endpoint>}}`, `{{env_scheme}}` — see **Environment**; `{{gateway_ip}}` — the
 gateway's IPv4 address, which the VM's DNS gives for every public name, for a product whose
 own egress policy must name it (a nested platform's gateways); rendering fails when it does not
-resolve. The rendered
-values (`$QI_ENV_DIR/values.json`) are mode 600 and never printed.
+resolve. The rendered values (`$QI_ENV_DIR/values.json`) are mode 600 and never printed.
 
 ## Check
 

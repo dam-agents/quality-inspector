@@ -82,7 +82,7 @@ baseline_channel issue_comments artifact_reports include_comments max_issues_per
 e2e_version e2e_web_version e2e_model audit_report log_level media_retention_days spec_feedback profile_source_path deploy_gate
 explorations max_explorations_per_ac auto_promote security_checks security_failed_logins
 confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps_per_issue min_free_disk_gi
-scenario_discovery scenario_channel profile_scenarios regression_channel blocker_alerts max_scenarios_per_run max_scenarios_per_day work_repo test_catalog
+scenario_discovery scenario_channel profile_scenarios regression_channel blocker_alerts max_scenarios_per_run max_scenarios_per_day work_repo test_catalog radar_window_days
 lend_model nested_target live_browser slack_channel slack_tests_per_day slack_report_visibility report_visibility github_login found_label fix_label
 design_label design_desk_findings design_desk_channel design_desk_bot design_desk_max_per_run design_desk_min_severity
 $(jq -r '[.global, (.modules[] | select(.kind == "modules" or .kind == "queue") | .settings)] | add | keys[]' "$SCRIPT_DIR/lib/modules.json" 2>/dev/null)"
@@ -108,7 +108,7 @@ if [ "$STRUCTURE" = 1 ]; then
   if [ -f "$HOME_DIR/.quality-inspector-onboarded" ] && grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z$' "$HOME_DIR/.quality-inspector-onboarded"; then
     ok sentinel "$(cat "$HOME_DIR/.quality-inspector-onboarded")"
   else
-    fail sentinel "missing or malformed \$HOME/.quality-inspector-onboarded" "write it per ONBOARDING.md Step 6"
+    fail sentinel "missing or malformed \$HOME/.quality-inspector-onboarded" "write it per ONBOARDING.md Step 7"
   fi
 
   # -------------------------------------------------------------- schedules

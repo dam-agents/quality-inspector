@@ -6,32 +6,29 @@ Read for every `issues_due` entry and for "test #N". The worklist gives `issue`,
 
 ## The deploy gate
 
-A label often arrives before the change does: on an open issue, or on the pull request that fixes
-it. Tested then, the old build answers and the verdict is worthless. So the pre-flight makes an issue
-due only when the candidate build **carries its change**: the change merged, the pipeline published a
-build after it, and that build is the candidate (`deploy_gate: enabled`, the default).
+A label often arrives before the change does, and an old build's answer is worthless. So with
+`deploy_gate: enabled` (the default) the pre-flight makes an issue due only when the candidate
+build **carries its change**: the change merged, and the candidate was published after it.
 
 - **A pull request with `qa_label`** stands for the issues it closes — GitHub's closing keywords
   (`closes`, `fixes`, `resolves` and their forms) before a `#<n>` of the target, in its sanitized
   title or body (`scripts/lib/pr-text.mjs`; nothing else of it is read — [radar.md](radar.md) → What it reads).
-  Those issues are due as if they carried the label (`via_pr`); their criteria still come from the
-  issue alone. A labelled pull request that closes no issue is logged and ignored. An issue it
-  closes that has no label is read with the listing (at most 10 a run).
-- **The merge time** is the latest of: each such pull request's `merged_at`, and the issue's
-  `closed_at` when GitHub closed it as completed (a merge with a closing keyword does that). An
-  open labelled pull request means "not merged yet". An open issue with no merged labelled pull
-  request has no merge time: it waits.
-- **Deployed** means the candidate's publish time (`bin/build-time`, [profile-contract.md](profile-contract.md))
-  is at or after the merge time. Unknown publish time → every issue waits. The rule assumes the
-  channel publishes builds of the main line in merge order; a build that started before the merge
-  and published after it passes the gate — the red-green against the baseline still catches a
-  change that is not there.
-- A waiting issue is in `issues_waiting[]` (`issue`, `kind`, `reason`) and in the logs; no state
-  is written, and the next run asks again. A takeover is never gated: its claim already passed.
-  A `retest` or `ac_changed` entry passes the same gate.
+  Those issues are due as if labelled (`via_pr`); their criteria still come from the issue alone.
+  A labelled pull request that closes no issue is logged and ignored; an unlabelled issue it
+  closes is read with the listing (at most 10 a run).
+- **The merge time** is the latest of each such pull request's `merged_at` and the issue's
+  `closed_at` when GitHub closed it as completed. An open labelled pull request is "not merged
+  yet"; an open issue with no merged labelled pull request has no merge time: it waits.
+- **Deployed**: the candidate's publish time (`bin/build-time`, [profile-contract.md](profile-contract.md))
+  is at or after the merge time; unknown publish time → every issue waits. The channel is assumed
+  to publish the main line in merge order; a build started before the merge and published after
+  it passes — the red-green against the baseline still catches a change that is not there.
+- A waiting issue is in `issues_waiting[]` (`issue`, `kind`, `reason`) and the logs; no state is
+  written, the next run asks again. `retest` and `ac_changed` entries pass the same gate; a
+  takeover is never gated (its claim already passed).
 - The operator's "test #N" ([on-demand.md](on-demand.md)) and Slack's ([slack.md](slack.md)) test
-  the current candidate at once: name the gate's reason in the reply when the pre-flight logs the
-  issue as waiting. `deploy_gate: disabled` turns the gate off.
+  the current candidate at once, naming the gate's reason in the reply when the pre-flight logs
+  the issue as waiting. `deploy_gate: disabled` turns the gate off.
 
 ## State
 
@@ -64,19 +61,17 @@ build after it, and that build is the candidate (`deploy_gate: enabled`, the def
    ([logging.md](logging.md)), then the catalog ([catalog.md](catalog.md) → **Build and publish**) — its Home shows the claim.
 2. **Re-check at action time.** `bash "$HOME/scripts/github.sh" issue <n>` — its text, labels and
    author — then `bash "$HOME/scripts/github.sh" comments <n>`, unless `include_comments: disabled`
-   (never `gh` or a URL: [black-box.md](black-box.md) → **GitHub**). The issue must still carry `qa_label` (or `retest_label`), or the entry name a labelled pull request (`via_pr`). Gone →
+   ([black-box.md](black-box.md) → **GitHub**). The issue must still carry `qa_label` (or `retest_label`), or the entry name a labelled pull request (`via_pr`). Gone →
    restore the previous row, unlock, log `issue_abort`, the catalog, next entry. Recompute nothing by
    hand: the pre-flight's `ac_hash` is authoritative for this run. Then start
    `bash "$HOME/scripts/env.sh" up <candidate>` as a harness background task and go on —
    it does not look at the product, so the freeze below stays blind.
-3. **Freeze the ACs** → [acceptance-criteria.md](acceptance-criteria.md). Output
-   `work/issues/<n>/criteria-<ac_hash>.md`. Written **before** you look at the product;
-   when it already exists (a takeover or a retest of the same text), reuse it unchanged. A
-   contradiction in the source adds `## Q-<k>` sections; they never change the ACs
-   ([acceptance-criteria.md](acceptance-criteria.md) → **Contradictions**).
-   Then the intent file, judged before it freezes ([intent.md](intent.md)), and, unless
-   `explorations: disabled`, the explorations file, same discipline
-   ([explorations.md](explorations.md)). No testable AC → verdict `not-testable`, go to step 8.
+3. **Freeze the ACs** → [acceptance-criteria.md](acceptance-criteria.md): `work/issues/<n>/criteria-<ac_hash>.md`,
+   written **before** you look at the product; an existing one (a takeover or a retest of the
+   same text) is reused unchanged. A contradiction adds `## Q-<k>` sections, never an AC change
+   (→ **Contradictions**). Then the intent file, judged before it freezes ([intent.md](intent.md)),
+   and, unless `explorations: disabled`, the explorations file ([explorations.md](explorations.md)).
+   No testable AC → verdict `not-testable`, go to step 8.
 4. **Candidate environment.** `bash "$HOME/scripts/env.sh" wait <candidate>` — again while it exits 3
    ([nested-env.md](nested-env.md) → Shape) — then
    `bash "$HOME/scripts/suite.sh" run smoke-<candidate> --tag smoke`. Either failing is
@@ -85,14 +80,14 @@ build after it, and that build is the candidate (`deploy_gate: enabled`, the def
    the catalog, end the run's issue work — an environment problem never becomes a verdict. A takeover
    while `blockers` holds `env` restores its row the same way, with no install.
 5. **Author** `work/suite/tests/issue-<n>.e2e.ts` per [test-authoring.md](test-authoring.md):
-   one test per testable AC, AC blocks written from the criteria file, steps found by
-   exploring the candidate; one per testable IN by the same rules ([intent.md](intent.md) →
-   Tests). Iterate until every test *reaches* its block on the candidate. One test per EX too, tagged `issue-<n>-ex` ([explorations.md](explorations.md)
-   → **Tests**). Then `bash "$HOME/scripts/check-asserts.sh" --lint <file>`: give every AC in
-   `no_unique_ref` (AC or IN) a discriminating check ([test-authoring.md](test-authoring.md)), and
-   retag every EX in `ex_with_issue_tag`. Something broken you see outside the ACs is one
-   `noticed` item ([explorations.md](explorations.md) → **Noticed in passing**) — not
-   chased in this run, a lead for the next discovery run. Refresh the row.
+   one test per testable AC and IN ([intent.md](intent.md) → Tests), blocks written from the
+   frozen files, steps found by exploring the candidate, and one per EX
+   ([explorations.md](explorations.md) → **Tests**). Iterate until every test *reaches* its
+   block on the candidate. Then `bash "$HOME/scripts/check-asserts.sh" --lint <file>`: give every
+   block in `no_unique_ref` (AC or IN) a discriminating check, and retag every EX in
+   `ex_with_issue_tag`. Something broken outside the ACs is one `noticed` item
+   ([explorations.md](explorations.md) → **Noticed in passing**) — not chased in this run, a lead
+   for the next discovery run. Refresh the row.
 6. **Red-green**, both runs with full evidence (video, screenshots, steps for every test):
    - `env.sh reset`, `env.sh up <baseline>`,
      `suite.sh run issue-<n>-baseline --evidence full --strict --tag issue-<n>`.
@@ -106,17 +101,13 @@ build after it, and that build is the candidate (`deploy_gate: enabled`, the def
    Refresh the row after each install.
 7. **Confirm every failure** before judging it: re-run each failing AC on the build where
    it failed with `--strict --repeat-each 3 --no-cache` ([triage.md](triage.md) → Order of
-   work, step 1). A `flaky` AC gets the verdict `flaky`, never `failed` or `verified`.
-   **Judge each AC** from the two summaries, the failing steps and the screenshots, per
-   [reporting.md](reporting.md) → Verdicts: a step the test could not perform is
-   `blocked`, an assertion that ran and was false is `failed`; a baseline that stopped
-   before the AC block is judged per [reporting.md](reporting.md) → **Baseline blocked**,
-   and a pass whose `AC-<k>` still shows an error per **Error at the check**.
-   Judge each IN the same way, into `intents[]` and `intent_verdict`, never into the issue
-   verdict ([intent.md](intent.md) → Verdict). Judge each EX per [explorations.md](explorations.md)
-   → **Run and judge** — never into an AC verdict. Write
-   `verdicts-<ac_hash>-<candidate>.json` ([reporting.md](reporting.md) → Verdicts file) with its
-   `trigger` (→ **Who started the run**), its `analysis` last ([reporting.md](reporting.md) → **The agent's analysis**).
+   work, step 1); mixed results → `flaky`. **Judge each AC** from the two summaries, the
+   failing steps and the screenshots, per [reporting.md](reporting.md) → Verdicts (with
+   **Baseline blocked** and **Error at the check**). Judge each IN the same way, into
+   `intents[]` and `intent_verdict` ([intent.md](intent.md) → Verdict), and each EX per
+   [explorations.md](explorations.md) → **Run and judge** — neither into an AC or the issue
+   verdict. Write `verdicts-<ac_hash>-<candidate>.json` ([reporting.md](reporting.md) → Verdicts file) with its
+   `trigger` (→ **Who started the run**), its `analysis` last (→ **The agent's analysis**).
 8. **Report.** In a platform Environment (`env.sh where`), with an AC `failed` or `blocked`
    by the product: `env.sh keep issue-<n>` first and put its `url`, `account` and
    `expires_utc` into the verdicts file as `environment`; with none such, `env.sh release
@@ -131,15 +122,14 @@ build after it, and that build is the candidate (`deploy_gate: enabled`, the def
    `promotable` when the file qualifies, else `exploratory`, `assert_hash` from
    `bash "$HOME/scripts/check-asserts.sh" --hash <file>` ([regression.md](regression.md) →
    Tiers); `auto_promote: verified` writes a qualifying file as `regression` instead. A
-   retest of a promoted file never demotes it and never rewrites its hash. When the
-   retest changed the file's AC or IN blocks — IN blocks added to a file promoted without
-   them included — the file drifts and the nightly run skips it: open its `drift` proposal
-   now (`maintenance.mjs open "#<n>" --kind drift --build <candidate> --proposal re-promote
-   --basis-file <f>`, [maintenance.md](maintenance.md)) and name it in the run's chat summary; the operator's
-   "accept M-<k>" alone re-promotes it with the new hash, also under `auto_promote: verified`
-   ([regression.md](regression.md) → Tiers: a heal or the operator). Name every
-   `promotable` (or auto-promoted) file in the run's chat summary. Put each of its criteria
-   into a feature ([features.md](features.md) → Who puts a test into a feature).
+   retest of a promoted file never demotes it and never rewrites its hash. When the retest
+   changed the file's AC or IN blocks (IN blocks added to a file promoted without them
+   included), the file drifts and the nightly run skips it: open its `drift` proposal now
+   (`maintenance.mjs open "#<n>" --kind drift --build <candidate> --proposal re-promote
+   --basis-file <f>`, [maintenance.md](maintenance.md)) and name it in the run's chat summary;
+   only the operator's "accept M-<k>" re-promotes it with the new hash, also under
+   `auto_promote: verified`. Name every `promotable` (or auto-promoted) file in the run's chat
+   summary. Put each of its criteria into a feature ([features.md](features.md) → Who puts a test into a feature).
 10. **Release.** `env.sh unlock issues` (it refuses while a background install or suite run
     runs: `env.sh wait <candidate>` / `suite.sh wait <label>` first); log `issue_done issue=<n> verdict=<v> minutes=<m> model_steps=<k>`,
     `m` and `k` the `elapsed_min` and `model_steps` of `suite.sh budget <claim time>`. Then the
@@ -161,8 +151,8 @@ work the same way ([nested-env.md](nested-env.md) → **Budgets**).
 - Every send of this run has its `intent` and `done`/`failed` ledger lines
   ([logging.md](logging.md) → **Ledger of external writes**).
 - `criteria-<ac_hash>.md`, `intent-<ac_hash>.md` (with its judge's answer) and `explorations-<ac_hash>.md` predate the first test file edit of this run.
-- No IN changed the issue verdict; an issue `verified` with intent `not-met` leads the chat summary.
-- No observation or `noticed` item changed an AC or issue verdict.
+- No IN, observation or `noticed` item changed an AC or issue verdict; an issue `verified` with
+  intent `not-met` leads the chat summary.
 - No AC is `verified` without a candidate pass and a baseline failure or
   `baseline_blocked_reason: absent`. No AC whose baseline stopped for `environment`,
   `model` or `setup` is `inconclusive`, and no pass with an error on its `AC-<k>` still counts.

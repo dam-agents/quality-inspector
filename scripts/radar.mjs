@@ -5,11 +5,9 @@
 // `github.sh prs` prints — never its diff, files, commits, reviews or comments, and writes nothing to
 // GitHub. The proposals it leads to are maintenance rows of kind `predicted` (docs/maintenance.md).
 //
-//   node radar.mjs since                    -> {"since": <iso>}   the newest updated_at of the ledger or the cut mark,
-//                                              else 14 days ago
-//   node radar.mjs scan <prs.json> [--since <iso>]   -> {"due": [...], "deferred", "truncated", "advance", "stalled", "inventory", "logs": []}
-//   node radar.mjs advance <iso>            -> {"since": <iso>}   the cut mark, work/.cache/radar-since; refused (exit 2)
-//                                              unless later than `since`
+//   node radar.mjs since [--days <n>]       -> {"since": <iso>}   the window's start: <n> (3; 1-30) days ago
+//   node radar.mjs scan <prs.json> [--since <iso>] [--record]
+//     -> {"due": [...], "plain": [{pr, kind, state, text_hash}], "deferred", "dropped", "truncated", "inventory", "logs": []}
 //   node radar.mjs record <pr> --hash <h> --state <open|merged|closed> --updated-at <iso>
 //        [--merged-at <iso>] [--proposal M-k]… [--keep]
 //     -> {"pr", "state", "proposals", "resolved": []}
@@ -19,19 +17,20 @@
 //                                              changes.sh, each with the recurring tests its title and spec name
 //                                              (lib/radar-match.mjs; docs/change-awareness.md). Read-only.
 //
-// scan: <prs.json> is `github.sh prs` output. Oldest update first, a pull request is due as
+// since: no watermark — every run lists the whole window, newest first, and the ledger tells what it
+//   read; a pull request last updated before the window's start is never read.
+// scan: <prs.json> is `github.sh prs` output. Newest update first, a pull request is
 //   `new` (no ledger row; open or merged — one closed unmerged before any scan is skipped), `changed`
 //   (its text hash differs, or it was reopened), `merged` (merged since the last scan, text the same) or
 //   `closed` (closed unmerged since). A `new` or `changed` entry carries its title, body,
-//   `injection_suspect` (lib/scan-issues.mjs) and `candidates` (lib/radar-match.mjs); at most
-//   QI_RADAR_MAX (10) of them a run — the first over the cap and every pull request after it wait for
-//   the next run (`deferred`), so the ledger's newest updated_at never passes one not read.
-//   A cut listing (`truncated`, more items than `github.sh prs` pages) that leaves nothing due or
-//   deferred gives `advance`: its last item's update time, which the pre-flight keeps as the cut mark
-//   (`advance`), so the next listing starts past what this one read instead of reading it again. Only a
-//   mark later than --since (the listing's start) advances: a cut listing whose last item has the start's
-//   own time — more items than the pages hold, all updated in that second — is `stalled` instead, an
-//   error of the run, since no later start exists that skips none of them.
+//   `injection_suspect` (lib/scan-issues.mjs) and `candidates` (lib/radar-match.mjs). One with nothing
+//   to judge and nothing to keep or resolve — no candidate (or `merged` / `closed`) and no proposal — is
+//   `plain`: --record writes its ledger row here, as `record` would, and it is never due. The rest are
+//   due; at most QI_RADAR_MAX (10) `new` / `changed` a run, the newest — the others are `deferred`, and
+//   a later run reads them while they stay inside the window. One updated before --since (the window's
+//   start) is `dropped`, one log line for all; one with no update time is skipped, since no row can
+//   hold it (one log line). `truncated`: the listing held more items than
+//   `github.sh prs` pages, so the oldest part of the window was not listed (one log line).
 // record: one ledger row per pull request, written under its mutex. The proposals are those the run
 //   opened or updated for it (open `predicted` rows only); --keep adds the row's earlier ones (a
 //   `merged` entry). A proposal the pull request no longer holds — every one when it is `closed` — is
@@ -40,25 +39,23 @@
 // failed close (nothing recorded: the next run retries).
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { withMutex, writeAtomic } from './lib/mutex.mjs';
+import { withMutex } from './lib/mutex.mjs';
 import { COLS, FILE, HEADER, M_RE, STATES, UTC_RE, holders, load, rawRows, save, text } from './lib/prscan.mjs';
 import { matchPr } from './lib/radar-match.mjs';
 import { injectionLint, textHash } from './lib/scan-issues.mjs';
+import { now, read } from './lib/util.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
-const FIRST_DAYS = 14;
+const WINDOW_DAYS = 3;
 const HASH_RE = /^[0-9a-f]{12}$/;
-const MARK = join(work, '.cache', 'radar-since');
 
 class Usage extends Error {}
 const die = (msg) => { throw new Usage(msg); };
 const out = (o) => console.log(JSON.stringify(o));
-const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
-const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 const node = (script, args) => JSON.parse(execFileSync(process.execPath, [join(HERE, script), ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
 // The text the hash covers: title, body and labels — what the radar matches and the agent judges.
 export const hashOf = (pr) => textHash(`${pr.title ?? ''}\n${pr.body ?? ''}\n${[...(pr.labels ?? [])].sort().join(',')}`);
@@ -90,38 +87,66 @@ function scan() {
   try { listing = JSON.parse(readFileSync(path, 'utf8')); } catch { die(`${path}: not the JSON of github.sh prs`); }
   const prs = listing?.prs;
   if (typeof listing?.truncated !== 'boolean' || !Array.isArray(prs) || prs.some((p) => !Number.isInteger(p?.number) || !STATES.includes(p?.state))) die(`${path}: not the JSON of github.sh prs`);
+  const since = flag('--since');
+  if (since != null && !UTC_RE.test(since)) die('--since is the window\'s start, <YYYY-MM-DDTHH:MM:SSZ>');
   const max = Number.parseInt(process.env.QI_RADAR_MAX ?? '10', 10) || 10;
   const ledger = new Map(load().map((r) => [r.pr, r]));
   const ctx = context();
-  const due = []; const logs = []; let deferred = 0; let reads = 0;
-  for (const pr of prs.slice().sort((a, b) => String(a.updated_at).localeCompare(String(b.updated_at)) || a.number - b.number)) {
-    if (deferred) { deferred++; continue; }
+  const due = []; const plain = []; const logs = []; let deferred = 0; let dropped = 0; let reads = 0; let unchanged = 0; let unseen = 0; let untimed = 0;
+  for (const pr of prs.slice().sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || b.number - a.number)) {
+    if (!UTC_RE.test(pr.updated_at ?? '')) { untimed++; continue; }
+    if (since && pr.updated_at < since) { dropped++; continue; }
     const row = ledger.get(String(pr.number)); const hash = hashOf(pr);
     let kind = null;
     if (!row) kind = pr.state === 'closed' ? null : 'new';
     else if (pr.state === 'closed') kind = row.state === 'closed' ? null : 'closed';
     else if (row.text_hash !== hash || row.state === 'closed') kind = 'changed';
     else if (pr.state === 'merged' && row.state === 'open') kind = 'merged';
-    if (!kind) { logs.push(`PR #${pr.number}: ${!row ? 'closed unmerged before any scan' : 'unchanged'} — skip`); continue; }
+    if (!kind) { if (row) unchanged++; else unseen++; continue; }
     const reading = kind === 'new' || kind === 'changed';
-    if (reading && reads >= max) { deferred = 1; logs.push(`PR #${pr.number}: ${kind} — deferred with every later one (${max} a run)`); continue; }
-    if (reading) reads++;
     const e = { pr: pr.number, kind, state: pr.state, draft: pr.draft === true, merged_at: pr.merged_at ?? null, updated_at: pr.updated_at,
       text_hash: hash, labels: pr.labels ?? [], proposals: row?.proposals ?? [] };
     if (reading) Object.assign(e, { title: pr.title, body: pr.body, injection_suspect: injectionLint(`${pr.title}\n${pr.body}`).injection_suspect,
       candidates: matchPr(`${pr.title}\n${pr.body}`, ctx) });
+    if (!e.proposals.length && !e.candidates?.length) { plain.push(e); continue; }
+    if (reading && reads >= max) { deferred++; continue; }
+    if (reading) reads++;
     due.push(e);
     logs.push(`PR #${pr.number}: ${kind}${reading ? ` (${e.candidates.length} candidate test${e.candidates.length === 1 ? '' : 's'})` : ''} — due`);
   }
+  if (unchanged) logs.push(`${unchanged} pull request(s) unchanged since their scan — skip`);
+  if (unseen) logs.push(`${unseen} pull request(s) closed unmerged before any scan — skip`);
+  let note = 'not due';
+  if (args.includes('--record') && plain.length) {
+    try { note = `ledger rows written (${recordPlain(plain).length})`; } catch (err) { note = `ledger rows not written (${err.message}) — the next run scans them again`; }
+  }
+  if (plain.length) logs.push(`${plain.length} pull request(s) with no candidate test and no proposal — ${note}`);
+  if (deferred) logs.push(`${deferred} new or changed pull request(s) over the cap (${max} a run) — a later run reads them, newest first, while they stay inside the window`);
+  if (dropped) logs.push(`${dropped} pull request(s) updated before ${since} — outside the window, dropped`);
+  if (untimed) logs.push(`${untimed} pull request(s) with no update time in the listing — skip`);
   const last = UTC_RE.test(listing.last_updated_at ?? '') ? listing.last_updated_at : null;
-  if (listing.truncated) logs.push(`listing cut after ${prs.length} pull requests${last ? ` (last update ${last})` : ''}`);
-  const since = flag('--since');
-  if (since != null && !UTC_RE.test(since)) die('--since is the listing\'s start, <YYYY-MM-DDTHH:MM:SSZ>');
-  const cut = listing.truncated && !due.length && !deferred;
-  const advance = cut && last && (!since || last > since) ? last : null;
-  const stalled = cut && !advance;
-  if (stalled) logs.push(`listing cut and nothing due, but no update time later than ${since ?? 'its start'}: the next listing would be the same`);
-  out({ due, deferred, truncated: listing.truncated, advance, stalled, inventory: ctx.inventory, logs });
+  if (listing.truncated) logs.push(`listing cut at its page limit${last ? ` (oldest listed update ${last})` : ''} — the pull requests updated before it are not read`);
+  out({ due, plain: plain.map(({ pr, kind, state, text_hash }) => ({ pr, kind, state, text_hash })), deferred, dropped, truncated: listing.truncated, inventory: ctx.inventory, logs });
+}
+
+// The ledger rows of the plain entries, as `record` writes them without a proposal: under the mutex,
+// and only where the row did not gain a proposal since the scan read the ledger. Returns their numbers.
+function recordPlain(plain) {
+  const ok = plain.filter((e) => UTC_RE.test(e.updated_at ?? '') && (e.state === 'merged' ? UTC_RE.test(e.merged_at ?? '') : true));
+  if (!ok.length) return [];
+  return withMutex(`${FILE}.lock`, () => {
+    const list = load(); const at = now(); const done = [];
+    for (const e of ok) {
+      const row = list.find((r) => r.pr === String(e.pr));
+      if (row?.proposals.length) continue;
+      const next = { pr: String(e.pr), text_hash: e.text_hash, state: e.state, merged_at: e.state === 'merged' ? e.merged_at : '-',
+        updated_at: e.updated_at, proposals: [], scanned_utc: at };
+      if (row) Object.assign(row, next); else list.push(next);
+      done.push(e.pr);
+    }
+    save(list);
+    return done;
+  });
 }
 
 // The completed issues of a build window against the suite: the leads of a night's triage.
@@ -193,31 +218,22 @@ function check() {
   return { ok: problems.length === 0, problems };
 }
 
-// The next listing's start: the newest of the ledger's updated_at and the cut mark, else 14 days ago.
-function sinceNow() {
-  const mark = (read(MARK) ?? '').trim();
-  const list = [...load().map((r) => r.updated_at), mark].filter((u) => UTC_RE.test(u)).sort();
-  return list.at(-1) ?? new Date(Date.now() - FIRST_DAYS * 86400000).toISOString().replace(/\.\d+Z$/, 'Z');
+// The window's start: --days (1-30, default 3) before now.
+function windowStart() {
+  const d = flag('--days') ?? String(WINDOW_DAYS);
+  if (!/^\d{1,2}$/.test(d) || +d < 1 || +d > 30) die('--days is a whole number of days, 1-30');
+  return new Date(Date.now() - +d * 86400000).toISOString().replace(/\.\d+Z$/, 'Z');
 }
 
 try {
   switch (cmd) {
-    case 'since': out({ since: sinceNow() }); break;
+    case 'since': out({ since: windowStart() }); break;
     case 'scan': scan(); break;
     case 'issues': issues(); break;
-    case 'advance': {
-      if (!UTC_RE.test(args[0] ?? '')) die('usage: radar.mjs advance <YYYY-MM-DDTHH:MM:SSZ>');
-      const from = sinceNow();
-      if (args[0] <= from) die(`${args[0]} is not later than the listing's start ${from}: the next run would read the same listing`);
-      mkdirSync(dirname(MARK), { recursive: true });
-      writeAtomic(MARK, `${args[0]}\n`);
-      out({ since: args[0] });
-      break;
-    }
     case 'record': out(record()); break;
     case 'list': out({ prs: load() }); break;
     case 'check': out(check()); break;
-    default: die('usage: radar.mjs since|scan|issues|advance|record|list|check — see its header');
+    default: die('usage: radar.mjs since|scan|issues|record|list|check — see its header');
   }
 } catch (e) {
   console.error(`radar: ${e.message}`);

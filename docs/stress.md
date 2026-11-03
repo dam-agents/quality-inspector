@@ -10,8 +10,7 @@ included. No model calls. Load against anything but the nested product stays out
 → `work/stress/<c>/stress.json` (`--dry-run` prints the plan). `<p>` is the worklist's
 `previous.stress`. Exit 1 = a browser ran and the owner could not sign in: an environment
 failure. Exit 3 = no browser to sign in with (`{"error": "no browser: …"}`): the module
-failed — an `<ISO> ERROR: module=stress candidate=<c> <error>` line in `work/MODULES.log`, never
-`ran`. Neither writes `stress.json`.
+failed ([modules.md](modules.md) step 4). Neither writes `stress.json`.
 
 **Load**, as the owner: `stress_max_concurrency` workers for `stress_duration_s` replay the
 map's `GET` requests round-robin (writes are never replayed); then up to 5 browser
@@ -37,6 +36,5 @@ again with the same settings, naming it:
 with `--confirm "$HOME/work/stress/<c>/stress.first.json"`. It overwrites `stress.json`: a
 check (same id and target) that failed in the first file and passes now is `flaky` — not a
 finding, not in `counts`' severities; one that fails again stays `fail`. Other settings
-than the first run's are a note; another build is refused. A `critical` leads the run's chat
-summary. Then `modules.sh ran stress <c> critical=<n> high=<n> medium=<n>` from the final
+than the first run's are a note; another build is refused. Then `modules.sh ran stress <c> critical=<n> high=<n> medium=<n>` from the final
 `counts`. The run's closing `env.sh reset` clears what the load left.

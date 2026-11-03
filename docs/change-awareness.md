@@ -1,19 +1,18 @@
 # Change awareness
 
-A regression run never starts blind. Before any test replays, you know what landed since
-the build the suite last passed on, and what moved in the UI and the interfaces — from
-three black-box sources, never from code or a pull request's diff ([black-box.md](black-box.md)); the one
-pull request input is the Change radar's sanitized text, before the build ([radar.md](radar.md)).
+Before any test replays, you know what landed since the build the suite last passed on, and
+what moved in the UI and the interfaces — from three black-box sources, never from code or a pull
+request's diff ([black-box.md](black-box.md)); the one pull request input is the Change radar's
+sanitized text, before the build ([radar.md](radar.md)).
 
 ## The three sources
 
 1. **What was merged — the issues.** `bash "$HOME/scripts/changes.sh" <previous> <candidate>`
    lists every target issue closed as *completed* between the two builds' publish times,
    with title, labels, its "Done when" text and `may_supersede` ([triage.md](triage.md) →
-   Retiring a superseded test). It is the product team's own statement of
-   intended change. The window is approximate (an issue closed minutes before a build may
-   ship in the next); treat it as context, and an issue just outside the window as
-   possibly in it.
+   Retiring a superseded test): the product team's own statement of intended change. The
+   window is approximate (an issue closed minutes before a build may ship in the next): treat
+   an issue just outside it as possibly in it.
 2. **What the UI looks like now — the UI map.** `node "$HOME/scripts/ui-inventory.mjs"
    work/inventory/<build>` signs in and walks the nested product read-only: every page
    reachable through links, navigation items and tabs, with its headings, nav items,
@@ -58,8 +57,8 @@ node "$HOME/scripts/radar.mjs" issues <ctx>/changes.json > <ctx>/issue-hits.json
 ```
 
 (Source `work/env/credentials.env` for the map's sign-in.) `<ctx>` is one run's own: a nightly run
-and an operator's "what changed since <build>?" never share a file (never `-t`: it follows
-`$TMPDIR`). `rm -rf <ctx>` when the run ends. `impact.mjs` names, per test,
+and an operator's "what changed since <build>?" never share a file (never `-t`,
+[maintenance.md](maintenance.md) → **The queue**). `rm -rf <ctx>` when the run ends. `impact.mjs` names, per test,
 every changed page or control it opens or mentions — and every removed command, flag,
 endpoint or response field it names — and whether the hit is inside an AC or IN block (frozen, [intent.md](intent.md));
 `maintenance.mjs predict` turns it into proposals ([maintenance.md](maintenance.md) → **Predicted from the change context**).
@@ -71,8 +70,8 @@ A candidate is a lead, never a verdict: it names the issue a failing step's rewo
 map of `<previous>` (first run, lost volume), the UI diff is skipped (pass `none` in its
 place) and the run says so — the triage then leans on the issues alone.
 
-Then, before replaying, read it once as a whole and write down — in the run's notes — a
-one-line expectation per impacted or issue-named test: *"#101 AC-1 checks the API keys tab, which the
+Then, before replaying, read it as a whole and write in the run's notes a one-line
+expectation per impacted or issue-named test: *"#101 AC-1 checks the API keys tab, which the
 map shows renamed to Access tokens; #4552 says the analytics report gets a share link; #3810
 replaces the channel ID field that P-slack-bind fills before AC-1"*.
 The triage ([triage.md](triage.md)) compares outcomes against these expectations.
@@ -85,13 +84,12 @@ node "$HOME/scripts/coverage.mjs" work/inventory/<build>/inventory.json work/SUI
 
 Without `--md` it prints the JSON (`pages[]` with `tests` and `covered`, `uncovered[]`,
 `nav_without_golden_path[]`). A page is **covered** when a `regression`-tier test opens
-its URL or names, in a quoted string, a control that only this page shows (shared chrome
+its URL or names, in a quoted string, a control only this page shows (shared chrome
 such as navigation or a "Save" on every form counts for no page). A top-level navigation
-item of the root page whose target page is uncovered has **no golden path**. Read-only;
+item of the root page whose target is uncovered has **no golden path**. Read-only;
 the audit reports the counts, never as a fail.
 
 ## Keeping maps
 
-`work/inventory/<build>/` (the map and `iface.json`) per regression-tested build; the audit pre-flight keeps the
-newest three. The map of the build last tested is what the next diff starts from, so
-never delete the newest.
+`work/inventory/<build>/` (the map and `iface.json`) per regression-tested build; the audit
+pre-flight keeps the newest three. Never delete the newest: the next diff starts from it.

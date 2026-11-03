@@ -37,9 +37,6 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/boundary.sh" || { echo "cannot source lib/boundary.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/lock.sh" || { echo "cannot source lib/lock.sh" >&2; exit 1; }
 
-iso2epoch() { date -d "$1" +%s 2>/dev/null \
-              || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
-
 # ---------------------------------------------------------------- config ----
 TARGET="${QI_TARGET_REPO:-$(cfg target_repo)}"
 QA_LABEL="$(cfg qa_label)"; QA_LABEL="${QA_LABEL:-qa:ready}"
@@ -144,15 +141,6 @@ env_busy_out() {
   runlog "$1" "busy holder=$held"
   jq -nc --arg mode "$MODE" --argjson logs "$(logs_json)" '{mode:$mode, nothing_to_do:true, logs:$logs}'
   exit 0
-}
-
-# Newest events-log timestamp mentioning `issue=<n>`, as epoch; 0 when none.
-last_event_epoch() {
-  local f ts
-  ts="$(for f in "$WORK"/logs/events-*.jsonl; do [ -f "$f" ] && echo "$f"; done | sort | tail -2 \
-        | xargs -r cat 2>/dev/null \
-        | jq -r --arg re "issue=$1( |$)" 'select(.msg | test($re)) | .ts' 2>/dev/null | sort | tail -1)"
-  [ -n "$ts" ] && iso2epoch "$ts" || echo 0
 }
 
 # The blocker register (docs/autonomy.md → The register; scripts/blockers.mjs status): what holds
@@ -279,7 +267,7 @@ scenarios_due() {
 }
 
 # ======================================================== REGRESSION MODE ====
-# The product team's scenarios (docs/regression.md → Profile scenarios): the profile's
+# The product team's scenarios (docs/scenarios.md → Profile scenarios): the profile's
 # scenarios/<slug>.md against the `source=profile` rows of SCENARIOS.md. adopt[] — a file with
 # no row, or whose text changed since its row's spec_hash (a `rejected` row waits for a new
 # text, a `retired` one comes back as new; `retry` — the same text whose adoption ended
@@ -882,11 +870,12 @@ mode_modules() {
 }
 
 # ============================================================= RADAR MODE ====
-# The Change radar (docs/radar.md): the target's pull requests updated since the ledger's newest
-# (work/PRSCAN.md, scripts/radar.mjs since), read through `github.sh prs` — their sanitized text
-# alone — and each one new, changed, merged or closed since its last scan, with the recurring tests
-# its text names. Never touches the nested environment. Its one local write is the listing's own
-# temp file, gone when the pre-flight ends.
+# The Change radar (docs/radar.md): the target's pull requests updated inside the window
+# (radar_window_days, scripts/radar.mjs since), newest first, read through `github.sh prs` — their
+# sanitized text alone — and each one new, changed, merged or closed since its last scan
+# (work/PRSCAN.md), with the recurring tests its text names. Never touches the nested environment.
+# Its local writes: the listing's own temp file, gone when the pre-flight ends, and the ledger rows
+# of the pull requests with nothing to judge (radar.mjs scan --record) — those are never due.
 mode_radar() {
   local since scan n
   [ -n "$TARGET" ] || fail_out "target_repo is not configured (work/CONFIG.md or QI_TARGET_REPO)"
@@ -895,24 +884,16 @@ mode_radar() {
     log "no recurring test in work/SUITE.md — no pull request can affect one"; runlog RADAR "skip=no-tests"
     jq -nc --argjson logs "$(logs_json)" '{mode:"radar", nothing_to_do:true, logs:$logs}'; return
   fi
-  since="$(node "$SCRIPT_DIR/radar.mjs" since 2>/dev/null | jq -r '.since // empty' 2>/dev/null)"
-  [ -n "$since" ] || fail_out "radar.mjs since failed (work/PRSCAN.md)"
+  since="$(node "$SCRIPT_DIR/radar.mjs" since --days "$(reg radar_window_days)" 2>/dev/null | jq -r '.since // empty' 2>/dev/null)"
+  [ -n "$since" ] || fail_out "radar.mjs since failed"
   RADAR_TMP="$(mktemp /tmp/quality-inspector-radar.XXXXXX)" || fail_out "no temp file for the pull request listing"
   trap 'rm -f "${RADAR_TMP:-}"' EXIT
   bash "$SCRIPT_DIR/github.sh" prs --since "$since" > "$RADAR_TMP" 2>/dev/null || fail_out "cannot list the target's pull requests (github.sh prs)"
-  scan="$(node "$SCRIPT_DIR/radar.mjs" scan "$RADAR_TMP" --since "$since" 2>/dev/null)" || fail_out "radar.mjs scan failed"
+  scan="$(node "$SCRIPT_DIR/radar.mjs" scan "$RADAR_TMP" --since "$since" --record 2>/dev/null)" || fail_out "radar.mjs scan failed"
   rm -f "$RADAR_TMP"
   while IFS= read -r n; do log "$n"; done < <(jq -r '.logs[]' <<<"$scan")
-  # A cut listing with nothing due: the next run starts past it (radar.mjs advance, later than $since
-  # only), never reads it again; one with no later time to start at is an error, never a quiet run.
-  jq -e '.stalled == true' <<<"$scan" >/dev/null && fail_out "the pull request listing is cut inside $since: more items updated in that second than github.sh prs pages — the radar cannot move past them; the operator's step: docs/radar.md → The ledger"
-  n="$(jq -r '.advance // empty' <<<"$scan")"
-  if [ -n "$n" ]; then
-    node "$SCRIPT_DIR/radar.mjs" advance "$n" >/dev/null 2>&1 && log "the next listing starts at $n" \
-      || fail_out "radar.mjs advance failed: the next run would read the same cut listing"
-  fi
   preflight_passed
-  runlog RADAR "since=$since due=$(jq '.due | length' <<<"$scan") $(jq -r '[.due | group_by(.kind)[] | "\(.[0].kind)=\(length)"] | join(" ")' <<<"$scan") deferred=$(jq .deferred <<<"$scan") truncated=$(jq .truncated <<<"$scan")"
+  runlog RADAR "since=$since due=$(jq '.due | length' <<<"$scan") $(jq -r '[.due | group_by(.kind)[] | "\(.[0].kind)=\(length)"] | join(" ")' <<<"$scan") plain=$(jq '.plain | length' <<<"$scan") deferred=$(jq .deferred <<<"$scan") truncated=$(jq .truncated <<<"$scan")"
   # The worklist goes to jq on stdin: ten bodies of 2000 characters stay clear of one argument's limit.
   jq -c --arg since "$since" --arg ch "$(cfg regression_channel)" --argjson logs "$(logs_json)" \
     '{mode:"radar", nothing_to_do:(.due | length == 0), prs_due:.due, deferred:.deferred, truncated:.truncated, since:$since,

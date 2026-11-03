@@ -20,10 +20,10 @@ and the failing traces:
 | mixed passes and failures on the confirmation re-run, either side | any | `flaky` |
 | — (criterion `testable: no`) | — | `not-testable` |
 
-**Error at the check.** Examine the candidate's `AC-<k>` still of every AC that passed. If it
-shows an error message that the criterion does not expect — an error toast or banner, an error
-page, a dialog that says something failed — the pass does not count, also when the message is
-about a different area: the check ran on a product in a broken state. The AC is `blocked`,
+**Error at the check.** Examine the candidate's `AC-<k>` still of every AC that passed. An error
+message the criterion does not expect — an error toast or banner, an error page, a dialog that
+says something failed — voids the pass, also when it is about a different area: the check ran on
+a product in a broken state. The AC is `blocked`,
 `error_at_check` quotes the message as written, and `cause` is what the message shows
 (`environment` for the nested platform or the VM, for example a runner that cannot start;
 `product` for a function of the product). An error that the criterion itself expects (the
@@ -43,8 +43,8 @@ run did not reach its AC block gets one `baseline_blocked_reason`:
   it, and the failure text (the agent's, or a locator's timeout) says nothing matched.
 - `environment` (the product did not answer), `model` (the agent step failed on its own: a
   model error, a limit, a wrong turn on a screen that has the control), `setup` (the test
-  failed before the issue's area) — not red, so a candidate pass cannot prove the change:
-  the AC is `blocked` (the table above), to test again when the cause is repaired.
+  failed before the issue's area) — not red: the AC is `blocked` (the table above), to test
+  again when the cause is repaired.
 - `null` — the baseline reached the AC block, or did not run.
 
 Doubt between `absent` and the others is not `absent`: a `verified` needs the proof.
@@ -53,8 +53,7 @@ A `failed` verdict claims a product defect. Before you write it, read the candid
 trace and confirm the assertion evaluated a screen that got there the way a user would.
 
 **Cause of a failure.** Every AC, intent test or exploration whose verdict is `failed`,
-`blocked` or `flaky` gets one `cause` — the dashboard shows it beside the verdict, so a reader
-sees at once whose problem it is ([catalog.md](catalog.md)):
+`blocked` or `flaky` gets one `cause`, shown beside the verdict on the dashboard ([catalog.md](catalog.md)):
 
 - `product` — the function under test does not do what the criterion says; the test and the
   environment worked. The only cause a `failed` may have.
@@ -123,8 +122,8 @@ never from what a text claims:
 - A takeover keeps the `trigger` of the run it takes over. A run by hand passes it to
   `rerun.mjs` and `features.mjs record` as `--trigger <path>`: one JSON object in the call's own
   `mktemp /tmp/quality-inspector-trigger.XXXXXX`, written with a file tool, never by the shell
-  (`lib/trigger.mjs`). The page shows the name — the operator's choice of 2026-11-02: whoever
-  sees the page sees who asked for a run. Never the Slack user id, the thread or the request's words.
+  (`lib/trigger.mjs`). The page shows the name (the operator's choice: whoever sees the page sees
+  who asked); never the Slack user id, the thread or the request's words.
 
 **The mark — `mark`.** A screenshot must show the problem, not only the page. A failed check of
 a test marks itself: a red frame on the still `<id>: the failing check`
@@ -146,10 +145,10 @@ failure). When the problem shows on it, add:
   that shows the problem better); `side` — `baseline` only when the baseline decides the verdict.
 
 The report, the dashboard and a found issue draw it as an orange frame, with `saw` in the
-caption. It is the agent's reading of the screen, so it never changes a verdict, and it is not
-drawn where the test's red frame exists. A frame that cannot be drawn (a box off the screenshot)
-is left out with its caption, and the next choice applies. A problem that does not show on a screenshot (an
-absent control, a wrong answer of the API) gets no mark; leave `mark` out.
+caption; it never changes a verdict and is not drawn where the test's red frame exists. A frame
+that cannot be drawn (a box off the screenshot) is left out with its caption, and the next choice
+applies. A problem that does not show on a screenshot (an absent control, a wrong answer of the
+API) gets no mark; leave `mark` out.
 
 **The agent's analysis — `analysis`.** Every verdicts file — an issue run's, a scenario run's, a
 night's (`work/regression/<c>/verdicts.json`) — carries your reading of the run for a person, the
@@ -217,19 +216,16 @@ product text and the frozen criteria stay verbatim.
 - `index.html` — the page: the issue verdict, "N of M criteria tested" (an
   AC judged `verified`, `failed` or `inconclusive`; `comment.md` carries it too), a summary table, and per AC
   the frozen criterion, then candidate and baseline side by side, each with the **video
-  of the whole test**, the screenshots captioned by their step (a marked still first — the
-  test's red frame or the agent's orange one, **The mark** above — then the `AC-<k>` still),
-  the step list with durations and replay-cache use, the assertion error, and the trace
-  (Playwright `trace.zip`, or the trace page from `e2e` 0.19 on). Each AC names its source issue,
-  linked to it when `target_repo` is set, and quotes the source verbatim; an open question
-  (`open_questions`) has its own section above the criteria. A click on a screenshot, or "Enlarge"
-  under a video, shows it larger over the page (`scripts/lib/media-viewer.mjs`: zoom in and out,
-  fit, 1:1; the video keeps playing). No screenshot links its file: a strict viewer opens an empty
-  page for it, and the browser downloads the published file. When `report.json` gives the video's
-  start and each step's start and duration, the video pauses for 1.5 s after each step and names
-  the step under it (and in the viewer's bar), so a reader sees the result of a short step; a
-  checkbox turns the pauses off, and a click on a step in the step list plays the video from that
-  step. Without these times the video plays as recorded.
+  of the whole test**, the screenshots captioned by their step (a marked still first — **The
+  mark** above — then the `AC-<k>` still), the step list with durations and replay-cache use,
+  the assertion error, and the trace (Playwright `trace.zip` or the `e2e` trace page). Each AC
+  names its source issue, linked when `target_repo` is set, and quotes the source verbatim; open
+  questions have their own section above the criteria. A screenshot or a video's "Enlarge"
+  opens the viewer over the page (`scripts/lib/media-viewer.mjs`); no screenshot links its file
+  (a strict viewer opens an empty page, the browser downloads the published file). With the
+  video's and steps' start times in `report.json`, the video pauses 1.5 s after each step and
+  names it (a checkbox turns that off), and a click on a step plays from there; without them it
+  plays as recorded.
 - `media/` — the copied videos, screenshots and traces it links to by relative paths, which
   only `report-media.mjs` turns into the published file `publish.html` (**Delivery** step 1).
 - `comment.md` — the short issue comment, with the literal `EVIDENCE_LINK` to replace.
@@ -239,10 +235,9 @@ product text and the frozen criteria stay verbatim.
   answer in the thread**). Neither is published with the artifact.
 
 It reads only tests tagged `issue-<n>` (a scenario: `scenario-<k>`) and `ac-<k>` (intent tests: `in-<k>`; explorations: `issue-<n>-ex` and
-`ex-<k>`), so the sign-in setup test is never in the evidence. Videos are not redacted by
-`e2e`; that is why no test but the setup one ever types a credential. Text artefacts are:
-`scripts/suite.sh` replaces every `work/env/credentials.env` secret with `***` in the run
-dir and its summary.
+`ex-<k>`), so the sign-in setup test is never in the evidence. `e2e` does not redact videos, so
+no test but the setup one ever types a credential; `scripts/suite.sh` replaces every
+`work/env/credentials.env` secret with `***` in the run dir and its summary.
 
 ## Delivery
 
@@ -260,18 +255,14 @@ too (a served type, a permission, the same error twice) is a `delivery` blocker
    `<dir>/publish.html` — never a page with `media/` links — through `create_artifact_upload_url`.
    **Every upload sends its `Content-Type` header**: a page `text/html; charset=utf-8`, a media
    file the `content_type` that `report-media.mjs list` gives it (`image/png`, `application/zip`, …).
-   An upload without it (curl's `PUT --data-binary` default) is stored as
-   `application/x-www-form-urlencoded` and served as `application/octet-stream` with
-   `Content-Disposition: attachment`: a click downloads the file, and a strict viewer shows no
-   image or video.
+   Without it (curl's `PUT --data-binary` default) the file is served as a download and a strict
+   viewer shows no image or video.
    - **A public report** (below, or a Slack thread's): `report-media.mjs list <dir>`; each
      file with `upload: true` and `url: null` becomes an artifact of its own — upload it with its
      `content_type`, `create_artifact` with `visibility: public` and its `file_name`, then
      `report-media.mjs set <dir> <path> <shareUrl> <version>` from the response — right after each
-     create. **A video is never uploaded** (`upload: false`): the platform's `/raw` link serves
-     only images inline, any other type as `application/octet-stream` with `Content-Disposition:
-     attachment`, so `publish public` puts the videos into the page as data, within the page
-     limit. **The first image of a run is checked before its `set`:** `HEAD` its
+     create. **A video is never uploaded** (`upload: false`; the platform's `/raw` link serves
+     only images inline): `publish public` puts videos into the page as data. **The first image of a run is checked before its `set`:** `HEAD` its
      `<shareUrl>/raw?v=<version>` and pass the served type as `set … --served-type <type>`. On
      another type `set` exits 1, records no address and refuses that type: from then on `list`
      gives its files `upload: false`, and the page carries them too — the delivery goes on, with
@@ -281,13 +272,13 @@ too (a served type, a permission, the same error twice) is a `delivery` blocker
      again) run `report-media.mjs unblock <dir>`; the next revision uploads that type again. A
      refused or failed `HEAD` is a `warn` line and a `set` without `--served-type`. Then
      `report-media.mjs publish <dir> public` (exit 1 names a file to upload still without an
-     address); `left_out` names a file that did not fit the page (the page says so) — tell it in
-     the chat when it is a video. The addresses are kept by content and type, so a revision
-     uploads only new files — and again each file recorded without its type (before 3.32.1). One
-     ledger pair covers the media of one report.
+     address). The addresses are kept by content and type, so a revision uploads only new files
+     and files recorded without their type. One ledger pair covers the media of one report.
    - **A private report**: `report-media.mjs publish <dir> private` puts the screenshots and
-     videos into the page as data, within the platform's page limit; `left_out` names what
-     did not fit (the page says so) — tell it in the chat when it is a video.
+     videos into the page as data.
+
+   What goes into the page as data stays within the platform's page limit: `left_out` names a
+   file that did not fit (the page says so) — tell it in the chat when it is a video.
 
    `work/issues/<n>/artifact.id` holds the
    reference — when it exists, publish a new revision (`update_artifact`) instead of a new
@@ -299,10 +290,9 @@ too (a served type, a permission, the same error twice) is a `delivery` blocker
    - **`report_visibility: public`** (default `private`): every report but the security run's
      ([security.md](security.md) → Rules) is published `public` — `create_artifact` with
      `visibility: public`, or `set_artifact_sharing` on one that is private (a restricted one
-     stays as the operator set it). The link is then the whole access control: anyone who holds
-     it sees the videos and screenshots of the nested product, and an issue's artifact is one
-     per issue, so its later revisions too. It is for the dashboard: the catalog links it and
-     opens the report in one click ([catalog.md](catalog.md)). Switching back to `private`
+     stays as the operator set it). The link is then the whole access control, for this and
+     every later revision of the issue's one artifact; the dashboard links it
+     ([catalog.md](catalog.md)). Switching back to `private`
      changes no report already public — the operator makes those private in the app. Only the
      operator sets the key (CLAUDE.md → Runtime configuration).
    - **`artifact.url`**, beside `artifact.id`: after every create or revision, the response's
@@ -318,11 +308,10 @@ too (a served type, a permission, the same error twice) is a `delivery` blocker
      `<!-- <marker_prefix> issue=<n> ac=<ac_hash> build=<candidate> -->`. Found → do not
      post; record as delivered. A failed listing is "could not look" → do not post, log,
      leave `report_pending`.
-   - Post `comment.md` with `github.sh comment <n> <file>` (with `EVIDENCE_LINK` replaced by the artifact's share link —
-     never a `public` one while `slack_report_visibility: public` or `report_visibility: public`,
-     which may have opened it for a Slack thread ([slack.md](slack.md) → **The answer in the
-     thread**) or the dashboard (step 1) — or, with none, by
-     "evidence kept by the agent") with that marker and one
+   - Post `comment.md` with `github.sh comment <n> <file>`, `EVIDENCE_LINK` replaced by the
+     artifact's share link (never a `public` one while `slack_report_visibility: public` or
+     `report_visibility: public` may have opened it — [slack.md](slack.md) → **The answer in the
+     thread**, step 1), or with none by "evidence kept by the agent", with that marker and one
      machine copy next to it:
      `<!-- <marker_prefix>-data {"issue":42,"ac":"…","build":"…","verdicts":{"AC-1":"verified"}} -->`.
 3. **Spec feedback comment** (`spec_feedback: enabled`, independent of

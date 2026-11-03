@@ -11,7 +11,7 @@ steps: the planner and the test are deterministic.
 → `work/validation/<c>/plan.json` (`--dry-run` prints it, writes nothing). The forms come
 from the map's `forms` (fields with type, required, length and number limits, pattern;
 read from attributes, nothing is typed — [change-awareness.md](change-awareness.md)). A map
-without `forms` (older than this version) → map the candidate again.
+without `forms` → map the candidate again.
 
 - **Skipped forms**, each with its reason in `skipped[]`: no submit button; a destructive
   submit or form name (the map's danger words, `scripts/lib/danger.mjs`); a page, form or
@@ -48,26 +48,25 @@ finding. Each failure message opens with the oracle that broke:
 `severity` from the table, `message` (the failure's first line); a case the run has no
 result for is `blocked` ("not run"). Exit 1 (`{"error"}`, nothing written) = the run never
 reached the tests: its `report.json` is missing or unreadable, or holds no `val-*` result
-while the plan has cases. The module failed — an `<ISO> ERROR: module=validation candidate=<c>
-<error>` line in `work/MODULES.log`, never `ran`. Otherwise
+while the plan has cases: the module failed ([modules.md](modules.md) step 4). Otherwise
 `modules.sh ran validation <c> cases=<n> major=<n> minor=<n> blocked=<n>`.
 
 Passing cases and double submits create `qa-val-*` objects; the run's closing `env.sh reset`
-removes them. A finding is never a verdict or a comment, an issue only on the operator's "create issue for VAL-`<k>`" ([skills/create-issue](../skills/create-issue/SKILL.md)); the dashboard lists it
+removes them. A finding is handled as every module's ([modules.md](modules.md) → Findings of a
+module: an issue only by "create issue for VAL-`<k>`"); the dashboard lists it
 ([catalog.md](catalog.md)) with its run's evidence.
 
 ## Recheck — the operator's "recheck VAL-`<k>`"
 
 One case again, on the build that is up, to see if a fix took — from the dashboard's Findings
-or in words. Direct session only ([on-demand.md](on-demand.md)); it is not a module run (no
-`modules.sh ran`, no `results.json`) and changes no verdict.
+or in words, under [modules.md](modules.md) → **Rechecks and discussions**; it writes no
+`results.json`.
 
 1. The case comes from the newest `work/validation/<c>/` whose `plan.json` and `results.json`
    both have it (case ids are stable): the plan gives the input, `results.json` its earlier
    result. A plan whose run wrote no `results.json` is skipped; none → say so, end.
-2. `env.sh lock operator` (busy → say who holds it, end); from here every end runs
-   `env.sh unlock operator` first. `env.sh status` — no product up → `env.sh up <candidate>` and
-   `wait`. Failure → say so, end.
+2. `env.sh lock operator`. `env.sh status` — no product up → `env.sh up <candidate>` and
+   `wait`.
 3. `QI_VALIDATION_INPUT=<that plan> bash "$HOME/scripts/suite.sh" run
    validation-recheck-<k>-<candidate>-<HHMM> --strict --tag val-<k> --repeat-each 3 --no-cache
    --evidence failures`. From its start, every end runs `env.sh reset` before the unlock: passing

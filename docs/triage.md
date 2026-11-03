@@ -1,10 +1,9 @@
 # Triage — redesign or regression
 
 Every regression-tier criterion that did not simply pass — an `AC-<k>` or an intent test's
-`IN-<k>` ([intent.md](intent.md)), triaged alike — gets exactly one category. The
-goal is twofold: a reworked UI never fails the suite, and a broken product never hides
-behind "the UI changed". When the two pull apart, the bias is towards **regression**: a
-false alarm costs one look; a hidden regression costs users.
+`IN-<k>` ([intent.md](intent.md)), alike — gets exactly one category: a reworked UI never
+fails the suite, and a broken product never hides behind "the UI changed". In doubt,
+**regression**: a false alarm costs one look; a hidden regression costs users.
 
 ## What each test already tells you
 
@@ -29,8 +28,8 @@ the step list and screenshots in `report.json`.
 
 ## Cause
 
-Each `regression`, `needs-review`, `flaky` or `blocked` entry also names its `cause`, as
-[reporting.md](reporting.md) → **Cause of a failure** defines it: `product` (a `regression` is
+Each `regression`, `needs-review`, `flaky` or `blocked` entry also names its `cause`
+([reporting.md](reporting.md) → **Cause of a failure**): `product` (a `regression` is
 always `product`), `test` (a `needs-review` that fails on the previous build too, a check the UI
 moved away from, a `flaky` wait), `environment` (the product as a whole did not work on this
 night: a `blocked` with no answer, a smoke failure after the start). A night whose environment
@@ -46,14 +45,13 @@ evidence for a cause, leave it out.
    and read `by_test[].stability`.
    `flaky` ends the triage of this criterion as `flaky`; only `stable-fail` can become a
    `regression`, `superseded` or `reworked` (a fail before the frozen block), and only `stable-pass` (non-strict for a judged check)
-   can become `relearned` or `healed`. A stale recording is not a finding either — the
-   re-run is uncached.
+   `relearned` or `healed`. The re-run is uncached, so a stale recording is no finding.
 2. **Look at the evidence**: the AC screenshot, the failing step, the previous build's
    screenshot of the same page (`work/inventory/<previous>/shots/`).
 3. **Check the context** ([change-awareness.md](change-awareness.md)): the test's
    `impact` hits, its `issue_hits` (completed issues whose text names it), and every completed
    issue whose title or spec touches this area.
-4. **Decide** by the table. Write one `explanation` sentence that names the evidence
+4. **Decide** by the table, with one `explanation` sentence that names the evidence
    (*"the tab is now 'Access tokens' — UI map, likely rename"*, *"#4552 replaces the
    export button with a share link"*, *"nothing in 13 completed issues touches agent
    lists; the list shows two agents after creating one"*).
@@ -144,17 +142,16 @@ Append one row per flaky criterion to `work/FLAKY.md`:
 
 A test with flaky rows from two different builds inside 14 days moves to tier
 `quarantined` in `work/SUITE.md`: it no longer replays, the report names it under
-"needs review", and it gets a `quarantined` proposal ([maintenance.md](maintenance.md)). A quarantined test comes back only by the operator ("promote #N") after
+"needs review", and it gets a `quarantined` proposal ([maintenance.md](maintenance.md)). It comes back only by the operator ("promote #N") once
 its cause is fixed — usually a wait for state the test assumed, or nested-platform
-instability recorded in `work/LESSONS.md`. A flaky result is never a regression and
-never a pass.
+instability recorded in `work/LESSONS.md`. A flaky result is never a regression nor a pass.
 
 ## Signals no test covers
 
 Each of these is a `needs-review` item in the report's `context.signals`
-([regression.md](regression.md) step 7) even when every test passed — never a
-`regression` on its own. Each item keeps the script's fields and adds
-`verdict: "needs-review"` and one `explanation` sentence:
+([regression.md](regression.md) step 7), also when every test passed, never a
+`regression` on its own: the script's fields plus `verdict: "needs-review"` and one
+`explanation` sentence. The signals:
 
 - **A new console error or failed request on a page** (`ui-diff.mjs`
   `console_errors_new`, `failed_requests_new`): the error text and the page's screenshot
@@ -188,6 +185,5 @@ criterion that no longer holds is `regression`, its explanation naming
   page; the issue must state the new behaviour.
 - `superseded` and `healed` are never decided from the UI map alone when the criterion is
   about behaviour (data saved, an action's effect) rather than presentation.
-- A judged pass alone (`judged` non-empty, the exact check failed) never yields
-  `unchanged`: it is `healed` or `needs-review`. A failing injection canary in the run's
+- A judged pass (`judged` non-empty) is never `unchanged` (see the table). A failing injection canary in the run's
   smoke voids every judged result of that run ([nested-env.md](nested-env.md) → Failures).

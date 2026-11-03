@@ -4,9 +4,9 @@
 // writer, under the mutex of lib/mutex.mjs) and by scripts/maintenance.mjs sweep (which proposal
 // belongs to a pull request merged before a build).
 
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { writeAtomic } from './mutex.mjs';
+import { read, tableRows as cells } from './util.mjs';
 
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 export const FILE = join(work, 'PRSCAN.md');
@@ -17,9 +17,6 @@ export const STATES = ['open', 'merged', 'closed'];
 export const UTC_RE = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/;
 export const M_RE = /^M-\d{1,6}$/;
 
-const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
-const cells = (text) => (text ?? '').split('\n').filter((l) => l.startsWith('|')).slice(2)
-  .map((l) => l.split('|').slice(1, -1).map((c) => c.trim()));
 
 export const text = () => read(FILE);
 export const rawRows = (t = text()) => cells(t);

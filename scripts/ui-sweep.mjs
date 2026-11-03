@@ -26,15 +26,12 @@
 // Signs in as the owner (E2E_USER_OWNER_*, env or work/env/credentials.env; kept in memory),
 // then only navigates: it never clicks, types or submits.
 
-import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, resolve } from 'node:path';
+import { WORK, axeSource as loadAxe, browserFn, msg, owner, playwright, profile as loadProfile, pwdVisible, settle, sh, signIn } from './lib/design-browser.mjs';
 import { parseExpected, isExpected } from './lib/expected-requests.mjs';
 import { pattern } from './lib/url-pattern.mjs';
 
-const here = dirname(fileURLToPath(import.meta.url));
 const flags = {}; const pos = [];
 for (let i = 2; i < process.argv.length; i++) {
   const a = process.argv[i];
@@ -46,13 +43,6 @@ const usage = 'usage: ui-sweep.mjs <inventory.json> --build B [--out DIR] [--pre
 const die = (m) => { console.error(`ui-sweep: ${m}`); process.exit(2); };
 if (!pos[0]) { console.error(usage); process.exit(2); }
 
-const WORK = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
-const sh = (expr) => {
-  try {
-    return execFileSync('bash', ['-c', `CONFIG="$WORK/CONFIG.md"; . "$LIB/config.sh"; . "$LIB/profile.sh"; ${expr}`],
-      { env: { ...process.env, WORK, LIB: join(here, 'lib') }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  } catch { return ''; }
-};
 const notes = [];
 const DEFAULT_VP = '1440x900,768x1024,390x844';
 const parseVp = (s) => {
@@ -75,7 +65,7 @@ if (!Number.isInteger(maxPages) || maxPages < 1) die(`--max-pages '${flags['max-
 
 let inv;
 try { inv = JSON.parse(readFileSync(pos[0], 'utf8')); } catch (e) { die(`cannot read the UI map ${pos[0]}: ${String(e.message).split('\n')[0]}`); }
-const profile = (() => { try { return JSON.parse(readFileSync(join(sh('profile_dir'), 'profile.json'), 'utf8')); } catch { return {}; } })();
+const profile = loadProfile();
 // A failed request the profile declares expected is no finding (lib/expected-requests.mjs).
 const expected = parseExpected(profile);
 notes.push(...expected.notes);
@@ -110,31 +100,15 @@ if (flags.dry) {
 }
 
 // ------------------------------------------------------------------ the run ----
-const credFile = (() => {
-  const o = {};
-  try {
-    for (const l of readFileSync(join(WORK, 'env', 'credentials.env'), 'utf8').split('\n')) {
-      const m = /^\s*(?:export\s+)?([A-Z0-9_]+)=(.*)$/.exec(l);
-      if (m) o[m[1]] = m[2].trim().replace(/^(['"])(.*)\1$/, '$2');
-    }
-  } catch { /* no file: env only */ }
-  return o;
-})();
-const user = process.env.E2E_USER_OWNER_USERNAME ?? credFile.E2E_USER_OWNER_USERNAME;
-const pass = process.env.E2E_USER_OWNER_PASSWORD ?? credFile.E2E_USER_OWNER_PASSWORD;
+const cred = owner();
 
-const msg = (e) => String(e?.message ?? e).split('\n')[0].slice(0, 160);
 // No browser is this module's failure, not the environment's: exit 3, never 1.
 const noBrowser = (e) => { console.log(JSON.stringify({ error: `no browser: ${msg(e)}` })); process.exit(3); };
-const req = createRequire(process.env.QI_PLAYWRIGHT_FROM ?? join(WORK, 'suite', 'package.json'));
-let pw;
-try {
-  try { pw = req('playwright-core'); } catch { pw = createRequire(req.resolve('@e2e-dev/web'))('playwright-core'); }
-} catch { noBrowser('playwright-core is not installed in work/suite (scripts/suite.sh init installs it)'); }
-let axeSource = null;
-try { axeSource = createRequire(join(WORK, 'suite', 'package.json'))('axe-core').source; } catch { notes.push('axe-core unavailable: no a11y rules run (scripts/suite.sh init installs it)'); }
+const pw = playwright() ?? noBrowser('playwright-core is not installed in work/suite (scripts/suite.sh init installs it)');
+const axeSource = loadAxe();
+if (!axeSource) notes.push('axe-core unavailable: no a11y rules run (scripts/suite.sh init installs it)');
 // The checks are one self-contained browser function, loaded as text so no module flavour matters.
-const qiUiChecks = new Function(`${readFileSync(join(here, 'lib', 'ui-checks.mjs'), 'utf8').replace(/^export\s+(?=(?:async\s+)?function\s+qiUiChecks\b)/m, '')}\nreturn qiUiChecks;`)();
+const qiUiChecks = browserFn('ui-checks.mjs', 'qiUiChecks');
 
 const sameOrigin = (u) => { try { return new URL(u).origin === base.origin; } catch { return false; } };
 // Volatile parts of a console line collapse as in ui-inventory.mjs (URLs to their pattern, ids,
@@ -147,8 +121,6 @@ const vol = (s) => String(s ?? '')
 
 let browser;
 try { browser = await pw.chromium.launch({ headless: true }); } catch (e) { noBrowser(e); }
-const settle = async (page) => { await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); await page.waitForTimeout(500); };
-const pwdVisible = async (page) => (await page.locator('input[type=password]').filter({ visible: true }).count()) > 0;
 // Cumulative layout shift, as the web-vitals session windows (gap < 1 s, window <= 5 s).
 const clsInit = () => {
   window.__qiCls = 0;
@@ -163,19 +135,6 @@ const clsInit = () => {
     }).observe({ type: 'layout-shift', buffered: true });
   } catch { window.__qiCls = null; }
 };
-
-async function signIn(page) {
-  await page.goto(base.href, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await settle(page);
-  if (!(await pwdVisible(page))) return;
-  if (!user || !pass) throw new Error('the sign-in page is shown but E2E_USER_OWNER_USERNAME/PASSWORD are not set');
-  const pwd = page.locator('input[type=password]');
-  await page.locator('input[type=text]:visible, input[type=email]:visible, input[name=username]').first().fill(user);
-  await pwd.first().fill(pass);
-  await Promise.all([page.waitForURL((u) => u.origin === base.origin, { timeout: 30000 }), pwd.first().press('Enter')]);
-  await settle(page);
-  if (await pwdVisible(page)) throw new Error('owner sign-in failed');
-}
 
 // Two shots compared on a canvas in a page that loads nothing (every request aborted).
 let cmpPage = null;
@@ -232,7 +191,7 @@ for (const vp of viewports) {
   const page = await context.newPage();
   // A link that opens a new window leaves the app: closed, the sweep goes on.
   context.on('page', (p) => { if (p !== page) p.close().catch(() => {}); });
-  try { await signIn(page); state = await context.storageState(); } catch (e) { console.error(`ui-sweep: ${msg(e)}`); await browser.close(); process.exit(1); }
+  try { await signIn(page, base, cred); state = await context.storageState(); } catch (e) { console.error(`ui-sweep: ${msg(e)}`); await browser.close(); process.exit(1); }
   let sig = null;
   page.on('console', (m) => { if (sig && m.type() === 'error' && !/^Failed to load resource/.test(m.text())) sig.errors.add(vol(m.text())); });
   page.on('pageerror', (e) => { if (sig) sig.errors.add(vol(`${e?.name || 'Error'}: ${String(e?.message ?? e).split('\n')[0]}`)); });
