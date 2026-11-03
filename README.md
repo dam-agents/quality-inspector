@@ -47,6 +47,10 @@ core (run types, schedules, invariants); the definition is versioned (`VERSION` 
   thread ([docs/slack.md](docs/slack.md)). In the direct session the operator can watch
   exploration live (`live_browser`), and the nested product can call the agent's own model
   (`lend_model`).
+- **On its own** — a failure is diagnosed and what is the agent's is repaired; the rest goes to a
+  register of blockers with its owner and the one repair, the pre-flight holds that work with a
+  growing back-off, and the operator is told once. Every problem carries a severity, and what a run
+  saw in passing feeds the next discovery ([docs/autonomy.md](docs/autonomy.md)).
 
 ## Setup
 
@@ -157,7 +161,8 @@ defaults: [`ONBOARDING.md`](ONBOARDING.md) → Step 3. The testing modules' keys
   **public comments** on the target's issues; on the operator's "create issue for …" only, **new issues**
   on the target about found problems ([`skills/create-issue`](skills/create-issue/SKILL.md));
   optionally Slack posts — request threads, `scenario_channel`'s weekly digest,
-  `regression_channel`'s nightly summary and breach alert, `slack_channel`'s ordered tests,
+  `regression_channel`'s nightly summary and breach alert (and the blocker notices with
+  `blocker_alerts: enabled`), `slack_channel`'s ordered tests,
   `design_desk_findings` to the Design Desk; with `work_repo`, pushes of the `work/` backup. The
   platform runtime's session state (`PLATFORM_RUNTIME_URL`) frees a dead run's environment lock
   at once; without it the lock waits `lock_ttl_min`.

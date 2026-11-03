@@ -75,9 +75,10 @@ build **carries its change**: the change merged, and the candidate was published
 4. **Candidate environment.** `bash "$HOME/scripts/env.sh" wait <candidate>` — again while it exits 3
    ([nested-env.md](nested-env.md) → Shape) — then
    `bash "$HOME/scripts/suite.sh" run smoke-<candidate> --tag smoke`. Either failing is
-   an **environment failure** ([nested-env.md](nested-env.md) → Failures): restore the
-   previous row, unlock, log `issue_abort reason=environment`, the catalog, end the run's issue work —
-   an environment problem never becomes a verdict.
+   an **environment failure** ([nested-env.md](nested-env.md) → Failures): diagnose and register it
+   ([autonomy.md](autonomy.md)), restore the previous row, unlock, log `issue_abort reason=environment`,
+   the catalog, end the run's issue work — an environment problem never becomes a verdict. A takeover
+   while `blockers` holds `env` restores its row the same way, with no install.
 5. **Author** `work/suite/tests/issue-<n>.e2e.ts` per [test-authoring.md](test-authoring.md):
    one test per testable AC and IN ([intent.md](intent.md) → Tests), blocks written from the
    frozen files, steps found by exploring the candidate, and one per EX
@@ -85,7 +86,8 @@ build **carries its change**: the change merged, and the candidate was published
    block on the candidate. Then `bash "$HOME/scripts/check-asserts.sh" --lint <file>`: give every
    block in `no_unique_ref` (AC or IN) a discriminating check, and retag every EX in
    `ex_with_issue_tag`. Something broken outside the ACs is one `noticed` item
-   ([explorations.md](explorations.md) → **Noticed in passing**) — never chased. Refresh the row.
+   ([explorations.md](explorations.md) → **Noticed in passing**) — not chased in this run, a lead
+   for the next discovery run. Refresh the row.
 6. **Red-green**, both runs with full evidence (video, screenshots, steps for every test):
    - `env.sh reset`, `env.sh up <baseline>`,
      `suite.sh run issue-<n>-baseline --evidence full --strict --tag issue-<n>`.
@@ -164,4 +166,5 @@ work the same way ([nested-env.md](nested-env.md) → **Budgets**).
 - A comment skipped as already posted was skipped for a marker in the agent's own comment.
 - The session carries the worklist's `title`, or a `warn` line says why not ([logging.md](logging.md) → **Session titles**).
 - The environment lock is released; no `/tmp/quality-inspector-*` left behind.
+- [autonomy.md](autonomy.md) → **Self-check** holds: every failure repaired or registered, every notice given.
 - One line appended to `work/ISSUES.log`: `<ISO> ran issues=<n,…> verdicts=<v,…>`.

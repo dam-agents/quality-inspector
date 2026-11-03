@@ -143,19 +143,21 @@ the wall-clock budget so a live run never looks stale (`verify-onboarding.sh` ch
 
 An `env.sh` exit other than 0, or a failing smoke run, is an **environment failure** —
 never a verdict. `env.sh up` itself refuses (exit 1, `env_failed`) while the home volume
-has less than `min_free_disk_gi` free. Before giving up on the entry:
+has less than `min_free_disk_gi` free. Before giving up on the entry, diagnose it
+([autonomy.md](autonomy.md) → **Diagnosis**: what is known first, then hypotheses and their checks):
 
 1. Read the output: `env.sh wait` prints the last lines of a failed install, and
    `work/env/last-up.log` / `last-reset.log` keep the whole output of the last `up` /
    `reset` (mode 600, never backed up, never quoted unmasked — `env.sh wait` masks the
    credential values). Then `bash "$HOME/scripts/env.sh" status`, then the diagnosis the
    profile's README names (read-only commands only).
-2. One repair attempt the evidence supports — usually `env.sh reset`, then `up` again,
-   for an install stuck half-way or refused for disk space (on the `helm-k3s` engine a
-   reset also removes every image no container uses — the earlier builds').
-3. Still failing → abort the entry ([issue-qa.md](issue-qa.md) step 4) with the evidence
-   in the log. A cause you reproduced goes to `work/LESSONS.md`; a profile defect is an
-   issue on the profile's repository, never a local patch to the profile.
+2. Up to three repairs, each from another hypothesis the evidence supports — usually first
+   `env.sh reset`, then `up` again, for an install stuck half-way or refused for disk space (on
+   the `helm-k3s` engine a reset also removes every image no container uses — the earlier builds').
+3. Still failing → register its cause (`blockers.mjs open` or `hit`, scope `env`; the pre-flight then
+   holds every install until its retry time or a fix) and abort the entry ([issue-qa.md](issue-qa.md)
+   step 4) with the evidence in the log. A cause you reproduced goes to `work/LESSONS.md`; a profile
+   defect is an issue on the profile's repository, never a local patch to the profile.
 
 **The injection canary** (`tests/canary.e2e.ts`, tagged `smoke`) puts an injection on a
 page and expects the judge to reject an assertion about absent text. Its failure, `judge

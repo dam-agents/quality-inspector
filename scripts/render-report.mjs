@@ -412,6 +412,7 @@ const acHtml = acs.map((ac) => `
 // The agent's analysis (docs/reporting.md → The agent's analysis): first on the page, under the verdict —
 // what ran, why the result is what it is, each problem with what happened, where, the cause and the repair.
 const CAUSE_TEXT = { product: '💥 Product defect', test: '🔧 Test defect', environment: '🏗️ Environment problem' };
+const PROBLEM_SEVERITY = ['critical', 'high', 'medium', 'low']; // their badges: VERDICT above
 const an = v.analysis && typeof v.analysis === 'object' ? v.analysis : null;
 const anProblems = (Array.isArray(an?.problems) ? an.problems : []).filter((p) => p && p.title);
 const anRow = (k, x) => (x ? `<dt>${k}</dt><dd>${esc(x)}</dd>` : '');
@@ -419,7 +420,7 @@ const analysisHtml = !an || !(an.summary || anProblems.length || an.next) ? '' :
 <section class="agent" id="analysis">
 <h2>What the agent found</h2>
 ${an.summary ? `<p>${esc(an.summary)}</p>` : ''}
-${anProblems.map((p) => `<div class="problem"><h3>${CAUSE_TEXT[p.cause] ? `<span class="badge warn">${esc(CAUSE_TEXT[p.cause])}</span> ` : ''}${esc(p.title)}</h3>
+${anProblems.map((p) => `<div class="problem"><h3>${CAUSE_TEXT[p.cause] ? `<span class="badge warn">${esc(CAUSE_TEXT[p.cause])}</span> ` : ''}${PROBLEM_SEVERITY.includes(p.severity) ? `${badge(p.severity)} ` : ''}${esc(p.title)}</h3>
 ${(p.about ?? []).length ? `<p class="dim">About: ${p.about.map((r) => esc(r)).join(', ')}</p>` : ''}
 <dl>${anRow('What happened', p.what)}${anRow('Where', p.where)}${anRow('Probable cause', p.why ? `${p.why}${p.certainty ? ` (certainty: ${p.certainty})` : ''}` : null)}${anRow('How to repair it', p.fix)}</dl></div>`).join('')}
 ${an.next ? `<p><b>Next step:</b> ${esc(an.next)}</p>` : ''}

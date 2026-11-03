@@ -177,6 +177,12 @@ first thing the report and the dashboard show. The badges and the counts say *wh
   - `title` — the problem in at most 80 characters, in the user's words ("The upload stops at 99 %"),
     never a verdict name.
   - `cause` — `product`, `test` or `environment`, as **Cause of a failure** above; `null` when not known.
+  - `severity` — what it costs: the users for a `product` cause, the testing for the others.
+    `critical` — users lose data, or no user can do the product's main task; no test can run.
+    `high` — a main function fails for many users, or its workaround is difficult; a feature's tests
+    cannot run. `medium` — a function fails, but the user has another way to the task; some criteria
+    cannot run. `low` — a small problem: how it looks, a rare case; a small repair. Order
+    `problems[]` by it, most severe first.
   - `what` — what the test did and what it saw, from the evidence: the step, the screen, the message.
   - `where` — the page, the control or the step, as the product shows it.
   - `why` — the most probable reason, as far as the evidence shows it. You see the product from the
@@ -239,7 +245,9 @@ Order per effect is **send-then-record**: its `intent` ledger line, the send, it
 `done`/`failed` line ([logging.md](logging.md) → **Ledger of external writes**), then
 `status: reported` as the next state write. A failed delivery leaves `report_pending`, is
 logged, and the next run's `reports_due` retries only the delivery — the tests are not
-re-run. Never retry within the same run.
+re-run. Never retry within the same run. A refusal by the platform that would stop the next try
+too (a served type, a permission, the same error twice) is a `delivery` blocker
+([autonomy.md](autonomy.md)): the pre-flight holds the retries until its retry time or a fix.
 
 1. **Artifact** (`artifact_reports: enabled`): an artifact is **one file** — a viewer never
    gets `media/`, so a relative `media/<name>` link answers 404. First make the page one file

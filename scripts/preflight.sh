@@ -108,6 +108,30 @@ env_busy_out() {
   exit 0
 }
 
+# The blocker register (docs/autonomy.md → The register; scripts/blockers.mjs status): what holds
+# the work, what was released to try again, the notices due. A register that cannot be read holds
+# nothing — the audit names it; it never stops a run.
+BLK='{"open":0,"held":[],"released":[],"notices":[],"env":null,"delivery":null,"tests":{}}'
+blockers_load() {
+  local s l
+  if s="$(node "$SCRIPT_DIR/blockers.mjs" status 2>/dev/null)" && jq -e 'type == "object" and (.held | type) == "array"' <<<"$s" >/dev/null 2>&1; then BLK="$s"
+  else log "WARN: the blocker register cannot be read (blockers.mjs status) — nothing is held"; fi
+  while IFS= read -r l; do log "$l"; done < <(jq -r '.released[] | "blocker \(.id) (\(.scope), owner \(.owner)) released (\(.reason)): this run tries again"' <<<"$BLK")
+}
+blockers_json() { jq -c '{held, released, notices}' <<<"$BLK"; }
+# Why a held row holds, in one line: `blocker B-3 (profile, up: <signature>) until <utc>`.
+blocker_why() { jq -r --arg id "$1" '.held[] | select(.id == $id) | "blocker \(.id) (\(.owner), \(.stage): \(.signature)) until \(.retry_utc)"' <<<"$BLK" | head -1; }
+# env_held_out <RUNTYPE>: a mode that installs the product does not run while an env blocker holds —
+# the known failure is not met again; the row's retry time or a fix releases it.
+env_held_out() {
+  local id; id="$(jq -r '.env // empty' <<<"$BLK")"
+  [ -n "$id" ] || return 0
+  log "the product does not install here: $(blocker_why "$id") — next occurrence"
+  runlog "$1" "skip=held blocker=$id"
+  jq -nc --arg mode "$MODE" --argjson b "$(blockers_json)" --argjson logs "$(logs_json)" '{mode:$mode, nothing_to_do:true, blockers:$b, logs:$logs}'
+  exit 0
+}
+
 # ============================================================ ISSUES MODE ====
 mode_issues() {
   [ -n "$TARGET" ] || fail_out "target_repo is not configured (work/CONFIG.md or QI_TARGET_REPO)"
@@ -156,17 +180,32 @@ mode_issues() {
   due="$(jq -c .due <<<"$scan")"; reports="$(jq -c .reports <<<"$scan")"; deferred="$(jq -r .deferred <<<"$scan")"
   waiting="$(jq -c '.waiting // []' <<<"$scan")"
   while IFS= read -r l; do log "$l"; done < <(jq -r '.logs[]' <<<"$scan")
-  local scen sc; scen="$(scenarios_due)"; [ -n "$scen" ] || scen='[]'; sc="$(printf '%s' "$scen" | jq length)"
+  local scen sc; scen="$(scenarios_due)"; [ -n "$scen" ] || scen='[]'
+  # A standing blocker holds what it stops (docs/autonomy.md → Hold and release): an env one the new
+  # tests and queued scenarios — a takeover still ends its row —, a delivery one the report retries.
+  blockers_load
+  local held; held="$(jq -r '.env // empty' <<<"$BLK")"
+  if [ -n "$held" ] && [ "$(jq '[.[] | select(.kind != "takeover")] | length' <<<"$due")$(jq '[.[] | select(.kind == "queued")] | length' <<<"$scen")" != 00 ]; then
+    waiting="$(jq -c --argjson d "$due" --arg why "$(blocker_why "$held")" '. + [$d[] | select(.kind != "takeover") | {issue, kind, reason: $why}]' <<<"$waiting")"
+    due="$(jq -c 'map(select(.kind == "takeover"))' <<<"$due")"; scen="$(jq -c 'map(select(.kind != "queued"))' <<<"$scen")"
+    log "the product does not install here: $(blocker_why "$held") — its issues and queued scenarios wait"
+  fi
+  held="$(jq -r '.delivery // empty' <<<"$BLK")"
+  if [ -n "$held" ] && [ "$(jq length <<<"$reports")$(jq '[.[] | select(.kind == "report")] | length' <<<"$scen")" != 00 ]; then
+    reports='[]'; scen="$(jq -c 'map(select(.kind != "report"))' <<<"$scen")"
+    log "reports are not delivered now: $(blocker_why "$held") — they wait, nothing is lost"
+  fi
+  sc="$(printf '%s' "$scen" | jq length)"
   [ "$sc" = 0 ] || log "$sc scenario(s) waiting: $(printf '%s' "$scen" | jq -r 'map(.id + " " + .kind) | join(", ")')"
   [ "$(scenario_runs_today)" -ge "$SCEN_CAP" ] && table_rows "$WORK/SCENARIOS.md" | grep -qE '\| *queued *\|' \
     && log "daily scenario cap reached ($SCEN_CAP) — queued scenarios wait for the next UTC day"
   local count rc; count="$(printf '%s' "$due" | jq length)"; rc="$(printf '%s' "$reports" | jq length)"
   runlog ISSUES "candidate=$candidate baseline=${baseline:-none} due=$count reports=$rc deferred=$deferred waiting=$(printf '%s' "$waiting" | jq length) scenarios=$sc"
   jq -nc --arg mode issues --arg c "$candidate" --arg b "$baseline" --arg built "$built" \
-    --argjson due "$due" --argjson rep "$reports" --argjson wait "$waiting" --argjson scen "$scen" --argjson logs "$(logs_json)" \
-    '{mode:$mode, nothing_to_do:(($due|length)==0 and ($rep|length)==0 and ($scen|length)==0),
+    --argjson due "$due" --argjson rep "$reports" --argjson wait "$waiting" --argjson scen "$scen" --argjson blk "$(blockers_json)" --argjson logs "$(logs_json)" \
+    '{mode:$mode, nothing_to_do:(($due|length)==0 and ($rep|length)==0 and ($scen|length)==0 and ($blk.notices|length)==0),
       candidate:$c, candidate_built:(if $built=="" then null else $built end), baseline:(if $b=="" then null else $b end),
-      issues_due:$due, issues_waiting:$wait, reports_due:$rep, scenarios_due:$scen, logs:$logs}'
+      issues_due:$due, issues_waiting:$wait, reports_due:$rep, scenarios_due:$scen, blockers:$blk, logs:$logs}'
 }
 
 # Scenarios this run takes over (docs/scenarios.md → Waiting scenarios): frozen and
@@ -231,6 +270,26 @@ mode_regression() {
     jq -nc --argjson logs "$(logs_json)" '{mode:"regression", nothing_to_do:true, logs:$logs}'; return
   fi
   env_busy_out REGRESSION
+  blockers_load; env_held_out REGRESSION
+  # A recurring test a tests blocker holds is not replayed, nor adopted again (docs/autonomy.md).
+  local held_tests='[]'
+  if [ "$(jq '.tests | length' <<<"$BLK")" != 0 ]; then
+    held_tests="$(jq -c --argjson t "$tests" --argjson ps "$ps" '.tests as $h
+      | def tid: if test("^tests/issue-[0-9]+\\.e2e\\.ts$") then "#" + capture("issue-(?<n>[0-9]+)").n
+                 elif test("^tests/scenario-[0-9]+\\.e2e\\.ts$") then "S-" + capture("scenario-(?<n>[0-9]+)").n
+                 elif test("^tests/profile-[a-z0-9-]+\\.e2e\\.ts$") then "P-" + capture("profile-(?<n>[a-z0-9-]+)\\.e2e").n else . end;
+      [($t[] | {test: ., id: tid}), (($ps // {adopt: []}).adopt[] | {test: null, id})] | map(select($h[.id]) | . + {blocker: $h[.id]})' <<<"$BLK" 2>/dev/null)"
+    # A filter that fails holds nothing: the night replays as before, and says so.
+    jq -e 'type == "array"' <<<"$held_tests" >/dev/null 2>&1 || { held_tests='[]'; log "WARN: the held tests could not be computed — nothing is held tonight"; }
+    tests="$(jq -c --argjson h "$held_tests" '[.[] | select(. as $f | $h | map(.test) | index($f) | not)]' <<<"$tests")"
+    [ "$ps" != null ] && ps="$(jq -c --argjson h "$held_tests" '.adopt |= map(select(.id as $i | $h | map(.id) | index($i) | not))' <<<"$ps")" \
+      && ps_work="$(jq '(.adopt | map(select(.kind != "retry")) | length) + (.retire | length)' <<<"$ps")"
+    [ "$held_tests" = '[]' ] || log "held, not run tonight: $(jq -r 'map("\(.id) (\(.blocker))") | join(", ")' <<<"$held_tests")"
+    if [ "$(jq length <<<"$tests")" = 0 ] && { [ "$ps" = null ] || [ "$(jq '(.adopt + .retire) | length' <<<"$ps")" = 0 ]; }; then
+      runlog REGRESSION "skip=held tests=$(jq length <<<"$held_tests")"
+      jq -nc --argjson h "$held_tests" --argjson b "$(blockers_json)" --argjson logs "$(logs_json)" '{mode:"regression", nothing_to_do:true, held_tests:$h, blockers:$b, logs:$logs}'; return
+    fi
+  fi
   versions="$(versions_json none 2>/dev/null)" || fail_out "cannot resolve the candidate build"
   candidate="$(printf '%s' "$versions" | jq -r .candidate)"
   last="$(grep -o 'ran candidate=[^ ]*' "$WORK/REGRESSION.log" 2>/dev/null | tail -1 | cut -d= -f2)"
@@ -268,9 +327,10 @@ mode_regression() {
   runlog REGRESSION "due candidate=$candidate tests=$(printf '%s' "$tests" | jq length) replay=$replay profile_scenarios=$ps_work"
   jq -nc --arg c "$candidate" --arg p "$last" --argjson t "$tests" --argjson d "$drift" --argjson logs "$(logs_json)" \
     --argjson cr "$confirm" --argjson bs "$((10#$bisect))" --argjson ps "$ps" --argjson rp "$replay" --arg ch "$ch" \
+    --argjson h "$held_tests" --argjson b "$(blockers_json)" \
     '{mode:"regression", nothing_to_do:false, candidate:$c, previous_candidate:(if $p=="" then null else $p end),
-      replay:$rp, tests:$t, assert_drift:$d, profile_scenarios:$ps, confirm_regressions:$cr, bisect_max_steps:$bs,
-      channel:(if $ch == "" then null else $ch end), logs:$logs}'
+      replay:$rp, tests:$t, held_tests:$h, assert_drift:$d, profile_scenarios:$ps, confirm_regressions:$cr, bisect_max_steps:$bs,
+      channel:(if $ch == "" then null else $ch end), blockers:$b, logs:$logs}'
 }
 
 # ============================================================= AUDIT MODE ====
@@ -420,6 +480,17 @@ mode_audit() {
     elif [ -z "$old" ]; then check maintenance ok "no proposal open over 14 days"
     else check maintenance warn "open over 14 days, waiting for the operator: $old"; fi
   fi
+  # the blocker register (docs/autonomy.md): its format, a cause open over 7 days, a notice not given
+  local bx bl
+  bx="$(node "$SCRIPT_DIR/blockers.mjs" check 2>/dev/null)"
+  if [ -z "$bx" ]; then check blockers warn "not measured (blockers.mjs check failed)"
+  elif [ "$(jq -r .ok <<<"$bx")" != true ]; then check blockers fail "work/BLOCKERS.md: $(jq -r '.problems | join("; ")' <<<"$bx")"
+  elif ! bl="$(node "$SCRIPT_DIR/blockers.mjs" status 2>/dev/null | jq -er --argjson l "$(node "$SCRIPT_DIR/blockers.mjs" list --open 2>/dev/null || echo '{"blockers":[]}')" \
+      --arg w "$(epoch2iso $((NOW_EPOCH - 7*86400)))" '[($l.blockers[] | select(.first_utc < $w) | "\(.id) open since \(.first_utc[0:10]) (\(.owner))"),
+        (.notices[] | "\(.id): the \(.kind) notice was not given")] | join("; ")' 2>/dev/null)"; then
+    check blockers warn "open blockers not measured (blockers.mjs status failed)"
+  elif [ -z "$bl" ]; then check blockers ok "no blocker open over 7 days, every notice given"
+  else check blockers warn "$bl"; fi
   # the Change radar's ledger (docs/radar.md): its format, a closed pull request holding no proposal
   local rx; rx="$(node "$SCRIPT_DIR/radar.mjs" check 2>/dev/null)"
   if [ -z "$rx" ]; then check radar warn "not measured (radar.mjs check failed)"
@@ -631,6 +702,7 @@ mode_discovery() {
         jq -nc --argjson logs "$(logs_json)" '{mode:"discovery", nothing_to_do:true, logs:$logs}'; return ;;
   esac
   env_busy_out DISCOVERY
+  blockers_load; env_held_out DISCOVERY
   versions="$(versions_json 2>/dev/null)" || fail_out "cannot resolve product builds"
   candidate="$(printf '%s' "$versions" | jq -r .candidate)"
   baseline="$(printf '%s' "$versions" | jq -r '.baseline // empty')"
@@ -652,9 +724,9 @@ mode_discovery() {
   fi
   log "candidate $candidate not explored yet (last: ${last:-never}) — due, budget $budget"
   runlog DISCOVERY "due candidate=$candidate budget=$budget"
-  jq -nc --arg m "$mode" --arg c "$candidate" --arg b "$baseline" --arg p "$last" --argjson n "$budget" --argjson logs "$(logs_json)" \
+  jq -nc --arg m "$mode" --arg c "$candidate" --arg b "$baseline" --arg p "$last" --argjson n "$budget" --argjson blk "$(blockers_json)" --argjson logs "$(logs_json)" \
     '{mode:"discovery", nothing_to_do:false, discovery:$m, candidate:$c, baseline:(if $b=="" then null else $b end),
-      previous_candidate:(if $p=="" then null else $p end), budget:$n, logs:$logs}'
+      previous_candidate:(if $p=="" then null else $p end), budget:$n, blockers:$blk, logs:$logs}'
 }
 
 # ========================================================== BENCHMARK MODE ====
@@ -673,6 +745,7 @@ mode_security() {
     jq -nc --argjson logs "$(logs_json)" '{mode:"security", nothing_to_do:true, logs:$logs}'; return
   fi
   env_busy_out SECURITY
+  blockers_load; env_held_out SECURITY
   local versions candidate last inv roles dep eng
   versions="$(versions_json none 2>/dev/null)" || fail_out "cannot resolve the candidate build"
   candidate="$(printf '%s' "$versions" | jq -r .candidate)"
@@ -689,9 +762,9 @@ mode_security() {
   if [ "$eng" = helm-k3s ] || profile_field '.requires.commands[]?' | grep -qx kubectl; then dep=true; else dep=false; fi
   log "candidate $candidate is new (last security run: ${last:-never}) — due"
   runlog SECURITY "due candidate=$candidate inventory=$([ -n "$inv" ] && echo yes || echo no)"
-  jq -nc --arg c "$candidate" --arg p "$last" --arg inv "$inv" --argjson roles "${roles:-[]}" --argjson dep "$dep" --argjson logs "$(logs_json)" \
+  jq -nc --arg c "$candidate" --arg p "$last" --arg inv "$inv" --argjson roles "${roles:-[]}" --argjson dep "$dep" --argjson blk "$(blockers_json)" --argjson logs "$(logs_json)" \
     '{mode:"security", nothing_to_do:false, candidate:$c, previous_candidate:(if $p=="" then null else $p end),
-      inventory:(if $inv=="" then null else $inv end), roles:$roles, deployment_checks:$dep, logs:$logs}'
+      inventory:(if $inv=="" then null else $inv end), roles:$roles, deployment_checks:$dep, blockers:$blk, logs:$logs}'
 }
 
 # ============================================================ MODULES MODE ====
@@ -729,6 +802,7 @@ mode_modules() {
     jq -e '.error' <<<"$ux" >/dev/null && runlog MODULES "ERROR: module=ux-signals $(jq -r '.error' <<<"$ux" | tr -s ' \n' ' ' | cut -c1-160)"
   fi
   env_busy_out MODULES
+  blockers_load; env_held_out MODULES
   versions="$(versions_json 2>/dev/null)" || fail_out "cannot resolve the candidate build"
   candidate="$(printf '%s' "$versions" | jq -r .candidate)"
   baseline="$(printf '%s' "$versions" | jq -r '.baseline // empty')"
@@ -747,10 +821,10 @@ mode_modules() {
   budget="$(reg modules_max_wallclock_min)"; case "$budget" in (''|*[!0-9]*) budget=90;; esac
   log "candidate $candidate: due $(jq -r '.due | join(",")' <<<"$d")$(jq -r 'if (.focus|length) > 0 then " focus " + (.focus | join(",")) else "" end' <<<"$d")"
   runlog MODULES "due candidate=$candidate modules=$(jq -r '.due | join(",")' <<<"$d") focus=$(jq -r '.focus | length' <<<"$d") prs=$(jq -r '[.due[].prs[]] | join(",")' <<<"$dc")"
-  jq -nc --arg c "$candidate" --arg b "$baseline" --arg inv "$inv" --argjson d "$d" --argjson dc "$dc" --argjson ux "$ux" --argjson budget "$budget" --argjson logs "$(logs_json)" \
+  jq -nc --arg c "$candidate" --arg b "$baseline" --arg inv "$inv" --argjson d "$d" --argjson dc "$dc" --argjson ux "$ux" --argjson budget "$budget" --argjson blk "$(blockers_json)" --argjson logs "$(logs_json)" \
     '{mode:"modules", nothing_to_do:false, candidate:$c, baseline:(if $b == "" then null else $b end),
       modules_due:$d.due, previous:$d.previous, focus:$d.focus, design_checks_due:$dc.due,
-      inventory:(if $inv == "" then null else $inv end), max_wallclock_min:$budget, logs:$logs}
+      inventory:(if $inv == "" then null else $inv end), max_wallclock_min:$budget, blockers:$blk, logs:$logs}
       + (if $ux.due == true then {ux_signals: ($ux | {period, scored, new, resolve})} else {} end)'
 }
 
@@ -865,7 +939,8 @@ TITLE_JQ='
            + (if .kind == "ac_changed" then " (ACs changed)" else "" end)]
        + [(.reports_due // [])[] | "Deliver report for " + issue]
        + [(.scenarios_due // [])[] | (.id | safe) as $s | select($s)
-         | ({takeover: "Resume ", report: "Deliver report for "}[.kind] // "Test ") + "scenario " + $s]) | few($run)
+         | ({takeover: "Resume ", report: "Deliver report for "}[.kind] // "Test ") + "scenario " + $s]
+       + [(.blockers.notices // [])[] | (.id | safe) as $b | select($b) | ({resolved: "Report resolved "}[.kind] // "Report ") + "blocker " + $b]) | few($run)
     elif .mode == "regression" then
       "Run regression" + on + some(
         (if .replay then [count(.tests | length; "test")] else [] end)

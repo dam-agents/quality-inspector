@@ -24,7 +24,7 @@ the step list and screenshots in `report.json`.
 | `superseded` | the criterion is false, and a completed issue in the window that `may_supersede` changes exactly this behaviour on purpose | retire the test (below) and open a proposal |
 | `regression` | the criterion is false (strict re-run fails and the judge agrees), and nothing in the context explains it | report it with both screens |
 | `flaky` | the confirmation re-run mixes passes and failures | log it in `work/FLAKY.md`; quarantine on the second flaky night (below) |
-| `blocked` | the test could not reach its frozen block, and the cause is `environment` or not known | fix or report as environment |
+| `blocked` | the test could not reach its frozen block, and the cause is `environment` or not known | diagnose and repair ([autonomy.md](autonomy.md) → **Diagnosis**); a cause that will stop it again is a `tests` blocker |
 
 ## Cause
 
@@ -126,7 +126,8 @@ three-heals rule above. Its verdicts entry: `reworked`, `cause: null`, `because_
 
 Any rule fails → `needs-review` (`cause` `test`), or `blocked` (`cause` `environment`) when the
 environment stopped the strict run, and a `rework` proposal ([maintenance.md](maintenance.md) →
-What opens a proposal), its basis naming what is missing (*"#3810: the channel is bound in the chat
+What opens a proposal) — with a `tests` blocker of the same cause when no build can repair it
+([autonomy.md](autonomy.md)), so the next nights do not replay it —, its basis naming what is missing (*"#3810: the channel is bound in the chat
 client — no product surface"*). For a profile scenario (`P-<slug>`) the report also tells the
 product team what its profile must give the test.
 

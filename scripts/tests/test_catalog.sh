@@ -72,7 +72,7 @@ echo abc123 > "$W/issues/42/artifact.id"
 echo 'http://share.example/a/plain' > "$W/issues/42/artifact.url" # not https: the reference stays
 cat > "$W/regression/c2/verdicts.json" <<'J'
 {"mode":"regression","candidate":"c2","trigger":{"via":"schedule","who":"Regression run","why":"nightly regression of the new build c2"},"acs":[{"issue":42,"id":"AC-1","verdict":"healed","explanation":"The tab moved to the side bar."}],
- "analysis":{"summary":"One check was repaired.","next":null,"problems":[{"title":"The tab moved","about":["#42 AC-1","rm -rf /","#42"],"cause":"bogus","certainty":"high",
+ "analysis":{"summary":"One check was repaired.","next":null,"problems":[{"title":"The tab moved","about":["#42 AC-1","rm -rf /","#42"],"cause":"bogus","severity":"low","certainty":"high",
    "what":"The tab is not in the top bar.","where":"/projects","why":"The new build moved it.","fix":"Nothing: the agent repaired the check.","extra":"dropped"},{"what":"no title: dropped"}]},
  "context":{"previous":"c1","issues":[{"number":40,"title":"Projects get tabs"}],"ui_diff":"- renamed tab \"Tasks\" → \"To-dos\" on /projects","signals":{"console_errors_new":["E1"],"slow_tests":[]}}}
 J
@@ -289,7 +289,7 @@ assert "coverage pages" '[.pages[] | {pattern, covered, nav}] | (map(select(.pat
   and (map(select(.pattern == "/files"))[0].covered == "exploratory")' "$data"
 # The agent's analysis and its sentence on a result are written for the page (docs/reporting.md →
 # The agent's analysis): text only, a bad cause or reference dropped, a problem without a title dropped.
-assert "a night: the agent's analysis" '.runs[1].analysis == {"summary":"One check was repaired.","next":null,"problems":[{"title":"The tab moved","cause":null,"certainty":"high",
+assert "a night: the agent's analysis" '.runs[1].analysis == {"summary":"One check was repaired.","next":null,"problems":[{"title":"The tab moved","cause":null,"severity":"low","certainty":"high",
   "about":["#42 AC-1","#42"],"what":"The tab is not in the top bar.","where":"/projects","why":"The new build moved it.","fix":"Nothing: the agent repaired the check."}]}
   and .runs[4].analysis == null' "$data"
 assert "a result's sentence in the history of its test case" '[.items[] | select(.key == "issue-42/AC-1") | .history[] | select(.build == "c2")][0].why == "The tab moved to the side bar."' "$data"
