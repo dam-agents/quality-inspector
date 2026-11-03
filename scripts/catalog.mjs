@@ -36,13 +36,14 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { controlRe, esc, matchable, pageRe } from './lib/match.mjs';
 import { AGENT_RGB, agentBoxes, drawMarks, splitMark } from './lib/shot-mark.mjs';
 import { deskRef } from './lib/ux-field.mjs';
+import { mtime, read, readJson, tableRows } from './lib/util.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
@@ -61,13 +62,9 @@ const HOTSPOTS_MAX = 120; // controls per page of the product map
 const CLICKED = new Set(['nav', 'tabs', 'buttons', 'links']); // box kinds a click of the UI map's crawl can be
 const DESIGN_CROPS_MAX = 80; // design findings' crops embedded, open and major first
 
-const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
-const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
 const ls = (p) => { try { return readdirSync(p); } catch { return []; } };
-const mtime = (p) => { try { return statSync(p).mtimeMs; } catch { return 0; } };
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-const rows = (p) => (read(p) ?? '').split('\n').filter((l) => l.startsWith('|')).slice(2)
-  .map((l) => l.split('|').slice(1, -1).map((c) => c.trim()));
+const rows = (p) => tableRows(read(p));
 const cfg = (k) => {
   const m = (read(join(work, 'CONFIG.md')) ?? '').match(new RegExp(`^- ${k.replace('.', '\\.')}:[ \\t]*(.*)$`, 'm'));
   return m ? m[1].replace(/\s+#.*$/, '').trim().replace(/^[`"']|[`"']$/g, '') : '';

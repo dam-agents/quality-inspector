@@ -35,6 +35,13 @@ first in Overview → Needs attention ([docs/catalog.md](docs/catalog.md) → Co
    `low`; [docs/reporting.md](docs/reporting.md) → **The agent's analysis**); the report and the
    dashboard show it, an older run shows none.
 
+## 3.54.1 — 2026-11-02
+
+**Upgrade:**
+Nothing to run — docs are re-read per run. The docs say each rule once and link to its home;
+no rule, key or default changed. Shared script helpers moved to `scripts/lib/util.mjs` and
+`scripts/lib/state.sh`.
+
 ## 3.54.0 — 2026-11-02
 
 **Upgrade:**

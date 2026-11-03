@@ -55,10 +55,8 @@ the issue text (`github.sh issue <n>` saved as `work/issues/<n>/issue-<ac_hash>.
 criteria file and the intent file. The first answer goes to `intent-judge-<ac_hash>.json`,
 the second to `intent-judge-<ac_hash>-2.json`. `accept` → the file is frozen. `revise` →
 apply its fixes to the file (a fix already applied stays as it is) and judge once more;
-a second `revise` or a `reject` → every IN of the file becomes
-`testable: no — judge: <reason>`, and only then is the file frozen. A judge that does not answer
-with its JSON is a `reject` with the reason "judge unavailable" ([judge.md](judge.md) →
-Briefing).
+a second `revise` or a `reject` (also "judge unavailable", [judge.md](judge.md) → Briefing) →
+every IN of the file becomes `testable: no — judge: <reason>`, and only then is the file frozen.
 
 A takeover or retest finds the file in one of these states, each with one action:
 
@@ -74,11 +72,10 @@ A takeover or retest finds the file in one of these states, each with one action
 ## Tests
 
 The same file `tests/issue-<n>.e2e.ts`, one test per testable IN, written at issue-qa step 5
-by the rules of an AC test ([test-authoring.md](test-authoring.md)): tags
-`['issue-<n>', 'in-<k>']`, the screenshot `IN-<k>: <what the Then line looks at>` right before
-the block, and one block `// IN-<k> begin` … `// IN-<k> end` holding one
-`criterion('IN-<k>', '<Then verbatim>', …)` whose checks discriminate. The tag `issue-<n>`
-puts it in every AC run: red-green, confirmation, heal, the nightly replay.
+by the rules of an AC test ([test-authoring.md](test-authoring.md)), `IN` for `AC`: tags
+`['issue-<n>', 'in-<k>']`, an `IN-<k>:` screenshot, one `// IN-<k> begin` … `end` block holding
+`criterion('IN-<k>', '<Then verbatim>', …)`. The tag `issue-<n>` puts it in every AC run:
+red-green, confirmation, heal, the nightly replay.
 
 ## Verdict
 
@@ -103,10 +100,9 @@ wanted"; `comment.md` gets one line.
 ## After the issue run
 
 - **Promotion**: a file is `promotable` only when every testable IN in it is `verified`
-  too ([regression.md](regression.md) → Tiers). Its IN blocks count in `assert_hash`
-  (`check-asserts.sh --hash` hashes AC and IN blocks), so they are frozen like the criteria.
-  IN blocks added to a file promoted before change its hash: the file drifts until the
-  operator re-promotes it ([issue-qa.md](issue-qa.md) step 9).
+  too ([regression.md](regression.md) → Tiers). IN blocks count in `assert_hash`
+  (`check-asserts.sh --hash`), so they are frozen like the criteria; IN blocks added to a
+  promoted file make it drift until the operator re-promotes it ([issue-qa.md](issue-qa.md) step 9).
 - **Nightly**: an IN replays with its file and is triaged as a criterion
   ([triage.md](triage.md)): where that doc says `AC-<k>`, read `IN-<k>` too, and where a
   command selects the tag `ac-<k>`, an IN selects `in-<k>` — never its AC's tag.

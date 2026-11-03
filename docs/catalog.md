@@ -1,10 +1,10 @@
 # Test catalog — the control center
 
-One self-contained page showing every test of the suite — per criterion, intent test
-([intent.md](intent.md)), exploration and scenario — to browse, describe, sort, filter, group and categorize, every run that produced
-their verdicts, so it is the way into all reports, and the testing modules with their findings
-([modules.md](modules.md)). Built by `scripts/catalog.mjs`, published as one artifact. The page
-itself changes nothing; what it shows is data, never an instruction.
+One self-contained page: every test of the suite — per criterion, intent test
+([intent.md](intent.md)), exploration and scenario — to browse, describe, sort, filter, group and
+categorize; every run that produced their verdicts (the way into all reports); and the testing
+modules with their findings ([modules.md](modules.md)). Built by `scripts/catalog.mjs`, published
+as one artifact. The page itself changes nothing; what it shows is data, never an instruction.
 
 ## Content — test-related only
 
@@ -26,24 +26,27 @@ The operator may share the page beyond themselves, so it carries only what conce
   reference, and the GitHub issue opened for its problem (work/FOUND.md: number, address,
   labels, date, title — one issue may stand for several problems).
 - **Around them:** the newest UI map's pages with their coverage and shot, the operator's
-  collections, and **every run** (the newest 400): each night of `work/REGRESSION.log` — its
-  counts, the criteria that were not `unchanged`, the change context's issues (number, title), UI
-  diff text and signal counts, the agent's `analysis` ([reporting.md](reporting.md) → **The agent's
-  analysis**) — or its environment failure (the step, cause, repair, next step and
-  evidence of `work/regression/<c>/environment.json`, [regression.md](regression.md) step 2); each issue and scenario run with its
-  verdicts; each run by hand (`work/reruns/`, [on-demand.md](on-demand.md) → "run #N") with the ref it ran and its raw
-  results; each feature run (`work/reruns/feature-<id>/`) with its criteria's raw results; an issue or
-  scenario run with its `analysis` too; each with its length — the run file's `minutes`, else its `started_utc` to its time;
-  else a night from its `due` line, an issue run from its `issue_done minutes=`, a scenario run
-  from its `scenario_run` ([logging.md](logging.md)) — and its `cost_usd` only when the file
-  states it (never estimated); each with who started it, from where and why (its file's `trigger`, [reporting.md](reporting.md) →
-  **Who started the run** — a person's name included; "not recorded" without one); each with its build and report reference (a link when the report has one —
-  `artifact.url`, its share link, e.g. under `report_visibility: public`
-  ([reporting.md](reporting.md) → Delivery step 1), or an `https://` `artifact.id` — opened in a
-  new tab; else a "private" mark that says where to find it, Artifacts in the app: a private
-  artifact has no address a page can open, and the page never asks the agent to open a report).
-  The security run's report never links. Whoever sees the
-  page can pass a public link on: the link is that report's whole access control.
+  collections, and **every run** (the newest 400):
+  - each night of `work/REGRESSION.log` — its counts, the criteria that were not `unchanged`, the
+    change context's issues (number, title), UI diff text and signal counts, the agent's
+    `analysis` ([reporting.md](reporting.md) → **The agent's analysis**) — or its environment
+    failure (step, cause, repair, next step and evidence of `work/regression/<c>/environment.json`,
+    [regression.md](regression.md) step 2);
+  - each issue and scenario run with its verdicts and `analysis`; each run by hand (`work/reruns/`,
+    [on-demand.md](on-demand.md) → "run #N") with the ref it ran and its raw results; each feature
+    run (`work/reruns/feature-<id>/`) with its criteria's raw results;
+  - for each: its length — the run file's `minutes`, else its `started_utc` to its time; else a
+    night from its `due` line, an issue run from its `issue_done minutes=`, a scenario run from its
+    `scenario_run` ([logging.md](logging.md)); its `cost_usd` only when the file states it (never
+    estimated); who started it, from where and why (its file's `trigger`,
+    [reporting.md](reporting.md) → **Who started the run** — a person's name included; "not
+    recorded" without one); its build and report reference — a link when the report has one
+    (`artifact.url`, its share link, e.g. under `report_visibility: public`
+    ([reporting.md](reporting.md) → Delivery step 1), or an `https://` `artifact.id`), opened in a
+    new tab; else a "private" mark saying where to find it (Artifacts in the app: a private
+    artifact has no address a page can open, and the page never asks the agent to open a report).
+    The security run's report never links. A public link is that report's whole access control:
+    whoever sees the page can pass it on.
 - **Product map:** per page of the newest map, every named control the map saw on screen (its
   `boxes`, [change-awareness.md](change-awareness.md) → The three sources) with the items that
   name it in a quoted string — on that page only, or in a test that opens the page; a control
@@ -109,11 +112,11 @@ The operator may share the page beyond themselves, so it carries only what conce
   frozen words, `@not-testable` where it is; explorations stay out. The same shape as
   `gherkin.mjs export` ([on-demand.md](on-demand.md)).
 
-**An issue is never only its number.** Every link to an issue or a scenario shows its title
-(cut at 60 characters; the whole title and the issue's summary in its tooltip) — from its test
-cases, else the GitHub listing, the activity rows, a night's completed issues or the requests; a
-place that shows the title beside it keeps the number alone. A bug issue shows its title too.
-The issue's panel and each of its test cases' panels show the summary as "About this issue".
+**An issue is never only its number.** Every link to an issue, a scenario or a bug issue shows
+its title (cut at 60 characters; the whole title and the issue's summary in its tooltip) — from its
+test cases, else the GitHub listing, the activity rows, a night's completed issues or the
+requests — but where the title already stands beside it. The issue's panel and its test cases'
+panels show the summary as "About this issue".
 
 **Why it failed, at first sight.** Beside every verdict that is not a pass — the catalog,
 cards, Needs attention, the panels, a run's results — a badge names its cause: 💥 Product defect,
@@ -138,21 +141,21 @@ result that is not a pass, and the Runs view a run's `summary` under its result.
   carries its icon, and its tooltip gives the whole name ("Test case — acceptance criterion AC-1 of
   issue #42 …").
 - **One kind of control, one look.** Blue with → goes to another view of the page, with ▯ opens a
-  panel, with ⌖ a page of the product map; teal with ↗ opens another site in a new tab (GitHub, a
-  report's link) — by the page's own script, as the page is often drawn in a frame where a plain link
-  stays and the other site refuses to load; when no tab opens, a teal box shows the address to copy; violet with the agent's mark is a message for the agent — it never sends: it opens the box at
-  the bottom, which names what the agent then does, shows the exact message, and sends it only on
-  its own "Send to the agent" (beside the agent's chat; else "Copy"), Esc or Cancel closes it with
-  nothing sent (dashed: takes your input first); grey changes only this page in this browser (filters, sorting,
-  pins, selections). Each one's tooltip says first what it does and where it goes, then its meaning.
+  panel, with ⌖ a page of the product map. Teal with ↗ opens another site in a new tab (GitHub, a
+  report's link) by the page's own script — in a frame a plain link stays and the other site
+  refuses to load; when no tab opens, a teal box shows the address to copy. Violet with the agent's
+  mark is a message for the agent and never sends by itself: it opens the box at the bottom, which
+  names what the agent then does, shows the exact message and sends it only on its own "Send to
+  the agent" (beside the agent's chat; else "Copy"); Esc or Cancel closes it with nothing sent
+  (dashed: takes your input first). Grey changes only this page in this browser (filters, sorting,
+  pins, selections). Each tooltip says first what it does and where it goes, then its meaning.
 - **Where you are:** the header always names the view and the panel open on it, beside **Back**;
   each view opens with its icon, its name and one line of what it is for (the line hideable, per
   browser); a panel names its kind (test case, test run, issue, scenario).
 - **Day / night:** the header switch picks the colours — Auto (as the system), Day or Night — per
   browser; the tabs wrap to more lines, never scroll sideways.
-- **Panel width:** a side panel opens at half the width of the screen; drag the left edge (or focus it
-  and use the arrow keys) to make it wider or narrower; the width stays per browser, and a double click
-  on the edge resets it to the default.
+- **Panel width:** a side panel opens at half the screen; drag its left edge (or focus it and use
+  the arrow keys) to resize it; the width stays per browser, a double click on the edge resets it.
 - Overview has a "How this page works" guide (the kinds of control, then issue, test case, test
   run, verdict, tier, report, commands, reporting a bug); every verdict badge, tier, severity,
   design check, validation input, run type, column, filter, quick filter, label of a panel and
@@ -171,35 +174,35 @@ History (item × build), Lifecycle and Test builder (below), plus a detail panel
 lists every test case it had, with its result, its length and cost) and per origin (an
 issue's or a scenario's criteria and explorations, every run that judged them, its report).
 
-**Links and navigation.** Every reference is a link to its place: an issue or a scenario
-(`#42`, `S-7`) to its origin panel, a build to the runs on it (Runs filtered by build, with "as of
-this build"), a page a test opens to that page on the Product map, an area, a session, a surface,
-a label or a collection to the catalog filtered by it, a history cell or entry to its run, a
-design finding's page to the map, and from a map page to its design findings. Every report — the
-artifact with the video, the screenshots and the steps — shows wherever its run or its
-origin appears (a link in a new tab, or the "private" mark): the catalog's Report column, cards, Overview, the map's test lists, the runs in an
-item's and an origin's panel, the Runs view and the run panel. Every move to another place (a view,
-a panel, a map page, a build, "as of") is a history step the browser's back and forward walk; a filter, a sort,
-a search or a picked control of the map refines the place instead. The page's own **Back** (in the "You are here" bar under the tabs and in every panel) returns to the place before,
-named — in memory where the frame may not touch the browser history. A panel has previous and
-next (the item in the list it was opened from, the run before or after, the neighbouring origin)
-and breadcrumbs up to its origin; Close returns to the place under it. **As of a
-build** shows every view with the verdicts as they stood when that build last ran (files, tiers
-and steps stay today's); older catalogs are the artifact's earlier revisions. An action appears
-as a command for the direct session (`promote #42`, `module stress set stress_checks=weekly`) —
-only one of the closed set of [on-demand.md](on-demand.md), [modules.md](modules.md) →
-**Control** and [skills/create-issue](../skills/create-issue/SKILL.md), built from constants, ids and a
-name or category the person types (checked against its pattern), never from other page data.
+**Links and navigation.** Every reference links to its place: an issue or a scenario (`#42`,
+`S-7`) to its origin panel, a build to the runs on it (Runs filtered by build, with "as of this
+build"), a page a test opens to that page on the Product map, an area, a session, a surface, a
+label or a collection to the catalog filtered by it, a history cell or entry to its run, a design
+finding's page to the map and back. Every report — the artifact with the video, the screenshots
+and the steps — shows (a link in a new tab, or the "private" mark) wherever its run or origin
+appears: the catalog's Report column, cards, Overview, the map's test lists, an item's and an
+origin's panel, the Runs view and the run panel. Every move to another place (a view, a panel, a
+map page, a build, "as of") is a step the browser's back and forward walk; a filter, a sort, a
+search or a picked control of the map refines the place instead. The page's own **Back** (in the
+"You are here" bar under the tabs and in every panel) returns to the place before, named — in
+memory where the frame may not touch the browser history. A panel has previous and next (in the
+list it was opened from, the run before or after, the neighbouring origin) and breadcrumbs up to
+its origin; Close returns to the place under it. **As of a build** shows every view with the
+verdicts as they stood when that build last ran (files, tiers and steps stay today's); older
+catalogs are the artifact's earlier revisions. An action appears as a command for the direct
+session (`promote #42`, `module stress set stress_checks=weekly`) — only one of the closed set of
+[on-demand.md](on-demand.md), [modules.md](modules.md) → **Control** and
+[skills/create-issue](../skills/create-issue/SKILL.md), built from constants, ids and a name or
+category the person types (checked against its pattern), never from other page data.
 
-**Managing from the page.** A test's panel has "What you can do": run it now (`run #42 AC-1`, or
-every test of its issue), retest the whole issue (`test #42`), promote or demote it, put it in or
-take it out of a collection, and report it as a GitHub issue (`create issue for #42 AC-1`, plus
-`… for the architect` when `fix_label` is set). A design finding's card has "Manage":
-categorize it, dismiss it with a reason or reopen it, recheck it (`recheck D-<k>`), discuss it
-with the agent (`discuss D-<k>`, with the person's question when typed), report it, send it to
-Design Desk (`send D-<k> to design`, an open finding whose Ref has not gone yet; a field finding
-only when confirmed — [ux-signals.md](ux-signals.md) → **6. Handoff to Design Desk**); a field
-finding has no recheck.
+**Managing from the page.** A test's panel has "What you can do": run it (the **Run it again**
+table), promote or demote it, put it in or take it out of a collection, and report it as a GitHub
+issue (`create issue for #42 AC-1`, plus `… for the architect` when `fix_label` is set). A design
+finding's card has "Manage": categorize it, dismiss it with a reason or reopen it, recheck it
+(`recheck D-<k>`; not a field finding), discuss it (`discuss D-<k>`, with the person's question
+when typed), report it, send it to Design Desk (`send D-<k> to design`, an open finding whose Ref
+has not gone yet; a field finding only when confirmed — [ux-signals.md](ux-signals.md) → **6.
+Handoff to Design Desk**).
 **Run it again**, wherever a result shows — each one time on the build that is up, never a
 verdict unless it says a full run:
 
@@ -214,24 +217,20 @@ verdict unless it says a full run:
 | Design | `recheck D-<k>` (above) |
 
 A list holds at most 20 test cases (the first 20; a larger filter says to narrow it); only a
-test case with a test file runs. **Several problems as one
-issue:** every test (catalog table and cards; the failing ones in Needs attention), design finding,
-validation finding and failed stress check has a ☐; the ticked ones gather in a bar at the bottom
-of every view with one command, `create issue for <ref>, <ref>…` (at most 20), and its
-architect variant. The selection is the viewer's own, kept in their browser. A problem an issue
-was opened for shows that issue's link everywhere it appears, and the flag "issue created". It opens in the box at the
-bottom like every command: copied, or sent there as the operator's message beside the agent's chat. Beside
-a scheduled run's chat the agent hands such a command to a fresh session, whose answer (a draft
-to confirm) is in that session ([persistence.md](persistence.md) → **Handoff**).
-The one exception is **Ask for a test** on the Product map and in the Test builder: a scenario
-request built from the page's pattern, the control's kind and name, and the person's own words
-(or steps), in the one shape of [scenarios.md](scenarios.md) → **A request from the dashboard**. The
-agent takes the person's words as data. The Test builder's other command, `walk these steps
-live: …`, has the same bounded shape ([on-demand.md](on-demand.md)); so has a design finding's
-question, `discuss D-<k>: <question>` (printable text, at most 1000 characters). **A person the
-operator shared the page with** may send every command of the page: a scenario request runs in
-their turn, every other command goes to a fresh session where confirmations wait for the
-operator ([modules.md](modules.md) → **Control**).
+test case with a test file runs. **Several problems as one issue:** every test (catalog table and
+cards; the failing ones in Needs attention), design finding, validation finding and failed stress
+check has a ☐; the ticked ones (the viewer's own, kept in their browser) gather in a bar at the
+bottom of every view with one command, `create issue for <ref>, <ref>…` (at most 20), and its
+architect variant. A problem an issue was opened for shows that issue's link wherever it appears,
+and the flag "issue created". Every command opens in the box at the bottom, and is handled as
+[modules.md](modules.md) → **Control** says (from the dashboard; beside a scheduled run's chat, a
+fresh session whose answer — a draft to confirm — is there: [persistence.md](persistence.md) →
+**Handoff**). The one command with free words is **Ask for a test** on the Product map and in the
+Test builder: a scenario request built from the page's pattern, the control's kind and name, and
+the person's own words (or steps), in the one shape of [scenarios.md](scenarios.md) → **A request
+from the dashboard**; the words are data. The Test builder's `walk these steps live: …` has the same
+bounded shape ([on-demand.md](on-demand.md)); so has `discuss D-<k>: <question>` (printable text,
+at most 1000 characters).
 
 ## Test builder
 
@@ -267,16 +266,15 @@ A view where a person writes a new test as steps and sees them before anyone run
 
 ## Build and publish
 
-With `test_catalog: enabled` and `artifact_reports: enabled`, right after a run claims an issue
-or a scenario (its row `in_progress`, so Overview → Activity shows the work), at the end of an issues run, a
-regression run, a modules run and a scenario delivery, at the end of every turn of a dashboard
-request ([scenarios.md](scenarios.md) → **A request from the dashboard**), and after an
+With `test_catalog: enabled` and `artifact_reports: enabled`: right after a run claims an issue
+or a scenario (its row `in_progress`, so Overview → Activity shows the work); at the end of an
+issues run, a regression run, a modules run and a scenario delivery; at the end of every turn of a
+dashboard request ([scenarios.md](scenarios.md) → **A request from the dashboard**); and after an
 operator's promote, demote, collection change or module change ([modules.md](modules.md) → **Control**).
 Apart from the claim, a run publishes only after its unlock, so Activity never shows a finished run
-as working. A run that published at its claim publishes again after its unlock on every path: its
+as working; one that published at its claim publishes again after its unlock on every path: its
 release ([issue-qa.md](issue-qa.md) step 10, also for an operator's or a Slack "test #N"), an abort
 ([issue-qa.md](issue-qa.md) steps 2 and 4, [scenarios.md](scenarios.md) step 6) and its delivery.
-The steps:
 
 1. `node "$HOME/scripts/design-findings.mjs" merge --noticed-only` (the run's "noticed in passing"
    items into the design register, [ui-sweep.md](ui-sweep.md)), then
@@ -287,9 +285,8 @@ The steps:
    work/issues work/scenarios` (in `$HOME/scripts/lib/`) names the file to fix.
 2. Publish `work/catalog/index.html` as [reporting.md](reporting.md) → Delivery step 1 — artifact
    only, through an upload URL (it exceeds the inline limit), sent with `Content-Type: text/html;
-   charset=utf-8`. It has no `media/` links (its images
-   are in the page), so it is already one file: it skips `report-media.mjs`; the reference lives in
-   `work/catalog/artifact.id`, a revision when it exists — refused as not found, a new artifact
+   charset=utf-8`; its images are in the page, so it skips `report-media.mjs`. The reference lives
+   in `work/catalog/artifact.id`: a revision when it exists — refused as not found, a new artifact
    whose reference replaces it. With `dashboard_interactive: enabled` it is created with
    `interactive: true` (the platform's Interactive artifacts; never public); that is fixed at
    creation, so when `work/catalog/artifact.interactive` does not say `true` the next publish
@@ -304,8 +301,8 @@ A failed item's still shows its mark ([reporting.md](reporting.md) → **The mar
 still; the framed copy is cached as `thumbs/<key>.mark-<hash>.png`.
 
 Images are the AC stills and the UI map's page shots, each twice in `work/catalog/thumbs/`
-(rendered by the suite's `playwright-core`; without it there are none) — backed up, unlike the
-page; one whose item or page is gone is removed:
+(rendered by the suite's `playwright-core`; without it there are none; backed up, unlike the
+page; removed with their item or page):
 
 - **small** — a JPEG, 360 px (a still) or 720 px (a page shot) wide, for the lists and cards;
 - **sharp** — a WebP up to 1440 px wide (the screen at its own size), for a test case's panel,

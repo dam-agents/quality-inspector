@@ -52,6 +52,7 @@ import { withMutex, writeAtomic } from './lib/mutex.mjs';
 import { load as loadPrs } from './lib/prscan.mjs';
 import { predict } from './lib/staleness.mjs';
 import { takeWords } from './lib/words.mjs';
+import { now, read, tableRows as rows } from './lib/util.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
@@ -73,10 +74,6 @@ const PR_BASIS_RE = /^PR #[1-9]\d{0,6}: \S/;
 class Usage extends Error {}
 const die = (msg) => { throw new Usage(msg); };
 const out = (o) => console.log(JSON.stringify(o));
-const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
-const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-const rows = (text) => (text ?? '').split('\n').filter((l) => l.startsWith('|')).slice(2)
-  .map((l) => l.split('|').slice(1, -1).map((c) => c.trim()));
 const COLS = ['id', 'test', 'kind', 'build', 'basis', 'proposal', 'state', 'opened_utc', 'closed_utc'];
 
 function load() {

@@ -108,7 +108,7 @@ if [ "$STRUCTURE" = 1 ]; then
   if [ -f "$HOME_DIR/.quality-inspector-onboarded" ] && grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z$' "$HOME_DIR/.quality-inspector-onboarded"; then
     ok sentinel "$(cat "$HOME_DIR/.quality-inspector-onboarded")"
   else
-    fail sentinel "missing or malformed \$HOME/.quality-inspector-onboarded" "write it per ONBOARDING.md Step 6"
+    fail sentinel "missing or malformed \$HOME/.quality-inspector-onboarded" "write it per ONBOARDING.md Step 7"
   fi
 
   # -------------------------------------------------------------- schedules

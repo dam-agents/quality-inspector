@@ -15,14 +15,12 @@
 // allowlist and names. Writes nothing to the product except what a failing check provokes:
 // DELETE is never replayed, other writes go with an empty body (docs/security.md → Rules).
 
-import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { WORK, credentials, msg, pwdVisible, settle, sh } from './lib/design-browser.mjs';
 import { pattern } from './lib/url-pattern.mjs';
 
-const here = dirname(fileURLToPath(import.meta.url));
 const flags = {}; const pos = [];
 for (let i = 2; i < process.argv.length; i++) {
   const a = process.argv[i];
@@ -33,14 +31,7 @@ for (let i = 2; i < process.argv.length; i++) {
 const usage = 'usage: security-checks.mjs [--dry-run] <inventory.json> [--build B] [--out DIR] [--base URL] [--failed-logins N]';
 if (!pos[0]) { console.error(usage); process.exit(2); }
 
-const WORK = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 // The config and the profile come through the one reader (scripts/lib/config.sh, profile.sh).
-const sh = (expr) => {
-  try {
-    return execFileSync('bash', ['-c', `CONFIG="$WORK/CONFIG.md"; . "$LIB/config.sh"; . "$LIB/profile.sh"; ${expr}`],
-      { env: { ...process.env, WORK, LIB: join(here, 'lib') }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  } catch { return ''; }
-};
 const profileDir = sh('profile_dir');
 const profile = (() => { try { return JSON.parse(readFileSync(join(profileDir, 'profile.json'), 'utf8')); } catch { return {}; } })();
 const base = new URL(flags.base ?? process.env.APP_URL ?? profile.app?.url ?? 'http://localhost');
@@ -50,16 +41,7 @@ const build = flags.build ?? inv.build ?? 'unknown';
 const failedLogins = Math.max(3, Number(flags['failed-logins'] ?? (sh('reg security_failed_logins') || 10)) || 10);
 
 // Roles (docs/profile-contract.md → The bin/ contract): env first, then credentials.env.
-const credFile = (() => {
-  const o = {};
-  try {
-    for (const l of readFileSync(join(WORK, 'env', 'credentials.env'), 'utf8').split('\n')) {
-      const m = /^\s*(?:export\s+)?([A-Z0-9_]+)=(.*)$/.exec(l);
-      if (m) o[m[1]] = m[2].trim().replace(/^(['"])(.*)\1$/, '$2');
-    }
-  } catch { /* no file: env only */ }
-  return o;
-})();
+const credFile = credentials();
 const cred = (role) => {
   const u = process.env[`E2E_USER_${role}_USERNAME`] ?? credFile[`E2E_USER_${role}_USERNAME`];
   const p = process.env[`E2E_USER_${role}_PASSWORD`] ?? credFile[`E2E_USER_${role}_PASSWORD`];
@@ -164,14 +146,11 @@ const HDRS = ['content-type', 'location', 'content-security-policy', 'x-content-
 const subset = (h) => Object.fromEntries(HDRS.map((k) => [k, typeof h.get === 'function' ? h.get(k) : h[k]]).filter(([, v]) => v != null));
 const ok2 = (s) => s >= 200 && s < 300;
 const of = (planned, id) => planned.filter((p) => p.id === id);
-const msg = (e) => String(e?.message ?? e).split('\n')[0].slice(0, 160);
 
 const req = createRequire(process.env.QI_PLAYWRIGHT_FROM ?? join(WORK, 'suite', 'package.json'));
 let pw;
 try { pw = req('playwright-core'); } catch { pw = createRequire(req.resolve('@e2e-dev/web'))('playwright-core'); }
 const browser = await pw.chromium.launch({ headless: true });
-const settle = async (page) => { await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); await page.waitForTimeout(500); };
-const pwdVisible = async (page) => (await page.locator('input[type=password]').filter({ visible: true }).count()) > 0;
 const local = (u) => { try { return ['localhost', '127.0.0.1'].includes(new URL(u).hostname); } catch { return false; } };
 const sameOrigin = (u) => { try { return new URL(u).origin === base.origin; } catch { return false; } };
 

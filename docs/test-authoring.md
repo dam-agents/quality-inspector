@@ -40,8 +40,8 @@ test('#42 AC-1: a renamed project keeps its tasks', { session: 'owner', tags: ['
   It is the still a reader checks the verdict against; the report captions it with that
   label. `agent.assert` adds its own screenshot. Never screenshot inside the setup test.
 - **Import `expect` from `../lib/criterion.js`, not from `e2e`** (**The mark of a failed check** below).
-- **Every AC block — and an intent test's `IN-<k>` block, which follows every rule here for an
-  AC block ([intent.md](intent.md)) — is one `criterion(id, then, ctx, check)` call**
+- **Every AC block — an `IN-<k>` block too, which follows every AC-block rule here
+  ([intent.md](intent.md)) — is one `criterion(id, then, ctx, check)` call**
   (`work/suite/lib/criterion.ts`): `then` is the criterion's Then sentence verbatim, the
   callback holds the exact checks. When the UI moves under a check, the sentence is judged
   on screen instead and the run's triage repairs the check ([triage.md](triage.md)).
@@ -79,11 +79,9 @@ test('#42 AC-1: a renamed project keeps its tasks', { session: 'owner', tags: ['
   reset removes the product's; the next pass of the same test also removes older runs'
   sandbox leftovers, found by their `unique()` id (the profile's helpers name where it stands).
 
-**Explorations** ([explorations.md](explorations.md)) live in the same file, one test per
-EX tagged `issue-<n>-ex`, `ex-<k>`, `from-ac-<j>`, with `// EX-<k> begin` / `end` blocks
-and an `EX-<k>:` screenshot written by the rules above. Their blocks are hashed apart
-(`check-asserts.sh --ex-hash`) and are not promoted state; a role session other than `owner`
-comes from the setup test too.
+**Explorations** live in the same file by the rules above, `EX` for `AC`, tagged and hashed
+apart ([explorations.md](explorations.md) → **Tests**); a role session other than `owner` comes
+from the setup test too (→ **Identities**).
 
 ## The mark of a failed check
 
@@ -148,12 +146,12 @@ The platform's shared browser starts on a random port that changes at every rest
 `live_cdp` finds it itself: the first line of `~/.local/share/platform/browser/DevToolsActivePort`,
 used when `/json/version` answers there. Nothing needs setting. `live_browser: http://127.0.0.1:<port>`
 is an explicit override, tried first and replaced by the detection when it does not answer;
-`live_browser: disabled` turns live off. `npx e2e mcp` and every
-`--evidence failures` run (smoke, authoring iterations) attach to that browser, so the
-operator watches you explore in the Browser Panel. Only in a direct session, only while it
-answers (`scripts/lib/config.sh` → `live_cdp`; no port file or no answer: headless, one log line); scheduled and Slack turns, a session whose
-transcript the shell cannot find (`CLAUDE_CODE_SESSION_ID`), and every `--evidence full` run
-stay headless, so evidence never depends on it. When you start exploring live, paste the
+`live_browser: disabled` turns live off. `npx e2e mcp` and every `--evidence failures` run
+(smoke, authoring iterations) attach to that browser, so the operator watches you explore in the
+Browser Panel — only in a direct session and while it answers (`scripts/lib/config.sh` →
+`live_cdp`; no port file or no answer: headless, one log line). Scheduled and Slack turns, a
+session whose transcript the shell cannot find (`CLAUDE_CODE_SESSION_ID`), and every
+`--evidence full` run stay headless, so evidence never depends on it. When you start exploring live, paste the
 line `bash "$HOME/scripts/env.sh" watch` prints into your reply, once and unchanged: the
 chat shows it as a button that opens the panel on the product.
 
@@ -197,10 +195,10 @@ next verified pass.
 seven days old. A default pin that is younger is an exception, and the `CHANGELOG.md` entry
 that sets it gives the reason. `@e2e-dev/web` pins its own `playwright-core`; when it no longer matches
 the image's Playwright, `suite.sh init` downloads the matching Chromium into the home
-([black-box.md](black-box.md) → **Egress rules** lists the hosts). From `e2e` 0.19 the
-trace is a markdown page per test (`results/<test>/trace.md`) instead of a Playwright zip;
-the report renders either. `e2e mcp` 0.20 is headless by default and has no `--headless` flag.
-The setup test's sign-in is a secret fill, and the saved session carries it to every test that
-restores it. Below `e2e` 0.21.3 that turned off all pixels there: `app.screenshot()` failed with
-`POLICY_DENIED` and the video had no frames. From 0.21.3 only the model gets no pixels (an
-`agent.assert` with `vision` judges the tree); screenshots, evidence and video stay on.
+([black-box.md](black-box.md) → **Egress rules** lists the hosts). The trace is a markdown page
+per test (`results/<test>/trace.md`, `e2e` ≥ 0.19) or a Playwright zip; the report renders either.
+`e2e mcp` (≥ 0.20) is headless by default and has no `--headless` flag. The setup test's
+sign-in is a secret fill, which the saved session carries to every test that restores it: from
+`e2e` 0.21.3 only the model gets no pixels there (an `agent.assert` with `vision` judges the
+tree) while screenshots, evidence and video stay on; below it `app.screenshot()` fails with
+`POLICY_DENIED` and the video has no frames.

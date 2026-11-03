@@ -17,6 +17,7 @@ import { createRequire } from 'node:module';
 import { existsSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { escHtml as esc } from './lib/util.mjs';
 
 const [dir] = process.argv.slice(2);
 if (!dir) {
@@ -44,7 +45,6 @@ const rows = (proof.rows ?? []).map((r) => ({ ...r, shots: (r.shots ?? []).map((
 const leftOut = Number(proof.left_out ?? 0);
 if (!rows.length) done({ sheet: null, rows: 0, left_out: leftOut, bytes: 0, reason: 'no criterion has a screenshot that shows its verdict' });
 
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const scenario = proof.mode === 'scenario';
 const LABEL = { verified: ['Verified', 'ok'], passed: ['Passed', 'ok'], failed: ['Failed', 'bad'], regression: ['Regression', 'bad'],
   inconclusive: ['Inconclusive', 'warn'], partial: ['Partial', 'warn'], 'needs-review': ['Needs review', 'warn'], blocked: ['Blocked', 'muted'],
