@@ -40,7 +40,8 @@
     { "id": "radar", "title": "Change radar", "kind": "schedule", "doc": "docs/radar.md", "log": "RADAR",
       "schedule": "quality-inspector-radar-3h",
       "what": "Reads the titles and descriptions of pull requests and proposes a review of the recurring tests that a change can affect.",
-      "settings": {} },
+      "settings": {
+        "radar_window_days": { "type": "int", "min": 1, "max": 30, "default": 3 } } },
     { "id": "audit", "title": "Audit", "kind": "schedule", "doc": "docs/audit.md", "log": "AUDIT", "ran": " ok=",
       "schedule": "quality-inspector-audit-weekly",
       "what": "Weekly health check of the agent: schedules, logs, costs, the suite.",
