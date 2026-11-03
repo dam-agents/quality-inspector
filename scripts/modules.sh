@@ -99,7 +99,7 @@ cmd_status() {
     if [ "$kind" = schedule ]; then case "$(jq -r '.enabled' <<<"$sched")" in (false) state="off";; (null) state="unknown";; esac; fi
     last="$(last_run "$id" "$log" "${ran:- ran }")"
     out="$(jq -c --arg id "$id" --arg st "$state" --argjson set "$settings" --argjson sc "$sched" --argjson lr "$last" \
-      --argjson m "$(jq -c --arg id "$id" '.modules[] | select(.id == $id) | {id,title,kind,what,doc}' "$REG")" \
+      --argjson m "$(jq -c --arg id "$id" '.modules[] | select(.id == $id) | {id,title,kind,what,doc,switch:(.switch // null)}' "$REG")" \
       '. + [$m + {state:$st, schedule:$sc, last_run:$lr, settings:$set}]' <<<"$out")"
   done < <(jq -r '.modules[] | [.id, .kind, (.log // "null"), (.ran // ""), (.switch // "")] | join("\u001f")' "$REG")
   local g='{}' gs; gs="$(specs global)"

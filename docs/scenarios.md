@@ -85,7 +85,9 @@ in their own words ([catalog.md](catalog.md)); its box at the bottom sends
 `test this scenario: On the page <pattern>, the <control kind> "<name>": <their words>`. The
 dashboard's Test builder sends the same shape without the control, its words a person's numbered
 steps (`Name: …`, then `1. Open: /projects`, `2. Do: Click the button "Save"`, `3. Check: …`, one a
-line) — their words like any other: what a Check states is the oracle, a Do is a step.
+line) — their words like any other: what a Check states is the oracle, a Do is a step. Home's
+**Ask for a test** sends it too, without the control, its page the one the person chose or `/`
+(any page: find where the words lead).
 
 - **The operator's own press** is their chat message: source `operator`, answered here.
 - **A person the operator shared the page with** — the platform frames the prompt

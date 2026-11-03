@@ -61,7 +61,7 @@ build after it, and that build is the candidate (`deploy_gate: enabled`, the def
    environment: end this entry untouched, log it). Write the row as `in_progress` with
    this run's `ac_hash`, `candidate`, `baseline`, verdict `-`, now — the claim time the
    budgets count from. Remember the previous row — an abort restores it. Log `issue_start issue=<n> kind=<kind>`
-   ([logging.md](logging.md)), then the catalog ([catalog.md](catalog.md) → **Build and publish**) — its Overview shows the claim.
+   ([logging.md](logging.md)), then the catalog ([catalog.md](catalog.md) → **Build and publish**) — its Home shows the claim.
 2. **Re-check at action time.** `bash "$HOME/scripts/github.sh" issue <n>` — its text, labels and
    author — then `bash "$HOME/scripts/github.sh" comments <n>`, unless `include_comments: disabled`
    (never `gh` or a URL: [black-box.md](black-box.md) → **GitHub**). The issue must still carry `qa_label` (or `retest_label`), or the entry name a labelled pull request (`via_pr`). Gone →
@@ -144,7 +144,7 @@ build after it, and that build is the candidate (`deploy_gate: enabled`, the def
     runs: `env.sh wait <candidate>` / `suite.sh wait <label>` first); log `issue_done issue=<n> verdict=<v> minutes=<m> model_steps=<k>`,
     `m` and `k` the `elapsed_min` and `model_steps` of `suite.sh budget <claim time>`. Then the
     catalog ([catalog.md](catalog.md) → **Build and publish**) — on every path, an operator's or a
-    Slack "test #N" included, so Overview no longer shows the issue as working; a Slack "test #N"
+    Slack "test #N" included, so Home no longer shows the issue as working; a Slack "test #N"
     sends its report reply after it ([slack.md](slack.md) → **Run the test**).
 
 A failure between steps 5 and 8 that is not an environment failure → finish with the

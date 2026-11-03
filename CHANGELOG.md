@@ -7,6 +7,17 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.57.0 — 2026-11-03
+
+**Upgrade:**
+Nothing to run — docs are re-read per run, and the kit's `scripts/catalog/viewer.html` and
+`scripts/modules.sh` come with it; the next catalog build publishes the new page. The dashboard has five
+sections (Home, Tests, Runs, Product, Modules) in place of twelve tabs; an old address (`#v=catalog`, …)
+still opens its view. Its new command `look into what needs attention` ([docs/on-demand.md](docs/on-demand.md))
+and `show blockers` / `retry B-<k>` are page commands now, so a shared viewer's press of them goes to a
+fresh session like the others ([docs/modules.md](docs/modules.md) → Control). `CLAUDE.md` → **How you
+decide**: `docs/` is the usual way, not a script; the invariants and the trust boundary do not change.
+
 ## 3.56.0 — 2026-11-02
 
 **Upgrade:**

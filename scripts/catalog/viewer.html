@@ -44,21 +44,76 @@ header.top::before{content:"";display:block;height:4px;background:var(--grad)}
 .title h1{font-size:18px;margin:0;letter-spacing:-.01em}
 .title .sp{flex:1}
 .title select{border:1px solid var(--line);border-radius:999px;background:var(--surface);padding:4px 10px;max-width:240px}
-.tabs{display:flex;flex-wrap:wrap;gap:6px 4px;margin-top:8px;padding-bottom:8px;align-items:center}
-.tabs .grp{display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding:3px;border-radius:18px;background:var(--card);max-width:100%}
-.tabs .gl{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);padding:0 6px 0 8px;white-space:nowrap}
-.tabs button{background:none;border:0;border-radius:999px;padding:5px 11px;cursor:pointer;color:var(--dim);white-space:nowrap;display:inline-flex;gap:6px;align-items:center;transition:background .15s,color .15s}
-.tabs button:hover{color:var(--fg);background:var(--surface)}
-.tabs button[aria-selected=true]{color:var(--fg);background:var(--surface);font-weight:600;box-shadow:var(--shadow)}
-.tabs .em{font-size:15px;line-height:1}
-@media (max-width:1440px){.tabs .gl{display:none}.tabs button{padding:5px 9px}}
-.loc{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:8px 16px;font-size:13px;color:var(--dim)}
-.loc .here{display:inline-flex;gap:6px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px 12px 3px 8px;color:var(--fg);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The five sections: big tabs with an underline; Home carries the count of what needs you. */
+.tabs{display:flex;flex-wrap:wrap;gap:2px 4px;margin-top:6px;align-items:flex-end}
+.tabs button{background:none;border:0;border-bottom:3px solid transparent;border-radius:8px 8px 0 0;padding:8px 14px 7px;cursor:pointer;color:var(--dim);white-space:nowrap;display:inline-flex;gap:7px;align-items:center;font-size:14.5px;transition:background .15s,color .15s,border-color .15s}
+.tabs button:hover{color:var(--fg);background:var(--card)}
+.tabs button[aria-selected=true]{color:var(--fg);font-weight:650;border-bottom-color:var(--link)}
+.tabs .em{font-size:16px;line-height:1}
+.tcount{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--bad);color:#fff;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+@media (max-width:640px){.tabs button{padding:7px 9px 6px;font-size:13.5px;gap:5px}}
+/* The agent's state in the header: a dot that pulses while it works. */
+.status{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px 4px 10px;cursor:pointer;font-size:13px;color:var(--fg);max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status.work{border-color:color-mix(in srgb,var(--ok) 55%,var(--line));background:var(--okbg)}
+.status:hover{border-color:var(--link)}
+.wide-only{display:inline}
+@media (max-width:760px){.wide-only{display:none}}
+#h-tools{flex-wrap:wrap;max-width:100%}
+@media (max-width:600px){.title select{max-width:140px}.status{max-width:170px}}
+/* Where you are: the place as breadcrumbs, and Back at the right. */
+.loc{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:7px 16px;font-size:13px;color:var(--dim);border-top:1px solid var(--line)}
+.loc .pin{font-size:13px}
+.loc .crumbs{display:inline-flex;flex-wrap:wrap;gap:4px 8px;align-items:center;min-width:0;max-width:100%}
+.loc .crumb{background:none;border:0;padding:2px 6px;border-radius:6px;color:var(--dim);font:inherit;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.loc button.crumb{cursor:pointer;color:var(--link)}.loc button.crumb:hover{background:var(--gobg)}
+.loc .crumb.here{color:var(--fg);font-weight:600}
+.loc .sep{opacity:.6}
+.loc .sp{flex:1}
 .loc .btn{font-size:12.5px;padding:3px 10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The views of one section, as a segmented control at the top of the page. */
+.subtabs{display:inline-flex;flex-wrap:wrap;gap:2px;padding:3px;margin:12px 0 4px;border-radius:12px;background:var(--card);border:1px solid var(--line);max-width:100%}
+.subtabs button{background:none;border:0;border-radius:9px;padding:6px 12px;cursor:pointer;color:var(--dim);display:inline-flex;gap:6px;align-items:center;white-space:nowrap;font-size:13.5px}
+.subtabs button:hover{color:var(--fg)}
+.subtabs button[aria-selected=true]{background:var(--surface);color:var(--fg);font-weight:600;box-shadow:var(--shadow)}
 main{padding:6px 0 56px}
 
+/* Home: the status card, what to do next, the box to ask for a test, the welcome line. */
+.hero{display:flex;gap:18px;align-items:flex-start;margin:14px 0 0;padding:18px 20px;border-radius:16px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);border-left:6px solid var(--muted)}
+.hero.t-ok{border-left-color:var(--ok)}.hero.t-warn{border-left-color:var(--warn)}.hero.t-bad{border-left-color:var(--bad)}.hero.t-idle{border-left-color:var(--link)}
+.hico{font-size:40px;line-height:1;flex:none;margin-top:2px}
+.hbody{min-width:0;flex:1}
+.hero h2{margin:0;font-size:22px;letter-spacing:-.015em;line-height:1.25}
+.hsub{margin:6px 0 0;color:var(--dim);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.facts{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
+.fact{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:6px 12px;color:var(--fg);font:inherit;text-align:left;text-decoration:none;min-width:0}
+button.fact{cursor:pointer}button.fact:hover{border-color:var(--link);text-decoration:none}
+.fact .fi{font-size:18px}.fact .fl{display:block;font-size:11.5px;color:var(--dim)}.fact b{display:block;font-size:13.5px}
+.fact b.tok{color:var(--ok)}.fact b.tbad{color:var(--bad)}.fact b.twarn{color:var(--warn)}
+.fact .ico{display:none}
+.hact{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.hact .btn{padding:7px 14px;font-size:13.5px}
+@media (max-width:600px){.hero{flex-direction:column;gap:8px;padding:14px}.hico{font-size:30px}.hero h2{font-size:19px}.facts{display:grid;grid-template-columns:1fr 1fr}.fact{padding:6px 9px}.fact .fi{font-size:15px}}
+.panels.two{grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
+.recs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.rec{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);border-left:4px solid var(--muted)}
+.rec.t-bad{border-left-color:var(--bad)}.rec.t-warn{border-left-color:var(--warn)}.rec.t-ok{border-left-color:var(--ok)}.rec.t-agent{border-left-color:var(--agent)}
+.rico{font-size:20px;line-height:1.2;flex:none}
+.rbody{min-width:0;flex:1}.rbody>b{display:block}
+.acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
+.maint>summary{list-style:none;display:inline-flex}.maint>summary::-webkit-details-marker{display:none}
+.maint[open]{flex-basis:100%}.maint .att{margin-top:8px}
+.ask textarea{width:100%;min-height:76px;resize:vertical;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font:inherit}
+.ask .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.ask select{padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface);max-width:100%}
+.welcome{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:12px 0 0;padding:9px 14px;border-radius:12px;background:var(--gobg);border:1px solid color-mix(in srgb,var(--link) 30%,var(--line));font-size:13.5px}
+.welcome .em{font-size:18px}.welcome>span:nth-child(2){flex:1 1 280px}.welcome .wbtns{display:inline-flex;gap:6px;margin-left:auto}
+details.more{margin-top:16px}
+details.more>summary{cursor:pointer;font-weight:600;padding:10px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);box-shadow:var(--shadow)}
+details.more[open]>summary{margin-bottom:14px}
+details.more .grid-kpi{margin-bottom:0}
+
 /* The view's own head: its icon, its name, one line of what it is for. */
-.vhead{display:flex;gap:12px;align-items:center;margin:4px 0 16px}
+.vhead{display:flex;gap:12px;align-items:center;margin:10px 0 16px}
 .vico{width:44px;height:44px;border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-size:24px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);flex:none}
 .vhead h2{font-size:20px;margin:0;letter-spacing:-.01em}
 .vhead p{margin:2px 0 0;color:var(--dim);font-size:13px;max-width:900px}
@@ -298,7 +353,15 @@ body.dragging{user-select:none;cursor:col-resize}
 .hist span{font-size:11px;border-radius:3px;padding:0 5px}
 .sec{margin-top:18px}
 .sec h3{font-size:12px;margin:0 0 8px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;display:flex;gap:4px;align-items:center}
-#legend{position:fixed;right:16px;top:70px;z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow2);padding:14px;max-width:min(460px,calc(100% - 32px));max-height:80vh;overflow:auto}
+#legend{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:31;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow2);padding:0 20px 18px;width:min(760px,calc(100% - 32px));max-height:min(86vh,900px);overflow:auto}
+#legend:focus{outline:none}
+#legend .lhead{position:sticky;top:0;display:flex;gap:8px;align-items:center;padding:14px 0 10px;margin-bottom:6px;background:var(--surface);border-bottom:1px solid var(--line);font-size:16px;z-index:1}
+#legend .lhead .sp{flex:1}
+#legend>b{display:block;margin-top:14px;font-size:14px}
+#legend .terms{display:grid;grid-template-columns:minmax(0,190px) minmax(0,1fr);gap:8px 14px;font-size:13px;margin:8px 0 0}
+#legend .terms dt{font-weight:600}#legend .terms dd{margin:0;color:var(--dim)}
+@media (max-width:560px){#legend .terms{grid-template-columns:minmax(0,1fr)}}
+#lscrim{position:fixed;inset:0;background:rgba(20,16,50,.35);z-index:30}
 #legend ul{list-style:none;padding:0;margin:6px 0 12px}
 #legend li{margin:5px 0}
 .close{float:right}
@@ -342,6 +405,11 @@ pre.diff{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--card);bord
 .mod header{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
 .mod header h3{font-size:15px;margin:0}
 .mod p{margin:0}
+.mod.is-on{border-top:3px solid var(--ok)}
+.set.main{padding:8px 10px;border-radius:10px;background:var(--card)}
+.set.main dt{color:var(--fg);font-weight:600}
+.more-set>summary{cursor:pointer;font-size:13px;color:var(--dim)}
+.more-set[open]>summary{margin-bottom:8px}
 .set{display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr);gap:6px 10px;align-items:center;font-size:13px;margin:0}
 .set dt{color:var(--dim);overflow-wrap:anywhere}.set dd{margin:0;display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-width:0}
 .set input{width:9ch;padding:3px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
@@ -354,8 +422,6 @@ pre.diff{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--card);bord
 .dcard details summary{cursor:pointer;color:var(--link);font-size:12.5px}
 .ask textarea{width:100%;min-height:96px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg);font:inherit;resize:vertical}
 .ask{display:flex;flex-direction:column;gap:6px;margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
-.guide{margin-bottom:16px}.guide summary{cursor:pointer;font-weight:600}.guide dl{display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr);gap:8px 14px;font-size:13px;margin:12px 0 0}.guide dt{font-weight:600}.guide dd{margin:0;color:var(--dim)}
-@media (max-width:520px){.guide dl{grid-template-columns:minmax(0,1fr)}}
 
 /* Actions: what you can ask the agent for — a title, what happens, the command. */
 .actions{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
@@ -599,7 +665,7 @@ const CAUSE_OF = new Set(['failed', 'regression', 'needs-review', 'blocked', 'fl
 const causeKey = (value, cause) => (!CAUSE_OF.has(str(value)) ? null : own(CAUSE, str(cause)) && cause !== 'unknown' ? str(cause) : 'unknown');
 const causeB = (value, cause) => { const k = causeKey(value, cause);
   return k ? h('span', { class: `badge cause c-${k}`, title: `Cause: ${CAUSE[k][0]}. ${CAUSE[k][2]}` }, `${CAUSE[k][1]} ${CAUSE[k][0]}`) : null; };
-// Overview: the failing test cases by cause, each a link to them; and a night whose environment failed.
+// Home: the failing test cases by cause, each a link to them; and a night whose environment failed.
 function causeSummary(att) {
   const n = {}; for (const i of att) { const k = causeKey(i.latest, i.verdict && i.verdict.cause); if (k) n[k] = (n[k] || 0) + 1; }
   const night = runs.find((r) => r.type === 'regression');
@@ -877,8 +943,8 @@ const FACET_HELP = {
 };
 // What each view is for: the line under the tabs and the tab's tooltip.
 const VIEW_HELP = {
-  overview: 'The status of testing: what the agent does now, what waits, the test cases that need attention, and the newest test runs.',
-  modules: 'Each testing module and scheduled run, with its switch and its settings. A change here only shows a message for the agent in a box at the bottom.',
+  overview: 'What the agent does now, what needs you, and what to do next.',
+  modules: 'Each testing module and scheduled run: what it does, when it runs, and its settings.',
   findings: 'The problems that the testing modules found outside the issues: form validation, load (stress) and security counts, and the scenarios that people requested. Select problems to report them in one bug issue.',
   design: 'The layout, visual and accessibility defects that the UI sweep found, each with a screenshot. Put them into categories, recheck them, discuss them with the agent, dismiss them, or report them in one bug issue.',
   runs: 'All test runs: nightly regressions, issue runs, scenario runs and manual runs. Each one has its result, its build and its report (video, screenshots, steps).',
@@ -935,12 +1001,21 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && tipFor) 
 window.addEventListener('scroll', hideTip, true);
 
 // ------------------------------------------------------------------- state
-// [id, name, icon, group]: the tabs, grouped by subject, each with its icon on every link to it.
-const VIEWS = [['overview', 'Overview', '🏠', 'Status'], ['runs', 'Runs', '🏃', 'Status'],
-  ['catalog', 'Catalog', '📚', 'Tests'], ['gallery', 'Gallery', '🖼️', 'Tests'], ['history', 'History', '🕰️', 'Tests'], ['lifecycle', 'Lifecycle', '🌱', 'Tests'], ['builder', 'Test builder', '🛠️', 'Tests'],
-  ['map', 'Product map', '🗺️', 'Product'], ['coverage', 'Coverage', '🧭', 'Product'], ['design', 'Design', '🎨', 'Product'],
-  ['findings', 'Findings', '🔎', 'Modules'], ['modules', 'Modules', '🧩', 'Modules']];
+// [id, name, icon, section, short name]: the views, each with its icon on every link to it. A section
+// is one tab of the header; the views of a section are the tabs under its name.
+const VIEWS = [['overview', 'Home', '🏠', 'home', 'Home'], ['runs', 'Runs', '🏃', 'runs', 'Runs'],
+  ['catalog', 'All tests', '📚', 'tests', 'All tests'], ['gallery', 'Screenshots', '🖼️', 'tests', 'Screenshots'], ['history', 'History', '🕰️', 'tests', 'History'], ['lifecycle', 'Lifecycle', '🌱', 'tests', 'Lifecycle'], ['builder', 'Test builder', '🛠️', 'tests', 'Test builder'],
+  ['map', 'Product map', '🗺️', 'product', 'Product map'], ['coverage', 'Coverage', '🧭', 'product', 'Coverage'], ['design', 'Design', '🎨', 'product', 'Design'],
+  ['modules', 'Settings', '🧩', 'checks', 'Settings'], ['findings', 'Findings', '🔎', 'checks', 'Findings']];
 const viewOf = (k) => VIEWS.find(([x]) => x === k) || VIEWS[0];
+// [id, name, icon, what it is for]: five places, one question each.
+const SECTIONS = [['home', 'Home', '🏠', 'What happens now, and what needs you.'], ['tests', 'Tests', '🧪', 'What the agent tests: every test case, its screenshots, its history, and new tests.'],
+  ['runs', 'Runs', '🏃', 'Every test run, with its result and its report.'], ['product', 'Product', '🗺️', 'The pages of the product: which tests reach them, and the design defects on them.'],
+  ['checks', 'Modules', '🧩', 'The automatic checks: their switches and settings, and what they found.']];
+const sectionOf = (v) => SECTIONS.find(([k]) => k === viewOf(v)[3]) || SECTIONS[0];
+const viewsIn = (sec) => VIEWS.filter((x) => x[3] === sec);
+// The view each section opened last, in memory: a tab returns to it.
+const lastView = {};
 const COLS = {
   ref: ['Issue / scenario', (i) => i.ref, (a, b) => (a.origin.kind || '').localeCompare(b.origin.kind || '') || num(a.ref) - num(b.ref), (i) => refLink(i.ref)],
   id: ['Test case', (i) => str(i.id), (a, b) => str(a.id).localeCompare(str(b.id)) || num(a.id) - num(b.id), (i) => h('span', { title: itemLong(i) }, `${ENT[i.kind][1]} ${str(i.id)}`)],
@@ -1044,9 +1119,10 @@ function where(st = S) {
   const it = st.i && byKey.get(st.i); if (it) return `${itemTag(it)} — ${str(it.name)}`.slice(0, 80);
   const run = st.r && byRun.get(st.r); if (run) return runName(run);
   if (st.o) return `${originName(st.o)}${originTitle(st.o) ? ` — ${originTitle(st.o)}` : ''}`.slice(0, 80);
-  const view = viewOf(st.v)[1];
+  const [, vname, , sec, short] = viewOf(st.v);
+  const view = viewsIn(sec).length > 1 ? `${sectionOf(st.v)[1]} › ${short}` : vname;
   const pg = st.v === 'map' && pageOf(st.pg);
-  // A filtered list names its filter: "Catalog · Area: projects".
+  // A filtered list names its filter: "Tests › All tests · Area: projects".
   const fs = ['catalog', 'gallery', 'history'].includes(st.v) ? Object.entries(st.f).filter(([, x]) => x.length) : [];
   const filt = fs.length ? ` · ${fs.slice(0, 2).map(([k, x]) => `${FACET[k] ? FACET[k].label : k}: ${x.slice(0, 2).map((y) => (k === 'verdict' ? vLabel(y) : y)).join(', ')}${x.length > 2 ? '…' : ''}`).join(' · ')}${fs.length > 2 ? ' …' : ''}`
     : st.q && ['catalog', 'gallery', 'history'].includes(st.v) ? ` · search "${st.q.slice(0, 30)}"` : '';
@@ -1082,7 +1158,10 @@ function nav(patch) {
   if (hashOf() === from) { render(); renderDrawer(); return; }
   trail = [...trail, { h: from, label }].slice(-100);
   setLocation(true);
+  const viewBefore = new URLSearchParams(from).get('v') || 'overview';
   if (panelOnly) renderHeader(); else render();
+  // A different view starts at its top, so that its head and its tabs show.
+  if (!panelOnly && viewBefore !== S.v) try { window.scrollTo(0, 0); } catch { /* ignore */ }
   renderDrawer();
 }
 function back() {
@@ -1122,7 +1201,7 @@ function stepText(t) {
 }
 // The commands the page may offer: the operator's words of docs/on-demand.md and docs/modules.md,
 // built from constants and ids only. Anything else is never shown, copied or sent.
-const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|run (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)(?:, (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)){0,19}|repair (?:#\d+(?: (?:AC|IN)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: AC-\d+)?)|test scenario [a-z0-9][a-z0-9-]{0,40}|create issue for (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})(?:, (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})){0,19}(?: for the architect)?|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+(?: as (?:false-positive|wont-fix|duplicate|by-design))?|(?:reopen|recheck|discuss) D-\d+|send D-\d+ to design|recheck VAL-\d{1,6}|categorize D-\d+ (?:[a-z0-9][a-z0-9-]{0,29}|-)|(?:add (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) to|remove (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) from) the collection [A-Za-z0-9][A-Za-z0-9 _.-]{0,39}|run feature [a-z0-9][a-z0-9-]{0,39}|(?:accept|rewrite|retire|keep) M-\d{1,6})$/;
+const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|run (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)(?:, (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)){0,19}|repair (?:#\d+(?: (?:AC|IN)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: AC-\d+)?)|test scenario [a-z0-9][a-z0-9-]{0,40}|create issue for (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})(?:, (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})){0,19}(?: for the architect)?|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+(?: as (?:false-positive|wont-fix|duplicate|by-design))?|(?:reopen|recheck|discuss) D-\d+|send D-\d+ to design|recheck VAL-\d{1,6}|categorize D-\d+ (?:[a-z0-9][a-z0-9-]{0,29}|-)|(?:add (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) to|remove (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) from) the collection [A-Za-z0-9][A-Za-z0-9 _.-]{0,39}|run feature [a-z0-9][a-z0-9-]{0,39}|(?:accept|rewrite|retire|keep) M-\d{1,6}|look into what needs attention|show blockers|retry B-\d{1,6})$/;
 // A problem a found issue may be about (skills/create-issue): a criterion's or an exploration's failure,
 // a design finding, a validation case, a stress check.
 const PROB_RE = /^(?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})$/;
@@ -1456,38 +1535,67 @@ const applyTheme = () => { if (theme === 'auto') document.documentElement.remove
 applyTheme();
 const themeBtn = () => h('button', { class: 'btn', type: 'button', 'aria-label': `Colour mode: ${THEMES[theme][1]}`, title: 'Changes the colours: Auto (as the system), Day or Night. Only in this browser.',
   onclick: () => { theme = { auto: 'light', light: 'dark', dark: 'auto' }[theme]; applyTheme(); try { localStorage.setItem(THEME_KEY, theme); } catch { /* this browser only */ } renderHeader(); } },
-  `${THEMES[theme][0]} ${THEMES[theme][1]}`);
+  THEMES[theme][0], h('span', { class: 'wide-only' }, ` ${THEMES[theme][1]}`));
+// What the agent does, as of this page's build: a run that holds the environment, an issue or a scenario in progress.
+function agentState() {
+  const lock = A.lock && A.lock.owner ? A.lock : null;
+  const active = arr(A.issues).filter((x) => x && x.status === 'in_progress' && Number.isInteger(x.issue));
+  const scen = arr(F.requests).filter((x) => x && x.status === 'in_progress' && x.id);
+  if (!lock && !active.length && !scen.length) return { work: false, text: 'Idle', what: 'The agent does not test anything now.' };
+  const refs = [...active.map((x) => `#${x.issue}`), ...scen.map((x) => str(x.id))];
+  const text = refs.length ? `Testing ${refs.slice(0, 2).join(', ')}${refs.length > 2 ? '…' : ''}` : `Working: ${lockBy(lock.owner)}`;
+  return { work: true, text, what: refs.length ? `The agent tests ${refs.map((r) => (refTitle(r) ? `${r} "${cut(refTitle(r), 40)}"` : r)).join(', ')} now.` : `The agent works now: ${lockBy(lock.owner)}.` };
+}
+// The test cases that need a person, the worst first.
+const attention = () => items.filter((i) => i.flags.includes('needs attention')).sort((a, b) => SEV[a.cls] - SEV[b.cls] || str(b.verdict && b.verdict.utc).localeCompare(str(a.verdict && a.verdict.utc)));
+// A tab of the header: one section; it opens the view of that section that was open last.
+const openSection = (sec) => go({ v: lastView[sec] && viewOf(lastView[sec])[3] === sec ? lastView[sec] : viewsIn(sec)[0][0] });
 function renderHeader() {
   const a = D.agent || {};
   $('#h-title').textContent = `${D.product ? `${str(D.product)} · ` : ''}Quality control center`;
-  document.title = $('#h-title').textContent;
+  document.title = `${viewOf(S.v)[1]} · ${$('#h-title').textContent}`;
   const meta = $('#h-meta'); meta.textContent = '';
-  meta.append([str(D.target), str(a.display_name), a.version ? `v${a.version}` : '', D.generated_utc ? `page built ${rel(D.generated_utc)} (${str(D.generated_utc)})` : ''].filter(Boolean).join(' · '));
+  meta.append([str(D.target), str(a.display_name), a.version ? `v${a.version}` : '', D.generated_utc ? `updated ${rel(D.generated_utc)}` : ''].filter(Boolean).join(' · '));
+  if (D.generated_utc) meta.title = `The agent built this page at ${str(D.generated_utc)}. The page shows the state at that time. The agent builds it again after each test run.`;
+  const st = agentState();
   const tools = $('#h-tools'); tools.textContent = '';
-  tools.append(...[builds.length ? h('select', { 'aria-label': 'Show the state as of a build', 'data-kind': 'go', title: 'Shows all views with the verdicts as they were when that build was tested.', onchange: (e) => go({ at: e.target.value || null }) },
-    h('option', { value: '' }, '⏱ As of: now'), builds.slice().reverse().map((b) => h('option', { value: b.id, selected: S.at === b.id ? true : null }, `⏱ As of ${fmtDate(b.utc)} · ${b.id}`))) : null,
+  tools.append(...[S.at ? null : h('button', { class: `status ${st.work ? 'work' : 'idle'}`, type: 'button', 'data-kind': 'go', 'data-dest': '🏠 Home', title: `${st.what} This is the state when the page was built (${rel(D.generated_utc)}).`, onclick: () => go({ v: 'overview' }) },
+    h('span', { class: `pulse${st.work ? '' : ' idle'}`, 'aria-hidden': 'true' }), h('span', {}, st.text)),
+  builds.length ? h('select', { 'aria-label': 'Show the state as of a build', 'data-kind': 'go', title: 'Shows all views with the verdicts as they were when that build was tested.', onchange: (e) => go({ at: e.target.value || null }) },
+    h('option', { value: '' }, '⏱ Now'), builds.slice().reverse().map((b) => h('option', { value: b.id, selected: S.at === b.id ? true : null }, `⏱ As of ${fmtDate(b.utc)} · ${b.id}`))) : null,
   themeBtn(),
-  h('button', { class: 'btn', type: 'button', onclick: toggleLegend, 'aria-expanded': $('#legend') ? 'true' : 'false', title: 'The meaning of the icons, colours, verdicts, tiers and test runs.' }, '📖 Legend')].filter(Boolean)); // DOM append writes a null as text
+  h('button', { class: 'btn', type: 'button', onclick: toggleLegend, 'aria-expanded': $('#legend') ? 'true' : 'false', 'aria-haspopup': 'dialog', title: 'How this page works: the words, the icons, the colours, the verdicts and the controls.' }, '❔', h('span', { class: 'wide-only' }, ' Help'))].filter(Boolean)); // DOM append writes a null as text
+  // The five sections. Home shows how many test cases need you.
   const tabs = $('#tabs'); tabs.textContent = '';
-  let grp = null;
-  for (const [k, label, icon, g] of VIEWS) {
-    if (!grp || grp.dataset.g !== g) { grp = h('div', { class: 'grp', role: 'presentation' }, h('span', { class: 'gl', 'aria-hidden': 'true' }, g)); grp.dataset.g = g; tabs.append(grp); }
-    grp.append(h('button', { role: 'tab', type: 'button', 'aria-selected': S.v === k ? 'true' : 'false', 'data-kind': 'go', 'data-dest': `${icon} ${label}`, title: VIEW_HELP[k] || null, onclick: () => go({ v: k }) },
-      h('span', { class: 'em', 'aria-hidden': 'true' }, icon), label));
+  const nAtt = attention().length + (S.at ? 0 : blockers.length);
+  for (const [k, label, icon, what] of SECTIONS) {
+    const here = viewOf(S.v)[3] === k;
+    const n = k === 'home' && nAtt ? h('span', { class: 'tcount', title: `${nAtt} thing(s) need your attention: blockers and test cases.` }, String(nAtt)) : null;
+    tabs.append(h('button', { role: 'tab', type: 'button', 'aria-selected': here ? 'true' : 'false', 'aria-current': here ? 'page' : null, 'data-kind': 'go', 'data-dest': `${icon} ${label}`, title: what, onclick: () => openSection(k) },
+      h('span', { class: 'em', 'aria-hidden': 'true' }, icon), label, n));
   }
-  // Where you are, always: the view (and the panel open on it), and the way back.
+  // Where you are, always: the section, the view (and the panel open on it), and the way back.
   const bb = $('#h-back'); bb.textContent = '';
-  const [, vname, vicon] = viewOf(S.v);
+  const [, , vicon] = viewOf(S.v);
   const panel = S.i ? 'testcase' : S.r ? 'run' : S.o ? refKind(S.o) : null;
-  bb.append(h('span', {}, '📍 You are here:'), h('span', { class: 'here', title: 'The view and the panel that are open now. The address of the page also keeps this place.' },
-    `${vicon} ${where({ ...S, i: null, r: null, o: null })}`, panel ? ` › ${ENT[panel][1]} ${where()}` : ''), backBtn() || '');
+  const base = `${vicon} ${where({ ...S, i: null, r: null, o: null })}`;
+  bb.append(h('span', { class: 'pin', 'aria-hidden': 'true' }, '📍'),
+    h('span', { class: 'crumbs', title: 'Where you are now. The address of the page also keeps this place.' },
+      panel ? h('button', { class: 'crumb', type: 'button', 'data-kind': 'go', 'data-dest': base, title: 'Closes the panel and shows this view.', onclick: closeDrawer }, base) : h('span', { class: 'crumb here' }, base),
+      panel ? [h('span', { class: 'sep', 'aria-hidden': 'true' }, '›'), h('span', { class: 'crumb here' }, panel === 'run' ? `${ENT.run[1]} ${where()}` : where())] : null),
+    h('span', { class: 'sp' }), backBtn() || '');
 }
 function toggleLegend() {
-  const old = $('#legend'); if (old) { old.remove(); renderHeader(); return; }
+  const old = $('#legend');
+  if (old) { old.remove(); const sc = $('#lscrim'); if (sc) sc.remove(); renderHeader(); const hb = $('#h-tools [aria-haspopup=dialog]'); if (hb) hb.focus(); return; }
   const groups = { ok: [], warn: [], bad: [], muted: [] };
   for (const [k, [label, c]] of Object.entries(VAL)) groups[c].push([k, label]);
-  document.body.append(h('div', { id: 'legend', role: 'dialog', 'aria-label': 'Legend' },
-    h('button', { class: 'btn close', type: 'button', onclick: toggleLegend }, ico('close'), 'Close'), h('b', {}, 'What the controls do'), keysRow(),
+  document.body.append(h('div', { id: 'legend', role: 'dialog', 'aria-label': 'Help', tabindex: -1, onkeydown: (e) => { if (e.key === 'Escape') { e.stopPropagation(); toggleLegend(); } } },
+    h('div', { class: 'lhead' }, h('b', {}, '❔ How this page works'), h('span', { class: 'sp' }), h('button', { class: 'btn', type: 'button', onclick: toggleLegend, title: 'Closes the help (also the Esc key).' }, ico('close'), 'Close')),
+    h('p', { class: 'muted-t' }, 'The agent tests the product and builds this page after each test run. Start on 🏠 Home: it tells you what needs you and what to do next.'),
+    h('b', {}, 'The five places'), h('ul', {}, SECTIONS.map(([k, label, icon, what]) => h('li', {}, h('b', {}, `${icon} ${label}`), ' — ', h('span', { class: 'muted-t' }, what)))),
+    h('b', {}, 'The words'), h('dl', { class: 'terms' }, guideTerms().map(([t, d]) => [h('dt', {}, t), h('dd', {}, d)])),
+    h('b', {}, 'What the controls do'), keysRow(),
     h('p', { class: 'muted-t' }, bridge() ? 'A violet button opens a box at the bottom. The box shows the message for the agent. "Send to the agent" in the box sends it to the chat of the agent as your message. Nothing changes before the agent does the action.'
       : 'This page does not change anything itself. A violet button opens a box at the bottom with the message for the agent. Copy the message into the chat of the agent. When an interactive page is open next to that chat, the box sends the message.'),
     h('b', {}, 'Names and icons'), namesList(),
@@ -1497,7 +1605,9 @@ function toggleLegend() {
     h('b', {}, 'Tiers'), h('ul', {},
       TIERS.map((t) => h('li', {}, tierB(t), ' ', h('span', { class: 'muted-t' }, TIER_HELP[t])))),
     h('b', {}, `${ENT.run[1]} Test runs`), h('ul', {}, Object.entries(RUNTYPE).map(([k, l]) => h('li', {}, h('b', {}, l), ' — ', h('span', { class: 'muted-t' }, RUNTYPE_HELP[k]))))));
+  document.body.append(h('div', { id: 'lscrim', onclick: toggleLegend }));
   renderHeader();
+  $('#legend').focus();
 }
 
 // ---------------------------------------------------------------- overview
@@ -1684,27 +1794,33 @@ function activityTimeline() {
 }
 function activityBlock() {
   if (S.at) return null;
-  return h('div', { class: 'activity' }, activityNow(), activityQueue(), activitySchedule(), activityTimeline());
+  return h('div', { class: 'activity' }, activityNow(), activityQueue(), activitySchedule());
 }
 
-// The words of this page, once: what a test, a criterion, a tier, a verdict and an action are.
+// The words of this page, once (in Help): what a test, a criterion, a tier, a verdict and an action are.
 const GUIDE_KEY = `qi-catalog:${str(D.target)}:guide`;
-function guide() {
-  let open = true; try { open = localStorage.getItem(GUIDE_KEY) !== 'closed'; } catch { /* default open */ }
-  const terms = [
+function guideTerms() {
+  return [
     [`${ENT.issue[1]} Issue → ${ENT.criterion[1]} acceptance criteria`, 'The agent changes each GitHub issue that has the QA label into acceptance criteria (AC-1, AC-2: Given, When, Then). It freezes the criteria from the issue text before it tests. A scenario (💬) is the same, from a request of a person.'],
     [`${ENT.testcase[1]} Test case`, 'One acceptance criterion (🎯) or exploration (🔦) and its automated browser test. "#42 AC-1" is the test case of acceptance criterion AC-1 of issue #42. Put the pointer on a name to see all of it.'],
     [`${ENT.run[1]} Test run`, 'One time that the agent ran tests on one build (📦). An issue run tests one issue. The nightly regression runs the nightly test cases on the newest build. A manual run is a run that you start from the panel of a test case.'],
-    [`${ENT.verdict[1]} Verdict`, 'The result of a test case. Verified: the test fails on the last release and passes on the new build. This shows that the change works. Failed or Regression: possibly a bug. The Legend shows all verdicts.'],
+    [`${ENT.verdict[1]} Verdict`, 'The result of a test case. Verified: the test fails on the last release and passes on the new build. This shows that the change works. Failed or Regression: possibly a bug. The list below shows all verdicts.'],
     [`${ENT.tier[1]} Tier`, '🆕 Exploratory: the test ran one time. ⭐ Promotable: the test is verified. 🌙 Regression: the test runs each night. Quarantined and retired tests do not run at night.'],
     [`${ENT.report[1]} Report`, 'The evidence of a test run: video, screenshots and steps. A report with a link opens in a new tab. A private report shows 🔒: find it in Artifacts in the app.'],
     ['🛠️ Test builder', 'Write the steps of a new test as blocks or as text, or start from a test case or a page of the map. The preview shows each step on the screens of the product. Then ask for the test, or ask the agent to do the steps in the Browser Panel.'],
     ['🤖 Messages for the agent', 'A violet button opens a box at the bottom. The box shows the message for the agent, for example "run #42 AC-1". Next to the chat of the agent, "Send to the agent" in the box sends it. Else copy it into the chat. Nothing goes to the agent before you send it. The page itself does not change anything.'],
     [`${ENT.bug[1]} Report a bug`, 'Select failed test cases and findings (☐). Then use the violet bar at the bottom: one bug issue for all of them. Or use "Report it as a bug issue" in the panel of a test case. The agent shows you the draft and creates the issue only when you agree.' + (FIX_LABEL ? ` The command with "for the architect" adds the label "${FIX_LABEL}". The software architect then repairs the problem.` : '')],
   ];
-  return h('details', { class: 'panel guide', open: open ? true : null, ontoggle: (e) => { try { localStorage.setItem(GUIDE_KEY, e.currentTarget.open ? 'open' : 'closed'); } catch { /* ignore */ } } },
-    h('summary', {}, '👋 How this page works'), h('p', { class: 'meta', style: 'margin:10px 0 0' }, 'Each kind of control has its colour and icon. Put the pointer on a control: its tooltip says where it goes.'), keysRow(),
-    h('dl', {}, terms.map(([t, d]) => [h('dt', {}, t), h('dd', {}, d)])));
+}
+// A first visit: one line that points to Help. It goes away for good in this browser.
+function welcome() {
+  let shown = true; try { shown = localStorage.getItem(GUIDE_KEY) !== 'closed'; } catch { /* default shown */ }
+  if (!shown) return null;
+  const bar = h('div', { class: 'welcome', role: 'note' }, h('span', { class: 'em', 'aria-hidden': 'true' }, '👋'),
+    h('span', {}, 'First time here? This page shows what the agent tests and what needs you. ', h('b', {}, '❔ Help'), ' explains the words and the controls.'),
+    h('span', { class: 'wbtns' }, h('button', { class: 'btn', type: 'button', 'aria-haspopup': 'dialog', onclick: toggleLegend }, '❔ Open help'),
+      h('button', { class: 'btn', type: 'button', 'data-kind': 'local', 'aria-label': 'Hide this line', title: 'Hides this line. Only in this browser.', onclick: () => { try { localStorage.setItem(GUIDE_KEY, 'closed'); } catch { /* ignore */ } bar.remove(); } }, ico('close'))));
+  return bar;
 }
 const KPI_HELP = {
   'Nightly (regression tier)': 'Test cases that run each night on the newest build.', Promotable: 'Verified test cases that you can promote into the nightly regression.',
@@ -1742,22 +1858,181 @@ function blockerItem(b) {
 }
 const blockerList = () => (blockers.length && !S.at ? h('ul', { class: 'att' }, blockers.map(blockerItem)) : null);
 const BLOCKER_TIP = `${ENT.blocker[2]} The agent shows them first. "show blockers" in the chat gives its notes.`;
+// ------------------------------------------------------------------- home
+// Home answers three questions, in this sequence: what is the state, what must I do, what does the agent do.
+// The schedules that are on, as text: "Issues run every hour at :07".
+function runsByItself() {
+  const sc = A.schedules && typeof A.schedules === 'object' ? arr(A.schedules.list).filter((x) => x && x.name && x.enabled === true) : [];
+  const key = (n) => str(n).replace(/^quality-inspector-/, '');
+  const order = Object.keys(SCHED);
+  return sc.slice().sort((a, b) => order.indexOf(key(a.name)) - order.indexOf(key(b.name))).map((x) => `${SCHED[key(x.name)] || key(x.name)}${x.cron ? ` ${cronText(x.cron)}` : ''}`);
+}
+const AGENT_ALL = 'look into what needs attention';
+const AGENT_ALL_TIP = 'The agent examines each test case that needs attention. It runs a test again to find a flaky test, repairs a test that is wrong, and writes a bug issue draft for a product defect. It asks you before it creates an issue or promotes a test.';
+// The status card: one sentence on the tests, one on the agent, four facts, the main actions.
+function hero(att) {
+  const st = agentState();
+  const last = nightsAt[nightsAt.length - 1];
+  const lastRun = last ? nightOf(str(last.build)) : null;
+  const regN = last && last.counts ? +last.counts.regression || 0 : 0;
+  const night0 = runsAt.find((r) => r.type === 'regression');
+  const envFail = !!(night0 && night0.verdict === 'environment');
+  const bad = att.filter((i) => i.cls === 'bad').length;
+  const n = att.length;
+  const nb = S.at ? 0 : blockers.length;
+  const [tone, icon, head] = nb ? ['bad', ENT.blocker[1], `${nb} blocker${nb === 1 ? ' stops' : 's stop'} the work of the agent`]
+    : !items.length ? ['idle', '🌱', 'No test cases yet']
+    : n ? [bad ? 'bad' : 'warn', bad ? '🚨' : '👀', `${n} test case${n === 1 ? ' needs' : 's need'} your attention`]
+      : envFail ? ['bad', '🏗️', 'The newest night did not run: the product did not start']
+        : ['ok', '✅', 'All test cases pass'];
+  const lastAny = runsAt[0];
+  const agentLine = S.at ? `This is the state as of build ${S.at}.`
+    : st.work ? st.what : `${st.what}${lastAny ? ` Its last test run was ${rel(lastAny.utc)}.` : ''}${nb && n ? ` Also, ${n} test case${n === 1 ? ' needs' : 's need'} your attention.` : ''}`;
+  const t = (x) => items.filter((i) => i.tier === x).length;
+  const cov = pagesData.filter((p) => p.covered === 'regression').length;
+  const sched = runsByItself();
+  const fact = (ic, label, val, patch, help, cls) => (patch ? goLink(patch, [h('span', { class: 'fi', 'aria-hidden': 'true' }, ic), h('span', {}, h('span', { class: 'fl' }, label), h('b', { class: cls || null }, val))], help, 'fact')
+    : h('span', { class: 'fact', title: help || null }, h('span', { class: 'fi', 'aria-hidden': 'true' }, ic), h('span', {}, h('span', { class: 'fl' }, label), h('b', { class: cls || null }, val))));
+  const actionable = n || maintenance.length || nb;
+  const scrollAsk = () => { const a = $('#ask textarea'); if (a) { a.scrollIntoView({ behavior: 'smooth', block: 'center' }); a.focus({ preventScroll: true }); } };
+  return h('section', { class: `hero t-${tone}`, 'aria-label': 'Status' },
+    h('div', { class: 'hico', 'aria-hidden': 'true' }, icon),
+    h('div', { class: 'hbody' },
+      h('h2', {}, head),
+      h('p', { class: 'hsub' }, !S.at && st.work ? h('span', { class: 'pulse', 'aria-hidden': 'true' }) : null, agentLine),
+      h('div', { class: 'facts' },
+        fact('🌙', 'Last night', envFail ? 'did not run' : !last ? 'not run yet' : regN ? `${regN} regression${regN === 1 ? '' : 's'}` : 'no regression',
+          envFail ? { r: night0.id } : lastRun ? { r: lastRun.id } : null, KPI_HELP['Last night'], envFail || regN ? 'tbad' : last ? 'tok' : null),
+        fact('🧪', 'Test cases', `${items.length} · ${t('regression')} each night`, items.length ? { v: 'catalog', f: {}, q: '' } : null, 'All test cases, and how many of them run each night.'),
+        pagesData.length ? fact('🖥️', 'Pages with a nightly test', `${cov} of ${pagesData.length}`, { v: 'coverage' }, KPI_HELP['Pages covered'], cov < pagesData.length ? 'twarn' : 'tok') : null,
+        S.at ? null : fact('⏰', 'Runs by itself', sched.length ? `${sched[0]}${sched.length > 1 ? ` +${sched.length - 1}` : ''}` : 'no schedule on', { v: 'modules' }, sched.length ? `The schedules that are on: ${sched.join('; ')}.` : 'No schedule is on. The agent tests only when you ask it.')),
+      h('div', { class: 'hact' },
+        actionable && !S.at ? agentBtn(AGENT_ALL, 'Let the agent take care of it', '🤖 The agent examines everything that needs attention', true) : null,
+        S.at ? null : h('button', { class: 'btn', type: 'button', 'data-kind': 'local', title: 'Goes to the box where you write a test in your words.', onclick: scrollAsk }, '💬 Ask for a test'),
+        n ? goLink({ v: 'catalog', f: { flag: ['needs attention'] }, q: '' }, `See the ${n} test case${n === 1 ? '' : 's'}`, null, 'btn') : null)));
+}
+// A violet button for one of the page's commands; `strong` fills it. It opens the box at the bottom, as copyBox.
+function agentBtn(text, label, title, strong) {
+  const b = copyBox(text, label, title);
+  if (b && strong) b.className = 'btn agent';
+  return b;
+}
+// What to do next: the page reads the state and names the useful steps, each with its one action.
+function nextSteps(att) {
+  const recs = [];
+  for (const b of S.at ? [] : blockers) {
+    const yours = ['operator', 'platform'].includes(b.owner);
+    recs.push(['bad', ENT.blocker[1], `${b.id} stops the agent: ${BLOCKER_SCOPE[b.scope][0].toLowerCase()}${b.scope === 'preflight' && b.stage ? ` (${b.stage})` : ''}.`,
+      `Who repairs it: ${BLOCKER_OWNER[b.owner][0]}. ${BLOCKER_OWNER[b.owner][1].split('{id}').join(b.id)}`,
+      [yours ? agentBtn(`retry ${b.id}`, 'I repaired it: try again', `${ENT.blocker[1]} Tell the agent to try ${b.id} again`) : null,
+        agentBtn('show blockers', 'What did the agent examine?', `${ENT.blocker[1]} Show the blockers and the notes of the agent`)]]);
+  }
+  const by = {};
+  for (const i of att) { const k = i.drift && !causeKey(i.latest, i.verdict && i.verdict.cause) ? 'drift' : causeKey(i.latest, i.verdict && i.verdict.cause) || 'unknown'; (by[k] = by[k] || []).push(i); }
+  const pl = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+  const see = (f, text = 'See them') => goLink({ v: 'catalog', f, q: '' }, text, null, 'btn');
+  const probs = (list) => list.map(problemRef).filter(Boolean).slice(0, PICK_MAX);
+  if (by.product) {
+    const refs = probs(by.product);
+    recs.push(['bad', CAUSE.product[1], `${pl(by.product.length, 'test case fails', 'test cases fail')} because of a product defect.`, 'Report the defect, so that a developer repairs it.',
+      [refs.length ? agentBtn(`create issue for ${refs.join(', ')}`, refs.length === 1 ? 'Report it as a bug issue' : 'Report them as one bug issue', `${ENT.bug[1]} Report ${refs.length} product defect${refs.length === 1 ? '' : 's'} as one bug issue`) : null, see({ cause: ['product'] })]]);
+  }
+  if (by.test) {
+    const one = by.test.length === 1 ? by.test[0] : null;
+    const rr = one ? runRef(one) : null;
+    recs.push(['warn', CAUSE.test[1], `${pl(by.test.length, 'test case fails', 'test cases fail')} because the test is wrong.`, 'The product possibly works. The agent can repair the test.',
+      [rr && CMD_RE.test(`repair ${rr}`) ? agentBtn(`repair ${rr}`, 'Ask the agent to repair it', `🔧 Repair the test ${rr}`) : agentBtn(AGENT_ALL, 'Ask the agent to repair them', '🔧 The agent repairs the tests that are wrong'), see({ cause: ['test'] })]]);
+  }
+  if (by.environment) {
+    const cmd = runList(by.environment.map(runRef));
+    recs.push(['muted', CAUSE.environment[1], `${pl(by.environment.length, 'test case', 'test cases')} did not run: an environment problem.`, 'The product did not start or work as a whole. Run them again when it works.',
+      [cmd ? agentBtn(cmd, 'Run them again', `${ENT.run[1]} Run the test cases again on the current build`) : null, see({ cause: ['environment'] })]]);
+  }
+  if (by.unknown) recs.push(['warn', CAUSE.unknown[1], `${pl(by.unknown.length, 'test case is', 'test cases are')} not a pass, and the cause is not known.`, 'The agent can examine them and find the cause.',
+    [agentBtn(AGENT_ALL, 'Ask the agent to examine them', '🔎 The agent examines the test cases'), see({ cause: ['unknown'] })]]);
+  if (by.drift) recs.push(['warn', '🧷', `${pl(by.drift.length, 'test case has', 'test cases have')} checks that a person changed after promotion.`, 'They do not run each night until you promote them again.',
+    [see({ flag: ['drift'] })]]);
+  if (maintenance.length) recs.push(['agent', ENT.maintenance[1], `${pl(maintenance.length, 'test maintenance proposal waits', 'test maintenance proposals wait')} for your decision.`, 'The agent found a test that must change. Accept, rewrite, retire or keep it.',
+    [h('details', { class: 'maint' }, h('summary', { class: 'btn' }, 'Show them'), h('ul', { class: 'att' }, maintenance.slice().reverse().slice(0, 12).map((m) => h('li', {}, h('b', { title: MAINT_KIND[m.kind] }, `${ENT.maintenance[1]} ${m.id}`), ' ', maintTest(m),
+      h('div', { class: 'meta' }, h('span', { title: MAINT_KIND[m.kind] }, m.kind), ` → ${MAINT_PROP[m.proposal] || m.proposal}`), h('div', { class: 'acts' }, maintActions(m).slice(0, 1))))))]]);
+  const prom = items.filter((i) => i.tier === 'promotable');
+  if (prom.length) recs.push(['ok', '⭐', `${pl(prom.length, 'verified test case', 'verified test cases')} can run each night.`, 'Promote them. Then the nightly regression finds it when they break again.',
+    [agentBtn('promote all pending', 'Promote them', '⭐ Promote all the verified test cases into the nightly regression'), see({ tier: ['promotable'] })]]);
+  const none = pagesData.filter((p) => p.covered === 'none');
+  if (none.length) recs.push(['muted', ENT.page[1], `${pl(none.length, 'page has', 'pages have')} no test.`, 'Ask for a test of a page, or see which pages they are.',
+    [goLink({ v: 'coverage' }, 'See the pages', null, 'btn'), goLink({ v: 'map', pg: none[0].pattern }, 'Ask on the map', null, 'btn')]]);
+  const openMajor = design.filter((d) => d.status === 'open' && ['major', 'critical', 'high'].includes(str(d.severity)));
+  if (openMajor.length) recs.push(['warn', ENT.design[1], `${pl(openMajor.length, 'major design finding is', 'major design findings are')} open.`, 'Layout, visual or accessibility defects that a user sees.',
+    [goLink({ v: 'design' }, 'See them', null, 'btn')]]);
+  const sec = h('section', { class: 'panel next' }, h('h2', {}, '👉 What to do next', tip('The page reads the state of the tests and shows the useful steps. The most important step is first. Each violet button shows a message for the agent first: nothing changes before you send it.')));
+  if (S.at) { sec.append(h('p', { class: 'muted-t' }, 'The steps show only for the current state. Go back to now to see them.'), goLink({ at: null }, 'Back to now', null, 'btn')); return sec; }
+  if (!recs.length) { sec.append(h('p', { class: 'celebrate' }, h('span', { class: 'em' }, '🎉'), 'Nothing needs you now. The agent continues by itself.')); return sec; }
+  sec.append(h('ol', { class: 'recs' }, recs.slice(0, 6).map(([tone, ic, what, why, acts]) => h('li', { class: `rec t-${tone}` },
+    h('span', { class: 'rico', 'aria-hidden': 'true' }, ic), h('div', { class: 'rbody' }, h('b', {}, what), h('div', { class: 'meta' }, why), h('div', { class: 'acts' }, acts.filter(Boolean)))))));
+  return sec;
+}
+// The test cases that need attention, each with its cause, its report and its box for one bug issue.
+function attentionList(att) {
+  const bl = blockerList();
+  return h('section', { class: 'panel' }, h('h2', {}, `🚨 Needs attention (${att.length + (bl ? blockers.length : 0)})`, tip(`Test cases that failed, have a regression, are flaky, need review or changed after promotion. The worst are first. Select them (☐) to report them in one bug issue. Click a name to open the panel of the test case.${bl ? ` Above them, the blockers: ${BLOCKER_TIP}` : ''}`)),
+    bl, causeSummary(att),
+    att.length ? h('ul', { class: 'att' }, att.slice(0, 8).map((i) => h('li', {}, pickBox(problemRef(i)), badge(i.latest || (i.flags.includes('drift') ? 'drift' : '')), ' ', itemCause(i), ' ',
+      itemLink(i), ofRef(i), i.evidence ? reportBtn(i.evidence) : null, foundLinks(problemRef(i))))) : bl ? null : h('p', { class: 'celebrate' }, h('span', { class: 'em' }, '🎉'), 'Nothing needs attention. All green!'),
+    att.length > 8 ? goLink({ v: 'catalog', f: { flag: ['needs attention'] }, q: '' }, `All ${att.length}`, null, 'linkish') : null);
+}
+// Ask for a test in your own words: a scenario request (docs/scenarios.md → A request from the dashboard).
+function askBox() {
+  const pages = pagesData.map((p) => p.pattern).filter((p) => /^\/[A-Za-z0-9_./:-]{0,120}$/.test(p) && p !== '/');
+  const ta = h('textarea', { rows: 3, maxlength: 2000, placeholder: 'Example: A user uploads a file of 50 MB. The upload finishes, and the file shows in the list.', 'aria-label': 'What the agent must test, in your words' });
+  const sel = pages.length ? h('select', { 'aria-label': 'The page where the test starts', title: 'The page where the test starts. The agent can go to other pages from there.' },
+    h('option', { value: '/' }, 'Starts on: any page'), pages.map((p) => h('option', { value: p }, `Starts on: ${p}`))) : null;
+  const msg = h('span', { class: 'meta', role: 'status' });
+  const send = () => {
+    const words = ta.value.replace(/\r/g, '').replace(/\t/g, ' ').trim();
+    if (words.length < 10) { msg.textContent = 'Write what the user does and what must happen (at least 10 characters).'; msg.className = 'badge warn'; ta.focus(); return; }
+    if (!askAgent(`test this scenario: On the page ${sel ? sel.value : '/'}: ${words}`, `${ENT.scenario[1]} Ask for this test`)) { msg.textContent = 'Use only printable text, at most 2000 characters.'; msg.className = 'badge bad'; return; }
+    msg.textContent = ''; msg.className = 'meta';
+  };
+  return h('section', { class: 'panel ask', id: 'ask' }, h('h2', {}, `${ENT.scenario[1]} Ask for a test`, tip('The agent makes a scenario from your words, checks it, tests it on the newest build and shows the result on this page. The message goes to the agent only when you send it from the box at the bottom.')),
+    h('p', { class: 'meta', style: 'margin:0 0 8px' }, 'Write what a user does and what must happen. The agent writes the test and runs it.'),
+    ta, h('div', { class: 'row' }, sel, prepBtn('Ask for this test', send), msg),
+    h('p', { class: 'meta', style: 'margin:8px 0 0' }, 'For exact steps, use ', goLink({ v: 'builder' }, `${viewOf('builder')[2]} Test builder`, null, 'linkish'), '. To ask about one page or control, use ', goLink({ v: 'map' }, `${viewOf('map')[2]} the map`, null, 'linkish'), '.'));
+}
 function viewOverview() {
   const v = $('#view');
-  v.append(guide());
+  const att = attention();
+  const w = welcome(); if (w) v.append(w);
+  v.append(hero(att));
+  if (!items.length) {
+    v.append(h('div', { class: 'panels two' }, nextSteps(att), blockerList() ? attentionList(att) : S.at ? null : askBox()));
+    const act = activityBlock(); if (act) v.append(act);
+    v.append(h('div', { class: 'empty' }, h('span', { class: 'em' }, '🌱'), h('p', {}, 'Test cases show here after the first issue run.'),
+      modList.length ? h('p', {}, goLink({ v: 'modules' }, 'Testing modules', null, 'btn')) : null));
+    return;
+  }
+  v.append(h('div', { class: 'panels two' }, nextSteps(att), attentionList(att)));
   const act = activityBlock(); if (act) v.append(act);
-  const bl = blockerList();
-  if (!items.length) { if (bl) v.append(h('section', { class: 'panel' }, h('h2', {}, `🚨 Needs attention (${blockers.length})`, tip(BLOCKER_TIP)), bl));
-    v.append(h('div', { class: 'empty' }, h('span', { class: 'em' }, '🌱'), h('p', {}, 'No test cases in the catalog yet.'), h('p', {}, 'Test cases show here after the first issue run.'),
-    modList.length ? h('p', {}, goLink({ v: 'modules' }, 'Testing modules', null, 'btn')) : null)); return; }
+  v.append(h('div', { class: 'panels two' },
+    h('section', { class: 'panel' }, h('h2', {}, `${ENT.run[1]} Latest test runs`, tip(ENT.run[2])), runsAt.length ? [h('ul', { class: 'att' }, runsAt.slice(0, 6).map((r) => h('li', {}, badge(r.verdict),
+      runLink(r, `${fmtDate(r.utc)} · ${runName(r)}`), r.report ? reportBtn(r.report) : null))),
+      goLink({ v: 'runs' }, `All ${runs.length} test runs`, null, 'linkish')] : h('p', { class: 'muted-t' }, 'No test run yet.')),
+    S.at ? null : askBox()));
+  v.append(moreNumbers());
+}
+// The numbers and the charts, closed until you open them; the open state stays in this browser.
+const MORE_KEY = `qi-catalog:${str(D.target)}:more`;
+function moreNumbers() {
+  let open = false; try { open = localStorage.getItem(MORE_KEY) === 'open'; } catch { /* default closed */ }
   const t = (x) => items.filter((i) => i.tier === x).length;
   const origins = new Set(items.map((i) => `${i.origin.kind}:${i.ref}`));
   const cov = pagesData.filter((p) => p.covered === 'regression').length;
-  const last = nightsAt[nightsAt.length - 1];
-  const lastTxt = last ? (last.counts && +last.counts.regression ? `${last.counts.regression} regression(s)` : 'no regression') : 'no night yet';
-  const lastRun = last ? nightOf(str(last.build)) : null;
   const nFlaky = items.filter((i) => i.flags.includes('flaky')).length; const nDrift = items.filter((i) => i.flags.includes('drift')).length;
-  v.append(h('div', { class: 'grid-kpi' },
+  const labels = buildsAt.map((b) => fmtDate(b.utc) || b.id);
+  const all = buildsAt.map((b) => items.filter((i) => i.file && i.history.length && str(i.history[0].utc) <= b.utc).length);
+  const reg = buildsAt.map((b) => items.filter((i) => i.promoted_utc && str(i.promoted_utc) <= b.utc && i.tier === 'regression').length);
+  const dist = {}; for (const i of items) dist[i.latest || 'none'] = (dist[i.latest || 'none'] || 0) + 1;
+  const openD = design.filter((d) => d.status === 'open');
+  const body = () => [h('div', { class: 'grid-kpi' },
     kpi('🌙', 'Nightly (regression tier)', t('regression'), { v: 'catalog', f: { tier: ['regression'] }, q: '' }, 'go'),
     kpi('⭐', 'Promotable', t('promotable'), { v: 'catalog', f: { tier: ['promotable'] }, q: '' }, t('promotable') ? 'agent' : null),
     kpi('🆕', 'Exploratory (ran once)', t('exploratory'), { v: 'catalog', f: { tier: ['exploratory'] }, q: '' }),
@@ -1765,28 +2040,14 @@ function viewOverview() {
     kpi(`${ENT.criterion[1]}${ENT.exploration[1]}`, 'Criteria · explorations', `${items.filter((i) => i.kind === 'criterion').length} · ${items.filter((i) => i.kind === 'exploration').length}`, null),
     kpi(`${ENT.issue[1]}${ENT.scenario[1]}`, 'Issues · scenarios', `${[...origins].filter((o) => o.startsWith('issue')).length} · ${[...origins].filter((o) => o.startsWith('scenario')).length}`, null),
     kpi(ENT.page[1], 'Pages covered', pagesData.length ? `${cov} / ${pagesData.length}` : '–', pagesData.length ? { v: 'coverage' } : null),
-    kpi(ENT.run[1], 'Last night', lastTxt, lastRun ? { r: lastRun.id } : null, last ? (last.counts && +last.counts.regression ? 'bad' : 'ok') : null),
     kpi('🎲', 'Flaky', nFlaky, { v: 'catalog', f: { flag: ['flaky'] }, q: '' }, nFlaky ? 'warn' : null),
-    kpi('🧷', 'Drift', nDrift, { v: 'catalog', f: { flag: ['drift'] }, q: '' }, nDrift ? 'warn' : null)));
-  const att = items.filter((i) => i.flags.includes('needs attention')).sort((a, b) => SEV[a.cls] - SEV[b.cls] || str(b.verdict && b.verdict.utc).localeCompare(str(a.verdict && a.verdict.utc)));
-  const labels = buildsAt.map((b) => fmtDate(b.utc) || b.id);
-  const all = buildsAt.map((b) => items.filter((i) => i.file && i.history.length && str(i.history[0].utc) <= b.utc).length);
-  const reg = buildsAt.map((b) => items.filter((i) => i.promoted_utc && str(i.promoted_utc) <= b.utc && i.tier === 'regression').length);
-  const dist = {}; for (const i of items) dist[i.latest || 'none'] = (dist[i.latest || 'none'] || 0) + 1;
-  const openD = design.filter((d) => d.status === 'open');
-  v.append(h('div', { class: 'panels' },
+    kpi('🧷', 'Drift', nDrift, { v: 'catalog', f: { flag: ['drift'] }, q: '' }, nDrift ? 'warn' : null)),
+  S.at ? null : h('div', { class: 'panels' }, activityTimeline()),
+  h('div', { class: 'panels' },
     modList.length ? h('section', { class: 'panel' }, h('h2', {}, `${ENT.module[1]} Testing modules`, tip(ENT.module[2])), h('ul', { class: 'att' }, modList.map((m) => h('li', {}, stateB(str(m.state)), ' ',
       goLink({ v: 'modules' }, str(m.title) || str(m.id), str(m.what) || null, 'linkish'),
       m.last_run && m.last_run.utc ? h('span', { class: 'meta' }, ` · ${rel(m.last_run.utc)}`) : null))),
       h('p', { class: 'meta' }, openD.length ? goLink({ v: 'design' }, `${ENT.design[1]} ${openD.length} open design finding(s), ${openD.filter((d) => d.severity === 'major').length} major`, ENT.design[2], 'linkish') : 'No open design finding.')) : null,
-    h('section', { class: 'panel' }, h('h2', {}, `🚨 Needs attention (${att.length + (bl ? blockers.length : 0)})`, tip(`Test cases that failed, have a regression, are flaky, need review or changed after promotion. The worst are first. Select them (☐) to report them in one bug issue. Click a name to open the panel of the test case.${bl ? ` Above them, the blockers: ${BLOCKER_TIP}` : ''}`)),
-      bl, causeSummary(att),
-      att.length ? h('ul', { class: 'att' }, att.slice(0, 14).map((i) => h('li', {}, pickBox(problemRef(i)), badge(i.latest || (i.flags.includes('drift') ? 'drift' : '')), ' ', itemCause(i), ' ',
-      itemLink(i), ofRef(i), i.evidence ? reportBtn(i.evidence) : null, foundLinks(problemRef(i))))) : bl ? null : h('p', { class: 'celebrate' }, h('span', { class: 'em' }, '🎉'), 'Nothing needs attention. All green!'),
-      att.length > 14 ? goLink({ v: 'catalog', f: { flag: ['needs attention'] }, q: '' }, `All ${att.length}`, null, 'linkish') : null),
-    maintenance.length ? h('section', { class: 'panel' }, h('h2', {}, `${ENT.maintenance[1]} Test maintenance (${maintenance.length})`, tip(`${ENT.maintenance[2]} Open a test case to see the actions.`)),
-      h('ul', { class: 'att' }, maintenance.slice().reverse().slice(0, 12).map((m) => h('li', {}, h('b', { title: MAINT_KIND[m.kind] }, `${ENT.maintenance[1]} ${m.id}`), ' ', maintTest(m),
-        h('div', { class: 'meta' }, h('span', { title: MAINT_KIND[m.kind] }, m.kind), ` → ${MAINT_PROP[m.proposal] || m.proposal} · `, m.basis, ' · ', buildLink(m.build)))))) : null,
     features.length ? h('section', { class: 'panel' }, h('h2', {}, `${ENT.feature[1]} Features (${features.length})`, tip(ENT.feature[2])),
       h('ul', { class: 'att' }, features.map((f) => { const its = featItems(f.id); const rec = its.filter((i) => ['regression', 'promotable'].includes(i.tier)).length;
         return h('li', {}, facetLink('feature', f.id, `${ENT.feature[1]} ${f.name}`), h('span', { class: 'meta' }, ` · ${rec} recurring of ${its.length}`), ' ',
@@ -1795,12 +2056,16 @@ function viewOverview() {
       h('ul', { class: 'att' }, [...new Map(FOUND.slice().reverse().map((f) => [f.issue, f])).values()].slice(0, 10).map((f) => h('li', {}, extLink(f.url, `${ENT.bug[1]} #${f.issue}${str(f.title) ? ` ${cut(f.title, TITLE_MAX)}` : ''}`, `${ENT.bug[0]} #${f.issue}${str(f.title) ? ` "${str(f.title)}"` : ''} on GitHub.`, 'found'),
         h('span', { class: 'meta' }, `${fmtDate(f.utc)} · ${FOUND.filter((x) => x.issue === f.issue).map((x) => x.ref).join(', ')}${f.labels.includes(FIX_LABEL) ? ' · for the architect' : ''}`))))) : null,
     h('section', { class: 'panel' }, h('h2', {}, '📈 Test cases over builds', tip('How many test cases have a test (blue), and how many of them run each night (green), on each build.')), buildsAt.length ? lineChart([{ name: 'test cases', color: 'var(--link)', values: all }, { name: 'nightly (regression tier)', color: 'var(--ok)', values: reg }], labels) : h('p', { class: 'muted-t' }, 'No builds yet.')),
-    h('section', { class: 'panel' }, h('h2', {}, `${ENT.run[1]} Latest test runs`, tip(ENT.run[2])), runsAt.length ? [h('ul', { class: 'att' }, runsAt.slice(0, 8).map((r) => h('li', {}, badge(r.verdict),
-      runLink(r, `${fmtDate(r.utc)} · ${runName(r)}`), r.report ? reportBtn(r.report) : null))),
-      goLink({ v: 'runs' }, `All ${runs.length} test runs`, null, 'linkish')] : h('p', { class: 'muted-t' }, 'No test run yet.')),
     h('section', { class: 'panel' }, h('h2', {}, `🌙 Nightly results (${Math.min(30, nightsAt.length)} nights)`, tip('The results of each nightly regression, by verdict. Click a bar to open the panel of that night.')), nightsAt.length ? nightsChart(nightsAt.slice(-30)) : h('p', { class: 'muted-t' }, 'The nightly regression has not run yet.')),
-    h('section', { class: 'panel' }, h('h2', {}, `${ENT.verdict[1]} Latest verdicts`, tip('The newest verdict of each test case. Click a verdict to see its test cases in the catalog.')), h('ul', { class: 'att' }, Object.entries(dist).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
-      h('li', {}, goLink({ v: 'catalog', f: { verdict: [k] }, q: '' }, badge(k === 'none' ? '' : k), null, 'linkish'), ` ${n}`))))));
+    h('section', { class: 'panel' }, h('h2', {}, `${ENT.verdict[1]} Latest verdicts`, tip('The newest verdict of each test case. Click a verdict to see its test cases in All tests.')), h('ul', { class: 'att' }, Object.entries(dist).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
+      h('li', {}, goLink({ v: 'catalog', f: { verdict: [k] }, q: '' }, badge(k === 'none' ? '' : k), null, 'linkish'), ` ${n}`)))))];
+  // Drawn on the first open only: a closed section costs nothing.
+  const det = h('details', { class: 'more', open: open ? true : null, ontoggle: (e) => {
+    const d = e.currentTarget; try { localStorage.setItem(MORE_KEY, d.open ? 'open' : 'closed'); } catch { /* ignore */ }
+    if (d.open && d.children.length < 2) d.append(h('div', {}, body()));
+  } }, h('summary', {}, '📊 Numbers, charts and the last 14 days', h('span', { class: 'meta' }, ' — the tiers, the trends, the modules, the features and the bug issues')));
+  if (open) det.append(h('div', {}, body()));
+  return det;
 }
 
 // ----------------------------------------------------------------- catalog
@@ -1898,7 +2163,7 @@ function viewList(gallery) {
   const v = $('#view');
   const list = sorted(filtered());
   const main = h('div', {}, toolbar(list, gallery));
-  if (!list.length) main.append(h('div', { class: 'empty' }, h('span', { class: 'em' }, items.length ? '🤷' : '🌱'), items.length ? 'No test case agrees with these filters.' : 'No test cases in the catalog yet.'));
+  if (!list.length) main.append(h('div', { class: 'empty' }, h('span', { class: 'em' }, items.length ? '🤷' : '🌱'), items.length ? 'No test case agrees with these filters.' : 'No test cases yet.'));
   let budget = S.limit;
   for (const [g, gl] of groupsOf(list)) {
     if (budget <= 0) break;
@@ -2156,7 +2421,7 @@ function originDrawer(ref) {
       dt('Pages'), h('dd', {}, pages.length ? joinNodes(pages.map((p) => pageLink(p))) : '–'),
       dt('Collections'), h('dd', {}, cs.length ? joinNodes(cs.map((c) => facetLink('collection', c, `${ENT.collection[1]} ${c}`))) : '–')),
     h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
-      goLink({ v: 'catalog', f: { ref: [ref] }, q: '' }, '📚 Its test cases in the catalog', null, 'btn'),
+      goLink({ v: 'catalog', f: { ref: [ref] }, q: '' }, '📚 Its test cases', null, 'btn'),
       goLink({ v: 'gallery', f: { ref: [ref] }, q: '' }, '🖼️ Its screenshots', null, 'btn')),
     h('section', { class: 'sec' }, h('h3', {}, `${ENT.testcase[1]} Test cases (${its.length})`, tip('Its acceptance criteria (🎯) and explorations (🔦), each with its test. Click one to open its panel.')), its.length ? h('ul', { class: 'att' }, its.map((x) => itemRow(x, false))) : h('p', { class: 'muted-t' }, S.at ? 'None judged by then.' : 'None yet.')),
     h('section', { class: 'sec' }, h('h3', {}, `${ENT.run[1]} Test runs (${rs.length})`), rs.length ? runTable(rs.map((r) => [r, null]), (r) => own2(r)) : h('p', { class: 'muted-t' }, 'Not run yet.'),
@@ -2196,7 +2461,7 @@ function viewRuns() {
   if (S.rb) {
     const b = builds.find((x) => x.id === S.rb);
     v.append(h('div', { class: 'filterbar panel' }, h('b', { title: ENT.build[2] }, `${ENT.build[1]} Build `), h('code', {}, S.rb), b ? h('span', { class: 'meta' }, `first tested ${fmtDate(b.utc)}`) : null,
-      b ? goLink({ at: S.rb, v: 'catalog' }, '📚 Catalog as of this build', null, 'btn') : null,
+      b ? goLink({ at: S.rb, v: 'catalog' }, '📚 All tests as of this build', null, 'btn') : null,
       b ? goLink({ at: S.rb, v: 'map' }, '🗺️ Product map as of this build', null, 'btn') : null,
       goLink({ rb: null }, '✕ All builds', null, 'btn')));
   }
@@ -2293,7 +2558,7 @@ function runDrawer(r) {
       h('dt', { title: DUR_HELP }, 'Duration'), h('dd', {}, fmtDur(r.secs) || '–'),
       fmtCost(r.cost_usd) ? [h('dt', { title: COST_HELP }, 'Cost'), h('dd', {}, fmtCost(r.cost_usd))] : null),
     hasBuild ? h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
-      goLink({ at: r.build, v: 'catalog' }, '📚 Catalog as of this build', null, 'btn'),
+      goLink({ at: r.build, v: 'catalog' }, '📚 All tests as of this build', null, 'btn'),
       goLink({ at: r.build, v: 'map' }, '🗺️ Product map as of this build', null, 'btn'),
       goLink({ v: 'runs', rb: r.build, rt: 'all' }, `${ENT.run[1]} All test runs on this build`, null, 'btn')) : null,
     r.verdict === 'environment' ? h('p', { class: 'muted-t' }, 'The test environment failed on this build. No test ran, and no test has a result from this night.') : null,
@@ -2711,7 +2976,7 @@ const ON = new Set(['on', 'enabled', 'per-build', 'daily', 'weekly', 'propose', 
 const stateB = (st) => h('span', { class: `badge ${ON.has(st) ? 'ok' : st === 'off' || st === 'disabled' ? 'muted' : 'none'}`, title: ON.has(st) ? 'This module is on.' : st === 'off' || st === 'disabled' ? 'This module is off.' : 'The state is not known.' }, st || 'unknown');
 // A change opens the box with its command: what the agent then changes.
 const want = (id, cmd) => askAgent(cmd, `${ENT.module[1]} ${id === 'global' ? 'All modules' : str(modList.find((m) => str(m.id) === id)?.title) || id}: ${cmd.replace(/^module [a-z-]+ /, '')}`);
-function settingRow(id, key, spec) {
+function settingRow(id, key, spec, label) {
   if (!KEY_RE.test(key) || !spec || typeof spec !== 'object') return null;
   const val = str(spec.value); const t = str(spec.type);
   let ctl;
@@ -2731,7 +2996,7 @@ function settingRow(id, key, spec) {
       want(id, `module ${id} set ${key}=${v}`);
     }), msg];
   } else ctl = h('code', {}, val);
-  return [h('dt', { title: `The setting ${key}${str(spec.default) ? `. Its default is ${str(spec.default)}` : ''}.` }, key), h('dd', {}, ctl,
+  return [h('dt', { title: `The setting ${key} in work/CONFIG.md${str(spec.default) ? `. Its default is ${str(spec.default)}` : ''}.` }, label || key.replace(/_/g, ' ')), h('dd', {}, ctl,
     spec.invalid ? h('span', { class: 'badge bad', title: 'work/CONFIG.md holds a value outside this setting\'s range' }, `CONFIG says "${str(spec.raw)}" — invalid`) : null)];
 }
 function moduleCard(m) {
@@ -2746,10 +3011,10 @@ function moduleCard(m) {
   const nightly = id === 'regression' ? items.filter((i) => i.tier === 'regression') : null;
   const jobTests = nightly ? h('details', { open: nightly.length && nightly.length <= 12 ? true : null },
     h('summary', { style: 'cursor:pointer;font-weight:600' }, `${ENT.testcase[1]} What it tests: ${nightly.length} test case${nightly.length === 1 ? '' : 's'} of ${new Set(nightly.map((i) => i.ref)).size} issues and scenarios`),
-    nightly.length ? [caseGroups(nightly, (i) => (i.drift ? 'drift' : i.latest || null)), goLink({ v: 'catalog', f: { tier: ['regression'] }, q: '' }, 'Show them in the Catalog', null, 'linkish')]
+    nightly.length ? [caseGroups(nightly, (i) => (i.drift ? 'drift' : i.latest || null)), goLink({ v: 'catalog', f: { tier: ['regression'] }, q: '' }, 'Show them in All tests', null, 'linkish')]
       : h('p', { class: 'muted-t' }, 'No test case is in the nightly regression. Promote a verified test case to add it.'))
-    : id === 'issues' ? h('p', { class: 'meta' }, `${ENT.testcase[1]} What it tests: the acceptance criteria of each issue with the QA label. `, goLink({ v: 'catalog', f: { origin: ['issue'] }, q: '' }, 'Show them in the Catalog', null, 'linkish'))
-    : id === 'discovery' ? h('p', { class: 'meta' }, `${ENT.testcase[1]} What it tests: the scenarios that it proposes. `, goLink({ v: 'catalog', f: { origin: ['scenario'] }, q: '' }, 'Show the scenarios in the Catalog', null, 'linkish'))
+    : id === 'issues' ? h('p', { class: 'meta' }, `${ENT.testcase[1]} What it tests: the acceptance criteria of each issue with the QA label. `, goLink({ v: 'catalog', f: { origin: ['issue'] }, q: '' }, 'Show them in All tests', null, 'linkish'))
+    : id === 'discovery' ? h('p', { class: 'meta' }, `${ENT.testcase[1]} What it tests: the scenarios that it proposes. `, goLink({ v: 'catalog', f: { origin: ['scenario'] }, q: '' }, 'Show the scenarios in All tests', null, 'linkish'))
     : null;
   let focus = null;
   if (m.kind === 'queue') {
@@ -2762,23 +3027,28 @@ function moduleCard(m) {
       }))),
       q.length ? h('ul', { class: 'att' }, q.slice(-8).reverse().map((f) => h('li', {}, h('span', { class: `badge ${f.status === 'queued' ? 'warn' : 'ok'}` }, str(f.status)), ` ${str(f.area)} · ${fmtDate(f.queued_utc)}${f.build ? ` · ${str(f.build)}` : ''}`))) : null];
   }
-  return h('section', { class: 'mod', 'aria-label': str(m.title) || id },
+  // The switch of the module first; its other settings behind "More settings", open when one is invalid.
+  const sw = settings.find(([k]) => k === str(m.switch));
+  const rest = settings.filter(([k]) => k !== str(m.switch));
+  return h('section', { class: `mod${ON.has(str(m.state)) ? ' is-on' : ''}`, 'aria-label': str(m.title) || id },
     h('header', {}, h('h3', {}, `${ENT.module[1]} ${str(m.title) || id}`), stateB(str(m.state)), h('span', { class: 'meta', title: 'When this module runs.' }, MKIND[m.kind] || str(m.kind))),
     m.what ? h('p', { class: 'meta' }, str(m.what)) : null,
     h('p', { class: 'meta' }, lr ? [`Last run ${rel(lr.utc)}`, lr.candidate ? [' on ', buildLink(lr.candidate)] : ''] : 'Not run yet',
-      sc ? ` · schedule ${sc.enabled === true ? 'on' : sc.enabled === false ? 'off' : 'state unknown'}${sc.cron ? ` (${str(sc.cron)})` : ''}` : ''),
-    jobTests,
-    settings.length ? h('dl', { class: 'set' }, settings.map(([k, spec]) => settingRow(id, k, spec))) : null,
-    focus, actions.filter(Boolean).length ? h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' }, actions) : null);
+      sc ? ` · schedule ${sc.enabled === true ? 'on' : sc.enabled === false ? 'off' : 'state unknown'}${sc.cron ? ` (${cronText(sc.cron)})` : ''}` : ''),
+    sw ? h('dl', { class: 'set main' }, settingRow(id, sw[0], sw[1], str(sw[1].type) === 'cadence' ? 'When it runs' : 'On or off')) : null,
+    jobTests, focus,
+    rest.length ? h('details', { class: 'more-set', open: rest.some(([, spec]) => spec && spec.invalid) ? true : null },
+      h('summary', {}, `⚙️ More settings (${rest.length})`), h('dl', { class: 'set' }, rest.map(([k, spec]) => settingRow(id, k, spec)))) : null,
+    actions.filter(Boolean).length ? h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' }, actions) : null);
 }
 function viewModules() {
   const v = $('#view');
   if (!modList.length) { v.append(h('div', { class: 'empty' }, h('span', { class: 'em' }, '🧩'), h('p', {}, 'The module state was not available when this page was built.'))); return; }
-  v.append(h('div', { class: 'note' }, '🤖 The dashed violet buttons change nothing: each one shows a message for the agent in a box at the bottom. ', bridge() ? 'There, "Send to the agent" sends the message to its chat as your message.'
-    : D.interactive ? 'Open this page next to the chat of the agent to send messages with a click. Here, copy the messages into the chat.'
-      : 'There, copy the message into the chat of the agent. The agent makes the change and builds this page again.',
+  const on = modList.filter((m) => ON.has(str(m.state)));
+  v.append(h('div', { class: 'note' }, h('b', {}, `${on.length} of ${modList.length} are on`), on.length ? `: ${on.map((m) => str(m.title) || str(m.id)).join(', ')}.` : '.',
+    ' A change here is a message for the agent: you see it in a box at the bottom first, and nothing changes before you send it.',
     MODS.schedules_as_of ? ` Schedule states as of ${fmtDate(MODS.schedules_as_of)}.` : ''));
-  const groups = [['🧩 Testing modules', (m) => m.kind === 'modules' || m.kind === 'queue'], ['🗓️ Scheduled runs', (m) => m.kind === 'schedule'], ['🎫 Issue runs', (m) => m.kind === 'core' || m.kind === 'config']];
+  const groups = [['🎫 Issue runs', (m) => m.kind === 'core' || m.kind === 'config'], ['🗓️ Scheduled runs', (m) => m.kind === 'schedule'], ['🧩 Testing modules', (m) => m.kind === 'modules' || m.kind === 'queue']];
   for (const [title, f] of groups) {
     const list = modList.filter(f); if (!list.length) continue;
     v.append(h('h2', { style: 'font-size:15px;margin:16px 0 8px' }, title), h('div', { class: 'mods' }, list.map(moduleCard)));
@@ -2998,11 +3268,17 @@ function render(keepSearchFocus) {
       nightOf(S.at) ? goLink({ r: nightOf(S.at).id }, '🌙 That night', null, 'btn') : null,
       goLink({ at: null }, 'Back to now', null, 'btn')));
   }
-  // The view's head: its icon and name always, its one line of help unless hidden.
-  const [, vname, vicon] = viewOf(S.v); const hid = hiddenHelp.has(S.v);
-  v.append(h('div', { class: 'vhead' }, h('span', { class: 'vico', 'aria-hidden': 'true' }, vicon), h('div', {}, h('h2', {}, vname), !hid && VIEW_HELP[S.v] ? h('p', {}, VIEW_HELP[S.v]) : null),
+  // The views of this section as tabs, then the view's head: its icon and name always, its one line
+  // of help unless hidden. Home has its status card instead of a head.
+  const [, vname, vicon, sec] = viewOf(S.v); const hid = hiddenHelp.has(S.v);
+  lastView[sec] = S.v;
+  const sibs = viewsIn(sec);
+  if (sibs.length > 1) v.append(h('nav', { class: 'subtabs', role: 'tablist', 'aria-label': `The views of ${sectionOf(S.v)[1]}` }, sibs.map(([k, name, icon, , short]) =>
+    h('button', { role: 'tab', type: 'button', 'aria-selected': k === S.v ? 'true' : 'false', 'aria-current': k === S.v ? 'page' : null, 'data-kind': 'go', 'data-dest': `${icon} ${name}`, title: VIEW_HELP[k] || null, onclick: () => go({ v: k }) },
+      h('span', { class: 'em', 'aria-hidden': 'true' }, icon), short))));
+  if (S.v !== 'overview') v.append(h('div', { class: 'vhead' }, h('span', { class: 'vico', 'aria-hidden': 'true' }, vicon), h('div', {}, h('h2', {}, vname), !hid && VIEW_HELP[S.v] ? h('p', {}, VIEW_HELP[S.v]) : null),
     VIEW_HELP[S.v] ? h('button', { class: 'btn', type: 'button', 'data-kind': 'local', title: hid ? 'Shows the line of help of this view again.' : 'Hides the line of help in this view. Only this browser keeps this setting.',
-      onclick: () => { if (hid) hiddenHelp.delete(S.v); else hiddenHelp.add(S.v); saveHidden(); render(); } }, hid ? 'ⓘ Help' : 'Hide help') : null));
+      'aria-label': hid ? 'Show the help line' : 'Hide the help line', onclick: () => { if (hid) hiddenHelp.delete(S.v); else hiddenHelp.add(S.v); saveHidden(); render(); } }, hid ? 'ⓘ' : ico('close')) : null));
   ({ overview: viewOverview, modules: viewModules, findings: viewFindings, design: viewDesign, runs: viewRuns, map: viewMap, catalog: () => viewList(false), gallery: () => viewList(true), coverage: viewCoverage, history: viewHistory, lifecycle: viewLifecycle, builder: viewBuilder }[S.v] || viewOverview)();
   if (pos != null) { const q = $('input[type=search]'); if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch { /* ignore */ } } }
   renderTray();

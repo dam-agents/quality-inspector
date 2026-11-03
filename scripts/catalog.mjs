@@ -632,7 +632,7 @@ const findings = {
     checks: (stress.checks ?? []).map((c) => ({ id: c.id, target: c.target, status: c.status, severity: c.severity, evidence: c.evidence ?? null, reason: c.reason ?? null })) } : null,
   security: sec ? { candidate: sec.candidate ?? null, utc: sec.generated_utc ?? null, counts: sec.counts ?? null, report: artRef(dirname(secFile), { link: false }) } : null,
 };
-// What the agent does now, what waits, and when it runs (Overview → Activity): the lock's holder
+// What the agent does now, what waits, and when it runs (Home → Activity): the lock's holder
 // and since (never its session), the rows in progress or awaiting delivery, the labelled open
 // issues with no row yet, the queued scenario requests, and the schedules' name, switch and cron.
 const lockLine = (read(join(work, 'env', 'LOCK')) ?? '').trim().split(/\s+/);
