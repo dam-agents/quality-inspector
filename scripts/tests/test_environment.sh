@@ -53,6 +53,12 @@ mkdir -p "$SANDBOX/envs/${host#env-}"; cd "$SANDBOX/envs/${host#env-}" || exit 1
 cmd="$*"; HOME="$PWD" bash -c "${cmd//\/dev\/kvm/$SANDBOX/env-kvm}"
 S
 printf '#!/usr/bin/env bash\nexit 0\n' > "$B/curl"
+# This VM's free disk: 50 Gi, whatever the host has — an up here passes env.sh's disk gate
+# (its refusal: test_env_disk.sh).
+cat > "$B/df" <<'S'
+#!/usr/bin/env bash
+printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/x 104857600 1 %s 50%% /home\n' "${STUB_DF_KB:-52428800}"
+S
 chmod +x "$B"/*
 export SANDBOX
 # This VM's /dev/kvm (environment.sh → KVM_DEV): absent until a test makes it.

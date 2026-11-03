@@ -1,10 +1,11 @@
 # Change radar — pull request text, before the build
 
-The Change radar reads the target's pull requests every few hours and warns the operator, before a
-build carries the change, about the **recurring** tests it will likely affect — maintenance
-proposals of kind `predicted` ([maintenance.md](maintenance.md)). It never changes a test, a criterion, a tier or a verdict, and it
-never writes to GitHub. Schedule `quality-inspector-radar-3h` (off by default); a run needs at least
-one recurring test (`work/SUITE.md` tier `regression`, `promotable` or `quarantined`).
+The Change radar reads the target's recently updated pull requests every few hours, newest first,
+and warns the operator, before a build carries the change, about the **recurring** tests it will
+likely affect — maintenance proposals of kind `predicted` ([maintenance.md](maintenance.md)). It
+never changes a test, a criterion, a tier or a verdict, and it never writes to GitHub. Schedule
+`quality-inspector-radar-3h` (off by default); a run needs at least one recurring test
+(`work/SUITE.md` tier `regression`, `promotable` or `quarantined`).
 
 ## What it reads — the one exception of the boundary
 
@@ -27,7 +28,9 @@ The worklist ([CLAUDE.md](../CLAUDE.md) → Worklist keys): `prs_due[]` — `pr`
 (`new` | `changed` | `merged` | `closed`), `state`, `draft`, `merged_at`, `updated_at`,
 `text_hash`, `labels`, `proposals` (the ones it holds); a `new` or `changed` entry also `title`,
 `body`, `injection_suspect` and `candidates[]` (`test`, `tier`, `score`, `reasons`). Also `inventory`
-(the UI map's build), `channel`, `deferred`, `truncated`. Per entry, oldest first:
+(the UI map's build), `channel`, `deferred`, `truncated`. A pull request with nothing to judge — no
+candidate (or `merged` / `closed`) and no proposal — is never due: the pre-flight writes its ledger
+row itself, and a run where nothing else is due is declined. Per entry, in order:
 
 1. **`new` / `changed`** — judge each candidate: does the text say the change alters what the test
    checks (a renamed or moved control, a changed flow, a removed feature)? A word in common is not
@@ -61,6 +64,15 @@ recurring tests that are members of that feature, open that page or name that co
 the change replaced) that stands in the text counts too. An ad-hoc
 test — an exploration, a rerun, an unsaved scenario, a retired test — is never a candidate.
 
+## The window
+
+Every run lists the pull requests updated in the last `radar_window_days` days (default 3, 1–30;
+registry `scripts/lib/modules.json`, [modules.md](modules.md) → Control), newest first; no
+watermark — the ledger tells what was read. At most 10 due `new` / `changed` entries a run, the
+newest; the rest (`deferred`) wait while they stay inside the window. One last updated before the window's start
+is never read: a build carries its change. A listing cut at 1000 items (`truncated`) leaves out the
+oldest part of the window: one log line, never an error.
+
 ## The ledger — `work/PRSCAN.md`
 
 ```
@@ -69,20 +81,15 @@ test — an exploration, a rerun, an unsaved scenario, a retired test — is nev
 | 812 | 1a2b3c4d5e6f | merged | 2026-10-25T08:00:00Z | 2026-10-25T08:01:10Z | M-14, M-15 | 2026-10-25T09:15:02Z |
 ```
 
-Written only by `radar.mjs record`, under its mutex. The next listing starts at its newest
-`updated_at`; a pull request is due again only when its text hash, or its state, changed. At most
-10 `new` / `changed` a run: the rest waits, in order. A listing cut at 1000 items (`truncated`) that
-leaves nothing due moves the start past it instead (`radar.mjs advance`, the cut mark
-`work/.cache/radar-since`, only to a time later than the start): the radar never reads the same cut
-listing twice. One cut inside its start's own second has no later start that skips nothing: the
-pre-flight reports it as an error on every run until the operator, in the direct session, moves the
-start one second on — `node "$HOME/scripts/radar.mjs" advance <start + 1 s>` — and accepts that the
-pull requests updated in that second are not read. The audit checks the
-ledger's format (`radar`).
+Written only by `radar.mjs` under its mutex: `record`, and the pre-flight's `scan --record` for a
+pull request with nothing to judge. A pull request is due again only when its text hash, or its
+state, changed. The audit checks the ledger's format (`radar`).
 
 ## Lifecycle of a `predicted` proposal
 
 - **Open pull request** — the row stays open; the operator may "keep" or "retire" it at any time.
+  One merged or closed while the radar did not run for longer than the window stays `open` in the
+  ledger; its `predicted` rows stay open until the operator decides or a stronger row replaces them.
 - **Merged** — the nightly regression of a build that carries it decides: a triage row of the test,
   or an `obsolete`, `moved` or `renamed` row, replaces it (`replaced`); a plain `unchanged` or
   absorbed test resolves it by the sweep ([maintenance.md](maintenance.md) → Predicted from the

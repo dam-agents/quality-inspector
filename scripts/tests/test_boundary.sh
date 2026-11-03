@@ -94,7 +94,7 @@ deny GET https://api.github.com/repos/acme/widgets/pulls/3/comments
 deny GET https://api.github.com/repos/acme/widgets/pulls/3?x=/issues
 deny GET https://api.github.com/repos/acme/widgets/pulls?state=all&x=/issues
 deny GET https://api.github.com/repos/acme/widgets/pulls/3/issues
-allow GET https://api.github.com/repos/acme/widgets/issues?state=all&sort=updated&direction=asc&per_page=100&since=2026-10-20T00:00:00Z&page=1
+allow GET https://api.github.com/repos/acme/widgets/issues?state=all&sort=updated&direction=desc&per_page=100&since=2026-10-20T00:00:00Z&page=1
 deny GET https://github.com/acme/widgets/pull/3.diff
 deny GET https://github.com/acme/widgets/pull/3.patch
 deny GET https://github.com/acme/widgets/pull/3/files
