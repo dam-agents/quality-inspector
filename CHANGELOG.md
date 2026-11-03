@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.56.0 — 2026-11-02
+## 3.55.0 — 2026-11-02
 
 **Upgrade:**
 `rm -f "$HOME/work/.cache/radar-since"` — the cut mark is no longer read; nothing else to run, docs
