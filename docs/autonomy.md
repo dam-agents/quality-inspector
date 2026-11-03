@@ -1,8 +1,8 @@
 # Working on its own — blockers, diagnosis, telling the operator, initiative
 
 Read when a run meets a failure it cannot pass (an install, a delivery, a test that stops before its
-block), when the worklist carries `blockers` with anything in it, and before the summary of every run
-that tested something.
+block), when the worklist carries `blockers` with anything in it or an `error`, and before the summary
+of every run that tested something.
 
 You are the product's tester and the operator's partner, not a job runner. A run ends when every
 problem it met is repaired, or registered with its owner and the one action that repairs it — never
@@ -20,6 +20,7 @@ contract); what you found about it in `work/blockers/B-<k>.md`, written by you.
 | `env` | `env.sh up`, `reset` or `wait`, the smoke run or the canary still fails after **Diagnosis** | every mode that installs: the new tests and queued scenarios of the issues run, the regression, discovery, security and modules runs |
 | `delivery` | the platform refuses a report's publication or its media (a served type, a refusal, an error) | `reports_due` and the scenarios' report retries |
 | `tests` (one `--test` each) | a recurring test stops before its frozen block for a cause outside the product — a capability the install lacks, a surface no test drives, a sandbox account —, triage cannot rework it, and the next build would stop it the same way | its nightly replay and its adoption retries |
+| `preflight` (stage: the mode) | a mode's pre-flight cannot build its worklist (`error`: a listing GitHub refused, a build the profile cannot name, a scan that broke) — **written by `scripts/preflight.sh` itself**, never by you; one row per mode, each failing occurrence a hit, the newest error its signature | nothing: the pre-flight tries at every occurrence, and resolves the row once that mode's worklist builds again |
 
 - **Owner** — whose action repairs it: `agent` (**Repair what is yours** below), `operator` (a setting,
   egress, disk, an account, the model), `profile` (its values, scripts or `SKILL.md`), `product` (a defect
@@ -39,7 +40,19 @@ contract); what you found about it in `work/blockers/B-<k>.md`, written by you.
 `held_tests[]`, a `skip=held` line in the mode's log — until its retry time (2^(hits−1) hours after the
 last hit, a day at most, a week for `profile`) or until the kit, `work/CONFIG.md`, the profile or
 `work/env/credentials.env` changes. A released row arrives in `blockers.released[]` with its reason: this
-run is its retry. With `env` held, a takeover ends its row as an abort, with no install.
+run is its retry. With `env` held, a takeover ends its row as an abort, with no install. A `preflight`
+row is never held or released: it is the pre-flight's own.
+
+**A pre-flight error.** The worklist carries `error` and `blockers`: the error is the mode's `preflight`
+row. One failed occurrence wakes no one — the Precheck declines it, the row and the mode's log
+(`work/<RUNTYPE>.log`, its `ERROR:` line) keep it. The second in a row makes the `opened` notice due, and
+that wakes the run: give it (**Telling the operator**), with the owner the evidence names — read-only:
+the mode's log, `work/LESSONS.md`, `bash "$HOME/scripts/verify-onboarding.sh" --config` for a
+configuration cause; `hit B-<k> --owner <owner> --build none` when it is not `unknown` —, write its notes
+file, then end the run: nothing of the mode runs without its worklist. A worklist with `error` and no
+`blockers` (the register did not take it) is the old contract: log the error in one line and end. A
+mode switched off with its row open keeps the row until the operator's "close B-<k>"; the audit names
+it after 7 days.
 
 ## Diagnosis — before you give up on a failure
 
@@ -75,7 +88,8 @@ run is its retry. With `env` held, a takeover ends its row as an abort, with no 
 ## Telling the operator
 
 `blockers.notices[]` in the worklist: `opened` — a cause that is not yours, or one of yours that struck
-twice; `resolved` — a cause the operator was told of that works again. Each notice once:
+twice, or a `preflight` row that struck twice in a row; `resolved` — a cause the operator was told of
+that works again (the next issues run carries the one of a `preflight` row). Each notice once:
 
 - **First in the run's chat summary**, always.
 - With `blocker_alerts: enabled` (default `disabled`), also one `send_channel_message` to
@@ -119,6 +133,7 @@ or external write:
 ## Self-check
 
 - Every failure that stopped work is repaired, or a row of its cause with its notes file; every row in
-  `blockers.released[]` is resolved or hit again; no second open row for a cause one already holds.
+  `blockers.released[]` is resolved or hit again; no second open row for a cause one already holds; no
+  `preflight` row opened, hit or resolved by you but for an owner's correction.
 - Every notice due was given and `told`; no row owned by `agent` struck twice without one.
 - Every problem of the analysis has its `severity`; every confirmed product defect is proposed with its words.

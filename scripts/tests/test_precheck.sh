@@ -21,6 +21,10 @@ run '{"mode":"issues","nothing_to_do":false,"issues_due":[{"issue":1}]}' >/dev/n
 assert_eq "without lib/channel.sh the frame is the same" "<qi-scheduled-run>issues</qi-scheduled-run>" "$(head -1 "$SANDBOX/stdout")"
 mv "$SANDBOX/channel.sh" "$H/scripts/lib/channel.sh"
 assert_eq "error -> run" 0 "$(run '{"mode":"issues","nothing_to_do":true,"error":"boom"}')"
+# An error in the blocker register (docs/autonomy.md → The register) is not hidden: it declines until
+# its notice is due, then runs once for it.
+assert_eq "a registered error, no notice due -> decline" 1 "$(run '{"mode":"issues","nothing_to_do":true,"error":"boom","blockers":{"held":[],"released":[],"notices":[]}}')"
+assert_eq "a registered error with its notice due -> run" 0 "$(run '{"mode":"issues","nothing_to_do":false,"error":"boom","blockers":{"held":[],"released":[],"notices":[{"id":"B-1","kind":"opened"}]}}')"
 assert_eq "not JSON -> run" 0 "$(run 'garbage')"
 # A Slack turn is never declined, even on nothing_to_do, and writes no marker of its own: the
 # policy hook knows it by its transcript. `slack <n>` marks the issue a Slack test delivers to

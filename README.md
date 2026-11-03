@@ -49,8 +49,10 @@ core (run types, schedules, invariants); the definition is versioned (`VERSION` 
   (`lend_model`).
 - **On its own** — a failure is diagnosed and what is the agent's is repaired; the rest goes to a
   register of blockers with its owner and the one repair, the pre-flight holds that work with a
-  growing back-off, and the operator is told once. Every problem carries a severity, and what a run
-  saw in passing feeds the next discovery ([docs/autonomy.md](docs/autonomy.md)).
+  growing back-off, and the operator is told once and sees it first on the dashboard. A pre-flight
+  that cannot build its worklist (a GitHub listing refused) is a blocker of its own, told at the
+  second failure in a row. Every problem carries a severity, and what a run saw in passing feeds the
+  next discovery ([docs/autonomy.md](docs/autonomy.md)).
 
 ## Setup
 

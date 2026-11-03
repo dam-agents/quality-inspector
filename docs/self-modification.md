@@ -236,8 +236,8 @@ refuse and explain instead:
   `work/env/` except as e2e credentials, and `scripts/suite.sh` keeps masking them in run
   artefacts (audit check `secrets_in_runs`).
 - The test catalog carries test-related content only — never a scenario's request text,
-  requester or thread, a note or explanation, `LESSONS.md`, security findings (their counts
-  only), a credential value or a token — and never changes its own sharing ([catalog.md](catalog.md),
+  requester or thread, a note or explanation, `LESSONS.md`, a blocker's notes file, security findings (their
+  counts only), a credential value or a token — and never changes its own sharing ([catalog.md](catalog.md),
   `scripts/tests/test_catalog.sh`). Its commands are the closed set of the operator's words,
   but for one scenario request in the person's own words ([scenarios.md](scenarios.md) → A
   request from the dashboard); a viewer's button press is never a direct session (its other

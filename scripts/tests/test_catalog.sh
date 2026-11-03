@@ -4,7 +4,7 @@
 # content only (no request text, requester, notes, lessons; the agent's analysis and explanations travel); escaped data; a stable
 # hash and `changed` against the published one; collections; coverage pages; drift nights; the
 # image budget; the credential and token refusal; the verifier's CATALOG.md and test_catalog checks;
-# the profile scenarios still to adopt.
+# the profile scenarios still to adopt; the open blockers (their register's fields, never a notes file).
 . "$(dirname "$0")/lib.sh"
 command -v node >/dev/null || { echo "  node missing"; exit 1; }
 seed_work
@@ -135,6 +135,17 @@ echo '[{"number":42,"title":"Rename <b>projects</b>","state":"closed","labels":[
 mkdir -p "$W/env"; echo 'issues 2026-10-22T19:35:00Z SESSION-SECRET-ID' > "$W/env/LOCK"
 printf '| 57 | def | c4 | b1 | - | in_progress | 2026-10-22T19:50:00Z |\n| 67 | jkl | c4 | b1 | - | in_progress | 2026-10-22T19:40:00Z |\n' >> "$W/QA.md"
 echo '{"taken_utc":"2026-10-22T15:00:00Z","schedules":{"quality-inspector-issues-1h":{"enabled":true,"cron":"7 * * * *","task":"TASK-SECRET"},"quality-inspector-audit-weekly":{"enabled":null,"cron":"0 7 * * 5"},"other-agent-job":{"enabled":true,"cron":"0 1 * * *"}}}' > "$W/schedules.json"
+# Overview → Needs attention: the open rows of the blocker register (docs/autonomy.md), written as a run
+# writes them; a resolved row is gone, a row's notes file never travels.
+export QI_WORDS_DIR="$SANDBOX"
+SIG() { local f; f="$(mktemp "$SANDBOX/quality-inspector-signature.XXXXXX")"; printf '%s' "$*" > "$f"; echo "$f"; }
+BL() { node "$SCRIPTS/blockers.mjs" "$@" >/dev/null; }
+BL open --scope env --owner profile --stage up --build c3 --signature-file "$(SIG 'helm: a value is required')"
+BL open --scope tests --test '#42' --test S-7 --owner unknown --stage replay --build c3 --signature-file "$(SIG 'no node advertises devices.kubevirt.io/kvm')"
+BL open --scope preflight --owner unknown --stage issues --build none --signature-file "$(SIG 'issue listing failed for the target repository')"
+BL open --scope delivery --owner platform --stage upload --build c3 --signature-file "$(SIG 'video served application/octet-stream')"
+BL resolve B-4
+mkdir -p "$W/blockers"; echo 'BLOCKER-NOTES-SECRET: what the agent examined' > "$W/blockers/B-1.md"
 
 mkdir -p "$W/catalog/thumbs"; echo old > "$W/catalog/thumbs/issue-99-ac-1.jpg"; echo old > "$W/catalog/thumbs/issue-99-ac-1.full.webp"
 printf '%s\n' '{"ts":"2026-10-02T14:05:00Z","run":"r","job":"issues","level":"info","event":"issue_done","msg":"issue=42 verdict=partial minutes=37 model_steps=120"}' \
@@ -293,7 +304,18 @@ assert "a night: the agent's analysis" '.runs[1].analysis == {"summary":"One che
   "about":["#42 AC-1","#42"],"what":"The tab is not in the top bar.","where":"/projects","why":"The new build moved it.","fix":"Nothing: the agent repaired the check."}]}
   and .runs[4].analysis == null' "$data"
 assert "a result's sentence in the history of its test case" '[.items[] | select(.key == "issue-42/AC-1") | .history[] | select(.build == "c2")][0].why == "The tab moved to the side bar."' "$data"
-for secret in U0SECRETUSER C0SECRET REQUEST-SECRET SOURCE-SECRET NOTE-SECRET LESSON-SECRET SEC-SECRET FOCUS-NOTE-SECRET; do
+assert "the open blockers: the register's fields, the signature as the agent's own text" '[.blockers[] | {id, scope, tests, owner, stage, signature, build, hits}] == [
+  {"id":"B-1","scope":"env","tests":[],"owner":"profile","stage":"up","signature":"helm: a value is required","build":"c3","hits":1},
+  {"id":"B-2","scope":"tests","tests":["#42","S-7"],"owner":"unknown","stage":"replay","signature":"no node advertises devices.kubevirt.io/kvm","build":"c3","hits":1},
+  {"id":"B-3","scope":"preflight","tests":[],"owner":"unknown","stage":"issues","signature":"issue listing failed for the target repository","build":null,"hits":1}]
+  and all(.blockers[]; (.first_utc | test("^[0-9-]{10}T[0-9:]{8}Z$")) and (.retry_utc | test("^[0-9-]{10}T[0-9:]{8}Z$")) and (has("told") or has("last_utc") or has("notes") | not))' "$data"
+# The viewer knows every scope and owner of the register, no more.
+sync="$(node -e 'const fs=require("fs");const v=fs.readFileSync(process.argv[1],"utf8");const b=fs.readFileSync(process.argv[2],"utf8");
+const keys=(name)=>[...(v.match(new RegExp(`^const ${name} = \\{\\n([\\s\\S]*?)\\n\\};`,"m"))||["",""])[1].matchAll(/^  (\w+): \[/gm)].map((m)=>m[1]).sort().join(",");
+const list=(name)=>eval(b.match(new RegExp(`^const ${name} = (\\[.*\\]);$`,"m"))[1]).sort().join(",");
+process.stdout.write(`${keys("BLOCKER_SCOPE")===list("SCOPES")}:${keys("BLOCKER_OWNER")===list("OWNERS")}`)' "$SCRIPTS/catalog/viewer.html" "$SCRIPTS/blockers.mjs" 2>/dev/null)"
+assert_eq "the viewer names every scope and owner of blockers.mjs" "true:true" "$sync"
+for secret in U0SECRETUSER C0SECRET REQUEST-SECRET SOURCE-SECRET NOTE-SECRET LESSON-SECRET SEC-SECRET FOCUS-NOTE-SECRET BLOCKER-NOTES-SECRET; do
   case "$html" in (*"$secret"*) echo "  not test-related, must not be in the page: $secret"; FAILED=1;; esac
 done
 case "$html" in (*'<b>projects'*|*'<i>large'*) echo "  data not escaped inside the page"; FAILED=1;; esac
@@ -480,13 +502,15 @@ assert "a night's causes" '([.runs[] | select(.type == "regression" and .build =
 # that repeats 6 words in a row of a request, or names a requester or thread, is dropped, and a note says so.
 jq '.acs[0].explanation = "The requester asked: please test the upload, my boss asked. EXPLAIN-QUOTE-CANARY"
   | .analysis.summary = "Asked by U0SECRETUSER. EXPLAIN-WHO-CANARY" | .analysis.problems[0].why = "The new build moved it."' "$W/regression/c2/verdicts.json" > "$W/v.tmp" && mv "$W/v.tmp" "$W/regression/c2/verdicts.json"
+BL open --scope delivery --owner agent --stage upload --build c3 --signature-file "$(SIG 'the requester asked: please test the upload, my boss asked')"
 out="$(node "$SCRIPTS/catalog.mjs")"; data="$(page_data)"; html="$(cat "$W/catalog/index.html")"
 for secret in EXPLAIN-QUOTE-CANARY EXPLAIN-WHO-CANARY U0SECRETUSER "my boss asked"; do
   case "$html" in (*"$secret"*) echo "  a request's words or its requester reached the page in the agent's text: $secret"; FAILED=1;; esac
 done
 assert "the agent's text that quotes a request is dropped, the rest kept, a note says so" '[.runs[] | select(.type == "regression" and .build == "c2" and .verdict != "environment")][0]
   | (.analysis.summary == null and .analysis.problems[0].why == "The new build moved it." and ([.entries[] | select(.key == "issue-42/AC-1")][0] | has("why") | not))' "$data"
-assert "a note counts the dropped texts" '.notes | any(test("^2 text\\(s\\) of the agent.s analysis left out"))' "$out"
+assert "a blocker's signature that quotes a request is dropped, its row kept" '[.blockers[] | select(.id == "B-5") | .signature] == [null]' "$data"
+assert "a note counts the dropped texts" '.notes | any(test("^3 text\\(s\\) of the agent.s own left out"))' "$out"
 # The mark on a still (docs/reporting.md → The mark): the test's marked still wins and is framed in a
 # cached copy; else the agent's `mark` frames the AC still; with neither, the plain still and no copy.
 mkdir -p "$W/suite/.e2e/runs/cand/artifacts/a"
