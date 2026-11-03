@@ -36,9 +36,6 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/boundary.sh" || { echo "cannot source lib/boundary.sh" >&2; exit 1; }
 . "$SCRIPT_DIR/lib/lock.sh" || { echo "cannot source lib/lock.sh" >&2; exit 1; }
 
-iso2epoch() { date -d "$1" +%s 2>/dev/null \
-              || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
-
 # ---------------------------------------------------------------- config ----
 TARGET="${QI_TARGET_REPO:-$(cfg target_repo)}"
 QA_LABEL="$(cfg qa_label)"; QA_LABEL="${QA_LABEL:-qa:ready}"
@@ -109,15 +106,6 @@ env_busy_out() {
   runlog "$1" "busy holder=$held"
   jq -nc --arg mode "$MODE" --argjson logs "$(logs_json)" '{mode:$mode, nothing_to_do:true, logs:$logs}'
   exit 0
-}
-
-# Newest events-log timestamp mentioning `issue=<n>`, as epoch; 0 when none.
-last_event_epoch() {
-  local f ts
-  ts="$(for f in "$WORK"/logs/events-*.jsonl; do [ -f "$f" ] && echo "$f"; done | sort | tail -2 \
-        | xargs -r cat 2>/dev/null \
-        | jq -r --arg re "issue=$1( |$)" 'select(.msg | test($re)) | .ts' 2>/dev/null | sort | tail -1)"
-  [ -n "$ts" ] && iso2epoch "$ts" || echo 0
 }
 
 # ============================================================ ISSUES MODE ====
@@ -204,7 +192,7 @@ scenarios_due() {
 }
 
 # ======================================================== REGRESSION MODE ====
-# The product team's scenarios (docs/regression.md → Profile scenarios): the profile's
+# The product team's scenarios (docs/scenarios.md → Profile scenarios): the profile's
 # scenarios/<slug>.md against the `source=profile` rows of SCENARIOS.md. adopt[] — a file with
 # no row, or whose text changed since its row's spec_hash (a `rejected` row waits for a new
 # text, a `retired` one comes back as new; `retry` — the same text whose adoption ended

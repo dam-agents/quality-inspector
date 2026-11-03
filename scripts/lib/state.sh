@@ -35,8 +35,8 @@ scenario_runs_today() {
 # Cell <n> (1-based) of a table row, trimmed.
 cell() { printf '%s\n' "$1" | awk -F'|' -v n="$(( $2 + 1 ))" '{gsub(/^[ \t]+|[ \t]+$/, "", $n); print $n}'; }
 
-# The QA.md row of one issue, or nothing.
-qa_row() { table_rows "$WORK/QA.md" | awk -F'|' -v id="$1" '{x=$2; gsub(/[ \t]/,"",x)} x==id {print; exit}'; }
+# Epoch seconds of an ISO-8601 UTC time (GNU date, else BSD); 0 when it does not parse.
+iso2epoch() { date -d "$1" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
 
 # The text an AC freeze reads: the "Done when" section when present (up to the next
 # heading of the same or a higher level), else the whole body. Title prepended.

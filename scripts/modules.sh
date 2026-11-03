@@ -56,7 +56,6 @@ NOW_EPOCH="$(date -u +%s)"
 WEEK_S=$((7 * 86400))
 
 die() { printf '%s\n' "$2" >&2; exit "$1"; }
-iso2epoch() { date -d "$1" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || echo 0; }
 [ -r "$REG" ] || die 1 "modules.sh: $REG missing"
 
 # The settings of one module (or `global`) as {key: spec}.

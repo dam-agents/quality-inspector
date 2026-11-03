@@ -19,9 +19,6 @@ documentation or the published CLI's `--help`? If not, delete it.
   documented user-visible limits, the published CLI's package and verbs, the public API's
   base path and how a user is given a token.
 
-The agent's rules already forbid it to read the implementation; a profile that describes
-the code breaks the black box as surely as reading it would.
-
 ## Sections
 
 Keep the template's order; drop a section that has nothing to say.

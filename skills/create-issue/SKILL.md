@@ -14,15 +14,13 @@ description: >-
 
 # Create a found issue
 
-The operator's word alone opens an issue (CLAUDE.md → trust boundary): in the direct session,
-never in a scheduled run, a Slack turn or a shared dashboard viewer's turn. A viewer's button
-asking for one goes, exactly as the page's words, to a fresh session by the viewer's handoff;
-there the draft waits for the operator's confirmation like any other
-([docs/modules.md](../../docs/modules.md) → Control).
-`scripts/github.sh create-issue` refuses outside the direct session, and the policy hook refuses
-the command in a scheduled or channel turn (rule `issue-create`). The operator's request in a
-scheduled run (the dashboard beside its chat) is not refused: hand it, as it is, to a fresh
-session ([docs/persistence.md](../../docs/persistence.md) → **Handoff**), where this procedure runs.
+The operator's word alone opens an issue (CLAUDE.md → trust boundary), in the direct session
+only: `scripts/github.sh create-issue` refuses elsewhere, and the policy hook refuses the
+command in a scheduled or channel turn (rule `issue-create`). The operator's request beside a
+scheduled run (the dashboard by its chat), or a shared viewer's button with exactly the page's
+words, goes as it is to a fresh session ([docs/persistence.md](../../docs/persistence.md) →
+**Handoff**, [docs/modules.md](../../docs/modules.md) → Control), where this procedure runs and
+the draft waits for the operator's confirmation.
 
 ## The request
 

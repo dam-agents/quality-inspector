@@ -1,7 +1,7 @@
 # Weekly audit
 
-Read-only toward every external system and repair-free; it reports. Skip the report only
-when `audit_report: disabled` (still append the log line).
+Read-only toward every external system and repair-free; it reports — skip the report only
+with `audit_report: disabled` (still append the log line).
 
 1. Run `bash "$HOME/scripts/preflight.sh" audit`. Its `checks[]` are the deterministic
    half: GitHub identity, issues reachability, **the black-box boundary probes**, the
@@ -15,7 +15,7 @@ when `audit_report: disabled` (still append the log line).
    unreachable; `warn` for files changed over an hour ago and not pushed, or a backup error
    since the last push), `secrets_in_runs` (a credential
    value left in a raw run's text files; a `fail` names the paths, never the value),
-   **coverage** of the newest UI map (`warn` while pages are uncovered, never `fail`;
+   **coverage** of the newest UI map (`warn` while pages are uncovered;
    [change-awareness.md](change-awareness.md) → Coverage), `features`, `maintenance` and `radar` (the
    registry's, the queue's and `work/PRSCAN.md`'s format; members that do not run; proposals open over 14 days —
    [features.md](features.md), [maintenance.md](maintenance.md), [radar.md](radar.md)), `design_desk` (the design checks'
@@ -41,14 +41,13 @@ when `audit_report: disabled` (still append the log line).
      missing → `fail` (unrecorded external write). An `intent` of the week older than
      15 minutes with no later `done`/`failed` → `warn` (unfinished write).
 2. Add the judgment half:
-   - `mcp__platform-outbound__list_schedules`: every `quality-inspector-*` schedule of `kit.yaml` exists; their
+   - `mcp__platform-outbound__list_schedules`: every `quality-inspector-*` schedule of `kit.yaml` exists, its
      task text and precheck match `kit.yaml` (drift is a `warn` — the operator updates a
-     live schedule). Save the JSON to `/tmp/quality-inspector-schedules.json` and run
+     live schedule). Save the JSON to `/tmp/quality-inspector-schedules.json`, run
      `bash "$HOME/scripts/verify-onboarding.sh" --schedules /tmp/quality-inspector-schedules.json`
      (offline structure pass) and `bash "$HOME/scripts/modules.sh" schedules` with it (the
-     dashboard's switches); delete the file afterwards.
-   - `precheck.sh issues` and `… regression`, timed: exit 0 or 1 within
-     two minutes.
+     dashboard's switches), then delete it.
+   - `precheck.sh issues` and `… regression`, timed: exit 0 or 1 within two minutes.
    - `env.sh kept` ([nested-env.md](nested-env.md) → **Kept for a person**): list each kept
      Environment with its label, build and expiry; one whose issue is closed or passed since,
      or whose scenario passed → a `warn` naming it (release it in the direct session:
@@ -68,11 +67,11 @@ when `audit_report: disabled` (still append the log line).
      file predates the test file and the report states its observations count
      ([explorations.md](explorations.md)).
    - Benchmark: the newest line of `work/benchmark/history.jsonl` — its age, accuracy and
-     `false_verified` (above 0 is a red line until a later run is clean); a benchmark
-     never run, or older than two months with cases defined, is a warn.
-   - Security: the newest `ran` line of `work/SECURITY.log` — a critical or high count above
-     0 stays a red line until a later run is clean; `security_checks` enabled with no run in
-     five weeks is a warn. Never quote a finding beyond its id.
+     `false_verified`; with cases defined, never run or older than two months is a warn.
+   - Security: the newest `ran` line of `work/SECURITY.log`; `security_checks` enabled with no
+     run in five weeks is a warn. Never quote a finding beyond its id.
+   - A benchmark `false_verified` or a security critical or high count above 0 stays a red
+     line until a later run is clean.
    - Spec quality: this week's `not-testable` verdicts and `testable: no` ACs by reason,
      issues without "Done when", and how many suggested rewrites authors adopted (an
      issue that became due again by `ac_changed` after a `spec-feedback` file).

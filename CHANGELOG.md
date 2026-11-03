@@ -17,6 +17,13 @@ first, and never reads one updated before that; the pre-flight writes the ledger
 request with nothing to judge itself, so a run where no pull request names a recurring test is
 declined and costs no model step ([docs/radar.md](docs/radar.md) → **The window**).
 
+## 3.54.1 — 2026-11-02
+
+**Upgrade:**
+Nothing to run — docs are re-read per run. The docs say each rule once and link to its home;
+no rule, key or default changed. Shared script helpers moved to `scripts/lib/util.mjs` and
+`scripts/lib/state.sh`.
+
 ## 3.54.0 — 2026-11-02
 
 **Upgrade:**

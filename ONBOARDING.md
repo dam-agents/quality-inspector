@@ -37,11 +37,10 @@ operator-only steps, and tick each with `complete_onboarding_step` as it is sett
 2. *Backend* — the agent runs on the backend and size the profile's README asks for
    (the kit creates it on the vm backend; by hand, choose vm when the profile requires root).
 3. *Target repository* — the `target_repo` whose issues are tested.
-4. *Egress rules* — the kit's GitHub rules hold for any github.com target. The rest come from
-   `scripts/egress-rules.sh` (Step 3): a `prompt` rule the operator approves in its approval
-   prompt when `verify-onboarding.sh --egress` asks for it; a `by-hand` rule (under a kit deny,
-   the work backup, a GitHub Enterprise target, the kit's own on the by-hand path) the
-   operator adds in the agent's network settings, as host, method, path and why.
+4. *Egress rules* — the kit's GitHub rules hold for any github.com target; the rest are the
+   rows of `scripts/egress-rules.sh` (Step 3 → **The egress**): a `prompt` rule the operator
+   approves when `verify-onboarding.sh --egress` asks for it, a `by-hand` rule the operator adds
+   in the agent's network settings.
 5. *Issue comments* — enable or keep disabled.
 6. *Profile settings* — a value for every profile key it marks `ask`.
 7. *Model* — agent steps reach the agent's model connection through the gateway, with an
@@ -199,7 +198,8 @@ boundary**). This file is a pointer and carries no rules of its own.
 EOF
 ```
 
-**2d — environment and suite:**
+**2d — environment and suite:** write `- profile: <name>` into `work/CONFIG.md` first (Step 3
+completes the file) — both scripts find the profile through it.
 
 ```bash
 bash "$HOME/scripts/env.sh" init
@@ -210,9 +210,7 @@ claude mcp get e2e >/dev/null 2>&1 || claude mcp add --scope user e2e -- bash "$
 `env.sh init` runs the profile's `bin/env init` (it writes `work/env/credentials.env`).
 `suite.sh init` needs `registry.npmjs.org`, which the kit allows — refused there means the
 agent lacks the kit's rules: `egress-rules.sh --kit` lists them for the operator to add (item 4),
-then re-run this block. Write
-`- profile: <name>` into `work/CONFIG.md` first (Step 3 completes the file) — both
-scripts find the profile through it.
+then re-run this block.
 
 **2e — the hooks:** `bash "$HOME/scripts/hooks/install.sh"` merges the PreToolUse policy
 hook, the Stop backup hook, the trace hook ([docs/logging.md](docs/logging.md) → **Harness trace**), the SessionStart
@@ -247,10 +245,9 @@ file → keep its values, show them once, and ask only for the keys it lacks. As
 5. **`slack_channel`** — optional, off unless the operator says yes: `describe_channel` for
    `slack`; when it lists a chat, offer test requests there ([docs/slack.md](docs/slack.md))
    and record its id. Not connected → skip; a channel can be bound later. Say that an answer
-   in Slack carries a picture of the evidence, and a link only where one opens for its readers —
-   the dashboard's, once the operator shares it ([docs/slack.md](docs/slack.md) → **The answer in
-   the thread**); `slack_report_visibility: public` makes such reports open to anyone with the
-   link, posted in their thread only — only on the operator's word.
+   in Slack carries a picture of the evidence, and a link only where one opens for its readers
+   ([docs/slack.md](docs/slack.md) → **The answer in the thread**); `slack_report_visibility:
+   public` only on the operator's word.
 6. **The profile's keys** — every `config` entry of its `profile.json`, written as
    `- profile.<key>: <value>`: ask those marked `"ask": true` (its `about` text is the
    question), default the rest. Tick item 6.
@@ -271,15 +268,18 @@ file → keep its values, show them once, and ask only for the keys it lacks. As
    model and the ones the connection lists: keep the configured one when it answers, else offer
    those that do and write the operator's pick. None answers → checklist item 7 (the
    connection). Tick item 7 once one answers.
-10. Everything else — defaults; show them and change only what the operator asks for. Offer
-   `lend_model: enabled` when the profile's `SKILL.md` names criteria only a real model makes
-   testable (tokens per product AI step), and nothing for the live browser: it is detected from the shared browser's
-   `DevToolsActivePort` ([docs/test-authoring.md](docs/test-authoring.md) → Watching live); set `live_browser`
-   only to override it, or `disabled` to turn it off. Offer the testing modules ([docs/modules.md](docs/modules.md)), all off
-   by default — `ux_signals` only when the profile has a `ux_signals` entry; with a Design Desk agent
-   in a bound Slack conversation, also `design_desk_findings` (its conversation's `C…` id, its bot's
-   `U…` id; [docs/design-checks.md](docs/design-checks.md)) —, and `dashboard_interactive: enabled` when the operator has Interactive artifacts on
-   in the platform (the dashboard's buttons then send commands to this chat). Name, never
+10. Everything else — defaults; show them and change only what the operator asks for. Offer:
+   - `lend_model: enabled` when the profile's `SKILL.md` names criteria only a real model makes
+     testable (tokens per product AI step);
+   - the testing modules ([docs/modules.md](docs/modules.md)), all off by default — `ux_signals`
+     only when the profile has a `ux_signals` entry; with a Design Desk agent in a bound Slack
+     conversation, also `design_desk_findings` (its conversation's `C…` id, its bot's `U…` id;
+     [docs/design-checks.md](docs/design-checks.md));
+   - `dashboard_interactive: enabled` when the operator has Interactive artifacts on in the
+     platform (the dashboard's buttons then send commands to this chat).
+
+   Nothing for the live browser: it is detected ([docs/test-authoring.md](docs/test-authoring.md)
+   → Watching live); `live_browser` only overrides it, or `disabled` turns it off. Name, never
    enable on your own, `report_visibility: public`: the dashboard then opens a report in one
    click, but anyone holding its link sees the videos and screenshots — only on the operator's word.
 
@@ -371,9 +371,10 @@ Then `bash "$HOME/scripts/verify-onboarding.sh" --config`, apply every `fix:`, a
 file to the operator.
 
 **The egress (checklist item 4).** `bash "$HOME/scripts/egress-rules.sh"` lists what this
-instance needs beyond the kit. Give the operator every `by-hand` row in its words — host,
-method, path, why: "add an allow rule in this agent's network settings" — never a command; no
-prompt ever appears for it. A `refused` row is never given: it is a profile defect to report. Then run `bash "$HOME/scripts/verify-onboarding.sh" --egress`: it
+instance needs beyond the kit ([docs/black-box.md](docs/black-box.md) → **Egress rules**). Give
+the operator every `by-hand` row in words — host, method, path, why: "add an allow rule in this
+agent's network settings"; no prompt ever appears for it. A `refused` row is never given: it is a
+profile defect to report. Then run `bash "$HOME/scripts/verify-onboarding.sh" --egress`: it
 requests every `prompt` rule, so its approval prompt opens for the operator — "Allow
 permanently" — and reports each rule allowed, refused (`FAIL`, the rule to add by hand),
 HTTP 403 (a `warn`: the gateway's refusal or the host's own answer — ask the operator whether
@@ -403,8 +404,8 @@ asks again.
    to this agent (`/home/agent/work/env/credentials.env`) — **never in chat**. A value pasted in chat anyway: write
    it into its line, never repeat it, and tell the operator to rotate it once the check passes.
 4. The egress: re-run `bash "$HOME/scripts/egress-rules.sh"` — the profile's sandbox rules
-   now carry the names from step 2 — and give the operator its new `by-hand` rows in words
-   (item 4). A `refused` row is never added: it is a profile defect, report it.
+   now carry the names from step 2 — and give the operator its new `by-hand` rows as in Step 3
+   (item 4).
 5. `bash "$HOME/scripts/sandbox.sh" check` until it exits 0 — a `FAIL` names the account and
    what is wrong (a token, a missing channel, a refused request = an egress rule). Exit 3
    (the profile has no check) → say so; the first scenario that uses the accounts proves them.

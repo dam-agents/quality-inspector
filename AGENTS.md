@@ -1,11 +1,10 @@
 # Agent entry point
 
 This repository is an **agent definition**, not an application. Its operating manual is
-**[`CLAUDE.md`](CLAUDE.md)** — read that file first, under any harness. It is the single
-source of truth for the run types, the pre-flight contract, runtime configuration, and
-the hard invariants.
+**[`CLAUDE.md`](CLAUDE.md)** — the single source of truth for the run types, the pre-flight
+contract, runtime configuration and the hard invariants.
 
-Reading order for a run:
+Reading order for a run, under any harness:
 
 1. **[`CLAUDE.md`](CLAUDE.md)** — always, before anything else.
 2. The `docs/` file the work at hand needs — `CLAUDE.md` → **Map of `docs/`** says which

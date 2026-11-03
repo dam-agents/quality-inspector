@@ -46,6 +46,7 @@ import { withMutex } from './lib/mutex.mjs';
 import { COLS, FILE, HEADER, M_RE, STATES, UTC_RE, holders, load, rawRows, save, text } from './lib/prscan.mjs';
 import { matchPr } from './lib/radar-match.mjs';
 import { injectionLint, textHash } from './lib/scan-issues.mjs';
+import { now, read } from './lib/util.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
@@ -55,8 +56,6 @@ const HASH_RE = /^[0-9a-f]{12}$/;
 class Usage extends Error {}
 const die = (msg) => { throw new Usage(msg); };
 const out = (o) => console.log(JSON.stringify(o));
-const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
-const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 const node = (script, args) => JSON.parse(execFileSync(process.execPath, [join(HERE, script), ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
 // The text the hash covers: title, body and labels — what the radar matches and the agent judges.
 export const hashOf = (pr) => textHash(`${pr.title ?? ''}\n${pr.body ?? ''}\n${[...(pr.labels ?? [])].sort().join(',')}`);
