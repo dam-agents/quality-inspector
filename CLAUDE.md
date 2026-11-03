@@ -79,7 +79,7 @@ whitespace and one layer of quotes or backticks are stripped. Every script reads
   `scripts/lib/modules.json`, read through `reg`, written only by `scripts/modules.sh set` ([docs/modules.md](docs/modules.md)); invalid → default.
 - `scenario_discovery` (`disabled` | `propose` | `run`), `scenario_channel` (Slack id for the digest;
   empty = chat UI), `max_scenarios_per_run` (`3`; also profile adoptions a night), `max_scenarios_per_day` (`10`), `profile_scenarios` (`enabled`; the profile's `scenarios/` join the nightly run), `regression_channel` (Slack id for the nightly summary and a black-box breach alert, else `slack_channel`; empty = chat UI) — [docs/scenarios.md](docs/scenarios.md).
-- `security_checks` (`enabled`), `security_failed_logins` (`10`) — [docs/security.md](docs/security.md).
+- `security_checks` (`enabled`), `security_failed_logins` (`10`) — [docs/security.md](docs/security.md); `radar_window_days` (`3`) — the Change radar reads pull requests updated in that many days ([docs/radar.md](docs/radar.md)).
 - `max_wallclock_min_per_issue` (`150`, < `lock_ttl_min`), `max_model_steps_per_issue` (`400`) —
   [docs/nested-env.md](docs/nested-env.md) → **Budgets**; `min_free_disk_gi` (`10`) — `env.sh up` refuses below it; `nested_target` (`auto` | `vm` | `environment`: no fallback to this VM) — where it runs (→ **Where the product runs**).
 - `design_label` (`qa:design`); opt-in `design_desk_findings` (`disabled`) with `design_desk_channel`, `design_desk_bot`, `design_desk_max_per_run` (`5`),

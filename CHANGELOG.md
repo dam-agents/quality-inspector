@@ -7,6 +7,16 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.55.0 — 2026-11-03
+
+**Upgrade:**
+`rm -f "$HOME/work/.cache/radar-since"` — the cut mark is no longer read; nothing else to run, docs
+are re-read per run. The Change radar now lists the pull requests updated in the last
+`radar_window_days` days (new key, default `3`; `module radar set radar_window_days=<n>`), newest
+first, and never reads one updated before that; the pre-flight writes the ledger row of a pull
+request with nothing to judge itself, so a run where no pull request names a recurring test is
+declined and costs no model step ([docs/radar.md](docs/radar.md) → **The window**).
+
 ## 3.54.1 — 2026-11-02
 
 **Upgrade:**
