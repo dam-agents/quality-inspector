@@ -14,6 +14,17 @@ read its `SKILL.md` before freezing ACs or writing tests. Never hard-code a prod
 only issue and request text, the running nested product, its CLI `--help`, and what the profile
 tells you. **First-run onboarding:** once, by [`ONBOARDING.md`](ONBOARDING.md) (sentinel `$HOME/.quality-inspector-onboarded`).
 
+## How you decide
+
+Your purpose: tell, with evidence, whether the product works for its users. `docs/` is the usual way there, not a script.
+- **Judgment over procedure.** When a step does not fit what you see — the product changed, a tool fails, a doc misses
+  the case, a check says nothing for this issue — take the path that serves the purpose; the run's summary says what you did differently and why.
+- **Choose inside the limits.** Switches, caps and budgets are the operator's limits; inside them you choose what to
+  test, how deep and in which order, by risk: what changed, what failed before, what users touch most.
+- **Ask only when it is the operator's**: an external write the rules do not already allow, a change of your definition,
+  a contradiction in the spec. What is reversible and in scope, you do.
+- **Never bent**, not for the purpose, not for speed: the black box, the trust boundary and the hard invariants below.
+
 ## Run types
 
 | Run type | Schedule (default) | Entry command |
@@ -58,6 +69,7 @@ Worklist keys → procedure:
 Every instance-specific value lives in `work/CONFIG.md` (created at onboarding). **Parsing contract:** a key is
 read from a `- <key>: <value>` bullet only — any other line is invisible; a trailing `#` comment, surrounding
 whitespace and one layer of quotes or backticks are stripped. Every script reads it through `scripts/lib/config.sh`.
+Only `profile` and `target_repo` are required; every other key has a working default — leave it unless the operator asks.
 
 - `profile` — the product profile skill; required (missing or not installed → every mode fails).
   `profile.<key>` — its own keys, defaults in its `profile.json`; an unknown one fails verification.

@@ -211,6 +211,15 @@ assert_eq "no command opens a report" 000 "$cmd"
 kinds="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
 process.stdout.write([/^function goLink\(/m, /^const extLink = /m, /class: .btn agent., type: .button., .data-kind.: .agent./, /^const prepBtn = /m, /^function showTip\(/m].map((re)=>re.test(s)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "the viewer: go links, new-tab links, agent commands, prepared commands, tooltips" 11111 "$kinds"
+# Five sections, each view in exactly one; Home's agent look and the blocker commands are page commands;
+# Home's "Ask for a test" sends the scenario shape with any page (docs/catalog.md → Home).
+sec="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
+const V=eval(s.match(/^const VIEWS = (\[[\s\S]*?\]\]);$/m)[1]);const S=eval(s.match(/^const SECTIONS = (\[[\s\S]*?\]\]);$/m)[1]);
+const ids=S.map((x)=>x[0]);const cmd=eval(s.match(/^const CMD_RE = (\/.*\/);$/m)[1]);const sc=eval(s.match(/^const SCEN_RE = (\/.*\/);$/m)[1]);
+process.stdout.write([S.length===5, V.every((v)=>ids.includes(v[3])), ids.every((k)=>V.some((v)=>v[3]===k)), V.length===12,
+  cmd.test("look into what needs attention"), cmd.test("show blockers"), cmd.test("retry B-3"), !cmd.test("look into what needs attention now"), !cmd.test("retry B-3; rm -rf /"),
+  sc.test("test this scenario: On the page /: A user uploads a file. The file shows in the list.")].map((x)=>x?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "the viewer: five sections hold every view; the agent look and the blocker commands; Home asks for a test" 1111111111 "$sec"
 # A link to another site opens by the page's script, also in a frame; with no new tab, a box shows the address.
 ext="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
 process.stdout.write([/^function openExt\(/m, /window\.open\(href, ._blank.\)/, /^\s*linkBox\(href\);/m, /document\.addEventListener\(.click., \(e\) => \{\n\s*if \(e\.defaultPrevented/].map((re)=>re.test(s)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"

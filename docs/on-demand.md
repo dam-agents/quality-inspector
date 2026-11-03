@@ -39,6 +39,25 @@ refused with a "start a new chat". A direct session's first request names it
   `blockers.mjs retry B-<k>` after the operator's fix that no file shows (egress, disk, a
   platform repair) — the next run tries again; `blockers.mjs close B-<k>` when it is no longer
   to be held (a closed cause that strikes again opens a new row).
+- **"look into what needs attention"** (the dashboard's "Let the agent take care of it") — you
+  decide, item by item, what helps most, and do it in this session; no script orders it:
+  1. **Gather**: the open blockers (`blockers.mjs list --open`), the open proposals of
+     `work/MAINTENANCE.md`, every test case whose newest result is `failed`, `regression`,
+     `needs-review`, `flaky` or `blocked` or whose file drifted (the sources of
+     [catalog.md](catalog.md)), and the `promotable` rows of `work/SUITE.md`.
+  2. **Plan**, most severe first: one line per item — what the evidence says it is, and what you
+     will do. Show it before you start.
+  3. **Do what is yours**, without asking: a blocker you own → [autonomy.md](autonomy.md) →
+     **Diagnosis**; a `flaky`, `blocked` or unknown cause → "run <ref>" (below) up to two times, to
+     tell a flaky test from a real failure; `cause: test` → "repair <ref>"; `cause: environment` →
+     the diagnosis, then "run <ref>". A result here is a run by hand, never a verdict.
+  4. **Propose what is the operator's**, each with the exact words that do it: a defect the runs
+     confirmed → "create issue for <ref>, …" (its draft first, [skills/create-issue](../skills/create-issue/SKILL.md));
+     the `promotable` files → "promote all pending"; each proposal → the answer you advise
+     ("accept M-<k>"); a blocker of another owner → its one action.
+  5. **Summary**: done, proposed, still waiting and why; then the catalog ([catalog.md](catalog.md)
+     → **Build and publish**). At most 20 test runs and `max_wallclock_min_per_issue` for all of it;
+     what the budget leaves out is in the summary.
 - **"accept M-<k>"**, **"rewrite M-<k>"**, **"retire M-<k>"**, **"keep M-<k>"**, **"show maintenance"** —
   a test maintenance proposal ([maintenance.md](maintenance.md) → The operator decides);
   "accept the review of #N" / "reject …" name that test's open `needs-review` proposal.

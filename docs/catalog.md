@@ -52,7 +52,7 @@ The operator may share the page beyond themselves, so it carries only what conce
   name it in a quoted string — on that page only, or in a test that opens the page; a control
   that leads to another page (a navigation item, a tab, a link, a list's first row) stands for
   the items that reach that page.
-- **Activity** (Overview, as of the page's build): the environment lock's holder and since (never
+- **Activity** (Home, as of the page's build): the environment lock's holder and since (never
   its session), the `work/QA.md` rows `in_progress` or `report_pending`, the labelled open issues
   with no row yet or carrying `retest_label` (unknown, not empty, when the listing failed), the queued scenario requests,
   the profile scenarios still to adopt (`scenarios.sh queue`: id, the file's `# ` title, kind, and
@@ -60,11 +60,11 @@ The operator may share the page beyond themselves, so it carries only what conce
   build; `null` with `profile_scenarios: disabled`), the time budget
   (`max_wallclock_min_per_issue`), each schedule's name, switch and cron from
   `work/schedules.json`, and the last 14 days of runs drawn from the runs above.
-- **Blockers** (Overview → Needs attention, first, also with no test case yet; not as of an older
-  build): the open rows of `work/BLOCKERS.md` (`blockers.mjs list --open`, [autonomy.md](autonomy.md))
+- **Blockers** (Home, first: the status card, What to do next and Needs attention, also with no test
+  case yet; not as of an older build): the open rows of `work/BLOCKERS.md` (`blockers.mjs list --open`, [autonomy.md](autonomy.md))
   — id, scope, the tests it stops, owner, since (days open at the page's build), hits, the build, the
   retry time, and the owner's general repair (the operator's words "retry B-<k>" where the fix is
-  theirs or the platform's); the signature as the agent's own text (dropped like the analysis when it
+  theirs or the platform's, and "show blockers" for the agent's notes in its chat); the signature as the agent's own text (dropped like the analysis when it
   repeats a request). Never a row's notes file (`work/blockers/`) or its `told`.
 - **Requests:** the scenarios still queued, running, awaiting delivery or rejected — id,
   source, state, the frozen title, the build and verdict once there are any, the time of the
@@ -98,17 +98,17 @@ The operator may share the page beyond themselves, so it carries only what conce
 
   A member is `#N`, `#N AC-k`, `#N IN-k`, `S-k` or `S-k AC-j`; an unknown one is kept and matches nothing.
 - **Features**, the agent's ([features.md](features.md)), from `work/FEATURES.md`: a facet and a
-  grouping like the collections, and in a test's panel. The Overview lists them with their recurring
+  grouping like the collections, and in a test's panel. Home → Numbers lists them with their recurring
   test count and a "Run this feature" action (`run feature <id>`).
 - **Maintenance**, from `work/MAINTENANCE.md` ([maintenance.md](maintenance.md)): the open proposals
-  on Overview (id, test, kind, basis, proposal) with the operator's four actions (`accept M-<k>`,
-  `rewrite M-<k>`, `retire M-<k>`, `keep M-<k>`), the test's own in its panel, and the flag
+  on Home → What to do next (id, test, kind, proposal, the first action) and in the test's panel with
+  the operator's four actions (`accept M-<k>`, `rewrite M-<k>`, `retire M-<k>`, `keep M-<k>`), and the flag
   "maintenance". Closed proposals are not shown. A failing recurring test whose cause is not
   `product` or `environment`, with no open proposal, gets "Repair this test" (`repair <ref> <AC-k>`,
   [on-demand.md](on-demand.md)); the bug-issue action is then not the highlighted one.
 - **Pins:** each viewer's own, kept in their browser.
 - **Gherkin:** "Copy as Gherkin" in a criterion's panel (every criterion of its issue or scenario)
-  and on each feature of Overview copies them as one `Feature`, a `Scenario` per criterion in its
+  and on each feature of Home → Numbers copies them as one `Feature`, a `Scenario` per criterion in its
   frozen words, `@not-testable` where it is; explorations stay out. The same shape as
   `gherkin.mjs export` ([on-demand.md](on-demand.md)).
 
@@ -149,30 +149,58 @@ result that is not a pass, and the Runs view a run's `summary` under its result.
   the agent" (beside the agent's chat; else "Copy"); Esc or Cancel closes it with nothing sent
   (dashed: takes your input first). Grey changes only this page in this browser (filters, sorting,
   pins, selections). Each tooltip says first what it does and where it goes, then its meaning.
-- **Where you are:** the header always names the view and the panel open on it, beside **Back**;
-  each view opens with its icon, its name and one line of what it is for (the line hideable, per
-  browser); a panel names its kind (test case, test run, issue, scenario).
+- **Where you are:** the header has five tabs, one per section; Home's tab counts the blockers and
+  the test cases that need attention. Under them the place as breadcrumbs (section › view and its
+  filter › the open panel, which closes on a click of the view) beside **Back**. A section with more
+  views shows them as tabs at the top of the page; it opens the view it showed last. Each view opens
+  with its icon, its name and one line of what it is for (the line hideable, per browser); a panel
+  names its kind (test case, test run, issue, scenario); the browser tab's title names the view; a
+  move to another view starts at its top.
+- **What the agent does:** the header's status — "Testing #81" with a pulsing dot, or "Idle" — as of
+  the page's build, which "updated … ago" beside the name states.
 - **Day / night:** the header switch picks the colours — Auto (as the system), Day or Night — per
   browser; the tabs wrap to more lines, never scroll sideways.
 - **Panel width:** a side panel opens at half the screen; drag its left edge (or focus it and use
   the arrow keys) to resize it; the width stays per browser, a double click on the edge resets it.
-- Overview has a "How this page works" guide (the kinds of control, then issue, test case, test
-  run, verdict, tier, report, commands, reporting a bug); every verdict badge, tier, severity,
-  design check, validation input, run type, column, filter, quick filter, label of a panel and
-  figure carries its meaning as a tooltip — the page's own, on hover, keyboard focus or a tap of an
-  ⓘ; the Legend lists the kinds of control, every name and icon, verdict, tier and run type.
+- **❔ Help** (the header) is one dialog — Esc, Close or a click beside it closes it: the five
+  sections, the words (issue, test case, test run, verdict, tier, report, test builder, messages for
+  the agent, reporting a bug), the kinds of control, every name and icon, verdict, cause, tier and
+  run type. A first visit shows one line that points to it, hideable per browser. Every verdict
+  badge, tier, severity, design check, validation input, run type, column, filter, quick filter,
+  label of a panel and figure carries its meaning as a tooltip — the page's own, on hover, keyboard
+  focus or a tap of an ⓘ.
 
-Views: Overview, Modules (each module's switches and settings, and what a job tests: the
-Nightly regression lists its test cases by issue and scenario), Findings (validation, stress,
-security counts, edge-case observations), Design (the design findings: crops, filters, "copy as
-Markdown" for the design team; a field finding with its real-user numbers, class and whether it
-went to Design Desk — [ux-signals.md](ux-signals.md)), Runs, Product map (the page shots with every control clickable, coloured by
+Five sections, one question each: 🏠 **Home** (below); 🧪 **Tests** — All tests (the catalog),
+Screenshots (the gallery), History (item × build), Lifecycle and Test builder (below); 🏃 **Runs**;
+🗺️ **Product** — Product map (the page shots with every control clickable, coloured by
 its tests' worst verdict, dashed where no test names it; a drawn outline where a shot did not fit; a
 navigation item, tab, link or list row that leads to a mapped page opens that page, like a
-click-through wireframe, with a "back" to the page before), Catalog, Gallery, Coverage,
-History (item × build), Lifecycle and Test builder (below), plus a detail panel per item, per run (a night's
-lists every test case it had, with its result, its length and cost) and per origin (an
-issue's or a scenario's criteria and explorations, every run that judged them, its report).
+click-through wireframe, with a "back" to the page before), Coverage, Design (the design findings: crops, filters, "copy as
+Markdown" for the design team; a field finding with its real-user numbers, class and whether it
+went to Design Desk — [ux-signals.md](ux-signals.md)); 🧩 **Modules** — Settings (how many modules are on;
+each module's switch first — when it runs, or on or off —, its other settings behind "More settings",
+open when one is invalid; what a job tests: the Nightly regression lists its test cases by issue and
+scenario) and Findings (validation, stress, security counts, edge-case observations). Plus a detail
+panel per item, per run (a night's lists every test case it had, with its result, its length and
+cost) and per origin (an issue's or a scenario's criteria and explorations, every run that judged
+them, its report).
+
+**Home** says, in this sequence, what the state is, what to do, and what the agent does:
+- **The status card:** one sentence — the open blockers first, else the test cases that need
+  attention, else a newest night whose environment failed, else "All test cases pass" —, what the
+  agent does as of the page's build, four facts (last night, the test cases and how many run each
+  night, the pages with a nightly test, the schedules that are on), and its actions: **Let the agent
+  take care of it** (`look into what needs attention`, [on-demand.md](on-demand.md): the agent goes
+  through all of it and decides per item), Ask for a test, and the test cases to see.
+- **What to do next:** the page reads its own data and names up to six steps, the most severe first,
+  each with its action — a blocker (its owner's repair, `retry B-<k>` where the fix is the operator's
+  or the platform's, `show blockers`), product defects (`create issue for …`), test defects
+  (`repair <ref>`; for several, the agent's look), environment problems (`run …`), causes not known,
+  drift, maintenance proposals, verified test cases (`promote all pending`), pages without a test,
+  open major design findings; with none, "Nothing needs you now".
+- **Needs attention**, Activity (now, the queue, the schedule), the latest runs, **Ask for a test**
+  (the person's words and a start page, or `/` for any page) and, closed until opened, the numbers,
+  the charts, the last 14 days, the modules, the features and the bug issues.
 
 **Links and navigation.** Every reference links to its place: an issue or a scenario (`#42`,
 `S-7`) to its origin panel, a build to the runs on it (Runs filtered by build, with "as of this
@@ -180,7 +208,7 @@ build"), a page a test opens to that page on the Product map, an area, a session
 label or a collection to the catalog filtered by it, a history cell or entry to its run, a design
 finding's page to the map and back. Every report — the artifact with the video, the screenshots
 and the steps — shows (a link in a new tab, or the "private" mark) wherever its run or origin
-appears: the catalog's Report column, cards, Overview, the map's test lists, an item's and an
+appears: the catalog's Report column, cards, Home, the map's test lists, an item's and an
 origin's panel, the Runs view and the run panel. Every move to another place (a view, a panel, a
 map page, a build, "as of") is a step the browser's back and forward walk; a filter, a sort, a
 search or a picked control of the map refines the place instead. The page's own **Back** (in the
@@ -225,8 +253,8 @@ architect variant. A problem an issue was opened for shows that issue's link whe
 and the flag "issue created". Every command opens in the box at the bottom, and is handled as
 [modules.md](modules.md) → **Control** says (from the dashboard; beside a scheduled run's chat, a
 fresh session whose answer — a draft to confirm — is there: [persistence.md](persistence.md) →
-**Handoff**). The one command with free words is **Ask for a test** on the Product map and in the
-Test builder: a scenario request built from the page's pattern, the control's kind and name, and
+**Handoff**). The one command with free words is **Ask for a test** on Home, on the Product map and in
+the Test builder: a scenario request built from the page's pattern, the control's kind and name, and
 the person's own words (or steps), in the one shape of [scenarios.md](scenarios.md) → **A request
 from the dashboard**; the words are data. The Test builder's `walk these steps live: …` has the same
 bounded shape ([on-demand.md](on-demand.md)); so has `discuss D-<k>: <question>` (printable text,
@@ -267,7 +295,7 @@ A view where a person writes a new test as steps and sees them before anyone run
 ## Build and publish
 
 With `test_catalog: enabled` and `artifact_reports: enabled`: right after a run claims an issue
-or a scenario (its row `in_progress`, so Overview → Activity shows the work); at the end of an
+or a scenario (its row `in_progress`, so Home → Activity shows the work); at the end of an
 issues run, a regression run, a modules run and a scenario delivery; at the end of every turn of a
 dashboard request ([scenarios.md](scenarios.md) → **A request from the dashboard**); and after an
 operator's promote, demote, collection change or module change ([modules.md](modules.md) → **Control**).
@@ -306,7 +334,7 @@ page; removed with their item or page):
 
 - **small** — a JPEG, 360 px (a still) or 720 px (a page shot) wide, for the lists and cards;
 - **sharp** — a WebP up to 1440 px wide (the screen at its own size), for a test case's panel,
-  the Gallery and the Product map. A click on a panel's screenshot, or **🔍 Full size**, shows it
+  Screenshots and the Product map. A click on a panel's screenshot, or **🔍 Full size**, shows it
   over the page: fit to the window or at its real size (a click changes between them), Esc closes.
 
 The page embeds them within 8 MiB — less when the data is large (a `notes` entry says so): first
