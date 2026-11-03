@@ -33,6 +33,7 @@ import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { VIEWER_CSS, VIEWER_HTML } from './lib/media-viewer.mjs';
 import { AGENT_RGB, agentBoxes, drawMarks, splitMark } from './lib/shot-mark.mjs';
+import { escHtml as esc } from './lib/util.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -65,7 +66,6 @@ if (v.mode === 'scenario' && [v.verdict, ...(v.acs ?? []).map((ac) => ac.verdict
   process.exit(2);
 }
 
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
 const ms = (n) => (n == null ? '' : n < 1000 ? `${n} ms` : `${(n / 1000).toFixed(1)} s`);
 

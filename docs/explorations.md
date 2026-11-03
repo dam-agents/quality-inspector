@@ -67,7 +67,8 @@ only). A required role that is missing → no test; the EX is `blocked`, note
 ## Tests
 
 Same file `tests/issue-<n>.e2e.ts`, one test per EX, written at issue-qa step 5 with the
-AC tests and by the same rules ([test-authoring.md](test-authoring.md)), `EX` for `AC`:
+AC tests and by the same rules ([test-authoring.md](test-authoring.md)), `EX` for `AC`: tags
+`issue-<n>-ex`, `ex-<k>`, `from-ac-<j>`, an `EX-<k>:` screenshot, a `// EX-<k> begin` / `end` block.
 
 ```ts
 test('#42 EX-1: a viewer cannot rename the agent', { session: 'viewer', tags: ['issue-42-ex', 'ex-1', 'from-ac-1'] },
@@ -84,11 +85,11 @@ test('#42 EX-1: a viewer cannot rename the agent', { session: 'viewer', tags: ['
 
 - **Tag `issue-<n>-ex`, never `issue-<n>`.** Tags match exactly, and every AC run (red-green,
   confirmation, heal, regression) selects `--tag issue-<n>` — so explorations never run on
-  the baseline or nightly. Explorations are not replayed nightly in this version.
-  `check-asserts.sh --lint <file>` lists in `ex_with_issue_tag` every EX block whose test
-  carries `issue-<n>`; issue-qa step 5 retags each one before red-green.
+  the baseline or nightly. `check-asserts.sh --lint <file>` lists in `ex_with_issue_tag` every
+  EX block whose test carries `issue-<n>`; issue-qa step 5 retags each one before red-green.
 - `check-asserts.sh --ex-hash <file>` hashes the EX blocks alone (`none` without any);
-  `--hash` and `work/SUITE.md` cover AC and IN blocks only ([intent.md](intent.md)), so EX blocks may evolve without drift.
+  `--hash` and `work/SUITE.md` cover AC and IN blocks only ([intent.md](intent.md)), so EX
+  blocks are not promoted state and may evolve without drift.
 
 ## Run and judge — candidate only
 
@@ -102,8 +103,7 @@ On the candidate install of issue-qa step 6, after its AC run:
 | reached it, Expected false | `observation` | `major` for `roles-isolation` or `persistence`, else `minor` |
 
 Read the trace before writing an `observation`, as for a `failed` AC. Confirm a would-be
-`major` like an AC failure (`--repeat-each 3 --no-cache`, issue-qa step 7); mixed results →
-`observation`, `info`, note `flaky`.
+`major` like an AC failure (issue-qa step 7); mixed results → `observation`, `info`, note `flaky`.
 
 ## Reporting
 

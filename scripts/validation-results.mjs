@@ -12,8 +12,9 @@
 // tests — its report.json missing or unreadable, or no val-* result while the plan has
 // cases — is no result: exit 1, {"error"}, nothing written.
 
-import { readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { readJson } from './lib/util.mjs';
 
 const argv = process.argv.slice(2);
 const planPath = argv[0];
@@ -24,7 +25,6 @@ if (!planPath || planPath.startsWith('--') || !label) {
 }
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 const runsRoot = process.env.QI_RUNS_ROOT ?? join(work, 'suite', '.e2e', 'runs');
-const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
 const plan = readJson(planPath);
 if (!plan || !Array.isArray(plan.cases)) { console.error(`validation-results: ${planPath} is not a plan`); process.exit(2); }
 

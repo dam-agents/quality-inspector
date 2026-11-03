@@ -21,13 +21,11 @@
 // OWNER (work/env/credentials.env) like security-checks.mjs; --skip-signin replays anonymously.
 // Evidence holds counts and timings only — never a header, cookie, body or credential.
 
-import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { WORK, credentials, msg, sh } from './lib/design-browser.mjs';
 
-const here = dirname(fileURLToPath(import.meta.url));
 const flags = {}; const pos = [];
 for (let i = 2; i < process.argv.length; i++) {
   const a = process.argv[i];
@@ -40,13 +38,6 @@ const usage = 'usage: stress.mjs <inventory.json> --build C [--out DIR] [--previ
 if (!pos[0]) { console.error(usage); process.exit(2); }
 
 const CAP = { concurrency: 50, duration_s: 300, requests: 20000, contexts: 5, endpoints: 30 };
-const WORK = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
-const sh = (expr) => {
-  try {
-    return execFileSync('bash', ['-c', `CONFIG="$WORK/CONFIG.md"; . "$LIB/config.sh"; . "$LIB/profile.sh"; ${expr}`],
-      { env: { ...process.env, WORK, LIB: join(here, 'lib') }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  } catch { return ''; }
-};
 const profileDir = sh('profile_dir');
 const profile = (() => { try { return JSON.parse(readFileSync(join(profileDir, 'profile.json'), 'utf8')); } catch { return {}; } })();
 const LOCAL = ['localhost', '127.0.0.1'];
@@ -121,7 +112,6 @@ const firstRun = (() => {
 const SEV = { 'STRESS-API-1': 'high', 'STRESS-API-2': 'high', 'STRESS-API-3': 'medium', 'STRESS-UI-1': 'high', 'STRESS-UI-2': 'medium', 'STRESS-HEALTH-1': 'critical' };
 const checks = [];
 const add = (id, target, status, evidence = {}, reason = '') => checks.push({ id, target, status, severity: SEV[id], evidence, ...(reason ? { reason } : {}) });
-const msg = (e) => String(e?.message ?? e).split('\n')[0].slice(0, 160);
 const pct = (a, p) => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.ceil((p / 100) * s.length) - 1)]; };
 const sameOrigin = (u) => { try { return new URL(u).origin === base.origin; } catch { return false; } };
 const local = (u) => { try { const x = new URL(u); return !/^https?:$/.test(x.protocol) || LOCAL.includes(x.hostname); } catch { return false; } };
@@ -158,16 +148,7 @@ if (!flags.skipSignin) {
     process.exit(3);
   }
   try {
-    const credFile = (() => {
-      const o = {};
-      try {
-        for (const l of readFileSync(join(WORK, 'env', 'credentials.env'), 'utf8').split('\n')) {
-          const m = /^\s*(?:export\s+)?([A-Z0-9_]+)=(.*)$/.exec(l);
-          if (m) o[m[1]] = m[2].trim().replace(/^(['"])(.*)\1$/, '$2');
-        }
-      } catch { /* no file: env only */ }
-      return o;
-    })();
+    const credFile = credentials();
     const user = process.env.E2E_USER_OWNER_USERNAME ?? credFile.E2E_USER_OWNER_USERNAME;
     const pass = process.env.E2E_USER_OWNER_PASSWORD ?? credFile.E2E_USER_OWNER_PASSWORD;
     if (!user || !pass) throw new Error('no OWNER account (E2E_USER_OWNER_*)');

@@ -1,27 +1,17 @@
 // design-browser.mjs — the browser plumbing design-check.mjs and consistency.mjs share
-// (docs/design-checks.md): the suite's playwright-core, the owner's sign-in, the config and profile
+// (docs/design-checks.md), and ui-sweep.mjs, stress.mjs and security-checks.mjs use in part: the
+// suite's playwright-core, credentials.env, the owner's sign-in, the config and profile
 // reads, a browser function loaded as text, a marked crop of one element and a sheet of crops side by
 // side. Node only; the page functions themselves live in lib/ui-checks.mjs and lib/design-probe.mjs.
 
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { WORK, escHtml, msg, sh } from './util.mjs';
 
+export { WORK, msg, sh };
 const here = dirname(fileURLToPath(import.meta.url));
-export const WORK = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
-export const msg = (e) => String(e?.message ?? e).split('\n')[0].slice(0, 160);
-
-// One expression of lib/config.sh and lib/profile.sh (`reg <key>`, `cfg <key>`, `profile_dir`,
-// `profile_run …`): its stdout, '' on any failure.
-export function sh(expr, { status = false } = {}) {
-  try {
-    const out = execFileSync('bash', ['-c', `CONFIG="$WORK/CONFIG.md"; . "$LIB/config.sh"; . "$LIB/profile.sh"; ${expr}`],
-      { env: { ...process.env, WORK, LIB: here }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 90000 }).trim();
-    return status ? { out, code: 0 } : out;
-  } catch (e) { return status ? { out: String(e.stdout ?? '').trim(), code: e.status ?? 1, err: String(e.stderr ?? '').trim().split('\n')[0] } : ''; }
-}
 export const regInt = (key, def, min, max) => { const n = Number(sh(`reg ${key}`)); return Number.isInteger(n) && n >= min && n <= max ? n : def; };
 export function profile() { try { return JSON.parse(readFileSync(join(sh('profile_dir'), 'profile.json'), 'utf8')); } catch { return {}; } }
 
@@ -29,8 +19,8 @@ export function profile() { try { return JSON.parse(readFileSync(join(sh('profil
 export const browserFn = (file, name) => new Function(`${readFileSync(join(here, file), 'utf8')
   .replace(new RegExp(`^export\\s+(?=(?:async\\s+)?function\\s+${name}\\b)`, 'm'), '')}\nreturn ${name};`)();
 
-// The owner's credentials: the environment, else work/env/credentials.env (kept in memory only).
-export function owner() {
+// The lines of work/env/credentials.env as {NAME: value} ({} without the file); kept in memory only.
+export function credentials() {
   const o = {};
   try {
     for (const l of readFileSync(join(WORK, 'env', 'credentials.env'), 'utf8').split('\n')) {
@@ -38,6 +28,11 @@ export function owner() {
       if (m) o[m[1]] = m[2].trim().replace(/^(['"])(.*)\1$/, '$2');
     }
   } catch { /* no file: env only */ }
+  return o;
+}
+// The owner's credentials: the environment, else work/env/credentials.env.
+export function owner() {
+  const o = credentials();
   return { user: process.env.E2E_USER_OWNER_USERNAME ?? o.E2E_USER_OWNER_USERNAME, pass: process.env.E2E_USER_OWNER_PASSWORD ?? o.E2E_USER_OWNER_PASSWORD };
 }
 
@@ -50,8 +45,7 @@ export function playwright() {
 export function axeSource() { try { return createRequire(join(WORK, 'suite', 'package.json'))('axe-core').source; } catch { return null; } }
 
 export const settle = async (page, ms = 500) => { await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); await page.waitForTimeout(ms); };
-const pwdVisible = async (page) => (await page.locator('input[type=password]').filter({ visible: true }).count()) > 0;
-export { pwdVisible };
+export const pwdVisible = async (page) => (await page.locator('input[type=password]').filter({ visible: true }).count()) > 0;
 export async function signIn(page, base, { user, pass }) {
   await page.goto(base.href, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await settle(page);
@@ -86,13 +80,12 @@ export async function crop(page, b, file, { margin = 40, mark = true } = {}) {
 
 // Crops side by side with a caption each, drawn on a page that loads nothing -> one PNG.
 export async function sheet(browser, items, title, file) {
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-  const cells = items.filter((i) => i.file).map((i) => `<figure><div class="img"><img src="data:image/png;base64,${readFileSync(i.file).toString('base64')}" alt=""></div><figcaption>${esc(i.caption)}</figcaption></figure>`);
+  const cells = items.filter((i) => i.file).map((i) => `<figure><div class="img"><img src="data:image/png;base64,${readFileSync(i.file).toString('base64')}" alt=""></div><figcaption>${escHtml(i.caption)}</figcaption></figure>`);
   if (!cells.length) return null;
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:0;background:#fff;color:#1d1f23;font:14px/1.4 system-ui,sans-serif;width:${Math.min(4, cells.length) * 400 + 40}px}
 main{padding:16px 20px}h1{font-size:16px;margin:0 0 12px}.row{display:grid;grid-template-columns:repeat(${cells.length},minmax(0,1fr));gap:16px;align-items:start}
 figure{margin:0}.img{border:1px solid #e3e5e8;border-radius:6px;padding:8px;background:#fafbfc}img{display:block;max-width:100%;max-height:420px;margin:0 auto}figcaption{font-size:12px;color:#555b63;margin-top:6px}</style></head>
-<body><main><h1>${esc(title)}</h1><div class="row">${cells.join('')}</div></main></body></html>`;
+<body><main><h1>${escHtml(title)}</h1><div class="row">${cells.join('')}</div></main></body></html>`;
   const page = await (await browser.newContext({ viewport: { width: 1000, height: 40 } })).newPage();
   try {
     await page.route('**', (r) => r.abort());

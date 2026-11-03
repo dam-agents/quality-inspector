@@ -15,6 +15,7 @@
 
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { now } from './lib/util.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (k, d) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? Number(argv[i + 1]) : d; };
@@ -29,7 +30,6 @@ const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'wo
 const runsRoot = process.env.QI_RUNS_ROOT ?? join(work, 'suite', '.e2e', 'runs');
 const dir = join(work, 'perf');
 const file = join(dir, 'trend.json');
-const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 
 const median = (xs) => {
   const s = [...xs].sort((p, q) => p - q);
