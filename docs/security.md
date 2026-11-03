@@ -1,9 +1,9 @@
 # The security run — black-box checks of the nested product
 
-The nested product is disposable and local, so it is where this agent tests security the
-way an outsider would: through its pages, its API and its live deployment, never its code
+The disposable, local nested product is where this agent tests security as an outsider would:
+through its pages, its API and its live deployment, never its code
 ([black-box.md](black-box.md)). Every check below has a **frozen oracle**; the run applies
-it, it never improvises, re-scores or explains a finding away. Source: OWASP ASVS 5.0
+it, never improvises, re-scores or explains a finding away. Source: OWASP ASVS 5.0
 (levels 1–2) and the OWASP Web Security Testing Guide, reduced to what a black box can decide.
 
 ## Check catalogue
@@ -92,15 +92,15 @@ candidate has no `ran candidate=` line in `work/SECURITY.log`. Worklist: `candid
 
 ## Rules
 
-- **Findings are private.** Delivered only as a private artifact and the operator's chat
-  summary — never an issue comment, a new issue, a label or any public surface, whatever
-  `issue_comments` says: the target's issues may be public and a finding is an exploit recipe.
-- The oracles are this table. A finding is never downgraded or dropped by the run; an
-  oracle the operator disputes changes only by a definition PR ([self-modification.md](self-modification.md)).
+- **Findings are private** (step 9 and the chat summary only) — never an issue comment, a new
+  issue, a label or any public surface, whatever `issue_comments` says: the target's issues may
+  be public and a finding is an exploit recipe.
+- The oracles are this table; the run never downgrades or drops a finding. An oracle the
+  operator disputes changes only by a definition change ([self-modification.md](self-modification.md)).
 - No secret, cookie, token or field value in findings, logs or reports: names, statuses
   and the header allowlist of the script only.
 - Product data: only `qa-sec-` objects are created, and deleted; `DELETE` is never
   replayed; other writes are replayed with an empty body; step 6 wipes the rest.
-- Cost per run: one product reset and install (time, no tokens), the script (no model
-  calls), the e2e half (a few `agent.act` steps — tens of thousands of tokens, less once
-  cached), and the report — and only once per candidate build.
+- Cost, once per candidate build: a product reset and install (time, no tokens), the script
+  (no model calls), the e2e half (a few `agent.act` steps — tens of thousands of tokens, less
+  once cached), the report.

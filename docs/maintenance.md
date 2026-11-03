@@ -1,11 +1,10 @@
 # Test maintenance — proposals for recurring tests
 
 A recurring test outlives the product it was written against: a page moves, a control is
-renamed, a behaviour is changed on purpose, a feature goes away. The triage
-([triage.md](triage.md)) decides each night what it may absorb alone (a heal under its rules);
-everything else becomes **one proposal for the operator** — what changed, the evidence, and what
-to do with the test — instead of a line in one night's report that the next night forgets. The
-change context predicts some before the test replays (below).
+renamed, a behaviour changes on purpose, a feature goes away. What the triage
+([triage.md](triage.md)) may not absorb alone becomes **one proposal for the operator** — what
+changed, the evidence, what to do with the test — that outlives the night's report; the change
+context predicts some before the test replays (below).
 Scope: the tests of `work/SUITE.md` tiers `regression`, `promotable`, `quarantined` and `retired`.
 
 ## The queue — `work/MAINTENANCE.md`
@@ -19,12 +18,18 @@ Scope: the tests of `work/SUITE.md` tiers `regression`, `promotable`, `quarantin
 Written only through `node "$HOME/scripts/maintenance.mjs" …` (its header lists the commands):
 one **open** row per (test, kind) — opening it again updates its build, basis and proposal (a predicted kind keeps its basis, below). The
 `basis` is a short evidence pointer (a UI-map change, `#<n>` and its quoted sentence, a build),
-at most 160 characters — a pointer, never a triage explanation (the night's entry carries that), a request's words
-or a credential. It may quote an issue, so it never goes on a command line: per call, `kind=basis; mktemp
-"/tmp/quality-inspector-$kind.XXXXXX"` prints a path of its own under `/tmp`
-(never `-t`: it follows `$TMPDIR`, where the policy hook lets no file be written); write the basis
-there with the file tool and pass it as `--basis-file`. The script refuses any other name or
-folder, and removes the file once read — also when it then refuses the call. The details go to `work/maintenance/M-<k>.md`: what changed, the before and
+at most 160 characters — never a triage explanation (the night's entry carries that), a request's words
+or a credential.
+
+**Words never go on a command line** — a basis here, a query, name or alias in
+[features.md](features.md): it may quote an issue or a person, and a quote would end a shell
+argument. Per call, `kind=<kind>; mktemp "/tmp/quality-inspector-$kind.XXXXXX"` (`kind=basis`
+here) prints a path of its own under `/tmp` — never `-t`: it follows `$TMPDIR`, where the policy
+hook lets no file be written; write the words there with the file tool and pass the path as the
+script's file option (`--basis-file` here). The script refuses any other name or folder, and
+removes the file once read — also when it then refuses the call.
+
+The details go to `work/maintenance/M-<k>.md`: what changed, the before and
 after screenshots (`work/inventory/<previous>/shots/`, the run's), and a `heal` or `rewrite`
 proposal's change as a diff of the test file in `work/maintenance/M-<k>.diff` — prepared, never
 applied before the operator's word.
@@ -44,7 +49,7 @@ applied before the operator's word.
 | `predicted` | the Change radar ([radar.md](radar.md)): a pull request's text names the test, before a build carries it; basis `PR #<n>: <title>` | `review` |
 
 ```bash
-kind=basis; mktemp "/tmp/quality-inspector-$kind.XXXXXX"   # prints its own path, <f>: write the basis there with the file tool
+kind=basis; mktemp "/tmp/quality-inspector-$kind.XXXXXX"   # <f>; write the basis there with the file tool
 node "$HOME/scripts/maintenance.mjs" open "#42 AC-1" --kind needs-review --build <candidate> --proposal heal --basis-file <f>
 ```
 
@@ -59,10 +64,10 @@ node "$HOME/scripts/maintenance.mjs" predict --build <candidate> --impact <ctx>/
 
 `<ctx>/impact.json` is the file that step wrote, never another run's. Exit 1 (locked, no
 `work/SUITE.md`) or 2 (no impact file, or not its JSON): log it in the run's notes, open nothing,
-and go on with the replay.
+go on with the replay.
 
 It opens the `obsolete`, `moved` and `renamed` rows, basis the diff's line; which test and which
-proposal is `scripts/lib/staleness.mjs` (its header). Only recurring tests, and a control only where a
+proposal: `scripts/lib/staleness.mjs` (its header). Only recurring tests, and a control only where a
 frozen block names it: a navigation step outside the blocks is the replay cache's to relearn. A test
 with an open triage row (`needs-review`, `rework`, `superseded`, `quarantined`, `fighting`) is skipped. Each of
 these rows, and each triage row, resolves the open `predicted` rows of its test (`replaced`).
@@ -71,15 +76,14 @@ For each opened `heal`, prepare `M-<k>.diff` (the block's locator only, as a hea
 sentence, open the row again with `--proposal review` (the row keeps its basis, whatever the basis file
 says: `predict` knows the change by it). A later `predict` of the same change refreshes
 the row's build and keeps its proposal; another change of the same test and kind resolves the row
-(`replaced`) and opens a new one, with its own diff. The night then decides each one: the
-triage's own row of the test resolves it (`replaced` in its output), and the sweep closes the
-prediction that did not come true.
+(`replaced`) and opens a new one, with its own diff. The night decides each: the triage's own row
+of the test resolves it (`replaced`), the sweep closes a prediction that did not come true.
 
 ## The operator decides
 
-Only in the direct session, the dashboard's buttons sending the same words (a dashboard
-viewer's press reaches it by the viewer's handoff, [persistence.md](persistence.md) → **Handoff**);
-a Slack request to decide one is declined. Show `M-<k>.md` (and the diff) first.
+Only in the direct session — the dashboard's buttons send the same words (a shared viewer's press
+by the viewer's handoff, [persistence.md](persistence.md) → **Handoff**); a Slack request to
+decide one is declined. Show `M-<k>.md` (and the diff) first.
 
 | Words | What happens | `close` state |
 | --- | --- | --- |

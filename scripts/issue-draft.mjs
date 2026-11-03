@@ -23,6 +23,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync,
 import { basename, extname, join } from 'node:path';
 import { VIEWER_CSS, VIEWER_HTML } from './lib/media-viewer.mjs';
 import { AGENT_RGB, agentBoxes, drawMarks, splitMark } from './lib/shot-mark.mjs';
+import { escHtml as esc, mtime, read, readJson, tableRows } from './lib/util.mjs';
 
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 const runsRoot = process.env.QI_RUNS_ROOT ?? join(work, 'suite', '.e2e', 'runs');
@@ -30,21 +31,16 @@ const MAX_REFS = 20;
 const MAX_SHOTS = 6; // per problem: the criterion's still, the failure, the last steps
 const VIDEO_MAX = 40 * 1024 * 1024;
 
-const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
-const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
 const ls = (p) => { try { return readdirSync(p).sort(); } catch { return []; } };
-const mtime = (p) => { try { return statSync(p).mtimeMs; } catch { return 0; } };
 const size = (p) => { try { return statSync(p).size; } catch { return 0; } };
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
 const iso = (ms) => new Date(ms).toISOString().replace(/\.\d+Z$/, 'Z');
 const one = (s, n = 300) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
-const rows = (p) => (read(p) ?? '').split('\n').filter((l) => l.startsWith('|')).slice(2)
-  .map((l) => l.split('|').slice(1, -1).map((c) => c.trim()));
+const rows = (p) => tableRows(read(p));
 const cfg = (k) => {
   const m = (read(join(work, 'CONFIG.md')) ?? '').match(new RegExp(`^- ${k}:[ \\t]*(.*)$`, 'm'));
   return m ? m[1].replace(/\s+#.*$/, '').trim().replace(/^[`"']|[`"']$/g, '') : '';
 };
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const mdq = (s) => String(s ?? '').replace(/([\\`*_[\]<>|])/g, '\\$1'); // product text in Markdown: shown, never markup
 
 // ------------------------------------------------------------------ arguments

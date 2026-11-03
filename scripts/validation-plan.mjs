@@ -12,13 +12,11 @@
 // submit or name is destructive (lib/danger.mjs), when it holds a password field, or when the
 // profile's profile.json → validation.exclude names its page pattern, form or submit exactly.
 
-import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { DANGER } from './lib/danger.mjs';
+import { WORK, sh } from './lib/util.mjs';
 
-const here = dirname(fileURLToPath(import.meta.url));
 const flags = {}; const pos = [];
 for (let i = 2; i < process.argv.length; i++) {
   const a = process.argv[i];
@@ -29,20 +27,13 @@ for (let i = 2; i < process.argv.length; i++) {
 const usage = 'usage: validation-plan.mjs <inventory.json> --build <c> [--out DIR] [--max-cases N] [--base URL] [--dry-run]';
 if (!pos[0]) { console.error(usage); process.exit(2); }
 
-const WORK = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
-// The config and the profile come through the one reader (scripts/lib/config.sh, profile.sh).
-const sh = (expr) => {
-  try {
-    return execFileSync('bash', ['-c', `CONFIG="$WORK/CONFIG.md"; . "$LIB/config.sh"; . "$LIB/profile.sh"; ${expr}`],
-      { env: { ...process.env, WORK, LIB: join(here, 'lib') }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  } catch { return ''; }
-};
 let inv;
 try { inv = JSON.parse(readFileSync(pos[0], 'utf8')); } catch (e) { console.error(`cannot read ${pos[0]}: ${e.message}`); process.exit(2); }
 const base = (() => { try { return new URL(flags.base ?? inv.base ?? 'http://localhost'); } catch { return null; } })();
 if (!base || !['localhost', '127.0.0.1'].includes(base.hostname)) { console.error(`refusing ${base?.origin ?? flags.base}: only the nested product on localhost`); process.exit(2); }
 const build = flags.build ?? inv.build;
 if (!build) { console.error(usage); process.exit(2); }
+// The config and the profile come through the one reader (scripts/lib/config.sh, profile.sh).
 const profileDir = sh('profile_dir');
 const profile = (() => { try { return JSON.parse(readFileSync(join(profileDir, 'profile.json'), 'utf8')); } catch { return {}; } })();
 const exclude = Array.isArray(profile.validation?.exclude) ? profile.validation.exclude.filter((x) => typeof x === 'string') : [];

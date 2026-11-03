@@ -1,11 +1,11 @@
 # Features — recurring tests by what the product does
 
-A feature is a group of recurring test cases named by what the product does for its user
-("Model switching", "Reply in Slack"), so a person can ask for a feature by its name and have
-its tests run again on the build that is up. Only **recurring** tests belong in one: a
-`work/SUITE.md` row of tier `regression` or `promotable`. Explorations, runs by hand and
-unsaved scenarios never do. Collections ([catalog.md](catalog.md)) stay the operator's own
-free grouping; features are the agent's, kept by the rules below.
+A feature groups recurring test cases by what the product does for its user
+("Model switching", "Reply in Slack"), so a person can have its tests run again by its name on
+the build that is up. Only **recurring** tests belong in one — a `work/SUITE.md` row of tier
+`regression` or `promotable`; never an exploration, a run by hand or an unsaved scenario.
+Collections ([catalog.md](catalog.md)) are the operator's free grouping; features are the
+agent's, kept by the rules below.
 
 ## The registry — `work/FEATURES.md`
 
@@ -21,13 +21,9 @@ free grouping; features are the agent's, kept by the rules below.
 - Written only through `node "$HOME/scripts/features.mjs" …` (its header lists the commands and
   their JSON), never by hand: the script keeps the format the catalog and the audit read
   (`features.mjs check`, the audit's `features` check).
-- **Words never go on a command line.** A query, a name or an alias is often a person's or an
-  issue's text; a quote in it would end a shell argument. Per call: `kind=words; mktemp
-  "/tmp/quality-inspector-$kind.XXXXXX"` prints a path of its own under `/tmp`
-  (two sessions never share one; never `-t`, which follows `$TMPDIR`, where the policy hook lets
-  no file be written); write the words to that path with the file tool, and pass it as `--file`
-  (`--name-file` for `add`). The script refuses any other name or folder, and removes the file once
-  read — also when it then refuses the call.
+- **Words never go on a command line** ([maintenance.md](maintenance.md) → **The queue**): a
+  query, a name or an alias goes in a `kind=words` file, passed as `--file` (`--name-file` for
+  `add`).
 - A member whose test is not recurring stays listed and is skipped with its reason when the
   feature runs (`skipped[]`); `check` warns about it.
 
@@ -57,9 +53,8 @@ free grouping; features are the agent's, kept by the rules below.
 | a person in `slack_channel` | "test feature <words>" | Slack ([slack.md](slack.md)), within `slack_tests_per_day` |
 | the operator, on the dashboard | its "Run this feature" button: "run feature <id>" | its message box ([catalog.md](catalog.md)) |
 
-**Resolve** — `node "$HOME/scripts/features.mjs" resolve --file <path>`, the words in a file of
-its own as above. Case, accents and punctuation
-do not count; a whole name or alias is an `exact` match. Then:
+**Resolve** — `node "$HOME/scripts/features.mjs" resolve --file <path>` (the words in a file, as
+above). Case, accents and punctuation do not count; a whole name or alias is an `exact` match. Then:
 
 - `exact` → run it.
 - `ranked` → answer with each candidate (id, name, how many tests run) and ask for the id; run
@@ -86,7 +81,7 @@ with `<path>` the run's `trigger` ([reporting.md](reporting.md) → **Who starte
 keeps the members' criteria only. Answer per criterion — `passed`, `failed` with its message,
 `blocked` — failures first with the run's screenshots, then the skipped members with their
 reasons. Log `feature_run feature=<id> build=<candidate> passed=<n> failed=<n> blocked=<n>`
-([logging.md](logging.md)). It is never a verdict: no criteria, no verdicts file, no comment, no
+([logging.md](logging.md)). Never a verdict: no criteria, verdicts file or comment, no
 tier, `work/QA.md` or `work/MAINTENANCE.md` change. A failure is offered as "create issue for
 <ref>" ([skills/create-issue](../skills/create-issue/SKILL.md)) or "run the regression now",
 never decided here. Then the catalog — the run shows in its history as "Feature run".

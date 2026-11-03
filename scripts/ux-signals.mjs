@@ -34,6 +34,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REPORTED, SIGNALS, deskRef, fingerprint, quietBuild, routeKey } from './lib/ux-field.mjs';
+import { escHtml as esc, now, readJson } from './lib/util.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const WORK = resolve(process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work'));
@@ -54,9 +55,7 @@ const sh = (expr) => {
       { env: { ...process.env, WORK, LIB: join(here, 'lib') }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   } catch { return ''; }
 };
-const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
 const atomic = (p, s) => { mkdirSync(dirname(p), { recursive: true }); writeFileSync(`${p}.tmp`, s); renameSync(`${p}.tmp`, p); };
-const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 const str = (s, n) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 const int = (v) => (Number.isInteger(v) && v >= 0 ? v : null);
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
@@ -295,7 +294,6 @@ function plan(file) {
 }
 
 // ------------------------------------------------------------------ report ----
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pct = (r) => (r == null ? '–' : `${Math.round(r * 1000) / 10} %`);
 const abs = (p) => (!p ? null : isAbsolute(p) ? p : join(WORK, p));
 function report(file) {

@@ -3,7 +3,7 @@
 // register): one row per cause — the product does not install or start (`env`), the platform refuses a
 // report's delivery (`delivery`), recurring tests cannot reach their frozen block for a reason outside the
 // product (`tests`) —, whose fix it is, how often it struck and when the agent tries again. The pre-flight
-// holds the work a standing blocker stops (scripts/preflight.sh → blockers_status), so a known failure
+// holds the work a standing blocker stops (scripts/preflight.sh → blockers_load), so a known failure
 // costs one try per backoff step instead of one per run, and the operator is told once.
 //
 //   node blockers.mjs open --scope <scope> [--test <id>]… --owner <owner> --stage <stage> --build <build> --signature-file <path>
@@ -35,15 +35,14 @@
 // as it was; exit 1: locked.
 
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withMutex, writeAtomic } from './lib/mutex.mjs';
+import { WORK as work, read, sh, tableRows } from './lib/util.mjs';
 import { takeWords } from './lib/words.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 const FILE = join(work, 'BLOCKERS.md');
 const TITLE = '# Blockers — what stops the agent\'s work, whose fix it is, when it tries again (docs/autonomy.md)';
 const COLS = ['id', 'scope', 'tests', 'owner', 'stage', 'signature', 'build', 'hits', 'state', 'first_utc', 'last_utc', 'retry_utc', 'fp', 'told'];
@@ -62,17 +61,10 @@ const HOUR = 3600000;
 class Usage extends Error {}
 const die = (msg) => { throw new Usage(msg); };
 const out = (o) => console.log(JSON.stringify(o));
-const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
 const utc = (ms) => new Date(ms).toISOString().replace(/\.\d+Z$/, 'Z');
 const sanitize = (raw) => String(raw ?? '').replace(/[|\r\n\u0000-\u001f`]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
 // One cause, whatever build or count it names: lower case, long hex and digit runs folded.
 const sameCause = (s) => s.toLowerCase().replace(/\b[0-9a-f]{7,}\b/g, 'h').replace(/\d+/g, 'n').replace(/\s+/g, ' ').trim();
-const sh = (expr) => {
-  try {
-    return execFileSync('bash', ['-c', `CONFIG="$WORK/CONFIG.md"; . "$LIB/config.sh"; . "$LIB/profile.sh"; ${expr}`],
-      { env: { ...process.env, WORK: work, LIB: join(HERE, 'lib') }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  } catch { return null; }
-};
 
 // ------------------------------------------------------------------ the fingerprint of what a fix changes
 const short = (s) => createHash('sha256').update(s).digest('hex').slice(0, 8);
@@ -105,9 +97,7 @@ const changedParts = (then, now) => { const a = then.split(':'); const b = now.s
 function load() {
   const text = read(FILE);
   if (text != null && !text.split('\n').includes(HEADER)) die('work/BLOCKERS.md: header changed — fix it to the format of docs/autonomy.md');
-  return (text ?? '').split('\n').filter((l) => l.startsWith('|')).slice(2)
-    .map((l) => l.split('|').slice(1, -1).map((c) => c.trim()))
-    .map((r) => Object.fromEntries(COLS.map((k, j) => [k, r[j] ?? '-'])));
+  return tableRows(text).map((r) => Object.fromEntries(COLS.map((k, j) => [k, r[j] ?? '-'])));
 }
 function save(list) {
   const body = list.map((b) => `| ${COLS.map((k) => b[k] || '-').join(' | ')} |`);

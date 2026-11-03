@@ -33,6 +33,7 @@ import { join } from 'node:path';
 import { withMutex, writeAtomic } from './lib/mutex.mjs';
 import { takeTrigger } from './lib/trigger.mjs';
 import { takeWords } from './lib/words.mjs';
+import { now, read, tableRows as rows } from './lib/util.mjs';
 
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 const runsRoot = process.env.QI_RUNS_ROOT ?? join(work, 'suite', '.e2e', 'runs');
@@ -48,10 +49,6 @@ const TEXT_RE = /^[^|\n\r\u0000-\u001f]{1,80}$/;
 class Usage extends Error {}
 const die = (msg) => { throw new Usage(msg); };
 const out = (o) => console.log(JSON.stringify(o));
-const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
-const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-const rows = (text) => (text ?? '').split('\n').filter((l) => l.startsWith('|')).slice(2)
-  .map((l) => l.split('|').slice(1, -1).map((c) => c.trim()));
 const list = (s, sep) => String(s ?? '').split(sep).map((x) => x.trim()).filter((x) => x && x !== '-');
 const clean = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
 
