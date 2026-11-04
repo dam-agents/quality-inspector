@@ -216,7 +216,7 @@ assert_eq "the viewer: go links, new-tab links, agent commands, prepared command
 sec="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
 const V=eval(s.match(/^const VIEWS = (\[[\s\S]*?\]\]);$/m)[1]);const S=eval(s.match(/^const SECTIONS = (\[[\s\S]*?\]\]);$/m)[1]);
 const ids=S.map((x)=>x[0]);const cmd=eval(s.match(/^const CMD_RE = (\/.*\/);$/m)[1]);const sc=eval(s.match(/^const SCEN_RE = (\/.*\/);$/m)[1]);
-process.stdout.write([S.length===5, V.every((v)=>ids.includes(v[3])), ids.every((k)=>V.some((v)=>v[3]===k)), V.length===12,
+process.stdout.write([S.length===5, V.every((v)=>ids.includes(v[3])), ids.every((k)=>V.some((v)=>v[3]===k)), V.length===13,
   cmd.test("look into what needs attention"), cmd.test("show blockers"), cmd.test("retry B-3"), !cmd.test("look into what needs attention now"), !cmd.test("retry B-3; rm -rf /"),
   sc.test("test this scenario: On the page /: A user uploads a file. The file shows in the list.")].map((x)=>x?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "the viewer: five sections hold every view; the agent look and the blocker commands; Home asks for a test" 1111111111 "$sec"

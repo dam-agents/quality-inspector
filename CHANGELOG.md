@@ -7,6 +7,13 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.59.0 — 2026-11-04
+
+**Upgrade:**
+Nothing to run — the kit's `scripts/catalog/viewer.html` comes with it; the next catalog build publishes
+the new page. Runs → **Problems found** lists every problem that the test runs found, one time each,
+from the data the page already has ([docs/catalog.md](docs/catalog.md) → Content).
+
 ## 3.58.0 — 2026-11-03
 
 **Upgrade:**
