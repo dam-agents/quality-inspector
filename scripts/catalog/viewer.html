@@ -632,6 +632,7 @@ const ENT = {
   run: ['Test run', '🏃', 'One time that the agent ran tests on one build: an issue run, a nightly regression, a scenario run or a manual run.'],
   build: ['Build', '📦', 'One version of the product. The agent installs it in its own machine and tests it.'],
   report: ['Report', '🎬', 'The evidence of a test run: the video, the screenshots and the steps of each criterion.'],
+  problem: ['Problem', '🐛', 'Something that a test run found that does not work: in the product, in a test or in the environment. One problem can be in many test cases and runs.'],
   bug: ['Bug issue', '🐞', 'A GitHub issue that the agent created for a problem that it found.'],
   page: ['Page', '🖥️', 'A page of the product on the UI map.'],
   control: ['Control', '🔘', 'A button, link, tab, field, row or other element on a page of the product.'],
@@ -947,6 +948,7 @@ const VIEW_HELP = {
   modules: 'Each testing module and scheduled run: what it does, when it runs, and its settings.',
   findings: 'The problems that the testing modules found outside the issues: form validation, load (stress) and security counts, and the scenarios that people requested. Select problems to report them in one bug issue.',
   design: 'The layout, visual and accessibility defects that the UI sweep found, each with a screenshot. Put them into categories, recheck them, discuss them with the agent, dismiss them, or report them in one bug issue.',
+  problems: 'All the problems that the test runs found, each one time: still there or not seen now, its cause, its test cases, when the agent saw it first and last, and its bug issue. Open a problem to see what the agent found.',
   runs: 'All test runs: nightly regressions, issue runs, scenario runs and manual runs. Each one has its result, its build and its report (video, screenshots, steps).',
   map: 'The pages of the product as screenshots. The colour of a control shows the result of the test cases that use it. A control with ↗ goes to its page. You can ask for a test of any page or control.',
   catalog: 'All test cases: one line for each acceptance criterion (🎯) or exploration (🔦) with its automated test. Filter at the left. Click a line to open its panel.',
@@ -1003,14 +1005,14 @@ window.addEventListener('scroll', hideTip, true);
 // ------------------------------------------------------------------- state
 // [id, name, icon, section, short name]: the views, each with its icon on every link to it. A section
 // is one tab of the header; the views of a section are the tabs under its name.
-const VIEWS = [['overview', 'Home', '🏠', 'home', 'Home'], ['runs', 'Runs', '🏃', 'runs', 'Runs'],
+const VIEWS = [['overview', 'Home', '🏠', 'home', 'Home'], ['runs', 'Runs', '🏃', 'runs', 'Runs'], ['problems', 'Problems found', '🐛', 'runs', 'Problems found'],
   ['catalog', 'All tests', '📚', 'tests', 'All tests'], ['gallery', 'Screenshots', '🖼️', 'tests', 'Screenshots'], ['history', 'History', '🕰️', 'tests', 'History'], ['lifecycle', 'Lifecycle', '🌱', 'tests', 'Lifecycle'], ['builder', 'Test builder', '🛠️', 'tests', 'Test builder'],
   ['map', 'Product map', '🗺️', 'product', 'Product map'], ['coverage', 'Coverage', '🧭', 'product', 'Coverage'], ['design', 'Design', '🎨', 'product', 'Design'],
   ['modules', 'Settings', '🧩', 'checks', 'Settings'], ['findings', 'Findings', '🔎', 'checks', 'Findings']];
 const viewOf = (k) => VIEWS.find(([x]) => x === k) || VIEWS[0];
 // [id, name, icon, what it is for]: five places, one question each.
 const SECTIONS = [['home', 'Home', '🏠', 'What happens now, and what needs you.'], ['tests', 'Tests', '🧪', 'What the agent tests: every test case, its screenshots, its history, and new tests.'],
-  ['runs', 'Runs', '🏃', 'Every test run, with its result and its report.'], ['product', 'Product', '🗺️', 'The pages of the product: which tests reach them, and the design defects on them.'],
+  ['runs', 'Runs', '🏃', 'Every test run, with its result and its report, and every problem that the runs found.'], ['product', 'Product', '🗺️', 'The pages of the product: which tests reach them, and the design defects on them.'],
   ['checks', 'Modules', '🧩', 'The automatic checks: their switches and settings, and what they found.']];
 const sectionOf = (v) => SECTIONS.find(([k]) => k === viewOf(v)[3]) || SECTIONS[0];
 const viewsIn = (sec) => VIEWS.filter((x) => x[3] === sec);
@@ -2485,6 +2487,85 @@ function viewRuns() {
       h('td', {}, h('button', { class: 'rowgo', type: 'button', 'data-kind': 'panel', 'data-dest': placeOf({ r: r.id }), 'aria-label': `Open ${runName(r)}`, onclick: () => openRun(r) }, ico('panel')))))))));
   if (list.length > S.limit) v.append(h('div', { class: 'more-row' }, h('button', { class: 'btn', type: 'button', 'data-kind': 'local', onclick: () => { S.limit += 100; render(); } }, `Show more (${list.length - S.limit} left)`)));
 }
+// Problems found: every problem of every run in one list, the same problem across runs once
+// (docs/catalog.md → Content). A run's analysis gives its problems; a result that is not a pass and
+// that no problem of its run names is a problem of its own; a night whose product did not start is one too.
+const PS = { st: 'open', cause: '' };
+const normTitle = (t) => str(t).toLowerCase().replace(/\s+/g, ' ').trim();
+function problemsFound() {
+  const occ = [];
+  for (const r of runsAt.slice().reverse()) {
+    const ps = r.analysis ? r.analysis.problems : [];
+    const named = new Set();
+    for (const p of ps) { const cs = casesOf(p.about.filter((m) => /\s/.test(m.trim()))); for (const i of cs) named.add(i.key); occ.push({ r, p, cases: cs.map((i) => i.key) }); }
+    for (const e of r.entries) {
+      if (!CAUSE_OF.has(e.value) || named.has(e.key)) continue;
+      const i = byKey.get(e.key);
+      occ.push({ r, cases: [e.key], p: { title: i ? `${i.label}: ${str(i.name) || 'the check does not pass'}` : e.key, cause: own(CAUSE, str(e.cause)) && e.cause !== 'unknown' ? e.cause : null,
+        severity: null, certainty: null, about: i ? [i.label] : [], what: e.why, where: '', why: '', fix: '' } });
+    }
+    if (r.verdict === 'environment' && !ps.length) {
+      const f = r.failure;
+      occ.push({ r, cases: [], stage: f && f.stage, p: { title: f && f.stage ? `The product did not start: ${f.stage}` : 'The product did not start', cause: 'environment', severity: null, certainty: null, about: [],
+        what: f ? f.cause : '', where: '', why: '', fix: f ? f.repair : '' } });
+    }
+  }
+  // One problem across runs: the same cause and a shared test case, else the same cause and title.
+  const up = occ.map((_, k) => k);
+  const root = (k) => { while (up[k] !== k) k = up[k] = up[up[k]]; return k; };
+  const seen = new Map();
+  occ.forEach((o, k) => {
+    const c = o.p.cause || '?';
+    const toks = o.cases.length ? o.cases.map((x) => `${c}|k:${x}`) : [o.stage ? `${c}|s:${o.stage}` : `${c}|t:${normTitle(o.p.title)}`];
+    for (const t of toks) { if (seen.has(t)) up[root(k)] = root(seen.get(t)); else seen.set(t, k); }
+  });
+  const groups = new Map();
+  occ.forEach((o, k) => { const g = root(k); (groups.get(g) || groups.set(g, []).get(g)).push(o); });
+  const now = new Map(items.map((i) => [i.key, i]));
+  return [...groups.values()].map((os) => {
+    const last = os[os.length - 1]; const cause = last.p.cause;
+    const cases = [...new Set(os.flatMap((o) => o.cases))].map((k) => byKey.get(k)).filter(Boolean);
+    // Still there: a test case of it still fails for this cause; without test cases, the newest run of its kind still has it.
+    const open = cases.length ? cases.some((i) => { const n = now.get(i.key); const ck = n && causeKey(n.latest, n.verdict && n.verdict.cause); return ck && (!cause || ck === cause); })
+      : runsAt.find((r) => r.type === last.r.type && (r.type === 'regression' || r.ref === last.r.ref)) === last.r;
+    const sev = os.map((o) => o.p.severity).filter(Boolean).sort((a, b) => Object.keys(PROBLEM_SEV).indexOf(a) - Object.keys(PROBLEM_SEV).indexOf(b))[0] || null;
+    return { os, first: os[0], last, p: last.p, cause, sev, cases, open, runs: new Set(os.map((o) => o.r.id)).size,
+      refs: cases.map(problemRef).filter(Boolean) };
+  }).sort((a, b) => (b.open - a.open) || ((a.sev ? Object.keys(PROBLEM_SEV).indexOf(a.sev) : 9) - (b.sev ? Object.keys(PROBLEM_SEV).indexOf(b.sev) : 9)) || b.last.r.utc.localeCompare(a.last.r.utc));
+}
+function viewProblems() {
+  const v = $('#view');
+  const all = problemsFound();
+  if (!all.length) { v.append(h('div', { class: 'empty' }, h('span', { class: 'em' }, ENT.problem[1]), h('p', {}, 'The agent found no problem yet.'), h('p', {}, 'Each problem that a test run finds shows here, one time, also when it comes back in more runs.'))); return; }
+  const inSt = all.filter((g) => PS.st === 'all' || (PS.st === 'open') === g.open);
+  const list = inSt.filter((g) => !PS.cause || (g.cause || 'unknown') === PS.cause);
+  const chip = (on, label, help, go) => h('button', { class: `chip${on ? ' on' : ''}`, type: 'button', 'aria-pressed': on ? 'true' : 'false', 'data-kind': 'local', title: help, onclick: () => { go(); render(); } }, label);
+  v.append(h('div', { class: 'chips' },
+    [['open', 'Still there', 'A test case of the problem still fails, or the newest run of its kind still has it.'], ['gone', 'Not seen now', 'The newest results do not show the problem. Possibly it is repaired.'], ['all', 'All', 'All problems.']]
+      .map(([k, l, t]) => chip(PS.st === k, `${l} (${k === 'all' ? all.length : all.filter((g) => (k === 'open') === g.open).length})`, t, () => { PS.st = k; })),
+    h('span', { class: 'meta', style: 'margin:0 4px' }, '·'),
+    chip(!PS.cause, `All causes (${inSt.length})`, 'Problems of all causes.', () => { PS.cause = ''; }),
+    Object.keys(CAUSE).map((k) => { const n = inSt.filter((g) => (g.cause || 'unknown') === k).length;
+      return n ? chip(PS.cause === k, `${CAUSE[k][1]} ${CAUSE[k][0]} (${n})`, CAUSE[k][2], () => { PS.cause = PS.cause === k ? '' : k; }) : null; })));
+  v.append(h('p', { class: 'meta' }, 'The problems of the test runs only. The defects that the testing modules found are in ', goLink({ v: 'design' }, `${ENT.design[1]} Design`, null, 'linkish'), ' and ', goLink({ v: 'findings' }, '🔎 Findings', null, 'linkish'), '.'));
+  if (!list.length) { v.append(h('p', { class: 'muted-t' }, 'No problem matches this filter.')); return; }
+  const when = (o) => h('div', { class: 'nw' }, runLink(o.r, `${fmtDate(o.r.utc)}`), h('div', { class: 'meta' }, buildLink(o.r.build)));
+  v.append(h('div', { class: 'tablewrap' }, h('table', { class: 'list' },
+    h('thead', {}, h('tr', {}, [[`${ENT.problem[1]} Problem`, 'The newest words of the agent about the problem. Open it for what happened, where, the probable cause and the repair.'], ['Status', 'Still there, or not seen in the newest results.'],
+      [`${ENT.testcase[1]} Test cases`, 'The test cases that show the problem.'], ['First seen', 'The first test run that found the problem.'], ['Last seen', 'The newest test run that found the problem.'],
+      [`${ENT.run[1]} Runs`, 'The number of test runs that found the problem.'], [`${ENT.bug[1]} Bug issue`, ENT.bug[2]]].map(([c, t]) => h('th', { scope: 'col', style: 'cursor:default', title: t }, c)))),
+    h('tbody', {}, list.slice(0, S.limit).map((g) => h('tr', {},
+      h('td', { class: 'name', style: 'white-space:normal;max-width:520px' }, h('details', {},
+        h('summary', { style: 'cursor:pointer' }, g.cause ? causeB('failed', g.cause) : causeB('failed', 'unknown'), g.sev ? h('span', { class: `badge ${PROBLEM_SEV[g.sev][0]}`, style: 'margin:0 6px', title: `Severity ${g.sev}: ${PROBLEM_SEV[g.sev][1]}` }, g.sev) : ' ', g.p.title),
+        problemCard(g.p),
+        g.runs > 1 ? h('div', { class: 'meta', style: 'margin-top:6px;display:flex;gap:6px;flex-wrap:wrap' }, 'Found in: ', joinNodes([...new Map(g.os.map((o) => [o.r.id, o.r])).values()].reverse().slice(0, 20).map((r) => runLink(r, `${fmtDate(r.utc)} ${r.type === 'regression' ? '🌙' : RUNTYPE[r.type]}`)), ' ')) : null)),
+      h('td', { class: 'nw' }, g.open ? h('span', { class: 'badge bad' }, 'Still there') : h('span', { class: 'badge ok', title: 'The newest results do not show the problem.' }, 'Not seen now')),
+      h('td', {}, g.cases.length ? joinNodes(g.cases.slice(0, 4).map((i) => h('span', { class: 'nw' }, g.open && !foundOf(problemRef(i)).length ? pickBox(problemRef(i)) : null, itemLink(i, false))), ' ') : h('span', { class: 'muted-t' }, '–'),
+        g.cases.length > 4 ? h('span', { class: 'meta' }, ` +${g.cases.length - 4}`) : null),
+      h('td', { class: 'nw' }, when(g.first)), h('td', { class: 'nw' }, when(g.last)), h('td', { class: 'nw' }, String(g.runs)),
+      h('td', {}, joinNodes(g.refs.map(foundLinks).filter(Boolean), ' ') || h('span', { class: 'muted-t' }, '–'))))))));
+  if (list.length > S.limit) v.append(h('div', { class: 'more-row' }, h('button', { class: 'btn', type: 'button', 'data-kind': 'local', onclick: () => { S.limit += 100; render(); } }, `Show more (${list.length - S.limit} left)`)));
+}
 // A run's window (docs/regression.md -> step 7): {from, to}, each a build tag with its time.
 // Any other shape prints as text, never `[object Object]`.
 function winText(w) {
@@ -3279,7 +3360,7 @@ function render(keepSearchFocus) {
   if (S.v !== 'overview') v.append(h('div', { class: 'vhead' }, h('span', { class: 'vico', 'aria-hidden': 'true' }, vicon), h('div', {}, h('h2', {}, vname), !hid && VIEW_HELP[S.v] ? h('p', {}, VIEW_HELP[S.v]) : null),
     VIEW_HELP[S.v] ? h('button', { class: 'btn', type: 'button', 'data-kind': 'local', title: hid ? 'Shows the line of help of this view again.' : 'Hides the line of help in this view. Only this browser keeps this setting.',
       'aria-label': hid ? 'Show the help line' : 'Hide the help line', onclick: () => { if (hid) hiddenHelp.delete(S.v); else hiddenHelp.add(S.v); saveHidden(); render(); } }, hid ? 'ⓘ' : ico('close')) : null));
-  ({ overview: viewOverview, modules: viewModules, findings: viewFindings, design: viewDesign, runs: viewRuns, map: viewMap, catalog: () => viewList(false), gallery: () => viewList(true), coverage: viewCoverage, history: viewHistory, lifecycle: viewLifecycle, builder: viewBuilder }[S.v] || viewOverview)();
+  ({ overview: viewOverview, modules: viewModules, findings: viewFindings, design: viewDesign, runs: viewRuns, problems: viewProblems, map: viewMap, catalog: () => viewList(false), gallery: () => viewList(true), coverage: viewCoverage, history: viewHistory, lifecycle: viewLifecycle, builder: viewBuilder }[S.v] || viewOverview)();
   if (pos != null) { const q = $('input[type=search]'); if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch { /* ignore */ } } }
   renderTray();
 }

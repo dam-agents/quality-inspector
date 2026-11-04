@@ -171,7 +171,14 @@ result that is not a pass, and the Runs view a run's `summary` under its result.
   focus or a tap of an ⓘ.
 
 Five sections, one question each: 🏠 **Home** (below); 🧪 **Tests** — All tests (the catalog),
-Screenshots (the gallery), History (item × build), Lifecycle and Test builder (below); 🏃 **Runs**;
+Screenshots (the gallery), History (item × build), Lifecycle and Test builder (below); 🏃 **Runs** —
+the runs, and **Problems found**: every problem of the runs one time, built by the page from the runs
+alone (no new data) — each problem of a run's `analysis`, each result that is not a pass and that no
+problem of its run names, each night whose product did not start; one problem across runs when the
+cause is the same and a test case is shared (else the title, a failed night its stage); "still there"
+while one of its test cases still fails for that cause (without test cases: the newest run of its kind
+still has it), else "not seen now"; its severity, test cases, first and last run, number of runs and
+bug issue; the modules' findings stay in Design and Findings;
 🗺️ **Product** — Product map (the page shots with every control clickable, coloured by
 its tests' worst verdict, dashed where no test names it; a drawn outline where a shot did not fit; a
 navigation item, tab, link or list row that leads to a mapped page opens that page, like a
