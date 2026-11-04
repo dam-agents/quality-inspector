@@ -169,6 +169,25 @@ assert_eq "the viewer's script parses" 0 "$?"
 # it prints as text, never `[object Object]`. A side panel opens at half the screen (docs/catalog.md).
 win="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const f=(s.match(/^function winText\([\s\S]*?^}$/m)||[""])[0];eval(f);process.stdout.write(winText({from:{tag:"c1",utc:"2026-10-24T02:02:55Z"},to:{tag:"c2",utc:"2026-10-25T21:36:01Z"}}))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "the viewer: a run's window as text, never [object Object]" "c1 · 2026-10-24 02:02 → c2 · 2026-10-25 21:36" "$win"
+# Problems found (docs/catalog.md → Content): one problem across runs by cause and shared test case, a
+# changed cause a new one, a night without a start by its stage; still there or not seen now; the open,
+# the most severe, then the newest first. Fixture: newest first, as the page holds its runs.
+prob="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");
+const line=(n)=>(s.match(new RegExp(`^const ${n} = .*$`,"m"))||[""])[0];
+const until=(n,next)=>{const a=s.indexOf(`const ${n} = `);return s.slice(a,s.indexOf(`\nconst ${next} `,a));};
+eval([...["str","arr","own","num","CAUSE_OF","causeKey","casesOf","normTitle","PROB_RE","problemRef"].map(line),until("CAUSE","CAUSE_OF"),until("PROBLEM_SEV","analysisIn"),(s.match(/^function problemsFound\([\s\S]*?^}$/m)||[""])[0]].join("\n").replace(/^const /gm,"var "));
+const it=(id,name,latest,cause)=>({key:`i42/${id}`,ref:"#42",id,label:`#42 ${id}`,name,origin:{kind:"issue"},latest,verdict:{cause}});
+var ALL=[it("AC-1","Keeps its tasks","regression","product"),it("AC-2","Shows the new name","unchanged",null)];var items=ALL;var byKey=new Map(ALL.map((i)=>[i.key,i]));
+const run=(utc,verdict,entries,x={})=>({id:utc,type:"regression",ref:"",build:utc.slice(8,10),utc,verdict,entries,analysis:null,...x});
+const P={title:"Renaming loses the tasks",about:["#42 AC-1"],cause:"product",severity:"high"};
+var runsAt=[run("2026-10-12T03:00:00Z","environment",[],{failure:{stage:"up",cause:"pull refused"}}),
+  run("2026-10-11T03:00:00Z","regression",[{key:"i42/AC-1",value:"regression",cause:"product"}],{analysis:{problems:[P]}}),
+  run("2026-10-10T03:00:00Z","regression",[{key:"i42/AC-1",value:"regression",cause:"product"},{key:"i42/AC-2",value:"failed",cause:"test"}],{analysis:{problems:[{...P,severity:"critical",title:"Old words"}]}}),
+  run("2026-10-09T03:00:00Z","environment",[],{failure:{stage:"up",cause:"pull refused"}}),
+  run("2026-10-08T03:00:00Z","needs-review",[{key:"i42/AC-1",value:"blocked",cause:"environment"}])];
+process.stdout.write(problemsFound().map((g)=>[g.cause,g.p.title,g.open?"open":"gone",g.runs,g.sev||"-",g.refs.join("+")||"-"].join("|")).join(";"))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "the viewer: problems found are grouped, have their status, the open, most severe and newest come first" \
+  "product|Renaming loses the tasks|open|2|critical|#42 AC-1;environment|The product did not start: up|open|2|-|-;test|#42 AC-2: Shows the new name|gone|1|-|#42 AC-2;environment|#42 AC-1: Keeps its tasks|gone|1|-|#42 AC-1" "$prob"
 dw=0
 grep -q 'width:min(var(--dw,max(360px,50vw)),100%)' "$SCRIPTS/catalog/viewer.html" && grep -q 'right:min(var(--dw,max(360px,50vw)),100%)' "$SCRIPTS/catalog/viewer.html" && dw=1
 assert_eq "the viewer: a side panel opens at half the screen" 1 "$dw"
