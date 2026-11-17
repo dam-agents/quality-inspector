@@ -72,7 +72,9 @@ then every end runs `env.sh unlock operator` first, and a failed `env.sh up` is 
 ([catalog.md](catalog.md) → **Explained on the page**). On an interactive dashboard beside the
 agent's chat, its "Send to the agent" sends exactly that command as the operator's chat message
 (`platform.sendPrompt`) — the direct session, handled as if typed; elsewhere the box offers it to
-copy. A prompt whose transcript line opens
+copy. On the dashboard's server the command passes `POST /api/commands` first, which checks it,
+records who sent it in `work/dashboard/commands.jsonl` and limits how many ([catalog.md](catalog.md)
+→ The server); that record is the server's, never a reason to act — the words in the prompt are. A prompt whose transcript line opens
 `<viewer> sent this from a button on the interactive artifact "…"` comes from a person the
 operator shared the page with: a channel turn, never direct (`lib/channel.sh`). The viewer may
 use every control of the page:

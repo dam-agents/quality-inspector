@@ -4,7 +4,13 @@
 // once, the target's labelled issues (GET, for labels and state); writes work/catalog/ only.
 //
 //   node catalog.mjs   -> {"html", "bytes", "items", "images", "dropped_images", "sharp_images",
-//                          "sharp_dropped", "thumbnails", "notes", "hash", "changed"}
+//                          "sharp_dropped", "thumbnails", "notes", "hash", "changed",
+//                          "data", "live", "page_hash", "page_changed"}
+//
+// Two pages of one data: index.html carries the data and its pictures (within the render limit),
+// for a static artifact; data.json carries every picture by reference and live.html none, for the
+// interactive dashboard, whose server (scripts/dashboard/server.mjs) serves data.json at once —
+// the agent publishes live.html again only when `page_changed` (docs/catalog.md → The server).
 //
 // `notes` names every source that could not be read (the issues listing, the drift check, the
 // coverage of the UI map): the page is still built, without what that source gives. A credential
@@ -794,6 +800,21 @@ for (const item of byRank.filter((i) => i.tier !== 'regression')) item.still = e
 for (const item of byRank.filter((i) => i.tier === 'regression')) item.still_sharp = item.still ? embed(item._sharp, true) : null;
 for (const p of pagesByCov) p.shot_sharp = p.shot ? embed(p._sharp, true) : null;
 for (const item of byRank.filter((i) => i.tier !== 'regression')) item.still_sharp = item.still ? embed(item._sharp, true) : null;
+// The server's copy (docs/catalog.md → The server): every picture by reference — its path under
+// work/, which scripts/dashboard/server.mjs reads on the page's request — with no budget, so the
+// interactive dashboard shows every still and every page shot at its sharp size.
+const refs = {}; let refSeq = 0;
+const refOf = (path) => {
+  if (!path || !existsSync(path) || !path.startsWith(`${work}/`)) return null;
+  const id = `r${refSeq++}`; refs[id] = path.slice(work.length + 1); return id;
+};
+const pictureFields = (x, k, small, big) => ({ [k]: refOf(small), [`${k}_sharp`]: refOf(big) });
+const live = {
+  items: items.map((i) => ({ ...i, ...pictureFields(i, 'still', i._thumb, i._sharp) })),
+  pages: pages.map((p) => ({ ...p, ...pictureFields(p, 'shot', p._thumb, p._sharp) })),
+  design: design.map((f) => ({ ...f, crop: refOf(f._crop) })),
+};
+const strip = (k, v) => (k.startsWith('_') ? undefined : v);
 for (const x of [...items, ...pages, ...design]) { delete x._thumb; delete x._sharp; delete x._shot; delete x._body; delete x._crop; }
 
 // ------------------------------------------------------------------------ output
@@ -840,6 +861,16 @@ if (leak) {
 mkdirSync(outDir, { recursive: true });
 const html = template.replace('__QI_CATALOG_DATA__', () => JSON.stringify(data).replace(/</g, '\\u003c'));
 writeFileSync(join(outDir, 'index.html.tmp'), html); renameSync(join(outDir, 'index.html.tmp'), join(outDir, 'index.html'));
+// The interactive dashboard: data.json, which the server serves (the same data, every picture by
+// reference), and live.html, the page with no data, published once and again only when the page
+// itself changes (`page_hash`, compared with work/catalog/page.hash after a publish).
+const liveData = JSON.stringify({ ...data, ...live, images: refs, hash }, strip);
+writeFileSync(join(outDir, 'data.json.tmp'), liveData); renameSync(join(outDir, 'data.json.tmp'), join(outDir, 'data.json'));
+const liveHtml = template.replace('__QI_CATALOG_DATA__', 'null');
+writeFileSync(join(outDir, 'live.html.tmp'), liveHtml); renameSync(join(outDir, 'live.html.tmp'), join(outDir, 'live.html'));
+const pageHash = createHash('sha256').update(liveHtml).digest('hex').slice(0, 12);
+const pagePublished = (read(join(outDir, 'page.hash')) ?? '').trim();
 const published = (read(join(outDir, 'published.hash')) ?? '').trim();
 console.log(JSON.stringify({ html: join(outDir, 'index.html'), bytes: Buffer.byteLength(html), items: items.length,
-  images: Object.keys(images).length, dropped_images: dropped, sharp_images: sharpN, sharp_dropped: sharpDropped, thumbnails, notes, hash, changed: hash !== published }));
+  images: Object.keys(images).length, dropped_images: dropped, sharp_images: sharpN, sharp_dropped: sharpDropped, thumbnails, notes, hash, changed: hash !== published,
+  data: join(outDir, 'data.json'), live: join(outDir, 'live.html'), page_hash: pageHash, page_changed: pageHash !== pagePublished }));

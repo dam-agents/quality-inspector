@@ -7,6 +7,22 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.60.0 — 2026-11-16
+
+**Upgrade:**
+1. `bash "$HOME/scripts/dashboard-service.sh" install` — once: the dashboard's server, a Login item
+   (`quality-inspector-dashboard`, `kit.yaml` → `startupItems`, which only an agent created from the kit
+   gets by itself). It must say `ok`.
+2. With `dashboard_interactive: enabled`, nothing more: the next catalog build writes
+   `work/catalog/data.json` and `live.html`, `page_changed` is true, and the build publishes `live.html` as a
+   revision of the same interactive artifact — its link and sharing stay. From then on the page asks the
+   server for its data, pictures and the agent's state, and a run publishes nothing
+   ([docs/catalog.md](docs/catalog.md) → The server). With `disabled`, the static page stays as it was;
+   offer the operator `dashboard_interactive: enabled` when they have Interactive artifacts on.
+
+The dashboard now has Design Desk's look ([docs/catalog.md](docs/catalog.md) → The look); the places of its
+controls did not change.
+
 ## 3.59.0 — 2026-11-04
 
 **Upgrade:**
