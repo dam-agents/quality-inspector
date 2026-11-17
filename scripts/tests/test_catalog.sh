@@ -570,4 +570,26 @@ assert "an undrawn test frame: the plain still, not marked" '(.items[] | select(
 jq '.acs[0].mark = {box: {x: 1, y: 1, w: 4, h: 4}, saw: "The Chat control shows."}' "$W/issues/42/verdicts-abc-c1.json" > "$W/v.tmp" && mv "$W/v.tmp" "$W/issues/42/verdicts-abc-c1.json"
 node "$SCRIPTS/catalog.mjs" >/dev/null; data="$(page_data)"
 assert "an undrawn test frame: the agent's mark is tried" '(.items[] | select(.key == "issue-42/AC-1") | .marked == "agent")' "$data"
+# The interactive dashboard (docs/catalog.md → The server): data.json with every picture by reference
+# under work/, live.html with no data, a page hash that only the page itself changes.
+out="$(node "$SCRIPTS/catalog.mjs")"
+assert "the build names data.json, live.html and the page's hash" '(.data | endswith("catalog/data.json")) and (.live | endswith("catalog/live.html")) and (.page_hash | test("^[0-9a-f]{12}$")) and .page_changed == true' "$out"
+assert "data.json: the same items, every picture a path under work/" '(.items | length) > 0 and ([.images[]] | all(test("^(catalog/thumbs|design/crops)/[^/]+\\.(jpg|webp|png)$"))) and .hash != null' "$(cat "$W/catalog/data.json")"
+assert "data.json: a still names a reference of its images" '[.items[] | select(.still != null) | .still] as $s | ($s | length) > 0 and ($s | all(test("^r[0-9]+$")))' "$(cat "$W/catalog/data.json")"
+grep -q '<script type="application/json" id="qi-catalog-data">null</script>' "$W/catalog/live.html" || { echo "  live.html carries data"; FAILED=1; }
+ph="$(jq -r .page_hash <<<"$out")"; echo "$ph" > "$W/catalog/page.hash"
+assert "the same page: page_changed false" '.page_changed == false' "$(node "$SCRIPTS/catalog.mjs")"
+grep -o '"[^"]*_[a-z]*":"/[^"]*"' "$W/catalog/data.json" | head -1 | grep -q . && { echo "  data.json carries a private path field"; FAILED=1; }
+
+# The look (docs/catalog.md → The look): Design Desk's scale in the page's style sheet — text in five
+# sizes (a glyph's or a figure's own size aside), weights up to 600, no gradient, no white text on a fill.
+css="$(awk '/<style>/,/<\/style>/' "$SCRIPTS/catalog/viewer.html")"
+bad="$(grep -o '[^{}]*{[^}]*font-size:[0-9.]*px' <<<"$css" | grep -vE '^\s*(\.hico|\.fact \.fi|\.rico|\.welcome \.em|\.vico|\.kpi \.ke|\.kpi b|\.celebrate \.em|\.star|\.empty \.em|\.bstep \.grip|\.bph \.em|\.vhead \.vico)\{')"
+[ -z "$bad" ] || { echo "  a text size off the scale: $(head -c 200 <<<"$bad")"; FAILED=1; }
+grep -qE 'font-weight:(650|700|800|900|bold)' <<<"$css" && { echo "  a weight above 600"; FAILED=1; }
+grep -qE 'gradient\(1[0-9]{2}deg|--grad' <<<"$css" && { echo "  a gradient"; FAILED=1; }
+grep -qE 'color:#fff[;}]' <<<"$css" && { echo "  white text on a fill"; FAILED=1; }
+for v in '--fs-title:26px' '--fs-head:17px' '--fs-ui:14px' '--fs-meta:12.5px' '--fs-micro:11px' '--bg:#fcfbfc' '--fg:#1b1b1a' '--link:#2f5bd3'; do
+  grep -qF -- "$v" <<<"$css" || { echo "  the token $v is missing"; FAILED=1; }
+done
 exit $FAILED

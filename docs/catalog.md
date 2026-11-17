@@ -140,15 +140,16 @@ result that is not a pass, and the Runs view a run's `summary` under its result.
   finding, 🏋️ stress check, 🗂️ collection, 🧩 testing module. A short reference (`#42 AC-1`) always
   carries its icon, and its tooltip gives the whole name ("Test case — acceptance criterion AC-1 of
   issue #42 …").
-- **One kind of control, one look.** Blue with → goes to another view of the page, with ▯ opens a
-  panel, with ⌖ a page of the product map. Teal with ↗ opens another site in a new tab (GitHub, a
-  report's link) by the page's own script — in a frame a plain link stays and the other site
-  refuses to load; when no tab opens, a teal box shows the address to copy. Violet with the agent's
-  mark is a message for the agent and never sends by itself: it opens the box at the bottom, which
-  names what the agent then does, shows the exact message and sends it only on its own "Send to
-  the agent" (beside the agent's chat; else "Copy"); Esc or Cancel closes it with nothing sent
-  (dashed: takes your input first). Grey changes only this page in this browser (filters, sorting,
-  pins, selections). Each tooltip says first what it does and where it goes, then its meaning.
+- **One kind of control, one look** — Design Desk's (**The look**, below). A link is ink with a faint
+  underline; its mark says where it goes: → another view of the page, ▯ a panel, ⌖ a page of the
+  product map, ↗ another site in a new tab (GitHub, a report's link), opened by the page's own
+  script — in a frame a plain link stays and the other site refuses to load; when no tab opens, a
+  box shows the address to copy. The agent's mark (violet) is a message for the agent and never
+  sends by itself: it opens the box at the bottom, which names what the agent then does, shows the
+  exact message and sends it only on its own "Send to the agent" (beside the agent's chat or on the
+  interactive dashboard; else "Copy"); Esc or Cancel closes it with nothing sent (dashed: takes
+  your input first). The next step of a view is its one ink button. A plain button changes only
+  this page in this browser (filters, sorting, pins, selections). Each tooltip says first what it does and where it goes, then its meaning.
 - **Where you are:** the header has five tabs, one per section; Home's tab counts the blockers and
   the test cases that need attention. Under them the place as breadcrumbs (section › view and its
   filter › the open panel, which closes on a click of the view) beside **Back**. A section with more
@@ -299,6 +300,53 @@ A view where a person writes a new test as steps and sees them before anyone run
     the operator's ([on-demand.md](on-demand.md)): the agent does the steps on the product that is
     up, live in the Browser Panel, and says per step what it did and saw. No verdict, report or test.
 
+## The server
+
+The dashboard runs on a server in the agent's machine, as Design Desk's Desk does: the page is
+published once, and asks the server for everything it shows.
+
+- `scripts/dashboard/server.mjs`, started at every boot by the Login item `quality-inspector-dashboard`
+  (`kit.yaml` → `startupItems`, command `~/scripts/dashboard/serve.sh`). It listens on
+  `127.0.0.1:5555`, the platform's Artifact API port, and answers only the platform's relay, which names
+  the caller on every request (`owner` — the operator — or `viewer`, with the verified email); the page
+  cannot forge those headers. It writes only `work/dashboard/commands.jsonl` and never executes what a
+  page sends.
+- `bash "$HOME/scripts/dashboard-service.sh" check` says whether it answers; `install` writes the
+  service for an agent created without it (before 3.60.0), `restart` restarts it. Its log is
+  `~/.local/state/rc/quality-inspector-dashboard.log`.
+- **What it serves:** `GET /api/catalog` — `work/catalog/data.json`, the data of the newest build
+  (the same data as the static page, every picture by reference, no 8 MiB budget); `GET
+  /api/images/<id>` — one picture of it, only an image file under `work/catalog/thumbs/` or
+  `work/design/`; `GET /api/status` — what the agent does now, read from `work/env/LOCK`, `QA.md` and
+  `SCENARIOS.md` at the moment of the question (the header's status is live, not as of the build);
+  `GET /api/me` — who looks.
+- **New results.** Each build writes `data.json`; the server serves it at once, so nothing is
+  published after a run. The open page asks every minute and shows "The agent built new results.
+  **Show them**". It asks for the agent's state every 30 s. A server that does not answer is said in
+  the same bar, with **Reload the page**.
+- **Commands.** "Send to the agent" first sends the command to `POST /api/commands`: the server
+  checks it against the page's own patterns (`CMD_RE`, `SCEN_RE`, `WALK_RE`, `DISCUSS_RE`, read from
+  `scripts/catalog/viewer.html`, as `lib/channel.sh` reads them), allows 20 per person in 10 minutes,
+  writes it with who sent it (`Q-<n>`, time, `owner`|`viewer`, email) to `work/dashboard/commands.jsonl`,
+  and gives it back; the page then sends exactly those words to the agent's chat. The agent handles
+  them as [modules.md](modules.md) → **Control** says — the platform's frame of a viewer's press does
+  not change. A refused command sends nothing, and the box says why.
+- **Development:** `WORK_DIR=<work> node scripts/catalog.mjs`, then `WORK_DIR=<work> node
+  scripts/dashboard/dev/harness.mjs 5600 5599` and open `http://localhost:5600/` (`?role=viewer`, or
+  `?static=1` for the static page). The harness stands in for the platform's relay; it is never
+  deployed.
+
+## The look
+
+The dashboard keeps Design Desk's scale (design-desk `docs/desk-page.md` → **The look**), so the two
+agents read as one family: Design Desk's colour tokens under this page's names, in light and dark;
+text only in five sizes (`--fs-title` 26, `--fs-head` 17, `--fs-ui` 14, `--fs-meta` 12.5,
+`--fs-micro` 11; weights up to 600; IBM Plex Sans, else the system font); corners 4, 6, 8, 10, 12
+(999px a pill, 50% a dot); space in multiples of 4; buttons 32px high; calm links; no gradient, no
+thick coloured edge on a card, no lift under the pointer. An ink means a state or a kind of control,
+never decoration; text on a coloured fill is `--on-fill`. Exempt: emoji and icon glyphs, a figure's
+numeral. `scripts/tests/test_catalog.sh` fails a value off the scale.
+
 ## Build and publish
 
 With `test_catalog: enabled` and `artifact_reports: enabled`: right after a run claims an issue
@@ -313,23 +361,31 @@ release ([issue-qa.md](issue-qa.md) step 10, also for an operator's or a Slack "
 
 1. `node "$HOME/scripts/design-findings.mjs" merge --noticed-only` (the run's "noticed in passing"
    items into the design register, [ui-sweep.md](ui-sweep.md)), then
-   `node "$HOME/scripts/catalog.mjs"` → `{html, bytes, items, images, dropped_images,
-   sharp_images, sharp_dropped, thumbnails, notes, hash, changed}`. `changed: false` → done. Each `notes` entry is a source it
-   could not read: log it as a `warn` and publish anyway. `refused` (exit 1): log it as an
-   `error` and publish nothing; `secrets.mjs scan-all work/env/credentials.env work/suite/tests
-   work/issues work/scenarios` (in `$HOME/scripts/lib/`) names the file to fix.
-2. Publish `work/catalog/index.html` as [reporting.md](reporting.md) → Delivery step 1 — artifact
-   only, through an upload URL (it exceeds the inline limit), sent with `Content-Type: text/html;
-   charset=utf-8`; its images are in the page, so it skips `report-media.mjs`. The reference lives
-   in `work/catalog/artifact.id`: a revision when it exists — refused as not found, a new artifact
-   whose reference replaces it. With `dashboard_interactive: enabled` it is created with
-   `interactive: true` (the platform's Interactive artifacts; never public); that is fixed at
-   creation, so when `work/catalog/artifact.interactive` does not say `true` the next publish
-   creates a new artifact, replaces the reference, writes that file, and tells the operator to
-   delete the old one — never by itself. Never change its sharing: private,
-   restricted or public is the operator's choice in the app. Ledger: surface `artifact`,
-   `issue=-`, key `catalog@<hash>`.
-3. Write `<hash>` to `work/catalog/published.hash`. A failure is logged; the next run retries.
+   `node "$HOME/scripts/catalog.mjs"` → `{html, bytes, items, images, dropped_images, sharp_images,
+   sharp_dropped, thumbnails, notes, hash, changed, data, live, page_hash, page_changed}`. Each `notes`
+   entry is a source it could not read: log it as a `warn` and publish anyway. `refused` (exit 1): log
+   it as an `error` and publish nothing — no `data.json` either; `secrets.mjs scan-all
+   work/env/credentials.env work/suite/tests work/issues work/scenarios` (in `$HOME/scripts/lib/`)
+   names the file to fix.
+2. **Interactive** (`dashboard_interactive: enabled`, recommended: it needs the operator's Interactive artifacts feature): `data.json` is written, and the
+   server shows it — done, unless `page_changed` or `work/catalog/artifact.interactive` does not say
+   `true`. Then publish `work/catalog/live.html` (the page with no data, `live`) as below and write
+   `<page_hash>` to `work/catalog/page.hash`. First check `dashboard-service.sh check`; a server that
+   does not answer → `install`, else `restart`, then check again; still none → log it as an `error`,
+   tell the operator once, and publish `index.html` as for a static dashboard meanwhile.
+   **Static** (`disabled`): `changed: false` → done; else publish `work/catalog/index.html` (the page
+   with its data) and write `<hash>` to `work/catalog/published.hash`.
+3. Publishing is [reporting.md](reporting.md) → Delivery step 1 — artifact only, through an upload URL
+   (the static page exceeds the inline limit), sent with `Content-Type: text/html; charset=utf-8`; its
+   images are in the page or on the server, so it skips `report-media.mjs`. The reference lives in
+   `work/catalog/artifact.id`: a revision when it exists — refused as not found, a new artifact whose
+   reference replaces it. With `dashboard_interactive: enabled` it is created with `interactive: true`
+   (the platform's Interactive artifacts; never public); that is fixed at creation, so when
+   `work/catalog/artifact.interactive` does not say `true` the next publish creates a new artifact,
+   replaces the reference, writes that file, and tells the operator to delete the old one — never by
+   itself. Never change its sharing: private, restricted or public is the operator's choice in the
+   app. Ledger: surface `artifact`, `issue=-`, key `catalog@<hash>` (`catalog-page@<page_hash>` for
+   `live.html`). A failure is logged; the next run retries.
 
 A failed item's still shows its mark ([reporting.md](reporting.md) → **The mark**): the test's
 `<id>: the failing check` with a red frame, else the agent's `mark` as an orange frame on the AC
@@ -344,7 +400,7 @@ page; removed with their item or page):
   Screenshots and the Product map. A click on a panel's screenshot, or **🔍 Full size**, shows it
   over the page: fit to the window or at its real size (a click changes between them), Esc closes.
 
-The page embeds them within 8 MiB — less when the data is large (a `notes` entry says so): first
+The interactive dashboard shows every one, each from the server when a view shows it. The static page embeds them within 8 MiB — less when the data is large (a `notes` entry says so): first
 every small one (the regression tier's stills, the design crops, the page shots, then the other
 stills), then the sharp ones in the same order while room is left — a place shows the small one
 where its sharp copy did not fit (`sharp_dropped`) — so it stays under the platform's 10 MiB

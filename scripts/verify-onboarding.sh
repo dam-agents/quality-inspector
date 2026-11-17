@@ -151,6 +151,11 @@ if [ "$STRUCTURE" = 1 ]; then
   [ -f "$WORK/LESSONS.md" ] && ok lessons "present" || fail lessons "work/LESSONS.md missing" "ONBOARDING.md Step 2b"
   [ "$(grep '^|' "$WORK/CATALOG.md" 2>/dev/null | head -1)" = "$CATALOG_HEADER" ] \
     && ok catalog_collections "header intact" || fail catalog_collections "work/CATALOG.md missing or header changed" "re-seed per ONBOARDING.md Step 2b (keep existing rows)"
+  # The interactive dashboard runs on its server (docs/catalog.md → The server).
+  if [ "$(reg dashboard_interactive)" = enabled ]; then
+    out="$(bash "$SCRIPT_DIR/dashboard-service.sh" check 2>&1)" && ok dashboard_server "answers" \
+      || fail dashboard_server "${out:-does not answer}" "bash \"\$HOME/scripts/dashboard-service.sh\" install"
+  fi
   # perf-trend.mjs creates it on first use; missing is only worth a note.
   [ -d "$WORK/perf" ] && ok perf_dir "present" || warn perf_dir "work/perf missing — mkdir -p work/perf (ONBOARDING.md Step 2b)"
   if [ -f "$WORK/env/credentials.env" ]; then

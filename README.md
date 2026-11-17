@@ -127,6 +127,9 @@ Media add a few MB per criterion ([docs/reporting.md](docs/reporting.md)).
 **The test catalog** is one more artifact — the dashboard: every test with its history,
 coverage map, every run and its report, a clickable product map and a Test builder. It holds
 test-related content only, so the operator may share it ([docs/catalog.md](docs/catalog.md)).
+As an interactive artifact it runs on a small server in the agent's machine, as Design Desk's Desk
+does: the page is published once and shows the newest results, every screenshot and what the agent
+does now, and its buttons go to the agent through the server. It has Design Desk's look.
 
 ## When the UI changes
 
