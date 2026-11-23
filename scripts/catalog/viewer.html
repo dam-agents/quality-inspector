@@ -397,6 +397,16 @@ body.dragging{user-select:none;cursor:col-resize}
 .cells{display:inline-flex;gap:2px;vertical-align:middle}
 .cells i{width:9px;height:12px;border-radius:2px;background:var(--mutedbg)}
 .cells i.ok{background:var(--ok)}.cells i.warn{background:var(--warn)}.cells i.bad{background:var(--bad)}.cells i.muted{background:var(--muted)}
+.rres{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin:10px 0}
+.rres h4{margin:0 0 6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:14px}
+.rsides{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:8px}
+.rside{background:var(--card);border-radius:var(--r);padding:8px 10px;min-width:0}
+.rside h5{margin:0 0 6px;font-size:13px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.rshots{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;margin:6px 0}
+.rshots figure{margin:0}.rshots img{width:100%;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:zoom-in}
+.rshots figcaption{font-size:11px;color:var(--dim);overflow-wrap:anywhere}
+ol.rsteps{margin:6px 0;padding-left:22px;font-size:12px}ol.rsteps li{overflow-wrap:anywhere}ol.rsteps li.failed,ol.rsteps li.timed-out{color:var(--bad);font-weight:600}
+ol.rsteps code{font-size:11px;color:var(--dim)}
 pre.diff{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:10px;font-size:12px;max-height:50vh;overflow:auto}
 
 /* Modules, findings, design. */
@@ -949,7 +959,7 @@ const VIEW_HELP = {
   findings: 'The problems that the testing modules found outside the issues: form validation, load (stress) and security counts, and the scenarios that people requested. Select problems to report them in one bug issue.',
   design: 'The layout, visual and accessibility defects that the UI sweep found, each with a screenshot. Put them into categories, recheck them, discuss them with the agent, dismiss them, or report them in one bug issue.',
   problems: 'All the problems that the test runs found, each one time: still there or not seen now, its cause, its test cases, when the agent saw it first and last, and its bug issue. Open a problem to see what the agent found.',
-  runs: 'All test runs: nightly regressions, issue runs, scenario runs and manual runs. Each one has its result, its build and its report (video, screenshots, steps).',
+  runs: 'All test runs: nightly regressions, issue runs, scenario runs and manual runs. Each one has its result, its build and its report (steps, errors and screenshots on this page; the video in the report itself).',
   map: 'The pages of the product as screenshots. The colour of a control shows the result of the test cases that use it. A control with ↗ goes to its page. You can ask for a test of any page or control.',
   catalog: 'All test cases: one line for each acceptance criterion (🎯) or exploration (🔦) with its automated test. Filter at the left. Click a line to open its panel.',
   gallery: 'The screenshot that each test makes right before its check.',
@@ -1053,12 +1063,12 @@ const QUICK = [
   ['Nightly regression', { tier: ['regression'] }], ['Needs attention', { flag: ['needs attention'] }], ['Promotable queue', { tier: ['promotable'] }],
   ['Flaky & healed', { flag: ['flaky', 'healed'] }], ['Costly (agent.assert)', { flag: ['agent.assert'] }], ['Explorations', { kind: ['exploration'] }], ['Scenarios', { origin: ['scenario'] }],
 ];
-const S = { v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS.slice(), i: null, r: null, o: null, at: null, pg: null, hs: null, rt: 'all', rb: null, only: false, hall: false, hsort: 'recent', limit: 100, side: false };
+const S = { v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS.slice(), i: null, r: null, rp: null, o: null, at: null, pg: null, hs: null, rt: 'all', rb: null, only: false, hall: false, hsort: 'recent', limit: 100, side: false };
 // The Design view's filters, in the address too, so "back" returns to them.
 const DS_DEFAULT = { st: 'open', sev: '', vp: '', ck: '', pg: '', cat: '', q: '' };
 const DS = { ...DS_DEFAULT };
 
-const DEFAULTS = JSON.stringify({ v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS, i: null, r: null, o: null, at: null, pg: null, hs: null, rt: 'all', rb: null });
+const DEFAULTS = JSON.stringify({ v: 'overview', q: '', f: {}, sort: [['ref', 1], ['id', 1]], g: 'none', l: 'table', cols: DEFAULT_COLS, i: null, r: null, rp: null, o: null, at: null, pg: null, hs: null, rt: 'all', rb: null });
 // The address holds every place: a view, its filters, the panel open on it. readHash reads one
 // (the location's, or a remembered one for "back" where the page may not change its address).
 function readHash(src) {
@@ -1075,6 +1085,7 @@ function readHash(src) {
   if (p.get('c')) { const c = p.get('c').split(',').filter((k) => own(COLS, k)); if (c.length) S.cols = c; }
   S.i = p.get('i') && byKey.has(p.get('i')) ? p.get('i') : null;
   S.r = !S.i && p.get('r') && byRun.has(p.get('r')) ? p.get('r') : null;
+  S.rp = S.r && p.get('rp') === '1' && (byRun.get(S.r) || {}).rep ? 1 : null;
   S.o = !S.i && !S.r && p.get('o') && origins.has(p.get('o')) ? p.get('o') : null;
   S.at = p.get('at') && builds.some((b) => b.id === p.get('at')) ? p.get('at') : null;
   S.pg = p.get('pg') && pageOf(p.get('pg')) ? p.get('pg') : null;
@@ -1096,6 +1107,7 @@ function hashOf(st = S) {
   if (st.cols.join(',') !== DEFAULT_COLS.join(',')) p.set('c', st.cols.join(','));
   if (st.i) p.set('i', st.i);
   if (st.r) p.set('r', st.r);
+  if (st.r && st.rp) p.set('rp', '1');
   if (st.o) p.set('o', st.o);
   if (st.at) p.set('at', st.at);
   if (st.pg) p.set('pg', st.pg);
@@ -1119,7 +1131,7 @@ function setLocation(push) {
 const writeHash = () => setLocation(false); // the same place, refined: a filter, a sort, a search
 function where(st = S) {
   const it = st.i && byKey.get(st.i); if (it) return `${itemTag(it)} — ${str(it.name)}`.slice(0, 80);
-  const run = st.r && byRun.get(st.r); if (run) return runName(run);
+  const run = st.r && byRun.get(st.r); if (run) return st.rp ? `${ENT.report[1]} ${ENT.report[0]} · ${runName(run)}` : runName(run);
   if (st.o) return `${originName(st.o)}${originTitle(st.o) ? ` — ${originTitle(st.o)}` : ''}`.slice(0, 80);
   const [, vname, , sec, short] = viewOf(st.v);
   const view = viewsIn(sec).length > 1 ? `${sectionOf(st.v)[1]} › ${short}` : vname;
@@ -1133,9 +1145,9 @@ function where(st = S) {
 // The place a move leads to, named for its tooltip: the state that nav(patch) makes.
 function placeOf(patch) {
   const p = { ...patch }; delete p.ds;
-  const st = { ...S, i: null, r: null, o: null, ...p };
-  const kind = st.i ? 'testcase' : st.r ? 'run' : st.o ? (str(st.o).startsWith('#') ? 'issue' : 'scenario') : null;
-  return kind === 'testcase' ? `the panel of the test case ${where(st)}` : kind === 'run' ? `the panel of the test run ${ENT.run[1]} ${where(st)}`
+  const st = { ...S, i: null, r: null, rp: null, o: null, ...p };
+  const kind = st.i ? 'testcase' : st.r && st.rp ? 'report' : st.r ? 'run' : st.o ? (str(st.o).startsWith('#') ? 'issue' : 'scenario') : null;
+  return kind === 'testcase' ? `the panel of the test case ${where(st)}` : kind === 'report' ? `the report of the test run ${where(st)}` : kind === 'run' ? `the panel of the test run ${ENT.run[1]} ${where(st)}`
     : kind ? `the panel of ${where(st)}` : `${viewOf(st.v)[2]} ${where(st)}`;
 }
 const isPanel = (patch) => DRAWER.some((k) => patch[k]);
@@ -1149,13 +1161,13 @@ function goLink(patch, text, help, cls = 'lnk') {
 // A link to a different site, in a new tab: GitHub, a report's share link.
 const hostOf = (u) => { try { return new URL(u).host; } catch { return ''; } };
 const extLink = (href, text, help, cls = 'lnk') => h('a', { class: `${cls} k-ext`, href, target: '_blank', rel: 'noopener noreferrer', 'data-kind': 'ext', 'data-dest': hostOf(href), title: help || null }, text, ico('ext'));
-const DRAWER = ['i', 'r', 'o'];
+const DRAWER = ['i', 'r', 'rp', 'o'];
 // Go to another place: `patch` changes the state; without a panel key, the panel closes.
 function nav(patch) {
   const from = hashOf(); const label = where();
   const p = { ...patch }; const ds = p.ds; delete p.ds;
   const panelOnly = Object.keys(p).length && Object.keys(p).every((k) => DRAWER.includes(k));
-  Object.assign(S, { i: null, r: null, o: null }, panelOnly ? {} : { limit: 100 }, p);
+  Object.assign(S, { i: null, r: null, rp: null, o: null }, panelOnly ? {} : { limit: 100 }, p);
   if (ds) Object.assign(DS, DS_DEFAULT, ds);
   if (hashOf() === from) { render(); renderDrawer(); return; }
   trail = [...trail, { h: from, label }].slice(-100);
@@ -1371,21 +1383,32 @@ const facetLink = (k, v, text) => (v ? goLink({ v: 'catalog', f: { [k]: [str(v)]
 const joinNodes = (list, sep = ', ') => list.flatMap((x, k) => (k ? [sep, x] : [x]));
 const cells = (hist, n = 12) => h('span', { class: 'cells', role: 'img', 'aria-label': `The newest ${Math.min(n, hist.length)} results`, title: `The newest ${Math.min(n, hist.length)} results, oldest at the left: ${hist.slice(-n).map((e) => `${vLabel(e.value)}${causeKey(e.value, e.cause) ? ` (${CAUSE[causeKey(e.value, e.cause)][0].toLowerCase()})` : ''}`).join(', ')}` },
   hist.slice(-n).map((e) => h('i', { class: vClass(e.value) })));
-// A report with a share link (artifact.url) opens in a new tab. A private report has no address that a
-// page can open: the page says so. It never asks the agent to open a report.
+// A report opens on this page (docs/catalog.md → **The report on the page**): the run's own report panel —
+// its tests' steps, errors and screenshots. The video stays in the report artifact: a share link
+// (artifact.url) opens it in a new tab; a private report has no address that a page can open, and the
+// page says so. A run without a report on the page (older than the page keeps) has the link only.
+// The page never asks the agent to open a report.
 const REPORT_TIP = `${ENT.report[0]} — ${ENT.report[2]}`;
-const PRIVATE_TIP = 'This report is private. This page cannot open it. Find it in the list of artifacts in the app. With the setting report_visibility: public, each report has a link here.';
+const PRIVATE_TIP = 'This report is private. This page cannot open its video. Find it in the list of artifacts in the app. With the setting report_visibility: public, each report has a link here.';
 const isPrivate = (ref) => /^platform:\/\/artifacts\/[A-Za-z0-9_-]{1,64}$/.test(str(ref));
-function reportLink(ref, text = 'Report', cls = 'btn rep') {
+// The newest run with this report on the page: an issue's or a scenario's one artifact has a revision per run.
+const repRunOf = (ref) => (ref ? runs.find((x) => x.rep && x.report === ref) || null : null);
+function extReport(ref, text = 'Report', cls = 'btn rep') {
   const r = str(ref);
   if (/^https:\/\/\S+$/.test(r)) return extLink(r, [h('span', { 'aria-hidden': 'true' }, ENT.report[1]), ` ${text}`], REPORT_TIP, cls);
   if (isPrivate(r)) return h('span', { class: 'private', title: PRIVATE_TIP, tabindex: 0 }, ico('lock'), `${text}: private`);
   return r ? h('code', {}, r) : null;
 }
+function reportLink(ref, text = 'Report', cls = 'btn rep', run = null) {
+  const r = run ? (run.rep ? run : null) : repRunOf(ref); // a run's own report only: an older run never opens a newer one's
+  if (r) return goLink({ r: r.id, rp: 1 }, [h('span', { 'aria-hidden': 'true' }, ENT.report[1]), ` ${text}`], `${REPORT_TIP} Opens it on this page: the steps, the errors and the screenshots of each test.`, cls);
+  return extReport(ref, text, cls);
+}
 // In a panel: the report with a line about what it holds.
-const artLink = (ref) => (ref ? h('div', {}, reportLink(ref, 'Open the report'), h('div', { class: 'meta' }, isPrivate(ref) ? 'Private: find it in Artifacts in the app.' : 'Video, screenshots and steps, in a new tab.')) : '–');
+const artLink = (ref, run = null) => (ref ? h('div', {}, reportLink(ref, 'Open the report', 'btn rep', run),
+  h('div', { class: 'meta' }, (run ? run.rep : repRunOf(ref)) ? 'The steps, the errors and the screenshots of each test, on this page. The video is in the report itself.' : isPrivate(ref) ? 'Private: find it in Artifacts in the app.' : 'Video, screenshots and steps, in a new tab.')) : '–');
 // The report of a run or an origin, compact: in a list, a table or a card; nothing without one.
-const reportBtn = (ref) => (ref ? reportLink(ref) : null);
+const reportBtn = (ref, run = null) => (ref ? reportLink(ref, 'Report', 'btn rep', run) : null);
 const commands = (i) => {
   const out = [];
   if (i.kind === 'exploration') return out;
@@ -1523,7 +1546,7 @@ function itemActions(i) {
 const keysRow = () => h('div', { class: 'keys' },
   h('span', { class: 'key k-go', title: 'A blue link with → goes to a different view of this page. With ⌖ it goes to a page of the product map.' }, ico('arrow'), 'Goes to a view'),
   h('span', { class: 'key k-go', title: 'A blue link with ▯ opens a panel at the right side. Close or Esc returns to the view under it.' }, ico('panel'), 'Opens a panel'),
-  h('span', { class: 'key k-ext', title: 'A teal link with ↗ opens a different site (GitHub, a report) in a new tab.' }, ico('ext'), 'Opens a new tab'),
+  h('span', { class: 'key k-ext', title: 'A teal link with ↗ opens a different site (GitHub, the video of a report) in a new tab.' }, ico('ext'), 'Opens a new tab'),
   h('span', { class: 'key k-agent', title: 'A violet control opens a box at the bottom with a message for the agent. Nothing goes to the agent before you send it from the box. The agent does the action, not this page.' }, ico('agent'), 'Message for the agent'),
   h('span', { class: 'key k-local', title: 'Filters, sorting, pins and selections change only what you see, in this browser.' }, ico('eye'), 'Changes only this page'));
 // The names of the things on this page, with their icons.
@@ -1579,8 +1602,8 @@ function renderHeader() {
   // Where you are, always: the section, the view (and the panel open on it), and the way back.
   const bb = $('#h-back'); bb.textContent = '';
   const [, , vicon] = viewOf(S.v);
-  const panel = S.i ? 'testcase' : S.r ? 'run' : S.o ? refKind(S.o) : null;
-  const base = `${vicon} ${where({ ...S, i: null, r: null, o: null })}`;
+  const panel = S.i ? 'testcase' : S.r && S.rp ? 'report' : S.r ? 'run' : S.o ? refKind(S.o) : null;
+  const base = `${vicon} ${where({ ...S, i: null, r: null, rp: null, o: null })}`;
   bb.append(h('span', { class: 'pin', 'aria-hidden': 'true' }, '📍'),
     h('span', { class: 'crumbs', title: 'Where you are now. The address of the page also keeps this place.' },
       panel ? h('button', { class: 'crumb', type: 'button', 'data-kind': 'go', 'data-dest': base, title: 'Closes the panel and shows this view.', onclick: closeDrawer }, base) : h('span', { class: 'crumb here' }, base),
@@ -1808,7 +1831,7 @@ function guideTerms() {
     [`${ENT.run[1]} Test run`, 'One time that the agent ran tests on one build (📦). An issue run tests one issue. The nightly regression runs the nightly test cases on the newest build. A manual run is a run that you start from the panel of a test case.'],
     [`${ENT.verdict[1]} Verdict`, 'The result of a test case. Verified: the test fails on the last release and passes on the new build. This shows that the change works. Failed or Regression: possibly a bug. The list below shows all verdicts.'],
     [`${ENT.tier[1]} Tier`, '🆕 Exploratory: the test ran one time. ⭐ Promotable: the test is verified. 🌙 Regression: the test runs each night. Quarantined and retired tests do not run at night.'],
-    [`${ENT.report[1]} Report`, 'The evidence of a test run: video, screenshots and steps. A report with a link opens in a new tab. A private report shows 🔒: find it in Artifacts in the app.'],
+    [`${ENT.report[1]} Report`, 'The evidence of a test run: the steps, the errors and the screenshots of each test open on this page. The video is in the report itself: with a link it opens in a new tab; a private report shows 🔒: find it in Artifacts in the app. An old run that the page does not keep has only that link.'],
     ['🛠️ Test builder', 'Write the steps of a new test as blocks or as text, or start from a test case or a page of the map. The preview shows each step on the screens of the product. Then ask for the test, or ask the agent to do the steps in the Browser Panel.'],
     ['🤖 Messages for the agent', 'A violet button opens a box at the bottom. The box shows the message for the agent, for example "run #42 AC-1". Next to the chat of the agent, "Send to the agent" in the box sends it. Else copy it into the chat. Nothing goes to the agent before you send it. The page itself does not change anything.'],
     [`${ENT.bug[1]} Report a bug`, 'Select failed test cases and findings (☐). Then use the violet bar at the bottom: one bug issue for all of them. Or use "Report it as a bug issue" in the panel of a test case. The agent shows you the draft and creates the issue only when you agree.' + (FIX_LABEL ? ` The command with "for the architect" adds the label "${FIX_LABEL}". The software architect then repairs the problem.` : '')],
@@ -2016,7 +2039,7 @@ function viewOverview() {
   const act = activityBlock(); if (act) v.append(act);
   v.append(h('div', { class: 'panels two' },
     h('section', { class: 'panel' }, h('h2', {}, `${ENT.run[1]} Latest test runs`, tip(ENT.run[2])), runsAt.length ? [h('ul', { class: 'att' }, runsAt.slice(0, 6).map((r) => h('li', {}, badge(r.verdict),
-      runLink(r, `${fmtDate(r.utc)} · ${runName(r)}`), r.report ? reportBtn(r.report) : null))),
+      runLink(r, `${fmtDate(r.utc)} · ${runName(r)}`), r.report ? reportBtn(r.report, r) : null))),
       goLink({ v: 'runs' }, `All ${runs.length} test runs`, null, 'linkish')] : h('p', { class: 'muted-t' }, 'No test run yet.')),
     S.at ? null : askBox()));
   v.append(moreNumbers());
@@ -2260,7 +2283,7 @@ function sparkline(vals, w = 220, hh = 36) {
 let lastFocus = null;
 // Close: back to the place under the panel when that was the step before, else a step to it.
 function closeDrawer() {
-  const base = hashOf({ ...S, i: null, r: null, o: null });
+  const base = hashOf({ ...S, i: null, r: null, rp: null, o: null });
   if (trail.length && trail[trail.length - 1].h === base) back(); else nav({});
 }
 // The items of the list the panel was opened from, for "previous" and "next".
@@ -2272,7 +2295,7 @@ function siblingsOf(key) {
 // The panel's top bar: what kind of panel it is, the way back, previous and next, Close.
 function drawerShell(kind, label, step, kids) {
   const [prev, next] = step || [null, null];
-  const under = where({ ...S, i: null, r: null, o: null });
+  const under = where({ ...S, i: null, r: null, rp: null, o: null });
   const stepBtn = (x, t) => h('button', { class: 'btn', type: 'button', 'data-kind': 'panel', 'data-dest': x.title, onclick: x.go }, t);
   const top = h('div', { class: 'dtop' }, h('span', { class: 'dkind', title: ENT[kind][2] }, `${ENT[kind][1]} ${ENT[kind][0]}`), backBtn(),
     h('span', { class: 'sp' }),
@@ -2310,7 +2333,7 @@ function renderDrawer() {
   const org = !i && !run && S.o && origins.has(S.o) ? S.o : null;
   if (!i && !run && !org) { if (lastFocus && lastFocus.isConnected) lastFocus.focus(); return; }
   if (!had) lastFocus = document.activeElement;
-  if (run) runDrawer(run); else if (org) originDrawer(org); else itemDrawer(i);
+  if (run && S.rp && run.rep) reportDrawer(run); else if (run) runDrawer(run); else if (org) originDrawer(org); else itemDrawer(i);
 }
 const labelChips = (labels) => (arr(labels).length ? h('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin-top:4px' }, labels.map((l) => h('span', { class: 'tier' }, facetLink('label', str(l))))) : null);
 // One run per row: when, which run, the build, the verdict, the report with its video and screenshots.
@@ -2322,7 +2345,7 @@ function runTable(list, verdictOf) {
       h('td', {}, r ? runLink(r, RUNTYPE[r.type]) : RUNTYPE[str(e && e.run)] || str(e && e.run)),
       h('td', { class: 'nw' }, buildLink(str((e || r).build))),
       h('td', {}, badge(verdictOf ? verdictOf(r, e) : r.verdict)),
-      h('td', { class: 'nw' }, r ? reportBtn(r.report) || h('span', { class: 'muted-t' }, '–') : h('span', { class: 'muted-t' }, '–')))))));
+      h('td', { class: 'nw' }, r ? reportBtn(r.report, r) || h('span', { class: 'muted-t' }, '–') : h('span', { class: 'muted-t' }, '–')))))));
 }
 // A label of a panel's list, with its meaning as a tooltip.
 const DT_HELP = {
@@ -2360,7 +2383,7 @@ function itemDrawer(i) {
       i.quote ? h('p', { class: 'quote', title: 'The words of the source that state this criterion, verbatim.' }, h('b', {}, 'From the source'), `“${str(i.quote)}”`) : null),
     i.kind === 'criterion' ? h('div', { style: 'margin-top:6px' }, gherkinBtn(o.title || i.ref, ALL.filter((x) => x.ref === i.ref))) : null,
     src ? h('figure', { style: 'margin:10px 0' }, h('img', { src, alt: `The screen that ${i.id} checks`, class: 'zoomable', title: 'Click to see it at its full size.', onclick: () => zoom(src, `The screen that ${i.label} checks`), style: 'width:100%;border-radius:10px;border:1px solid var(--line);background:#fff' }),
-      h('figcaption', { class: 'meta', style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px' }, stillCaption(i), zoomBtn(src, `The screen that ${i.label} checks`), i.evidence ? [' The video and all screenshots:', reportBtn(i.evidence)] : null)) : null,
+      h('figcaption', { class: 'meta', style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px' }, stillCaption(i), zoomBtn(src, `The screen that ${i.label} checks`), i.evidence ? [' The whole report:', reportBtn(i.evidence)] : null)) : null,
     h('dl', { class: 'dl' },
       dt('Report'), h('dd', {}, artLink(i.evidence)),
       dt('Test file'), h('dd', {}, i.file ? h('code', {}, `${ENT.file[1]} ${str(i.file)}`) : '– (no test)'),
@@ -2483,7 +2506,7 @@ function viewRuns() {
       h('td', {}, badge(r.verdict), r.analysis && r.analysis.summary ? h('div', { class: 'meta', style: 'max-width:420px;white-space:normal', title: r.analysis.summary }, `🧠 ${r.analysis.summary.length > 160 ? `${r.analysis.summary.slice(0, 157)}…` : r.analysis.summary}`) : null), h('td', {}, outcome(r)),
       h('td', { class: 'nw' }, fmtDur(r.secs) || h('span', { class: 'muted-t' }, '–')),
       costs ? h('td', { class: 'nw' }, fmtCost(r.cost_usd) || h('span', { class: 'muted-t' }, '–')) : null,
-      h('td', { class: 'nw' }, reportBtn(r.report) || h('span', { class: 'muted-t' }, '–')),
+      h('td', { class: 'nw' }, reportBtn(r.report, r) || h('span', { class: 'muted-t' }, '–')),
       h('td', {}, h('button', { class: 'rowgo', type: 'button', 'data-kind': 'panel', 'data-dest': placeOf({ r: r.id }), 'aria-label': `Open ${runName(r)}`, onclick: () => openRun(r) }, ico('panel')))))))));
   if (list.length > S.limit) v.append(h('div', { class: 'more-row' }, h('button', { class: 'btn', type: 'button', 'data-kind': 'local', onclick: () => { S.limit += 100; render(); } }, `Show more (${list.length - S.limit} left)`)));
 }
@@ -2604,6 +2627,59 @@ function runAgain(r) {
   ].filter(Boolean);
   return acts.length ? h('section', { class: 'sec' }, h('h3', {}, '🔁 Run it again', tip('Each violet command goes to the chat of the agent. Nothing changes before the agent does the action.')), h('div', { class: 'actions' }, acts)) : null;
 }
+// The report of a run on this page (docs/catalog.md → **The report on the page**): per result, its test on
+// the new build and on the last release — the status, the error, the screenshots and the steps. The
+// video stays in the report artifact: its link (or "private") is at the top.
+const SIDE_STATE = { passed: ['passed', 'ok'], failed: ['failed', 'bad'], 'timed-out': ['timed out', 'bad'], flaky: ['flaky', 'warn'], interrupted: ['interrupted', 'muted'], skipped: ['skipped', 'muted'], 'no-test': ['no test', 'muted'], missing: ['run missing', 'muted'] };
+const SIDE_HELP = { 'no-test': 'This run has no test for this result.', missing: 'The files of this test run are not in the agent\u2019s machine any more.' };
+const fmtMs = (x) => (Number.isFinite(x) ? (x < 1000 ? `${x} ms` : `${(x / 1000).toFixed(1)} s`) : '');
+function reportSide(name, help, x, alt) {
+  if (!x) return null;
+  const [txt, cls] = SIDE_STATE[x.st] || [str(x.st), 'muted'];
+  const steps = arr(x.steps);
+  return h('div', { class: 'rside' },
+    h('h5', { title: help }, name, h('span', { class: `badge ${cls}`, title: SIDE_HELP[x.st] || null }, txt), x.ms != null ? h('span', { class: 'meta' }, fmtMs(x.ms)) : null),
+    str(x.err) ? h('pre', { class: 'diff', style: 'color:var(--bad);max-height:30vh', title: 'The error of the test.' }, str(x.err)) : null,
+    arr(x.shots).length ? h('div', { class: 'rshots' }, arr(x.shots).map((sh) => { const src = img(sh.img); return h('figure', {}, src
+      ? h('img', { src, alt: `${alt}: ${str(sh.cap)}`, loading: 'lazy', title: 'Click to see it at its full size.', onclick: () => zoom(src, `${alt}: ${str(sh.cap)}`) })
+      : h('div', { class: 'meta', title: 'The page has no room for this screenshot. It is in the report itself.' }, '🖼️ not on this page'), h('figcaption', {}, str(sh.cap))); })) : null,
+    steps.length ? h('details', { open: steps.some((st) => st[2] === 'failed' || st[2] === 'timed-out') || null }, h('summary', { title: 'Each step of the test, in sequence, with its time. A failed step is red.' }, `Steps (${steps.length + (+x.more || 0)})`),
+      h('ol', { class: 'rsteps' }, steps.map(([api, label, st, ms]) => h('li', { class: str(st) || null }, h('code', {}, str(api)), ' ', str(label), ms != null ? h('span', { class: 'meta' }, ` ${fmtMs(ms)}`) : null)),
+        +x.more ? h('li', { class: 'meta', style: 'list-style:none' }, `… ${+x.more} more step(s): see the report itself.`) : null)) : null);
+}
+function reportDrawer(r) {
+  const night = r.type === 'regression';
+  const res = r.rep.results || {};
+  const keys = r.entries.map((e) => e.key).filter((k) => res[k]);
+  const ents = keys.map((k) => r.entries.find((e) => e.key === k)).sort((a, b) => SEV[vClass(a.value)] - SEV[vClass(b.value)]);
+  const same = runs.filter((x) => x.rep && (night ? x.type === 'regression' : x.type === r.type && x.ref === r.ref)).sort((a, b) => a.utc.localeCompare(b.utc));
+  const k = same.indexOf(r);
+  const stepOf = (x, text) => (x ? { text, title: `${ENT.report[1]} ${fmtDate(x.utc)} · ${runName(x)}`, go: () => go({ r: x.id, rp: 1 }) } : null);
+  const ext = r.report && (/^https:\/\/\S+$/.test(str(r.report)) || isPrivate(r.report));
+  drawerShell('report', `The report of ${runName(r)}`, [stepOf(same[k - 1], night ? 'Night before' : 'Run before'), stepOf(same[k + 1], night ? 'Night after' : 'Run after')], [
+    h('div', { class: 'crumbs' }, goLink({ v: 'runs', rt: r.type, rb: null }, `${RUNTYPE[r.type]}s`, RUNTYPE_HELP[r.type]),
+      night ? null : [h('span', { class: 'sep' }, '›'), refLink(r.ref, `${originName(r.ref)}${originTitle(r.ref) ? ` — ${originTitle(r.ref)}` : ''}`)],
+      h('span', { class: 'sep' }, '›'), goLink({ r: r.id }, `${ENT.run[1]} ${r.utc}`, 'Opens the panel of this test run.'), h('span', { class: 'sep' }, '›'), h('span', {}, `${ENT.report[1]} Report`)),
+    h('h2', {}, `${ENT.report[1]} ${night ? `Night of ${fmtDate(r.utc)} · ${r.build}` : `${originName(r.ref)} · ${ENT.build[1]} ${r.build}`}`),
+    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center' }, badge(r.verdict),
+      h('span', { class: 'meta' }, `${ENT.build[1]} ${r.build}${!night && r.baseline ? ` compared with ${r.baseline}` : ''} · ${fmtDate(r.utc)}${fmtDur(r.secs) ? ` · ${fmtDur(r.secs)}` : ''}`)),
+    h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px' },
+      goLink({ r: r.id }, `${ENT.run[1]} The test run`, 'Opens the panel of this test run: who started it, the build, the outcome and the commands.', 'btn'),
+      ext ? [extReport(r.report, 'The video and all screenshots'), h('span', { class: 'meta' }, isPrivate(r.report) ? 'The video is in the private report: find it in Artifacts in the app.' : 'The video plays in the report itself, in a new tab.')] : null),
+    agentSec(r),
+    h('section', { class: 'sec' }, h('h3', {}, `${ENT.verdict[1]} ${night ? 'Results that were not unchanged' : 'Results'} (${ents.length})`,
+      tip(r.rep.side === 'both' ? 'Each result with its test on the new build and on the last release (the baseline). A verified result fails on the last release and passes on the new build.' : 'Each result with its test on this build.')),
+      ents.length ? ents.map((e) => { const i = byKey.get(e.key); const x = res[e.key]; const alt = i ? itemTag(i) : e.key;
+        return h('div', { class: 'rres' },
+          h('h4', {}, badge(e.value), causeB(e.value, e.cause), i ? itemLink(i) : h('code', {}, e.key)),
+          i && str(i.then) ? h('div', { class: 'meta', title: 'The result that the test checks (Then).' }, h('b', {}, 'Then '), str(i.then)) : null,
+          sayWhy(e.why),
+          h('div', { class: 'rsides' },
+            reportSide(night ? 'This build' : 'New build', `${ENT.build[0]} ${r.build}: the build under test.`, x.c, `${alt} on ${r.build}`),
+            reportSide('Last release', `${ENT.build[0]} ${str(r.baseline)}: the baseline. A verified result fails here.`, x.b, `${alt} on ${str(r.baseline)}`))); })
+        : h('p', { class: 'muted-t' }, 'This report has no result with a test.')),
+  ]);
+}
 function runDrawer(r) {
   const night = r.type === 'regression';
   const ents = r.entries.slice().sort((a, b) => SEV[vClass(a.value)] - SEV[vClass(b.value)]);
@@ -2630,7 +2706,7 @@ function runDrawer(r) {
     runAgain(r),
     h('dl', { class: 'dl' },
       h('dt', { title: TRIG_HELP }, 'Started by'), h('dd', {}, trigCell(r.trigger)),
-      dt('Report'), h('dd', {}, artLink(r.report)),
+      dt('Report'), h('dd', {}, artLink(r.report, r)),
       dt('Build'), h('dd', {}, buildLink(r.build)),
       night ? [dt('Since'), h('dd', {}, prevNight ? goLink({ r: prevNight.id }, [h('code', {}, str(r.previous))], 'The nightly regression before this one.') : r.previous ? buildLink(r.previous) : 'the first night')]
         : [dt('Baseline'), h('dd', {}, r.baseline ? buildLink(r.baseline) : '–')],

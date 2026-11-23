@@ -4,7 +4,8 @@
 // once, the target's labelled issues (GET, for labels and state); writes work/catalog/ only.
 //
 //   node catalog.mjs   -> {"html", "bytes", "items", "images", "dropped_images", "sharp_images",
-//                          "sharp_dropped", "thumbnails", "notes", "hash", "changed"}
+//                          "sharp_dropped", "reports", "report_shots", "report_shots_dropped",
+//                          "thumbnails", "notes", "hash", "changed"}
 //
 // `notes` names every source that could not be read (the issues listing, the drift check, the
 // coverage of the UI map): the page is still built, without what that source gives. A credential
@@ -21,7 +22,7 @@
 // the suite's own playwright-core; none without it). Every small one is embedded first; then the
 // sharp ones in the same order, while the page stays under its limit.
 // `runs` lists every night, issue run, scenario run and run by hand with its build, verdicts and report
-// reference — the page is the way into all of them; `found` the issues opened from its problems; `pages[].hotspots` are the controls of the
+// reference — the page is the way into all of them; `rep` a run's report on the page (its tests' steps, errors and screenshots); `found` the issues opened from its problems; `pages[].hotspots` are the controls of the
 // newest UI map with the items that name them, or reach the page the control leads to (the product map). `modules`, `design` and
 // `findings` make it the control center (docs/modules.md): the modules' state, the design
 // findings with their crops, the newest validation and stress results — of the security run its
@@ -250,7 +251,7 @@ function readVerdicts(dir, okey, run, ref) {
     // A scenario's file has no top verdict: its worst criterion stands for the run.
     const worst = (v.acs ?? []).map((e) => e?.verdict).filter(Boolean).sort((a, b) => rank(a) - rank(b))[0] ?? null;
     runs.push({ type: run, ref, build, baseline: v.baseline ?? null, utc, verdict: v.verdict ?? worst, report: artRef(dir), secs: secsOf(v, utc), cost_usd: costOf(v),
-      analysis: analysisOf(v), trigger: triggerOf(v),
+      analysis: analysisOf(v), trigger: triggerOf(v), _ev: { c: v.candidate_run ?? null, b: v.baseline_run ?? null, x: v.explorations_run ?? null },
       entries: [...(v.acs ?? []), ...(v.intents ?? []), ...(v.explorations ?? []).filter((e) => !isObserved(e))].filter((e) => e?.id && e.verdict).map((e) => withWhy({ key: `${okey}/${e.id}`, value: e.verdict, cause: causeOf(e) }, whyOf(e))) });
     // An intent test (docs/intent.md) runs in the same candidate run as the criteria.
     for (const ac of [...(v.acs ?? []), ...(v.intents ?? [])]) {
@@ -364,6 +365,7 @@ for (const line of (read(join(work, 'REGRESSION.log')) ?? '').split('\n')) {
     issues: (ctx.issues ?? []).filter((x) => x?.number != null).slice(0, 60).map((x) => ({ number: x.number, title: x.title ?? null })),
     ui_diff: typeof ctx.ui_diff === 'string' ? ctx.ui_diff.slice(0, 4000) : null, signals,
     report: artRef(join(work, 'regression', m[2])), analysis: analysisOf(v), trigger: triggerOf(v),
+    _ev: { c: v?.candidate_run ?? (existsSync(join(runsRoot, `regression-${m[2]}`, 'report.json')) ? `regression-${m[2]}` : null), b: null, x: null },
     entries: [...(nightOutcomes.get(m[2]) ?? new Map())].map(([key, value]) => withWhy({ key, value, cause: nightCauses.get(m[2])?.get(key) ?? null }, nightWhy.get(m[2])?.get(key))) });
 }
 // A run whose file says nothing of its length: the events log (docs/logging.md, 14 days) — an issue
@@ -761,10 +763,76 @@ async function renderThumbs(list) {
   } catch (e) { return `unavailable: ${String(e.message).split('\n')[0].slice(0, 120)}`; }
   finally { await browser?.close().catch(() => {}); }
 }
+// ------------------------------------------------------------------- reports
+// The report of a run on the page (docs/catalog.md → **The report on the page**): per result, its test
+// on each side — the status, the length, the error and the steps — and up to REPORT_SHOTS screenshots
+// per side as JPEGs REPORT_W wide, embedded last, while the image budget lasts. Newest runs first,
+// while the text stays under REPORT_MAX; an older run has none, and the page links its report only.
+// The video stays in the report artifact: it does not fit in the page.
+const REPORT_MAX = Number(process.env.QI_CATALOG_REPORT_MAX ?? 768 * 1024);
+const REPORT_STEPS = 60; const REPORT_SHOTS = 6; const REPORT_W = 720;
+const e2eRuns = new Map();
+const e2eRun = (label) => {
+  if (!label || !/^[A-Za-z0-9._-]{1,120}$/.test(label)) return null;
+  if (!e2eRuns.has(label)) {
+    const r = readJson(join(runsRoot, label, 'report.json'));
+    e2eRuns.set(label, r ? { results: r.run?.results ?? [], roots: [join(runsRoot, label, 'artifacts'), join(runsRoot, label, 'results'), join(runsRoot, label)] } : null);
+  }
+  return e2eRuns.get(label);
+};
+const STATES = new Set(['passed', 'failed', 'flaky', 'timed-out', 'interrupted', 'skipped']);
+const repShots = []; // [{shot, src}] in the order the runs come: newest first
+function sideOf(label, key) {
+  const run = e2eRun(label);
+  if (!run) return label ? { st: 'missing' } : null;
+  const [okey, id] = key.split('/');
+  const tags = [id.startsWith('EX-') ? `${okey}-ex` : okey, id.toLowerCase()];
+  const res = run.results.find((r) => tags.every((t) => (r.tags ?? []).includes(t)));
+  if (!res) return { st: 'no-test' };
+  const att = res.attempts?.at(-1) ?? {};
+  const arts = new Map((att.artifacts ?? []).filter((a) => a?.kind === 'screenshot' && a.path).map((a) => [a.id, a]));
+  const fileOf = (a) => run.roots.map((r) => join(r, a.path)).find(existsSync) ?? null;
+  const shots = [];
+  const all = att.steps ?? [];
+  const steps = all.slice(0, REPORT_STEPS).map((s, n) => {
+    const label = said(splitMark(String(s?.label ?? '')).label, 200) ?? '';
+    for (const a of (s?.artifacts ?? []).map((x) => arts.get(x)).filter(Boolean)) shots.push({ cap: s.api === 'app.screenshot' ? label : `After step ${n + 1}`, a, check: s.api === 'app.screenshot' });
+    return [txt(s?.api, 40) ?? '', label, STATES.has(s?.status) ? s.status : null, Number.isFinite(s?.durationMs) ? Math.round(s.durationMs) : null];
+  });
+  // The screen at the failure first, then the screenshots the test took, then the ones after a step.
+  const fail = [...arts.values()].filter((a) => a.producer?.kind !== 'step' && !all.some((s) => s?.artifacts?.includes(a.id))).map((a) => ({ cap: 'The screen at the failure', a, check: true }));
+  const picked = [...fail, ...shots.filter((x) => x.check && !fail.includes(x)), ...shots.filter((x) => !x.check)].slice(0, REPORT_SHOTS)
+    .map(({ cap, a }) => { const src = fileOf(a); return src ? { cap, src } : null; }).filter(Boolean);
+  const err = att.error ? said([att.error.code, att.error.message].filter((x) => typeof x === 'string' && x).join(': '), 600) : null;
+  return { st: STATES.has(res.status) ? res.status : 'failed', ms: Number.isFinite(att.durationMs) ? Math.round(att.durationMs) : null, err,
+    steps, more: Math.max(0, all.length - REPORT_STEPS), shots: picked.map(({ cap, src }) => { const shot = { cap, img: null }; repShots.push({ shot, src }); return shot; }) };
+}
+let repUsed = 0; let repCut = 0;
+for (const r of runs) {
+  const ev = r._ev; delete r._ev;
+  if (!ev || !r.report || (!ev.c && !ev.x)) continue;
+  const mark = repShots.length;
+  const results = {};
+  for (const e of r.entries) {
+    const ex = /\/EX-\d+$/.test(e.key);
+    const c = sideOf(ex ? ev.x : ev.c, e.key); const b = ex ? null : sideOf(ev.b, e.key);
+    if (c || b) results[e.key] = { c, b };
+  }
+  const size = Buffer.byteLength(JSON.stringify(results));
+  if (!Object.keys(results).length || repUsed + size > REPORT_MAX) { repShots.splice(mark); if (Object.keys(results).length) repCut++; continue; }
+  repUsed += size; r.rep = { results, side: ev.b ? 'both' : 'candidate' };
+}
+if (repCut) notes.push(`${repCut} older report(s) not on the page: their text is over ${Math.round(REPORT_MAX / 1024)} KiB; the page links them`);
+const repName = (src) => `rep-${createHash('sha256').update(src).digest('hex').slice(0, 16)}`;
+for (const x of repShots) {
+  x.dst = join(thumbsDir, `${repName(x.src)}.jpg`);
+  if (mtime(x.src) > mtime(x.dst)) jobs.push({ src: x.src, dst: x.dst, w: REPORT_W, tall: 2, type: 'image/jpeg', q: 0.72 });
+}
+
 const thumbnails = await renderThumbs(jobs);
 
 // Thumbnails of items and pages that no longer exist are a stale cache: removed one by one.
-const wanted = new Set([...items, ...pages].flatMap((x) => [x._thumb, x._sharp]));
+const wanted = new Set([...[...items, ...pages].flatMap((x) => [x._thumb, x._sharp]), ...repShots.map((x) => x.dst)]);
 for (const f of ls(thumbsDir).filter((x) => x.endsWith('.jpg') || x.endsWith('.webp') || /\.mark-[0-9a-f]+\.png$/.test(x))) if (!wanted.has(join(thumbsDir, f)) && !markCache.has(join(thumbsDir, f))) { try { rmSync(join(thumbsDir, f)); } catch { /* next run */ } }
 
 // Embed within the budget — what the data leaves of PAGE_MAX, at most IMG_BUDGET: regression
@@ -799,6 +867,11 @@ for (const item of byRank.filter((i) => i.tier !== 'regression')) item.still = e
 for (const item of byRank.filter((i) => i.tier === 'regression')) item.still_sharp = item.still ? embed(item._sharp, true) : null;
 for (const p of pagesByCov) p.shot_sharp = p.shot ? embed(p._sharp, true) : null;
 for (const item of byRank.filter((i) => i.tier !== 'regression')) item.still_sharp = item.still ? embed(item._sharp, true) : null;
+// The report screenshots last: newest runs first, each one once (a revision shows the same screen).
+const repIds = new Map();
+const beforeRep = dropped;
+for (const { shot, dst } of repShots) { if (!repIds.has(dst)) repIds.set(dst, embed(dst)); shot.img = repIds.get(dst); }
+const repDropped = dropped - beforeRep; dropped = beforeRep;
 for (const x of [...items, ...pages, ...design]) { delete x._thumb; delete x._sharp; delete x._shot; delete x._body; delete x._crop; }
 
 // ------------------------------------------------------------------------ output
@@ -847,4 +920,5 @@ const html = template.replace('__QI_CATALOG_DATA__', () => JSON.stringify(data).
 writeFileSync(join(outDir, 'index.html.tmp'), html); renameSync(join(outDir, 'index.html.tmp'), join(outDir, 'index.html'));
 const published = (read(join(outDir, 'published.hash')) ?? '').trim();
 console.log(JSON.stringify({ html: join(outDir, 'index.html'), bytes: Buffer.byteLength(html), items: items.length,
-  images: Object.keys(images).length, dropped_images: dropped, sharp_images: sharpN, sharp_dropped: sharpDropped, thumbnails, notes, hash, changed: hash !== published }));
+  images: Object.keys(images).length, dropped_images: dropped, sharp_images: sharpN, sharp_dropped: sharpDropped,
+  reports: runs.filter((r) => r.rep).length, report_shots: [...repIds.values()].filter(Boolean).length, report_shots_dropped: repDropped, thumbnails, notes, hash, changed: hash !== published }));

@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.60.0 — 2026-11-23
+## 3.61.0 — 2026-11-23
 
 **Upgrade:**
 1. Nothing to run — docs are re-read per run, and `work/ESCAPES.md` and `work/RISKS.md` are made by the first
@@ -22,6 +22,15 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    ([docs/escapes.md](docs/escapes.md)); then `bash "$HOME/scripts/verify-onboarding.sh" --config`.
 3. Nothing to run — `work/benchmark/cases.json` takes escape cases (`expected.bug`), graded stage by stage;
    the score adds `escape_recall` and `lost_at` ([docs/benchmark.md](docs/benchmark.md) → **Escape cases**).
+
+## 3.60.0 — 2026-11-23
+
+**Upgrade:**
+Nothing to run — the kit's `scripts/catalog.mjs` and `scripts/catalog/viewer.html` come with it; the next
+catalog build publishes the new page. A report opens on the dashboard as a panel of its own — the steps,
+the errors and the screenshots of each test — and no longer in a new window; the video stays in the
+report artifact, which the panel links ([docs/catalog.md](docs/catalog.md) → **The report on the page**).
+The first build renders the reports' screenshots into `work/catalog/thumbs/rep-*.jpg` once.
 
 ## 3.59.0 — 2026-11-04
 
