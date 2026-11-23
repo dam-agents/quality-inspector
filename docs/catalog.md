@@ -338,7 +338,7 @@ published once, and asks the server for everything it shows.
 
 ## The look
 
-The dashboard keeps Design Desk's scale (design-desk `docs/desk-page.md` → **The look**), so the two
+The dashboard keeps Design Desk's scale (the section "The look" of `docs/desk-page.md` in the Design Desk repository), so the two
 agents read as one family: Design Desk's colour tokens under this page's names, in light and dark;
 text only in five sizes (`--fs-title` 26, `--fs-head` 17, `--fs-ui` 14, `--fs-meta` 12.5,
 `--fs-micro` 11; weights up to 600; IBM Plex Sans, else the system font); corners 4, 6, 8, 10, 12
