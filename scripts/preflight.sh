@@ -540,6 +540,22 @@ mode_audit() {
   if [ -z "$rx" ]; then check design_desk warn "not measured (design-outbox.mjs check failed)"
   elif [ "$(jq -r .ok <<<"$rx")" != true ]; then check design_desk fail "work/design-checks: $(jq -r '.problems | join("; ")' <<<"$rx")"
   else check design_desk ok "ledgers well-formed"; fi
+  # escaped defects from the Incident Desk (docs/escapes.md): the register's format, one not analysed over 7 days
+  rx="$(node "$SCRIPT_DIR/escapes.mjs" check 2>/dev/null)"
+  if [ -z "$rx" ]; then check escapes warn "not measured (escapes.mjs check failed)"
+  elif [ "$(jq -r .ok <<<"$rx")" != true ]; then check escapes fail "work/ESCAPES.md: $(jq -r '.problems | join("; ")' <<<"$rx")"
+  elif [ "$(jq '.open_over_7_days | length' <<<"$rx")" -gt 0 ]; then check escapes warn "not analysed over 7 days: $(jq -r '.open_over_7_days | join(", ")' <<<"$rx")"
+  else check escapes ok "register well-formed; by phase: $(jq -r '.phases | to_entries | map("\(.key) \(.value)") | join(", ") | if . == "" then "none yet" else . end' <<<"$rx")"; fi
+  # the risk rules (docs/risks.md): format; observe rules ready for the operator, rules no issue met in 90 days, old lessons
+  rx="$(node "$SCRIPT_DIR/risks.mjs" check 2>/dev/null)"
+  if [ -z "$rx" ]; then check risks warn "not measured (risks.mjs check failed)"
+  elif [ "$(jq -r .ok <<<"$rx")" != true ]; then check risks fail "work/RISKS.md: $(jq -r '.problems | join("; ")' <<<"$rx")"
+  else
+    local rk; rk="$(jq -r '[(.ready[] | "\(.id) ran \(.runs)× with \(.observations) observations: \(.suggest) it"),
+                         (.stale[] | "\(.id) met no issue since \(.since[0:10]): retire it"),
+                         (if .lessons_old > 0 then "\(.lessons_old) lines of work/LESSONS.md older than 180 days: prune them" else empty end)] | join("; ")' <<<"$rx")"
+    [ -z "$rk" ] && check risks ok "register well-formed; nothing to decide" || check risks warn "$rk"
+  fi
 
   # coverage of the newest UI map by regression-tier tests — informational, never a fail
   local map cov=null

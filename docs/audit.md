@@ -20,7 +20,10 @@ with `audit_report: disabled` (still append the log line).
    registry's, the queue's and `work/PRSCAN.md`'s format; members that do not run; proposals open over 14 days —
    [features.md](features.md), [maintenance.md](maintenance.md), [radar.md](radar.md)), `blockers` (`work/BLOCKERS.md`'s
    format; a cause open over 7 days, with its owner; a notice not given — [autonomy.md](autonomy.md)), `design_desk` (the design checks'
-   ledgers, a Ref sent twice — [design-checks.md](design-checks.md)), and `criteria_injection` (the
+   ledgers, a Ref sent twice — [design-checks.md](design-checks.md)), `escapes` (`work/ESCAPES.md`'s format; an
+   escaped defect not analysed over 7 days; the count per phase — [escapes.md](escapes.md)), `risks`
+   (`work/RISKS.md`'s format; an `observe` rule ready for the operator's enforce or retire, a rule no issue met in
+   90 days, lines of `work/LESSONS.md` older than 180 days to prune — [risks.md](risks.md)), and `criteria_injection` (the
    week's criteria files of issues and scenarios and intent files of issues holding URLs, code fences or HTML comments;
    the week's `issue_injection_suspect` and `scenario_injection_suspect` events) — a `warn`
    lists the issues and `S-<k>`: sample one and check its instruction sentences are

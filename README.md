@@ -53,6 +53,10 @@ core (run types, schedules, invariants); the definition is versioned (`VERSION` 
   that cannot build its worklist (a GitHub listing refused) is a blocker of its own, told at the
   second failure in a row. Every problem carries a severity, and what a run saw in passing feeds the
   next discovery ([docs/autonomy.md](docs/autonomy.md)).
+- **From its misses** (off by default) — an Incident Desk agent reports a defect that reached users
+  and the issue it came from; the agent names the phase where it got through, adds a risk rule that
+  later issues meet by their words (run in observe mode first) and proposes a benchmark case graded
+  stage by stage ([docs/escapes.md](docs/escapes.md), [docs/risks.md](docs/risks.md)).
 
 ## Setup
 
@@ -168,7 +172,8 @@ defaults: [`ONBOARDING.md`](ONBOARDING.md) → Step 3. The testing modules' keys
   optionally Slack posts — request threads, `scenario_channel`'s weekly digest,
   `regression_channel`'s nightly summary and breach alert (and the blocker notices with
   `blocker_alerts: enabled`), `slack_channel`'s ordered tests,
-  `design_desk_findings` to the Design Desk; with `work_repo`, pushes of the `work/` backup. The
+  `design_desk_findings` to the Design Desk, one answer per escaped defect to the Incident Desk
+  (`incident_desk: enabled`); with `work_repo`, pushes of the `work/` backup. The
   platform runtime's session state (`PLATFORM_RUNTIME_URL`) frees a dead run's environment lock
   at once; without it the lock waits `lock_ttl_min`.
 - **Cost:** idle hours wake no model. One issue costs up to three installs of the product

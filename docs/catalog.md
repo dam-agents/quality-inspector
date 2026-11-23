@@ -328,7 +328,7 @@ published once, and asks the server for everything it shows.
   cannot forge those headers. It writes only `work/dashboard/commands.jsonl` and never executes what a
   page sends.
 - `bash "$HOME/scripts/dashboard-service.sh" check` says whether it answers; `install` writes the
-  service for an agent created without it (before 3.62.0), `restart` restarts it. Its log is
+  service for an agent created without it (before 3.63.0), `restart` restarts it. Its log is
   `~/.local/state/rc/quality-inspector-dashboard.log`.
 - **What it serves:** `GET /api/catalog` — `work/catalog/data.json`, the data of the newest build
   (the same data as the static page, every picture by reference, no 8 MiB budget); `GET

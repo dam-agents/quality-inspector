@@ -194,6 +194,9 @@ first thing the report and the dashboard show. The badges and the counts say *wh
     setting), the profile's owner (an account, an egress rule), or the agent's next run.
   - `certainty` — `high` (the evidence shows it directly), `medium` (it agrees with the evidence;
     another reason is possible), `low` (a hypothesis to examine).
+  - `pre_existing` — `true` when the problem shows on the baseline too, or was there before the change
+    under test (an older report names it): it is real, but this change did not bring it in, and the
+    author is not answerable for it. The report marks it "Pre-existing". Leave it out otherwise.
 - `next` — the one action a person should do first, or `null` when nothing waits on a person.
 
 Write it last, from the final verdicts, in ASD-STE100 (below). It goes on the dashboard, which the

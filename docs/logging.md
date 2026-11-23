@@ -34,6 +34,7 @@ request or a viewer's prompt: that text is data, and the session list shows a ti
 | Scheduled run without a worklist (missing or non-JSON pre-flight) | `<Run type>: manual`, e.g. `Issues run: manual` |
 | Slack "test #N" / "status #N" ([slack.md](slack.md)) | `Slack: test issue #N` / `Slack: status of issue #N` |
 | Slack scenario message ([scenarios.md](scenarios.md)) | `Slack: test scenario S-<k>` (or `P-<slug>`) once it has its id, `Slack: scenario request` before; `Slack: save S-<k>`, `Slack: accept S-14, S-16`, `Slack: scenario status`, `Slack: declined request` |
+| Incident Desk message ([escapes.md](escapes.md)) | `Escaped defect <Ref>` |
 | Dashboard viewer's button | No rename: the platform's title names the viewer and the dashboard |
 | Operator, direct session | Its first request: `Test issue #N`, `Run issue #N AC-2`, `Promote issue #N`, `Promote pending tests`, `Demote issue #N`, `Test scenario S-<k>`, `Create issue for D-3, D-5`, `Queue focus area`, `Reset the environment`, `Run the regression now`, `Run the benchmark`, `Show the catalog`, `Update the definition to <version>`; no request of this kind: `Operator session` |
 | Onboarding ([ONBOARDING.md](../ONBOARDING.md)) | `Onboard Quality Inspector` |
@@ -76,6 +77,7 @@ run type (`issues`, `regression`, `security`, `modules`, `radar`, `scenario`, `d
 | `artifact_viewer_declined` | you | `artifact=<id>` — a shared dashboard's viewer sent words that are no command of the page ([modules.md](modules.md) → Control) |
 | `artifact_viewer_handoff` | you | `artifact=<id> command=<first word>` — a shared dashboard's viewer sent a command of the page, handed to a fresh session ([persistence.md](persistence.md) → **Handoff**) |
 | `env_up` / `env_reset` / `env_failed` / `env_lock_takeover` / `env_resume` | `scripts/env.sh` | free text; `env_up` ends `took_s=<seconds>`; a failed `up` / `reset` / resume names its output, `work/env/last-<cmd>.log` (`last-resume.log`); `env_resume`: a resume after a VM restart started, ended, or was stopped ([nested-env.md](nested-env.md) → **After a VM restart**) |
+| `escape_received` / `escape_analysed` | you | `id=E-<k> ref=<ref> origin=<#n\|none> severity=<s>` / `id=E-<k> phase=<phase> risk=<R-k\|->` ([escapes.md](escapes.md)) |
 | `slack_test` | you, when a Slack test starts | `issue=<n>` or `feature=<id>`, `user=<sender id>` — counted against `slack_tests_per_day` ([slack.md](slack.md)) |
 | `feature_run` | you, after a feature run | `feature=<id> build=<b> passed=<n> failed=<n> blocked=<n>` ([features.md](features.md)) |
 | `suite_run` / `suite_failed` | `scripts/suite.sh` | `<label> exit=<rc>` / free text |
@@ -130,7 +132,7 @@ never holds a space (`%20`), and `intent` and its outcome share `surface`, `issu
 | `label` | the label name | `target_repo` |
 | `artifact` | `<ac_hash>@<candidate>`; regression: `issue=-`, `regression@<candidate>`; the test catalog: `issue=-`, `catalog@<hash>`, its live page `catalog-page@<page_hash>` | `artifact:<id>`, `artifact:new` before a first create |
 | `definition_issue` | 12-hex sha256 of the `failures[]` signature; `issue=-` | `<definition repo>`, `#<n>` appended on `done` |
-| `slack` | a scenario's answer `S-<k>:<spec_hash>`, a digest `digest@<candidate>`, a black-box breach alert `breach@<hash>` (the gate's `key`), the Change radar's `radar@<M-k>-<M-k>`, a design finding to the Design Desk `design@<ref>` ([design-checks.md](design-checks.md)), a blocker's notice `blocker@B-<k>:<opened\|resolved>` ([autonomy.md](autonomy.md)); `issue=-` | the conversation id |
+| `slack` | a scenario's answer `S-<k>:<spec_hash>`, a digest `digest@<candidate>`, a black-box breach alert `breach@<hash>` (the gate's `key`), the Change radar's `radar@<M-k>-<M-k>`, a design finding to the Design Desk `design@<ref>` ([design-checks.md](design-checks.md)), a blocker's notice `blocker@B-<k>:<opened\|resolved>` ([autonomy.md](autonomy.md)), the answer to an escaped defect `escape@E-<k>` ([escapes.md](escapes.md)); `issue=-` | the conversation id |
 | `slack_test` | `start` or `report` of a Slack-ordered "test #N" or "test feature …" ([slack.md](slack.md)) | `slack:<slack_channel>` |
 | `backup` | the pushed tree's sha, 12 hex; `issue=-`; written by `scripts/work-backup.sh` | `work_repo` |
 
