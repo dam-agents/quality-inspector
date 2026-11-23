@@ -236,7 +236,10 @@ const results = []; const findings = []; const register = [];
 let shotN = 0;
 for (const p of props) {
   const base0 = { id: p.id, kind: p.kind, statement: p.statement, surfaces: surfaces(p) };
-  const arb = p.kind === 'design' ? designArbitrary(fc, p.vary) : arbitrary(fc, p.input ?? { type: 'text' });
+  let arb;
+  try { arb = p.kind === 'design' ? designArbitrary(fc, p.vary) : arbitrary(fc, p.input ?? { type: 'text' }); } catch (e) {
+    results.push({ ...base0, result: 'blocked', severity: null, oracle: null, message: `no input generator: ${msg(e)}`, counterexample: null }); continue;
+  }
   const tryOne = p.kind === 'design' ? (x) => look(p, x) : (x) => once(p, x);
   let refused = 0;
   const prop = fc.asyncProperty(arb, async (x) => {

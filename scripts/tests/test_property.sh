@@ -75,10 +75,10 @@ class Pre extends Error {}
 const rng = (s) => () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const arb = (gen, shrink = () => []) => ({ gen, shrink, map(f) { return arb((r) => f(gen(r))); } });
 const POOL = ['a', 'b', ' ', 'é', 'ש', '🙂'];
-exports.string = ({ minLength = 0, maxLength = 10 } = {}) => arb((r) => {
+exports.string = ({ minLength = 0, maxLength = 10 } = {}) => { if (maxLength < minLength) throw new Error('fc.integer maximum value should be equal or greater than the minimum one'); return arb((r) => {
   const n = minLength + Math.floor(r() * (Math.min(maxLength, minLength + 6) - minLength + 1));
   return Array.from({ length: n }, () => POOL[Math.floor(r() * POOL.length)]).join('');
-}, (s) => (typeof s !== 'string' ? [] : [...new Set([s.length > minLength ? s.slice(1) : null, s.length > minLength ? s.slice(0, -1) : null, s.replace(/[^ a]/u, 'a')])].filter((x) => x !== null && x !== s)));
+}, (s) => (typeof s !== 'string' ? [] : [...new Set([s.length > minLength ? s.slice(1) : null, s.length > minLength ? s.slice(0, -1) : null, s.replace(/[^ a]/u, 'a')])].filter((x) => x !== null && x !== s))); };
 exports.integer = ({ min = -100, max = 100 } = {}) => arb((r) => min + Math.floor(r() * (max - min + 1)),
   (n) => (typeof n !== 'number' ? [] : [...new Set([Math.min(max, Math.max(min, 0)), Math.trunc(n / 2)])].filter((x) => x !== n && x >= min && x <= max)));
 exports.constantFrom = (...xs) => arb((r) => xs[Math.floor(r() * xs.length)]);
@@ -113,6 +113,17 @@ exports.check = async ({ a, pred }, { numRuns = 100, seed = 0, path, endOnFailur
 };
 JS
 export QI_FASTCHECK_FROM="$SANDBOX/fc/package.json"
+# Every valid length range builds a generator (fast-check refuses a maximum below the minimum).
+g="$(node --input-type=module -e "
+import { createRequire } from 'node:module';
+import { arbitrary, validate } from '$RULES';
+const fc = createRequire('$SANDBOX/fc/package.json')('fast-check');
+const inputs = [{ type: 'text', min: 50, max: 100 }, { type: 'text', min: 21, max: 2000 }, { type: 'text', min: 2000, max: 2000 }, { type: 'text', min: 0, max: 0 },
+  { type: 'text', min: 0, max: 10, mix: ['long'] }, { type: 'text', min: 30, max: 35, mix: ['whitespace'] }];
+const out = inputs.map((i) => { try { arbitrary(fc, i).gen(() => 0.5); return 'ok'; } catch (e) { return String(e.message); } });
+console.log(JSON.stringify({ out, valid: inputs.every((i) => validate({ properties: [{ id: 'PROP-1', kind: 'invariant', statement: 's', source: 'q', input: i,
+  steps: [{ as: 'a', api: { method: 'GET', path: '/x' } }], expect: [{ ok: 'a' }] }] }).length === 0) }));")"
+assert "every valid length range builds a generator" '.valid and (.out | all(. == "ok"))' "$g"
 
 # ---------------------------------------------------------------- the stub product
 cat > "$SANDBOX/server.js" <<'JS'

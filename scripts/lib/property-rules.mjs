@@ -170,7 +170,8 @@ export function arbitrary(fc, input = { type: 'text' }) {
   const min = input.min ?? 0; const max = input.max ?? 200;
   const mix = input.mix ?? MIX;
   const parts = [];
-  const text = (lo, hi) => fc.string({ unit: 'grapheme', minLength: lo, maxLength: hi });
+  // fast-check refuses a maximum below the minimum: every length range keeps hi >= lo.
+  const text = (lo, hi) => fc.string({ unit: 'grapheme', minLength: lo, maxLength: Math.max(lo, hi) });
   if (mix.includes('unicode')) parts.push({ arbitrary: text(min, Math.min(max, 40)), weight: 4 });
   if (mix.includes('whitespace')) {
     const ws = fc.constantFrom(' ', '  ', '\t', ' ', '　', '\n');
@@ -182,6 +183,7 @@ export function arbitrary(fc, input = { type: 'text' }) {
     parts.push({ arbitrary: fc.constantFrom(...at), weight: 1 });
   }
   if (mix.includes('html')) parts.push({ arbitrary: fc.constantFrom('<b>x</b>', '"\'><img src=x>', 'a &amp; b', '{{7*7}}', '${x}'), weight: 1 });
+  if (!parts.length) return text(min, max); // e.g. mix ["long"] with max <= 40
   return parts.length === 1 ? parts[0].arbitrary : fc.oneof(...parts);
 }
 
