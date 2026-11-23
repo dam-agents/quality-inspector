@@ -59,6 +59,14 @@
       "settings": {
         "validation_checks": { "type": "cadence", "default": "disabled" },
         "validation_max_cases": { "type": "int", "min": 1, "max": 200, "default": 60 } } },
+    { "id": "property", "title": "Property checks", "kind": "modules", "doc": "docs/property.md", "log": "MODULES",
+      "switch": "property_checks",
+      "what": "Tries invariants the agent states (round trip, one effect for a double submit, counts and totals, the same state on two surfaces, a layout that holds at every width, zoom, text length and locale) with many generated inputs, and shrinks a failure to the smallest one.",
+      "settings": {
+        "property_checks": { "type": "cadence", "default": "disabled" },
+        "property_runs": { "type": "int", "min": 1, "max": 500, "default": 50 },
+        "property_max_properties": { "type": "int", "min": 1, "max": 50, "default": 12 },
+        "property_max_seconds": { "type": "int", "min": 10, "max": 1800, "default": 180 } } },
     { "id": "stress", "title": "Stress", "kind": "modules", "doc": "docs/stress.md", "log": "MODULES",
       "switch": "stress_checks",
       "what": "Bounded concurrent load on the local product: errors, slowdowns, and whether it stays up.",
