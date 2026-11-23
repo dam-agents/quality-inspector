@@ -11,15 +11,16 @@
 import { createHash } from 'node:crypto';
 
 export const MARKER = '🧪 Automated test finding — Quality Inspector';
-// `field` and `design`: a design register finding (docs/ux-signals.md → 6), real-user or a sweep's.
-export const CHECKS = ['missing-state', 'accessibility', 'consistency', 'radar', 'field', 'design'];
+// `field` and `design`: a design register finding (docs/ux-signals.md → 6), real-user or a sweep's;
+// `property`: a design property's shrunk counterexample (docs/property.md).
+export const CHECKS = ['missing-state', 'accessibility', 'consistency', 'radar', 'field', 'design', 'property'];
 export const SEVERITIES = ['high', 'medium', 'low'];
 export const REF_RE = /^qi-[a-z0-9]+(?:-[a-z0-9]+){1,4}$/;
 export const sevRank = (s) => { const i = SEVERITIES.indexOf(s); return i < 0 ? SEVERITIES.length : i; };
 const clean = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
 const cut = (s, n) => { const t = clean(s); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
 
-// qi-<kind>-<10 hex> of the identity parts; kind a11y | state | token | word | focus.
+// qi-<kind>-<10 hex> of the identity parts; kind a11y | state | token | word | focus | prop.
 export function refOf(kind, ...parts) {
   if (!/^[a-z0-9]{2,8}$/.test(kind)) throw new Error(`ref kind '${kind}'`);
   return `qi-${kind}-${createHash('sha256').update(parts.map(clean).join('\u001f')).digest('hex').slice(0, 10)}`;

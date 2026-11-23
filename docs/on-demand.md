@@ -97,6 +97,8 @@ refused with a "start a new chat". A direct session's first request names it
   findings' triage ([modules.md](modules.md) → **Control**); the dashboard's buttons send the same words.
 - **"recheck VAL-<k>"** — that validation case again on the candidate now
   ([validation.md](validation.md) → **Recheck**).
+- **"replay PROP-<k>"** — that property's smallest breaking input again on the candidate now
+  ([property.md](property.md) → **Replay**).
 - **"recheck D-<k>"** — that design finding's page and viewport swept again on the candidate now
   ([ui-sweep.md](ui-sweep.md) → **5. Recheck**). **"discuss D-<k>[: <question>]"** — talk about the
   finding, read-only ([ui-sweep.md](ui-sweep.md) → **6. Discuss**).

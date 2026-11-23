@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # dashboard-service.sh install|check — the dashboard server's Login item for an agent created
-# without the kit, or before 3.60.0 (the kit's startupItems write the same service at create).
+# without the kit, or before 3.62.0 (the kit's startupItems write the same service at create).
 # install writes ~/.config/rc/init.d/quality-inspector-dashboard, links it into the default
 # runlevel and starts it; it never replaces a script already there. check says whether the
 # server answers on its loopback port (docs/catalog.md → The server).

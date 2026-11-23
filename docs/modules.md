@@ -12,7 +12,7 @@ the registry; `bash "$HOME/scripts/modules.sh" status` prints it.
 | `issues` | core | the issues run; never off | [issue-qa.md](issue-qa.md) |
 | `edge-cases` | config | inside each issue run (`explorations`) | [explorations.md](explorations.md) |
 | `regression`, `security`, `discovery`, `benchmark`, `audit` | schedule | their own schedule | their docs |
-| `ui-sweep`, `validation`, `stress` | modules | the **modules run**, per their cadence | [ui-sweep.md](ui-sweep.md), [validation.md](validation.md), [stress.md](stress.md) |
+| `ui-sweep`, `validation`, `property`, `stress` | modules | the **modules run**, per their cadence | [ui-sweep.md](ui-sweep.md), [validation.md](validation.md), [property.md](property.md), [stress.md](stress.md) |
 | `consistency`, `design-check` | modules | the modules run: per its cadence; per labelled pull request | [design-checks.md](design-checks.md) |
 | `ux-signals` | modules | the **modules run**, when real-user data has something new (`daily` or `weekly` fetch) | [ux-signals.md](ux-signals.md) |
 | `feature-focus` | queue | the next modules run, once per queued area | **Feature focus** below |
@@ -46,6 +46,7 @@ Only the operator, in the direct session, changes a module (CLAUDE.md → trust 
 | `categorize D-<k> <category>` | `modules.sh categorize D-<k> <category>` — a row in `work/design/CATEGORIES.md` (lower-case letters, digits, `-`, up to 30; `-` clears it) |
 | `recheck D-<k>` / `discuss D-<k>[: <question>]` | [ui-sweep.md](ui-sweep.md) → **5. Recheck** / **6. Discuss** — no `modules.sh` write |
 | `recheck VAL-<k>` | [validation.md](validation.md) → **Recheck** — no `modules.sh` write |
+| `replay PROP-<k>` | [property.md](property.md) → **Replay** — no `modules.sh` write |
 | `send D-<k> to design` | [ux-signals.md](ux-signals.md) → **6. Handoff to Design Desk** — no `modules.sh` write |
 
 `modules.sh set`, `focus`, `dismiss`, `reopen` and `categorize` write only registry keys with valid values, an area name,
@@ -62,7 +63,7 @@ and does not count a glob of `*` alone (`*`, `*.sh`), so ordinary scheduled comm
 a glob, or a name built at run time, can still reach `modules.sh`; the script then refuses. After any change: one line to the operator with
 the old and new value, then rebuild and publish the catalog.
 
-**Rechecks and discussions** (`recheck D-<k>`, `recheck VAL-<k>`, `discuss D-<k>`) are direct-session
+**Rechecks and discussions** (`recheck D-<k>`, `recheck VAL-<k>`, `replay PROP-<k>`, `discuss D-<k>`) are direct-session
 requests ([on-demand.md](on-demand.md)); beside a scheduled run's chat they go to a fresh session
 ([persistence.md](persistence.md) → **Handoff**). None is a module run (no `modules.sh ran`) or
 changes a verdict. A recheck takes `env.sh lock operator` (busy → say who holds it, end); from
@@ -111,7 +112,7 @@ and with `ux-signals` due `ux_signals` (`period`, `scored`, `new`, `resolve`).
    and reads their UI maps.
 3. `inventory: null` → map the candidate now ([change-awareness.md](change-awareness.md) →
    **Building the context**, first command only).
-4. Each due module on the candidate in this order — `ui-sweep`, `validation`, the focus areas,
+4. Each due module on the candidate in this order — `ui-sweep`, `validation`, `property`, the focus areas,
    `consistency`, `design-check`'s `merged` entry, `stress` last — by its doc. Before each one: the wall-clock since the claim against
    `max_wallclock_min`; over it → skip the rest, each logged `skip=budget` (the budget bounds
    the modules; bringing the product up and the closing reset come on top). After each:
@@ -126,7 +127,7 @@ and with `ux-signals` due `ux_signals` (`period`, `scored`, `new`, `resolve`).
 8. `env.sh unlock modules`. Log `modules_run`. Chat summary: per module one line (counts by
    severity, the newest major findings by id); a stress `critical` or a new `major` design
    finding first.
-9. A `check.json` or `radar.json` written, or field findings for the Design Desk under
+9. A `check.json`, `radar.json` or property `results.json` with `findings` written, or field findings for the Design Desk under
    `ux_handoff: auto` → the Design Desk ([design-checks.md](design-checks.md) → **4**,
    [ux-signals.md](ux-signals.md) → **6**).
 10. The catalog ([catalog.md](catalog.md) → **Build and publish**), after the unlock: the
@@ -159,6 +160,7 @@ map. For each queued area, on the candidate:
 Off, a module costs nothing: the Precheck declines the run; `ux-signals` also costs nothing while
 its data has nothing new. No tokens: `ui-sweep`'s checks, `validation`, `stress` and the dashboard
 (scripts). The `ui-sweep` model review: at most `ui_sweep_review_pages` screenshots a run (≈ 3–5k
-tokens each); a focus: like one issue's explorations (100–300k tokens); `ux-signals`:
+tokens each); a focus: like one issue's explorations (100–300k tokens); `property`:
+[property.md](property.md) → **Cost**; `ux-signals`:
 [ux-signals.md](ux-signals.md) → Cost; `consistency` and `design-check`:
 [design-checks.md](design-checks.md) → **Cost**.

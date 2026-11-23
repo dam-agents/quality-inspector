@@ -94,17 +94,19 @@ and the element, `qi-token-<hash>` of the property and its value, `qi-word-<hash
 same on every screen (a shared header's problem is one Ref; the run lists the other screens in
 `what`) —, `qi-state-<hash>` of the state and the page, `qi-radar-<pattern>` — one per pattern for good:
 once it went, a later radar finding of that pattern, other kinds too, stays in `radar.json` (a Ref of
-the kinds would change with each moved screen and send the same mismatch again).
+the kinds would change with each moved screen and send the same mismatch again) —, `qi-prop-<hash>` of
+the page, the invariant and the element ([property.md](property.md)).
 
 ## 4. To the Design Desk
 
 Opt-in: `design_desk_findings: enabled`, `design_desk_channel` (the Slack conversation the Design Desk
 listens in), `design_desk_bot` (its bot's member id, `U…`), `design_desk_max_per_run` (5),
 `design_desk_min_severity` (`medium`: medium and high go). After the modules run's unlock, before the
-catalog, when this run wrote a `check.json` or a `radar.json` — and for a design register finding
+catalog, when this run wrote a `check.json`, a `radar.json` or a property `results.json` with `findings`
+([property.md](property.md) → **3. Findings**) — and for a design register finding
 `D-<k>`, the outbox file of `ux-signals.mjs handoff` ([ux-signals.md](ux-signals.md) → **6**):
 
-1. `node "$HOME/scripts/design-outbox.mjs" plan <each check.json and radar.json of this run>` →
+1. `node "$HOME/scripts/design-outbox.mjs" plan <each check.json, radar.json and property results.json of this run>` →
    `due[]` (`ref`, `text`, `attachment`), the most severe first, each Ref not sent before. `sending:
    false` → nothing goes; the summary names `ready` and `reason`.
 2. Per entry: look at its `attachment`. It does not show what `text` says (the check is wrong here) →
@@ -126,14 +128,16 @@ What happens: <what>
 Expected: <expected>
 Steps: 1. … 2. …
 Build: <PR #n, the build (PR #n, …), or the build>
-Check: <missing-state | accessibility | consistency | radar | field | design>
+Check: <missing-state | accessibility | consistency | radar | field | design | property>
 Severity: <high | medium | low>
 Ref: qi-<id>
 <@design_desk_bot>
 ```
 
 The mention is the last line, so the first stays the marker and the Design Desk takes the message as
-addressed to it. Product text is Slack-escaped; nothing of a pull request's text goes, but its number.
+addressed to it. The `Check` values are a closed list the Design Desk validates: a new one (`property`,
+3.61.0) is sent only once the Design Desk's owner has accepted it there — until then keep
+`design_desk_findings` off or expect the Desk to refuse those messages; the register still has them. Product text is Slack-escaped; nothing of a pull request's text goes, but its number.
 **Never twice:** a Ref in `SENT.md`, or whose last ledger line in the event logs is an `intent` (no
 outcome) or a `done` (its `record` did not run), is never planned again; only a last `failed` lets it
 go again. Findings over the cap or below the floor are not kept: a later run that finds them

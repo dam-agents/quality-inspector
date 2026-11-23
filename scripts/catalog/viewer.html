@@ -695,6 +695,7 @@ const ENT = {
   design: ['Design finding', '🎨', 'A layout, visual or accessibility defect that the UI sweep found (D-1, D-2…).'],
   validation: ['Validation finding', '⌨️', 'A form that did not process incorrect or unusual input correctly (VAL-1…).'],
   stress: ['Stress check', '🏋️', 'A check of a page or an endpoint under load (STRESS-…).'],
+  property: ['Property finding', '🎲', 'A rule that must be true for every input, and the smallest generated input that breaks it (PROP-…).'],
   collection: ['Collection', '🗂️', 'Your own group of test cases (work/CATALOG.md).'],
   feature: ['Feature', '🧭', 'A group of recurring test cases by what the product does, for example "Model switching" (work/FEATURES.md). The agent keeps it. You can run all its tests.'],
   maintenance: ['Maintenance proposal', '🛠️', 'A proposal of the agent for a recurring test that the product moved away from (M-1, M-2…): what changed, the evidence, and what to do with the test. You decide.'],
@@ -1261,10 +1262,10 @@ function stepText(t) {
 }
 // The commands the page may offer: the operator's words of docs/on-demand.md and docs/modules.md,
 // built from constants and ids only. Anything else is never shown, copied or sent.
-const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|run (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)(?:, (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)){0,19}|repair (?:#\d+(?: (?:AC|IN)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: AC-\d+)?)|test scenario [a-z0-9][a-z0-9-]{0,40}|create issue for (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})(?:, (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})){0,19}(?: for the architect)?|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+(?: as (?:false-positive|wont-fix|duplicate|by-design))?|(?:reopen|recheck|discuss) D-\d+|send D-\d+ to design|recheck VAL-\d{1,6}|categorize D-\d+ (?:[a-z0-9][a-z0-9-]{0,29}|-)|(?:add (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) to|remove (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) from) the collection [A-Za-z0-9][A-Za-z0-9 _.-]{0,39}|run feature [a-z0-9][a-z0-9-]{0,39}|(?:accept|rewrite|retire|keep) M-\d{1,6}|look into what needs attention|show blockers|retry B-\d{1,6})$/;
+const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|run (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)(?:, (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)){0,19}|repair (?:#\d+(?: (?:AC|IN)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: AC-\d+)?)|test scenario [a-z0-9][a-z0-9-]{0,40}|create issue for (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|PROP-\d{1,4}|STRESS-[A-Z]{1,20}-\d{1,3})(?:, (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|PROP-\d{1,4}|STRESS-[A-Z]{1,20}-\d{1,3})){0,19}(?: for the architect)?|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+(?: as (?:false-positive|wont-fix|duplicate|by-design))?|(?:reopen|recheck|discuss) D-\d+|send D-\d+ to design|recheck VAL-\d{1,6}|categorize D-\d+ (?:[a-z0-9][a-z0-9-]{0,29}|-)|(?:add (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) to|remove (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) from) the collection [A-Za-z0-9][A-Za-z0-9 _.-]{0,39}|run feature [a-z0-9][a-z0-9-]{0,39}|(?:accept|rewrite|retire|keep) M-\d{1,6}|look into what needs attention|show blockers|retry B-\d{1,6})$/;
 // A problem a found issue may be about (skills/create-issue): a criterion's or an exploration's failure,
 // a design finding, a validation case, a stress check.
-const PROB_RE = /^(?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})$/;
+const PROB_RE = /^(?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|PROP-\d{1,4}|STRESS-[A-Z]{1,20}-\d{1,3})$/;
 // On an interactive artifact beside the agent's chat the platform injects `platform.sendPrompt`:
 // a click sends the command as the operator's own chat message. It gives no answer back: the app
 // shows its own red note when it refuses (no chat of the agent is open), so the page never says it arrived.
@@ -1489,7 +1490,7 @@ const foundLinks = (ref) => { const l = foundOf(ref);
 // The ref of a test case's problem: `#42 AC-2`, `#42 EX-1`, `S-7 AC-1`, `P-sign-in AC-1` (a scenario's exploration has none).
 const problemRef = (i) => { const r = i.origin.kind === 'scenario' ? `${i.ref} ${str(i.id)}` : `#${num(i.ref)} ${str(i.id)}`; return PROB_RE.test(r) ? r : null; };
 // A problem's kind, for its icon: a test case, a design finding, a validation finding, a stress check.
-const probIcon = (ref) => (/^D-/.test(ref) ? ENT.design[1] : /^VAL-/.test(ref) ? ENT.validation[1] : /^STRESS-/.test(ref) ? ENT.stress[1] : / EX-/.test(ref) ? ENT.exploration[1] : / IN-/.test(ref) ? ENT.intent[1] : ENT.criterion[1]);
+const probIcon = (ref) => (/^D-/.test(ref) ? ENT.design[1] : /^VAL-/.test(ref) ? ENT.validation[1] : /^PROP-/.test(ref) ? ENT.property[1] : /^STRESS-/.test(ref) ? ENT.stress[1] : / EX-/.test(ref) ? ENT.exploration[1] : / IN-/.test(ref) ? ENT.intent[1] : ENT.criterion[1]);
 const PICK_KEY = `qi-catalog:${str(D.target)}:picked`;
 const PICK_MAX = 20;
 let picked = [];
@@ -3286,6 +3287,8 @@ function viewFindings() {
   const v = $('#view');
   const val = F.validation && typeof F.validation === 'object' ? F.validation : null;
   const vf = val ? arr(val.cases).filter((c) => c && c.result && c.result !== 'ok') : [];
+  const pr = F.property && typeof F.property === 'object' ? F.property : null;
+  const pf = pr ? arr(pr.properties).filter((c) => c && c.result && c.result !== 'ok') : [];
   const st = F.stress && typeof F.stress === 'object' ? F.stress : null;
   const sf = st ? arr(st.checks).filter((c) => c && c.status !== 'pass') : [];
   const sec = F.security && typeof F.security === 'object' ? F.security : null;
@@ -3313,6 +3316,13 @@ function viewFindings() {
           h('span', { class: `badge ${c.result === 'finding' ? 'bad' : c.result === 'flaky' ? 'warn' : 'muted'}`, title: VAL_RESULT_HELP[str(c.result)] || null }, str(c.result)), c.severity ? sevB(c.severity) : '', str(c.message), foundLinks(str(c.id)),
           ...(S.at ? [] : [copyBox(`recheck ${str(c.id)}`, 'Recheck…', `${ENT.validation[1]} Recheck ${str(c.id)} on the current build`) || ''])])) : h('p', { class: 'muted-t' }, 'Every case passed.'),
     val && modAgain('validation', 'Run all the cases again…', 'Run the form validation again on the newest build')));
+  v.append(sec2(`${ENT.property[1]} Property checks`, pr ? ['The agent writes rules that must be true for every input. Then it tries many generated inputs and makes a failure as small as possible. A design finding of a property is also in Design. Build ', buildLink(pr.build), ` · ${fmtDate(pr.utc)} · seed ${str(pr.seed)} · ${arr(pr.properties).length} properties`] : null,
+    !pr ? h('p', { class: 'muted-t' }, 'The property module has not run yet.') : pf.length ? tableOf(['☐', 'Property', 'Kind', 'Rule', 'Result', 'Severity', 'Smallest input', 'What broke', `${ENT.bug[1]} Bug issue`],
+      pf.sort((a, b) => (a.result === 'finding' ? 0 : 1) - (b.result === 'finding' ? 0 : 1))
+        .map((c) => [c.result === 'finding' ? pickBox(str(c.id)) : '', h('code', {}, str(c.id)), str(c.kind), str(c.statement),
+          h('span', { class: `badge ${c.result === 'finding' ? 'bad' : c.result === 'blocked' ? 'muted' : 'warn'}` }, str(c.result)), c.severity ? sevB(c.severity) : '',
+          c.counterexample == null ? '' : h('code', {}, str(JSON.stringify(c.counterexample)).slice(0, 200)), str(c.message), foundLinks(str(c.id))])) : h('p', { class: 'muted-t' }, 'Every property held.'),
+    pr && modAgain('property', 'Run the property checks again…', 'Run the property checks again on the newest build')));
   v.append(sec2(`${ENT.stress[1]} Stress`, st ? ['Many users at the same time use the most important pages and endpoints. This finds errors and slow answers under load. Build ', buildLink(st.build), ` · ${fmtDate(st.utc)}${st.config ? ` · ${str(st.config.concurrency)} workers × ${str(st.config.duration_s)} s` : ''}`] : null,
     !st ? h('p', { class: 'muted-t' }, 'The stress module has not run yet.') : sf.length ? tableOf(['☐', 'Check', 'Target', 'Status', 'Severity', 'Evidence', `${ENT.bug[1]} Bug issue`],
       sf.map((c) => [c.status === 'fail' ? pickBox(str(c.id)) : '', h('code', {}, str(c.id)), h('code', {}, str(c.target)), h('span', { class: `badge ${c.status === 'fail' ? 'bad' : 'muted'}` }, str(c.status)), sevB(c.severity),

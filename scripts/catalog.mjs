@@ -31,7 +31,7 @@
 // reference — the page is the way into all of them; `rep` a run's report on the page (its tests' steps, errors and screenshots); `found` the issues opened from its problems; `pages[].hotspots` are the controls of the
 // newest UI map with the items that name them, or reach the page the control leads to (the product map). `modules`, `design` and
 // `findings` make it the control center (docs/modules.md): the modules' state, the design
-// findings with their crops, the newest validation and stress results — of the security run its
+// findings with their crops, the newest validation, property and stress results — of the security run its
 // counts and report reference only.
 // `features` (work/FEATURES.md) and `maintenance` (the open rows of work/MAINTENANCE.md) are the
 // agent's groups of recurring tests and the proposals waiting for the operator (docs/features.md,
@@ -591,6 +591,8 @@ const found = rows(join(work, 'FOUND.md')).filter(([ref, issue, url]) => ref && 
     title: title && title !== '-' ? title.slice(0, 200) : null }));
 const valFile = newestOf('validation', 'results.json');
 const val = valFile ? readJson(valFile) : null;
+const propFile = newestOf('property', 'results.json');
+const prop = propFile ? readJson(propFile) : null;
 const stressFile = newestOf('stress', 'stress.json');
 const stress = stressFile ? readJson(stressFile) : null;
 const secFile = newestOf('security', 'verdicts.json');
@@ -633,6 +635,9 @@ const findings = {
   validation: val ? { build: val.build ?? null, run: val.run ?? null, utc: val.generated_utc ?? null,
     cases: (val.cases ?? []).map((c) => ({ id: c.id, page: c.page, form: c.form, field: c.field ?? null, kind: c.kind, oracle: c.oracle,
       result: c.result, severity: c.severity ?? null, message: c.message ?? null })) } : null,
+  property: prop?.schema === 'qi-property/v1' ? { build: prop.build ?? null, utc: prop.generated_utc ?? null, seed: prop.seed ?? null,
+    properties: (prop.properties ?? []).map((c) => ({ id: c.id, kind: c.kind, statement: c.statement, result: c.result, severity: c.severity ?? null,
+      message: c.message ?? null, counterexample: c.counterexample ?? null })) } : null,
   stress: stress ? { build: stress.build ?? null, utc: stress.generated_utc ?? null, config: stress.config ?? null, counts: stress.counts ?? null,
     checks: (stress.checks ?? []).map((c) => ({ id: c.id, target: c.target, status: c.status, severity: c.severity, evidence: c.evidence ?? null, reason: c.reason ?? null })) } : null,
   security: sec ? { candidate: sec.candidate ?? null, utc: sec.generated_utc ?? null, counts: sec.counts ?? null, report: artRef(dirname(secFile), { link: false }) } : null,

@@ -71,7 +71,7 @@ The operator may share the page beyond themselves, so it carries only what conce
   row's last update; never the request's words. Under them, every profile scenario still to adopt, as in Activity.
 - **Control center:** every module's state, settings, schedule and last run (`modules.sh
   status`), the focus queue and the areas; the design findings register with each finding's crop
-  ([ui-sweep.md](ui-sweep.md)) with the operator's category and dismissal reason; the newest validation results and stress checks; of the newest
+  ([ui-sweep.md](ui-sweep.md)) with the operator's category and dismissal reason; the newest validation, property and stress results; of the newest
   security run only its counts by severity and its report's reference.
 - **Never:** a scenario's request text, requester id or thread (the requester's name shows only as a run's `trigger`); a verdicts file's `notes` (the agent's
   `analysis`, `explanation` and a criterion's `note` are written for the page, [reporting.md](reporting.md)
@@ -265,12 +265,12 @@ verdict unless it says a full run:
 | A run's panel, "🔁 Run it again" | by its type: a night `module regression run now`; an issue run `test #42` and `run #42`; a scenario run `run S-7` (a profile one also `test scenario <slug>`); a manual run the same ref it ran (`run #42 AC-1`); a feature run `run feature <id>`; and its failed test cases, `run <ref>, <ref>…` |
 | The catalog's toolbar, with a filter or a search | the test cases it shows, `run <ref>, <ref>…` — a collection, an area, a feature, "failing" |
 | The selection bar | the ticked test cases, `run <ref>, <ref>…`, beside the bug issue |
-| Findings | a validation case `recheck VAL-<k>`; the whole module `module validation\|stress\|security run now`; a focus area `focus <area>` |
+| Findings | a validation case `recheck VAL-<k>`; the whole module `module validation\|property\|stress\|security run now`; a focus area `focus <area>` |
 | Design | `recheck D-<k>` (above) |
 
 A list holds at most 20 test cases (the first 20; a larger filter says to narrow it); only a
 test case with a test file runs. **Several problems as one issue:** every test (catalog table and
-cards; the failing ones in Needs attention), design finding, validation finding and failed stress
+cards; the failing ones in Needs attention), design finding, validation finding, property finding and failed stress
 check has a ☐; the ticked ones (the viewer's own, kept in their browser) gather in a bar at the
 bottom of every view with one command, `create issue for <ref>, <ref>…` (at most 20), and its
 architect variant. A problem an issue was opened for shows that issue's link wherever it appears,
@@ -328,7 +328,7 @@ published once, and asks the server for everything it shows.
   cannot forge those headers. It writes only `work/dashboard/commands.jsonl` and never executes what a
   page sends.
 - `bash "$HOME/scripts/dashboard-service.sh" check` says whether it answers; `install` writes the
-  service for an agent created without it (before 3.60.0), `restart` restarts it. Its log is
+  service for an agent created without it (before 3.62.0), `restart` restarts it. Its log is
   `~/.local/state/rc/quality-inspector-dashboard.log`.
 - **What it serves:** `GET /api/catalog` — `work/catalog/data.json`, the data of the newest build
   (the same data as the static page, every picture by reference, no 8 MiB budget); `GET
