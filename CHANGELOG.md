@@ -7,6 +7,17 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.61.0 — 2026-11-23
+
+**Upgrade:**
+1. `bash "$HOME/scripts/suite.sh" init` — installs the pinned `fast-check` into `work/suite` (idempotent).
+2. Offer, never enable: `property_checks` (`disabled`; a cadence) turns on the property module — invariants
+   tried with many generated inputs through the API, the CLI or the UI, a failure shrunk to the smallest one
+   ([docs/property.md](docs/property.md)); its tunables `property_runs`, `property_max_properties`,
+   `property_max_seconds` keep their defaults. Re-run `scripts/verify-onboarding.sh`.
+3. **Operator-only**, with `design_desk_findings: enabled`: the Design Desk's owner accepts the new
+   `Check: property` value first ([docs/design-checks.md](docs/design-checks.md) → **4. To the Design Desk**).
+
 ## 3.60.0 — 2026-11-23
 
 **Upgrade:**
