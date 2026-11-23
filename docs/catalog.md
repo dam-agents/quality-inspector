@@ -142,7 +142,7 @@ result that is not a pass, and the Runs view a run's `summary` under its result.
   issue #42 …").
 - **One kind of control, one look** — Design Desk's (**The look**, below). A link is ink with a faint
   underline; its mark says where it goes: → another view of the page, ▯ a panel, ⌖ a page of the
-  product map, ↗ another site in a new tab (GitHub, a report's link), opened by the page's own
+  product map, ↗ another site in a new tab (GitHub, a report's video), opened by the page's own
   script — in a frame a plain link stays and the other site refuses to load; when no tab opens, a
   box shows the address to copy. The agent's mark (violet) is a message for the agent and never
   sends by itself: it opens the box at the bottom, which names what the agent then does, shows the
@@ -214,10 +214,26 @@ them, its report).
 `S-7`) to its origin panel, a build to the runs on it (Runs filtered by build, with "as of this
 build"), a page a test opens to that page on the Product map, an area, a session, a surface, a
 label or a collection to the catalog filtered by it, a history cell or entry to its run, a design
-finding's page to the map and back. Every report — the artifact with the video, the screenshots
-and the steps — shows (a link in a new tab, or the "private" mark) wherever its run or origin
-appears: the catalog's Report column, cards, Home, the map's test lists, an item's and an
-origin's panel, the Runs view and the run panel. Every move to another place (a view, a panel, a
+finding's page to the map and back. Every report shows wherever its run or origin appears: the
+catalog's Report column, cards, Home, the map's test lists, an item's and an origin's panel, the
+Runs view and the run panel — and opens **on the page** (below), never in a new window, while the
+page keeps it; else as before, a link in a new tab or the "private" mark.
+
+**The report on the page.** A run's report is a panel of its own (🎬 Report, address `r=<run>&rp=1`;
+an origin's report opens its newest run's): the run's verdict, build and baseline, the agent's
+analysis, then per result its badge, cause, the agent's sentence and its test on the new build and
+on the last release — the status, the length, the error, up to 6 screenshots (the screen at the
+failure first, a click shows it at its full size) and the steps (a failed one red, open when one
+failed). Previous and next walk the reports of the same issue, scenario or night; "The test run"
+returns to the run's panel. The video does not fit in the page: the report artifact keeps it, and
+the panel's "The video and all screenshots" opens it (a link in a new tab, or the "private" mark).
+`catalog.mjs` reads it from the run's `candidate_run`, `baseline_run` and `explorations_run`
+(a night's `regression-<candidate>` when its file names none) — the e2e `report.json` of each, by
+the result's tags, as `render-report.mjs` does: steps capped at 60, labels at 200 characters, the
+error at 600, the agent's text rules as everywhere. Newest runs first while the text stays under
+768 KiB (`QI_CATALOG_REPORT_MAX`); the screenshots, JPEGs 720 px wide in `thumbs/rep-<hash>.jpg`,
+embed last, after every other image, while the budget lasts — a run past the text budget keeps
+only its link, a screenshot past the image budget says "not on this page". Every move to another place (a view, a panel, a
 map page, a build, "as of") is a step the browser's back and forward walk; a filter, a sort, a
 search or a picked control of the map refines the place instead. The page's own **Back** (in the
 "You are here" bar under the tabs and in every panel) returns to the place before, named — in
@@ -362,7 +378,8 @@ release ([issue-qa.md](issue-qa.md) step 10, also for an operator's or a Slack "
 1. `node "$HOME/scripts/design-findings.mjs" merge --noticed-only` (the run's "noticed in passing"
    items into the design register, [ui-sweep.md](ui-sweep.md)), then
    `node "$HOME/scripts/catalog.mjs"` → `{html, bytes, items, images, dropped_images, sharp_images,
-   sharp_dropped, thumbnails, notes, hash, changed, data, live, page_hash, page_changed}`. Each `notes`
+   sharp_dropped, reports, report_shots, report_shots_dropped, thumbnails, notes, hash, changed, data,
+   live, page_hash, page_changed}`. Each `notes`
    entry is a source it could not read: log it as a `warn` and publish anyway. `refused` (exit 1): log
    it as an `error` and publish nothing — no `data.json` either; `secrets.mjs scan-all
    work/env/credentials.env work/suite/tests work/issues work/scenarios` (in `$HOME/scripts/lib/`)
@@ -391,9 +408,10 @@ A failed item's still shows its mark ([reporting.md](reporting.md) → **The mar
 `<id>: the failing check` with a red frame, else the agent's `mark` as an orange frame on the AC
 still; the framed copy is cached as `thumbs/<key>.mark-<hash>.png`.
 
-Images are the AC stills and the UI map's page shots, each twice in `work/catalog/thumbs/`
+Images are the AC stills and the UI map's page shots, each twice in `work/catalog/thumbs/`, and the
+reports' screenshots once (**The report on the page**)
 (rendered by the suite's `playwright-core`; without it there are none; backed up, unlike the
-page; removed with their item or page):
+page; removed with their item, page or report):
 
 - **small** — a JPEG, 360 px (a still) or 720 px (a page shot) wide, for the lists and cards;
 - **sharp** — a WebP up to 1440 px wide (the screen at its own size), for a test case's panel,

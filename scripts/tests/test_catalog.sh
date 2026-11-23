@@ -592,4 +592,28 @@ grep -qE 'color:#fff[;}]' <<<"$css" && { echo "  white text on a fill"; FAILED=1
 for v in '--fs-title:26px' '--fs-head:17px' '--fs-ui:14px' '--fs-meta:12.5px' '--fs-micro:11px' '--bg:#fcfbfc' '--fg:#1b1b1a' '--link:#2f5bd3'; do
   grep -qF -- "$v" <<<"$css" || { echo "  the token $v is missing"; FAILED=1; }
 done
+
+# The report on the page (docs/catalog.md → The report on the page): per result its test on each
+# side — status, error, steps, screenshots — from the run's candidate_run and baseline_run; no
+# internal key travels; over its text budget a run keeps only its link, with a note.
+jq '.run.results[0].attempts[0] += {durationMs: 4200, error: {code: "assert", message: "The list shows the old name."}} | .run.results[0].attempts[0].steps[0] += {status: "passed", durationMs: 900}' \
+  "$W/suite/.e2e/runs/cand/report.json" > "$W/r.tmp" && mv "$W/r.tmp" "$W/suite/.e2e/runs/cand/report.json"
+# A rendered report picture, as the renderer leaves it (no browser here): rep-<sha256 of the source path>.jpg.
+mkdir -p "$W/catalog/thumbs"
+while IFS= read -r src; do
+  h="$(printf '%s' "$src" | sha256sum | cut -c1-16)"; cp "$src" "$W/catalog/thumbs/rep-$h.jpg"; touch "$W/catalog/thumbs/rep-$h.jpg"
+done < <(find "$W/suite/.e2e/runs/cand" -name 's*.png')
+out="$(node "$SCRIPTS/catalog.mjs")"; data="$(page_data)"
+assert "an issue run carries its report: candidate and baseline sides" '(.runs[] | select(.type == "issue" and .ref == "#42") | .rep.side == "both"
+  and .rep.results["issue-42/AC-1"].c.st == "failed" and .rep.results["issue-42/AC-1"].c.ms == 4200
+  and .rep.results["issue-42/AC-1"].c.err == "assert: The list shows the old name."
+  and .rep.results["issue-42/AC-1"].c.steps[0] == ["app.screenshot", "AC-1: the page", "passed", 900]
+  and .rep.results["issue-42/AC-1"].b.st == "missing")' "$data"
+assert "a report screenshot has its caption, and its image when it fits" '[.runs[] | select(.type == "issue" and .rep) | .rep.results["issue-42/AC-1"].c.shots[]] | length >= 1 and (.[0].cap == "AC-1: the page")' "$data"
+assert "data.json: a report screenshot is a reference to its rep- picture" '.images as $im | [.runs[] | select(.type == "issue" and .rep) | .rep.results["issue-42/AC-1"].c.shots[].img] | length >= 1 and all(. != null and test("^r[0-9]+$") and ($im[.] | test("^catalog/thumbs/rep-[0-9a-f]{16}\\.jpg$")))' "$(cat "$W/catalog/data.json")"
+assert "no internal key of a run travels" '[.runs[] | has("_ev")] | any | not' "$data"
+assert "the output counts the reports on the page" '.reports >= 1 and (.report_shots | type == "number") and (.report_shots_dropped | type == "number")' "$out"
+out="$(QI_CATALOG_REPORT_MAX=10 node "$SCRIPTS/catalog.mjs")"; data="$(page_data)"
+assert "over its text budget a run keeps only its link" '[.runs[] | select(.rep)] | length == 0' "$data"
+assert "a note says so" '.notes | any(test("older report\\(s\\) not on the page"))' "$out"
 exit $FAILED
