@@ -9,6 +9,7 @@
 //   node design-findings.mjs merge <sweep.json> [--review <review.json>] [--no-render]
 //   node design-findings.mjs merge --noticed-only [--no-render]
 //   node design-findings.mjs merge --signals <scored.json> [--field <field.json>] [--no-render]
+//   node design-findings.mjs merge --property <results.json> [--no-render]
 //       -> {findings, open, resolved, dismissed, new, crops, notes}
 //   node design-findings.mjs recheck-plan D-<k>
 //       -> {id, status, source, check, severity, pattern, viewport, last_seen, sweep: {pattern, viewports} | null, review, note}
@@ -39,6 +40,10 @@
 // numbers come from scored.json only; bug, ux-friction or slow without the judge's agreement is
 // kept as not-reproduced. --signals alone refreshes their numbers and resolves an open one once a
 // newer build ran a whole period without it passing the thresholds (lib/ux-field.mjs → quietBuild).
+// Property findings (docs/property.md): --property is property.mjs's results.json — its `register`
+// entries join as source `property`, one id per page, invariant and element (never the shrunk
+// sample, which another seed shrinks to another value); a later run that tried that invariant on
+// that page and did not break it (result ok or finding) resolves it. A replay file is refused.
 
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -61,7 +66,7 @@ for (let i = 2; i < process.argv.length; i++) {
   else if (a.startsWith('--')) flags[a.slice(2)] = process.argv[++i];
   else pos.push(a);
 }
-const usage = 'usage: design-findings.mjs review-plan <sweep.json> [--max N] | merge <sweep.json> [--review FILE] [--no-render] | merge --noticed-only [--no-render] | merge --signals <scored.json> [--field FILE] [--no-render] | recheck-plan D-<k>';
+const usage = 'usage: design-findings.mjs review-plan <sweep.json> [--max N] | merge <sweep.json> [--review FILE] [--no-render] | merge --noticed-only [--no-render] | merge --signals <scored.json> [--field FILE] [--no-render] | merge --property <results.json> [--no-render] | recheck-plan D-<k>';
 const die = (m) => { console.error(m ? `design-findings: ${m}` : usage); process.exit(2); };
 const regValue = (k) => { // a registry key through lib/config.sh → reg: out of range reads as its default
   try {
@@ -93,12 +98,13 @@ if (cmd === 'recheck-plan') {
     id, status: f.status, source: f.source, check: f.check, severity: f.severity, pattern: f.pattern, viewport: f.viewport, last_seen: f.last_seen,
     sweep: sweepable ? { pattern: f.pattern, viewports: vp } : null, review: f.source === 'review',
     note: f.source === 'noticed' ? 'noticed in passing: no sweep resolves it — look at the page and say what you see'
+      : f.source === 'property' ? 'a property finding: replay its counterexample (docs/property.md → Replay)'
       : !sweepable ? `page '${str(f.pattern, 80)}' @ '${str(f.viewport, 20)}' is not one a sweep can repeat`
       : f.status === 'dismissed' ? 'dismissed: the merge keeps it dismissed until "reopen"' : null,
   }, null, 2));
   process.exit(0);
 }
-if (!sweepPath && !(cmd === 'merge' && (flags['noticed-only'] || flags.signals))) die();
+if (!sweepPath && !(cmd === 'merge' && (flags['noticed-only'] || flags.signals || flags.property))) die();
 const sweep = sweepPath ? readJson(sweepPath) : null;
 if (sweepPath && (!sweep || !Array.isArray(sweep.pages) || !BUILD.test(String(sweep.build ?? '')))) die(`${sweepPath} is not a sweep.json`);
 const sweepDir = sweepPath ? dirname(resolve(sweepPath)) : null;
@@ -271,15 +277,40 @@ if (flags.field) {
   });
 }
 
+// Property findings: a design property's shrunk counterexample (property.mjs → register[]).
+const prop = flags.property ? readJson(flags.property) : null;
+if (flags.property && (prop?.schema !== 'qi-property/v1' || !BUILD.test(String(prop.build ?? '')) || !Array.isArray(prop.register))) die(`${flags.property} is not a qi-property/v1 results file`);
+if (prop?.replay) die(`${flags.property} is a replay: only a run's results.json joins the register`);
+const propDir = flags.property ? dirname(resolve(flags.property)) : null;
+const propFp = (page, invariant, target) => fp(page, '-', `property:${invariant}`, norm(target));
+for (const r of prop?.register ?? []) {
+  if (!r || typeof r.pattern !== 'string' || !/^[a-z-]{2,30}$/.test(String(r.invariant ?? '')) || !str(r.target, 200)) { notes.push('a property register entry without page, invariant or element: skipped'); continue; }
+  const s = r.sample ?? {};
+  const at = `${s.width} px wide at ${Math.round((s.zoom ?? 1) * 100)} % zoom, locale ${s.locale}, texts of ${s.text_length} characters`;
+  upsert('property', { fingerprint: propFp(r.pattern, r.invariant, r.target), check: `property:${r.invariant}`, severity: r.severity === 'major' ? 'major' : 'minor',
+    pattern: r.pattern, viewport: '-', target: str(r.target, 200), saw: str(`At ${at}: ${r.target} — ${r.detail ?? r.invariant}`, 300), box: okBox(r.box),
+    shot: typeof r.shot === 'string' && r.shot && existsSync(join(propDir, r.shot)) ? rel(join(propDir, r.shot)) : null }, prop.build);
+  byFp.get(propFp(r.pattern, r.invariant, r.target)).property = { id: str(r.property, 20), sample: { width: s.width ?? null, zoom: s.zoom ?? null, text_length: s.text_length ?? null, locale: s.locale ?? null },
+    seed: Number.isInteger(r.seed) ? r.seed : null, path: typeof r.path === 'string' ? str(r.path, 400) : null };
+}
+// What a property run tried: page|invariant of each design property that ran to an end (ok or finding).
+const propTried = new Set();
+for (const t of prop?.ran ?? []) {
+  const res = (prop.properties ?? []).find((x) => x?.id === t?.id)?.result;
+  if (t?.kind !== 'design' || !['ok', 'finding'].includes(res)) continue;
+  for (const inv of t.invariants ?? []) propTried.add(`${t.page}|${inv}`);
+}
+
 // Resolution: not seen again on a page+viewport this merge covered, by a check that ran there.
 const sweptPage = new Map(swept.map((p) => [`${p.pattern}|${p.viewport}`, p]));
 const ran = (p, check) => (String(check).startsWith('a11y:') ? p.axe === true : check === 'layout-shift' ? p.cls != null : true);
 for (const f of reg.findings) {
   if (seenFp.has(f.fingerprint) || f.source === 'noticed') continue;
   const k = `${f.pattern}|${f.viewport}`;
-  const covered = f.source === 'sweep' ? sweptPage.has(k) && ran(sweptPage.get(k), f.check) : f.source === 'review' ? reviewed.has(k) : false;
+  const covered = f.source === 'sweep' ? sweptPage.has(k) && ran(sweptPage.get(k), f.check) : f.source === 'review' ? reviewed.has(k)
+    : f.source === 'property' ? propTried.has(`${f.pattern}|${String(f.check).replace(/^property:/, '')}`) : false;
   if (!covered || f.resolved_build || f.status === 'resolved') continue;
-  f.resolved_build = build;
+  f.resolved_build = f.source === 'property' ? prop.build : build;
   if (f.status !== 'dismissed') f.status = 'resolved';
 }
 if (scored) {

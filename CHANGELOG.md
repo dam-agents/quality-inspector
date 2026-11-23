@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.61.0 — 2026-11-23
+## 3.62.0 — 2026-11-23
 
 **Upgrade:**
 1. Nothing to run — docs are re-read per run, and `work/ESCAPES.md` and `work/RISKS.md` are made by the first
@@ -22,6 +22,17 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    ([docs/escapes.md](docs/escapes.md)); then `bash "$HOME/scripts/verify-onboarding.sh" --config`.
 3. Nothing to run — `work/benchmark/cases.json` takes escape cases (`expected.bug`), graded stage by stage;
    the score adds `escape_recall` and `lost_at` ([docs/benchmark.md](docs/benchmark.md) → **Escape cases**).
+
+## 3.61.0 — 2026-11-23
+
+**Upgrade:**
+1. `bash "$HOME/scripts/suite.sh" init` — installs the pinned `fast-check` into `work/suite` (idempotent).
+2. Offer, never enable: `property_checks` (`disabled`; a cadence) turns on the property module — invariants
+   tried with many generated inputs through the API, the CLI or the UI, a failure shrunk to the smallest one
+   ([docs/property.md](docs/property.md)); its tunables `property_runs`, `property_max_properties`,
+   `property_max_seconds` keep their defaults. Re-run `scripts/verify-onboarding.sh`.
+3. **Operator-only**, with `design_desk_findings: enabled`: the Design Desk's owner accepts the new
+   `Check: property` value first ([docs/design-checks.md](docs/design-checks.md) → **4. To the Design Desk**).
 
 ## 3.60.0 — 2026-11-23
 

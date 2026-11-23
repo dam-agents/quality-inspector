@@ -7,7 +7,7 @@
 // once it is fixed. Reads work/ only; writes work/found/<slug>/ only. Never posts anything.
 //
 //   node issue-draft.mjs <ref>[, <ref>…] [--fix]
-//     <ref>: `#42 AC-2`, `#42 EX-1`, `S-7 AC-1`, `P-sign-in AC-1`, `D-12`, `VAL-3`, `STRESS-API-2`
+//     <ref>: `#42 AC-2`, `#42 EX-1`, `S-7 AC-1`, `P-sign-in AC-1`, `D-12`, `VAL-3`, `PROP-4`, `STRESS-API-2`
 //     -> {"dir", "refs", "build", "title", "labels", "images", "video", "missing", "already", "notes"}
 //
 // The draft: title.txt (one line), body.md (Markdown with the hidden marker
@@ -46,10 +46,10 @@ const mdq = (s) => String(s ?? '').replace(/([\\`*_[\]<>|])/g, '\\$1'); // produ
 // ------------------------------------------------------------------ arguments
 const args = process.argv.slice(2);
 const fix = args.includes('--fix');
-const REF_RE = /^(#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|STRESS-[A-Z]{1,20}-\d{1,3})$/;
+const REF_RE = /^(#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|PROP-\d{1,4}|STRESS-[A-Z]{1,20}-\d{1,3})$/;
 const refs = [...new Set(args.filter((a) => a !== '--fix').join(' ').split(',').map((s) => s.trim().replace(/\s+/g, ' ')).filter(Boolean))];
 if (!refs.length || refs.length > MAX_REFS || refs.some((r) => !REF_RE.test(r))) {
-  console.error(`usage: issue-draft.mjs <ref>[, <ref>…] [--fix] — 1 to ${MAX_REFS} refs: #42 AC-2, #42 EX-1, S-7 AC-1, P-<slug> AC-1, D-12, VAL-3, STRESS-API-2`);
+  console.error(`usage: issue-draft.mjs <ref>[, <ref>…] [--fix] — 1 to ${MAX_REFS} refs: #42 AC-2, #42 EX-1, S-7 AC-1, P-<slug> AC-1, D-12, VAL-3, PROP-4, STRESS-API-2`);
   process.exit(2);
 }
 const notes = [];
@@ -290,6 +290,31 @@ function validationProblem(ref) {
   }
   return null;
 }
+// A property of the newest property run that has it (scripts/property.mjs): its rule, its smallest
+// breaking input and the seed that replays it.
+function propertyProblem(ref) {
+  const files = ls(join(work, 'property')).map((b) => join(work, 'property', b, 'results.json')).filter(existsSync).sort((a, b) => mtime(b) - mtime(a));
+  for (const f of files) {
+    const r = readJson(f); const c = (r?.properties ?? []).find((x) => x?.id === ref);
+    if (!c) continue;
+    const spec = ((readJson(join(f, '..', 'properties.json')) ?? readJson(r.properties_file ?? ''))?.properties ?? []).find((x) => x?.id === ref) ?? {};
+    const cx = `\`${one(JSON.stringify(c.counterexample ?? null), 300).replace(/`/g, "'")}\``;
+    const steps = c.kind === 'design' ? [`Open \`${spec.page ?? '?'}\` with the window, zoom, text length and locale of the input ${cx}.`, 'Examine the layout.']
+      : (spec.steps ?? []).map((s) => (s.api ? `Send \`${s.api.method} ${s.api.path}\`${s.api.body ? ` with the body \`${one(JSON.stringify(s.api.body), 200).replace(/`/g, "'")}\`` : ''}${s.repeat > 1 ? ` ${s.repeat} times` : ''}.`
+        : s.cli ? `Run the CLI with \`${one(s.cli.join(' '), 200).replace(/`/g, "'")}\`${s.repeat > 1 ? ` ${s.repeat} times` : ''}.` : `Open \`${s.ui?.open ?? '?'}\`.`));
+    return {
+      ref, kind: 'property', build: r.build ?? null, utc: r.generated_utc ?? null,
+      title: one(`${c.statement}: ${c.result === 'finding' ? 'broken' : c.result}`, 120),
+      what: [`On build \`${r.build ?? '?'}\`, the ${c.kind} property ${ref} "${mdq(one(c.statement, 200))}" gives the result "${c.result}"${c.severity ? ` (${c.severity})` : ''}.`,
+        `The smallest generated input that breaks it: ${cx}.`, c.message ? `What broke: \`${one(c.message, 400).replace(/`/g, "'")}\`` : null].filter(Boolean),
+      expected: { source: `the property ${ref}${spec.source ? ` (from: ${mdq(one(spec.source, 200))})` : ''}`, then: one(c.statement, 300) },
+      done: { given: 'any input of the generated kinds', when: c.kind === 'design' ? `\`${spec.page ?? '?'}\` is open` : 'the steps below run', then: one(c.statement, 300) },
+      repro: [...steps, `The input is ${cx}, where the steps say {input}.`],
+      lastOk: null, meta: [`property ${ref}`, `seed \`${c.seed ?? r.seed}\`${c.path ? `, path \`${one(c.path, 200)}\`` : ''}`], shots: [], video: null,
+    };
+  }
+  return null;
+}
 // A stress check is one id across its targets (scripts/stress.mjs): every target it failed on in the newest run.
 function stressProblem(ref) {
   const files = ls(join(work, 'stress')).map((b) => join(work, 'stress', b, 'stress.json')).filter(existsSync).sort((a, b) => mtime(b) - mtime(a));
@@ -316,7 +341,7 @@ function stressProblem(ref) {
 
 const problems = []; const missing = [];
 for (const ref of refs) {
-  const p = ref.startsWith('D-') ? designProblem(ref) : ref.startsWith('VAL-') ? validationProblem(ref) : ref.startsWith('STRESS-') ? stressProblem(ref) : testProblem(ref);
+  const p = ref.startsWith('D-') ? designProblem(ref) : ref.startsWith('VAL-') ? validationProblem(ref) : ref.startsWith('PROP-') ? propertyProblem(ref) : ref.startsWith('STRESS-') ? stressProblem(ref) : testProblem(ref);
   if (p) problems.push(p); else missing.push(ref);
 }
 if (!problems.length) { console.log(JSON.stringify({ error: 'none of the refs is known to work/', missing })); process.exit(2); }

@@ -15,6 +15,8 @@ touch -t 202001010000 "$WORK_DIR/design/b1/shots"; touch -t 202001020000 "$WORK_
 # The design checks: an old pull request build's map and shots go, a fresh map stays.
 old "$WORK_DIR/design-checks/pr-812/b9/map"; old "$WORK_DIR/design-checks/pr-812/b9/shots"
 mkdir -p "$WORK_DIR/design-checks/pr-813/b10/map"
+# The property module's crops: old ones go, its results stay.
+old "$WORK_DIR/property/c1/shots"; touch "$WORK_DIR/property/c1/results.json"
 out="$(bash "$SCRIPTS/preflight.sh" issues)"
 [ ! -d "$WORK_DIR/design/b1/shots" ] || { echo "  an old third sweep's shots kept"; FAILED=1; }
 [ -d "$WORK_DIR/design/b2/shots" ] && [ -d "$WORK_DIR/design/b3/shots" ] || { echo "  the two newest sweeps' shots deleted"; FAILED=1; }
@@ -25,5 +27,6 @@ out="$(bash "$SCRIPTS/preflight.sh" issues)"
 [ ! -d "$WORK_DIR/security/c1/report/media" ] || { echo "  delivered old security media kept"; FAILED=1; }
 [ ! -d "$WORK_DIR/design-checks/pr-812/b9/map" ] && [ ! -d "$WORK_DIR/design-checks/pr-812/b9/shots" ] || { echo "  an old pull request build's map or shots kept"; FAILED=1; }
 [ -d "$WORK_DIR/design-checks/pr-813/b10/map" ] || { echo "  a fresh pull request build's map deleted"; FAILED=1; }
-assert "sweep is logged" '.logs | map(select(test("retention: removed 6"))) | length == 1' "$out"
+[ ! -d "$WORK_DIR/property/c1/shots" ] && [ -f "$WORK_DIR/property/c1/results.json" ] || { echo "  old property shots kept, or its results deleted"; FAILED=1; }
+assert "sweep is logged" '.logs | map(select(test("retention: removed 7"))) | length == 1' "$out"
 exit $FAILED
