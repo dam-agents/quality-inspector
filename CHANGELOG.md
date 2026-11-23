@@ -18,6 +18,15 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 3. **Operator-only**, with `design_desk_findings: enabled`: the Design Desk's owner accepts the new
    `Check: property` value first ([docs/design-checks.md](docs/design-checks.md) → **4. To the Design Desk**).
 
+## 3.60.0 — 2026-11-23
+
+**Upgrade:**
+Nothing to run — the kit's `scripts/catalog.mjs` and `scripts/catalog/viewer.html` come with it; the next
+catalog build publishes the new page. A report opens on the dashboard as a panel of its own — the steps,
+the errors and the screenshots of each test — and no longer in a new window; the video stays in the
+report artifact, which the panel links ([docs/catalog.md](docs/catalog.md) → **The report on the page**).
+The first build renders the reports' screenshots into `work/catalog/thumbs/rep-*.jpg` once.
+
 ## 3.59.0 — 2026-11-04
 
 **Upgrade:**
