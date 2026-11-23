@@ -90,7 +90,7 @@ Only `profile` and `target_repo` are required; every other key has a working def
   after every turn; unset = local-only. Never read back but by a restore ([docs/persistence.md](docs/persistence.md) → **Backup & restore**).
 - `explorations` (`enabled`), `max_explorations_per_ac` (`3`; `0` = none) — checks beyond the ACs, outside every verdict ([docs/explorations.md](docs/explorations.md)); invalid → default.
 - The testing modules: `ui_sweep`, `validation_checks`, `property_checks`, `stress_checks`, `consistency_radar` (`disabled` | `per-build` | `weekly`), `design_checks` (`disabled` | `enabled`), `ux_signals` (`disabled` | `daily` | `weekly`; `ux_handoff` `manual` | `auto`), their tunables,
-  `focus_max_checks`, `modules_max_wallclock_min`, `dashboard_interactive` (`disabled`) — types, ranges and defaults in
+  `focus_max_checks`, `modules_max_wallclock_min`, `dashboard_interactive` (`disabled`; `enabled`: the dashboard on its server, [docs/catalog.md](docs/catalog.md) → The server) — types, ranges and defaults in
   `scripts/lib/modules.json`, read through `reg`, written only by `scripts/modules.sh set` ([docs/modules.md](docs/modules.md)); invalid → default.
 - `scenario_discovery` (`disabled` | `propose` | `run`), `scenario_channel` (Slack id for the digest;
   empty = chat UI), `max_scenarios_per_run` (`3`; also profile adoptions a night), `max_scenarios_per_day` (`10`), `profile_scenarios` (`enabled`; the profile's `scenarios/` join the nightly run), `regression_channel` (Slack id for the nightly summary and a black-box breach alert, else `slack_channel`; empty = chat UI) — [docs/scenarios.md](docs/scenarios.md); `blocker_alerts` (`disabled`; `enabled` also sends a blocker's notice there — [docs/autonomy.md](docs/autonomy.md)).

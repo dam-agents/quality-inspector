@@ -581,11 +581,39 @@ assert "an undrawn test frame: the plain still, not marked" '(.items[] | select(
 jq '.acs[0].mark = {box: {x: 1, y: 1, w: 4, h: 4}, saw: "The Chat control shows."}' "$W/issues/42/verdicts-abc-c1.json" > "$W/v.tmp" && mv "$W/v.tmp" "$W/issues/42/verdicts-abc-c1.json"
 node "$SCRIPTS/catalog.mjs" >/dev/null; data="$(page_data)"
 assert "an undrawn test frame: the agent's mark is tried" '(.items[] | select(.key == "issue-42/AC-1") | .marked == "agent")' "$data"
+# The interactive dashboard (docs/catalog.md → The server): data.json with every picture by reference
+# under work/, live.html with no data, a page hash that only the page itself changes.
+out="$(node "$SCRIPTS/catalog.mjs")"
+assert "the build names data.json, live.html and the page's hash" '(.data | endswith("catalog/data.json")) and (.live | endswith("catalog/live.html")) and (.page_hash | test("^[0-9a-f]{12}$")) and .page_changed == true' "$out"
+assert "data.json: the same items, every picture a path under work/" '(.items | length) > 0 and ([.images[]] | all(test("^(catalog/thumbs|design/crops)/[^/]+\\.(jpg|webp|png)$"))) and .hash != null' "$(cat "$W/catalog/data.json")"
+assert "data.json: a still names a reference of its images" '[.items[] | select(.still != null) | .still] as $s | ($s | length) > 0 and ($s | all(test("^r[0-9]+$")))' "$(cat "$W/catalog/data.json")"
+grep -q '<script type="application/json" id="qi-catalog-data">null</script>' "$W/catalog/live.html" || { echo "  live.html carries data"; FAILED=1; }
+ph="$(jq -r .page_hash <<<"$out")"; echo "$ph" > "$W/catalog/page.hash"
+assert "the same page: page_changed false" '.page_changed == false' "$(node "$SCRIPTS/catalog.mjs")"
+grep -o '"[^"]*_[a-z]*":"/[^"]*"' "$W/catalog/data.json" | head -1 | grep -q . && { echo "  data.json carries a private path field"; FAILED=1; }
+
+# The look (docs/catalog.md → The look): Design Desk's scale in the page's style sheet — text in five
+# sizes (a glyph's or a figure's own size aside), weights up to 600, no gradient, no white text on a fill.
+css="$(awk '/<style>/,/<\/style>/' "$SCRIPTS/catalog/viewer.html")"
+bad="$(grep -o '[^{}]*{[^}]*font-size:[0-9.]*px' <<<"$css" | grep -vE '^\s*(\.hico|\.fact \.fi|\.rico|\.welcome \.em|\.vico|\.kpi \.ke|\.kpi b|\.celebrate \.em|\.star|\.empty \.em|\.bstep \.grip|\.bph \.em|\.vhead \.vico)\{')"
+[ -z "$bad" ] || { echo "  a text size off the scale: $(head -c 200 <<<"$bad")"; FAILED=1; }
+grep -qE 'font-weight:(650|700|800|900|bold)' <<<"$css" && { echo "  a weight above 600"; FAILED=1; }
+grep -qE 'gradient\(1[0-9]{2}deg|--grad' <<<"$css" && { echo "  a gradient"; FAILED=1; }
+grep -qE 'color:#fff[;}]' <<<"$css" && { echo "  white text on a fill"; FAILED=1; }
+for v in '--fs-title:26px' '--fs-head:17px' '--fs-ui:14px' '--fs-meta:12.5px' '--fs-micro:11px' '--bg:#fcfbfc' '--fg:#1b1b1a' '--link:#2f5bd3'; do
+  grep -qF -- "$v" <<<"$css" || { echo "  the token $v is missing"; FAILED=1; }
+done
+
 # The report on the page (docs/catalog.md → The report on the page): per result its test on each
 # side — status, error, steps, screenshots — from the run's candidate_run and baseline_run; no
 # internal key travels; over its text budget a run keeps only its link, with a note.
 jq '.run.results[0].attempts[0] += {durationMs: 4200, error: {code: "assert", message: "The list shows the old name."}} | .run.results[0].attempts[0].steps[0] += {status: "passed", durationMs: 900}' \
   "$W/suite/.e2e/runs/cand/report.json" > "$W/r.tmp" && mv "$W/r.tmp" "$W/suite/.e2e/runs/cand/report.json"
+# A rendered report picture, as the renderer leaves it (no browser here): rep-<sha256 of the source path>.jpg.
+mkdir -p "$W/catalog/thumbs"
+while IFS= read -r src; do
+  h="$(printf '%s' "$src" | sha256sum | cut -c1-16)"; cp "$src" "$W/catalog/thumbs/rep-$h.jpg"; touch "$W/catalog/thumbs/rep-$h.jpg"
+done < <(find "$W/suite/.e2e/runs/cand" -name 's*.png')
 out="$(node "$SCRIPTS/catalog.mjs")"; data="$(page_data)"
 assert "an issue run carries its report: candidate and baseline sides" '(.runs[] | select(.type == "issue" and .ref == "#42") | .rep.side == "both"
   and .rep.results["issue-42/AC-1"].c.st == "failed" and .rep.results["issue-42/AC-1"].c.ms == 4200
@@ -593,6 +621,7 @@ assert "an issue run carries its report: candidate and baseline sides" '(.runs[]
   and .rep.results["issue-42/AC-1"].c.steps[0] == ["app.screenshot", "AC-1: the page", "passed", 900]
   and .rep.results["issue-42/AC-1"].b.st == "missing")' "$data"
 assert "a report screenshot has its caption, and its image when it fits" '[.runs[] | select(.type == "issue" and .rep) | .rep.results["issue-42/AC-1"].c.shots[]] | length >= 1 and (.[0].cap == "AC-1: the page")' "$data"
+assert "data.json: a report screenshot is a reference to its rep- picture" '.images as $im | [.runs[] | select(.type == "issue" and .rep) | .rep.results["issue-42/AC-1"].c.shots[].img] | length >= 1 and all(. != null and test("^r[0-9]+$") and ($im[.] | test("^catalog/thumbs/rep-[0-9a-f]{16}\\.jpg$")))' "$(cat "$W/catalog/data.json")"
 assert "no internal key of a run travels" '[.runs[] | has("_ev")] | any | not' "$data"
 assert "the output counts the reports on the page" '.reports >= 1 and (.report_shots | type == "number") and (.report_shots_dropped | type == "number")' "$out"
 out="$(QI_CATALOG_REPORT_MAX=10 node "$SCRIPTS/catalog.mjs")"; data="$(page_data)"

@@ -324,6 +324,15 @@ egressRules:
     pathPattern: "/*"
     verdict: deny
 
+# The dashboard's server (docs/catalog.md → The server): the interactive dashboard asks it for
+# its data, pictures and the agent's state, and sends its commands through it. Loopback only,
+# on the platform's Artifact API port; the platform names the caller on every request.
+startupItems:
+  - name: quality-inspector-dashboard
+    description: The dashboard's data and commands on the Artifact API port (loopback only)
+    command: ~/scripts/dashboard/serve.sh
+    args: []
+
 # A nested product runs a container runtime or a whole cluster (engines/helm-k3s needs
 # root), which an agent container cannot host: a kit that names no backend is created
 # as a container. On an install without virtualization the catalog hides the kit.

@@ -280,7 +280,10 @@ file → keep its values, show them once, and ask only for the keys it lacks. As
      its issue) in a bound Slack conversation, `incident_desk: enabled` (its conversation's `C…` id, its
      bot's `U…` id; [docs/escapes.md](docs/escapes.md));
    - `dashboard_interactive: enabled` when the operator has Interactive artifacts on in the
-     platform (the dashboard's buttons then send commands to this chat).
+     platform — recommended: the dashboard then runs on its server (live data, every picture, the
+     agent's state now) and its buttons send commands to this chat ([docs/catalog.md](docs/catalog.md)
+     → The server). With it, run `bash "$HOME/scripts/dashboard-service.sh" check` (a FAIL →
+     `install`) before the first catalog build.
 
    Nothing for the live browser: it is detected ([docs/test-authoring.md](docs/test-authoring.md)
    → Watching live); `live_browser` only overrides it, or `disabled` turns it off. Name, never
