@@ -31,6 +31,14 @@ When <one user action>
 Expected <an observable outcome every correct implementation shows>
 surface: ui | cli | api
 requires: viewer | nothing
+
+## EX-4 (from AC-2, heuristic: risk)
+risk: R-3
+Given …
+When …
+Expected …
+surface: ui
+requires: nothing
 ```
 
 ## Heuristic catalogue
@@ -47,6 +55,7 @@ The only allowed sources; each EX names exactly one, by its name in the first co
 | `roles-isolation` | its object reached by a `member`, `viewer` or `outsider` (another tenant) | cannot see or act beyond what `SKILL.md` says the role may |
 | `error-visibility` | its action made to fail (missing prerequisite, invalid state) | the failure is shown to the user, never silent |
 | `boundary-values` | a limit the issue states: 0, 1, max, max+1 | inside accepted, outside refused visibly |
+| `risk` | a rule of `work/RISKS.md` that `risks.mjs match` returns for this issue ([risks.md](risks.md)) — a defect that got through before | the rule's check, made concrete for this issue, never wider |
 
 - **Expected states only what every correct implementation satisfies.** A choice the issue
   leaves open (refuse or allow a duplicate) is written either-or, never guessed; no exact
@@ -56,6 +65,8 @@ The only allowed sources; each EX names exactly one, by its name in the first co
   `max_explorations_per_ac`; at most 3 × the testable ACs per issue; a check two ACs
   share is one EX; a check already made elsewhere is no EX
   ([test-authoring.md](test-authoring.md) → **Tested once**). Number EX-1… in AC order.
+  `risk` EXs come after the others, one per matched rule, at most `max_risk_checks_per_issue` (3),
+  outside both caps ([risks.md](risks.md) → **In an issue run**).
 
 ## Identities
 
@@ -111,7 +122,9 @@ Read the trace before writing an `observation`, as for a `failed` AC. Confirm a 
 `verdicts-<ac_hash>-<candidate>.json` ([reporting.md](reporting.md) → **Verdicts file**) adds
 `"explorations_run": "issue-<n>-explorations"`, `"ex_hash"` (from `--ex-hash`) and
 `"explorations": [{"id": "EX-1", "from_ac": "AC-1", "heuristic": "roles-isolation", "given": "…", "when": "…", "expected": "…", "surface": "ui", "verdict": "observation", "severity": "major", "note": "…"}]`
-— `given` / `when` / `expected` verbatim from the explorations file. `render-report.mjs`
+— `given` / `when` / `expected` verbatim from the explorations file; a `risk` EX adds `"risk": "R-<k>"`
+and `"mode": "observe" | "enforce"` (the rule's mode at the run), and `risks.mjs hit` counts its result.
+The report leaves out an `observe` EX (it counts in `work/RISKS.md` only); an `enforce` one shows with its rule. `render-report.mjs`
 renders them after the ACs as "Beyond the criteria", labelled not part of the verdict,
 candidate side only, and adds one line to `comment.md`:
 `N explorations beyond the criteria: M observations (see evidence)`.

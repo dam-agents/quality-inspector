@@ -28,6 +28,15 @@ and scores it: "did the model upgrade help?", "did the new `e2e` break judgment?
 - A useful set has both kinds and at least one case per verdict the agent may give.
   Ground truth lives only here; it is never shown to the pipeline that runs a case.
 
+### Escape cases
+
+An `issue` case whose `expected` holds `bug` — one sentence of what a user sees go wrong — replays an
+issue at the build where a defect got through this agent ([escapes.md](escapes.md)). The sentence is
+the answer key: the run scores only when what it produced describes **that** defect. `escapes.mjs
+propose-case` writes one to `work/benchmark/proposed/E-<k>.json`; the operator's "accept E-<k> as a
+benchmark case" adds it here. Keep the cases that pass beside the ones that missed, as the control
+against flagging too much: a set of escape cases alone rewards an agent that fails everything.
+
 ## The run (schedule `quality-inspector-benchmark-monthly`, or "run the benchmark")
 
 The pre-flight's `benchmark` mode is due when cases exist and the last run is 28 days old,
@@ -46,8 +55,22 @@ or the definition version, `e2e_version`, `e2e_model` or `profile` changed since
    with the input's `tag`; every file under `work/benchmark/runs/$RUN/<case>/` (criteria,
    `verdicts.json` with `minutes` and `cost_usd` added, the rendered report); no
    `QA.md`/`SUITE.md` rows, no comments, no artifact.
+4b. **Grade each escape case** yourself, after its sub-agent ended — the grader is not the pipeline:
+   read the case's `bug` in `cases.json` and its run directory, and write
+   `work/benchmark/runs/$RUN/<case>/grade.json`:
+   `{"stages": {"criteria": …, "test": …, "flagged": …, "reported": …}, "by": "<AC-k | IN-k | EX-k | null>", "note": "…"}`,
+   each `true` or `false`:
+   `criteria` — a criterion, intent test or exploration states the behaviour the bug breaks;
+   `test` — its test reached the step where the bug shows (its trace shows the input, role and state);
+   `flagged` — its verdict is not a pass (`failed`, `regression`, `observation`), or a `noticed` item shows it;
+   `reported` — the report's analysis has a problem that describes this bug.
+   A finding about something else is `false`, however true it is. The score counts a stage only while
+   every stage before it holds.
 5. `bash "$HOME/scripts/benchmark.sh" score "$RUN"` → the summary (also appended to
-   `work/benchmark/history.jsonl`).
+   `work/benchmark/history.jsonl`). With escape cases it adds `escape_recall` per stage and, per case,
+   `lost_at` — the first stage that lost the bug (`ungraded` without a `grade.json`). A recall that drops
+   between two stages shows where defects are lost: `criteria` → the freeze, `test` → authoring,
+   `flagged` → judgment, `reported` → the report.
 6. `env.sh unlock benchmark`. Report, and publish it as one artifact when
    `artifact_reports: enabled`:
 
@@ -55,6 +78,7 @@ or the definition version, `e2e_version`, `e2e_model` or `profile` changed since
 📏 Benchmark <RUN> — AC accuracy 0.92 (23/25) · issue accuracy 0.88 · false verified 0 · false failed 1 · blocked 8 %
 vs last run: accuracy +0.04 · cost −12 % · minutes +5
 Misses: false-claim AC-1 expected failed, got inconclusive — <one line why, from its report>
+Escapes: 4 cases · recall criteria 1.00 → test 0.75 → flagged 0.50 → reported 0.50 · lost: escape-E-3 at test, escape-E-7 at flagged
 ```
 
 **`false_verified` above 0 is the headline**: the agent called something verified that is

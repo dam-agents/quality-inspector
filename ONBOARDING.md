@@ -276,6 +276,9 @@ file → keep its values, show them once, and ask only for the keys it lacks. As
      only when the profile has a `ux_signals` entry; with a Design Desk agent in a bound Slack
      conversation, also `design_desk_findings` (its conversation's `C…` id, its bot's `U…` id;
      [docs/design-checks.md](docs/design-checks.md));
+   - with an Incident Desk agent (it follows the product's bugs and incidents and traces each one to
+     its issue) in a bound Slack conversation, `incident_desk: enabled` (its conversation's `C…` id, its
+     bot's `U…` id; [docs/escapes.md](docs/escapes.md));
    - `dashboard_interactive: enabled` when the operator has Interactive artifacts on in the
      platform (the dashboard's buttons then send commands to this chat).
 
@@ -364,6 +367,10 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - design_desk_bot:
 - design_desk_max_per_run: 5
 - design_desk_min_severity: medium
+- incident_desk: disabled
+- incident_desk_channel:
+- incident_desk_bot:
+- max_risk_checks_per_issue: 3
 
 - profile.chart_ref: oci://quay.io/dam-agents/charts/platform
 - profile.mock_image: quay.io/dam-agents/mock:<sha>
