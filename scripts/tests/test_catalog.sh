@@ -570,4 +570,21 @@ assert "an undrawn test frame: the plain still, not marked" '(.items[] | select(
 jq '.acs[0].mark = {box: {x: 1, y: 1, w: 4, h: 4}, saw: "The Chat control shows."}' "$W/issues/42/verdicts-abc-c1.json" > "$W/v.tmp" && mv "$W/v.tmp" "$W/issues/42/verdicts-abc-c1.json"
 node "$SCRIPTS/catalog.mjs" >/dev/null; data="$(page_data)"
 assert "an undrawn test frame: the agent's mark is tried" '(.items[] | select(.key == "issue-42/AC-1") | .marked == "agent")' "$data"
+# The report on the page (docs/catalog.md → The report on the page): per result its test on each
+# side — status, error, steps, screenshots — from the run's candidate_run and baseline_run; no
+# internal key travels; over its text budget a run keeps only its link, with a note.
+jq '.run.results[0].attempts[0] += {durationMs: 4200, error: {code: "assert", message: "The list shows the old name."}} | .run.results[0].attempts[0].steps[0] += {status: "passed", durationMs: 900}' \
+  "$W/suite/.e2e/runs/cand/report.json" > "$W/r.tmp" && mv "$W/r.tmp" "$W/suite/.e2e/runs/cand/report.json"
+out="$(node "$SCRIPTS/catalog.mjs")"; data="$(page_data)"
+assert "an issue run carries its report: candidate and baseline sides" '(.runs[] | select(.type == "issue" and .ref == "#42") | .rep.side == "both"
+  and .rep.results["issue-42/AC-1"].c.st == "failed" and .rep.results["issue-42/AC-1"].c.ms == 4200
+  and .rep.results["issue-42/AC-1"].c.err == "assert: The list shows the old name."
+  and .rep.results["issue-42/AC-1"].c.steps[0] == ["app.screenshot", "AC-1: the page", "passed", 900]
+  and .rep.results["issue-42/AC-1"].b.st == "missing")' "$data"
+assert "a report screenshot has its caption, and its image when it fits" '[.runs[] | select(.type == "issue" and .rep) | .rep.results["issue-42/AC-1"].c.shots[]] | length >= 1 and (.[0].cap == "AC-1: the page")' "$data"
+assert "no internal key of a run travels" '[.runs[] | has("_ev")] | any | not' "$data"
+assert "the output counts the reports on the page" '.reports >= 1 and (.report_shots | type == "number") and (.report_shots_dropped | type == "number")' "$out"
+out="$(QI_CATALOG_REPORT_MAX=10 node "$SCRIPTS/catalog.mjs")"; data="$(page_data)"
+assert "over its text budget a run keeps only its link" '[.runs[] | select(.rep)] | length == 0' "$data"
+assert "a note says so" '.notes | any(test("older report\\(s\\) not on the page"))' "$out"
 exit $FAILED
