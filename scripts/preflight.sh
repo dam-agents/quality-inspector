@@ -124,6 +124,8 @@ retention_sweep() {
   # findings went out in their own run.
   while IFS= read -r d; do rm -rf "$d" && n=$((n+1)); done < <(find "$WORK/design-checks" -mindepth 2 -maxdepth 3 -type d \( -name shots -o -name crops -o -name map \) -mtime +"$MEDIA_DAYS" 2>/dev/null)
   find "$WORK/design-checks/radar" -mindepth 2 -maxdepth 2 -type f -name '*.png' -mtime +"$MEDIA_DAYS" -delete 2>/dev/null
+  # The property module's crops (docs/property.md): the register renders its own; the Design Desk took its run's.
+  while IFS= read -r d; do rm -rf "$d" && n=$((n+1)); done < <(find "$WORK/property" -mindepth 2 -maxdepth 2 -type d -name shots -mtime +"$MEDIA_DAYS" 2>/dev/null)
   [ "$n" -gt 0 ] && log "retention: removed $n media directories older than ${MEDIA_DAYS}d"
   return 0
 }

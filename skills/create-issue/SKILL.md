@@ -32,6 +32,7 @@ the draft waits for the operator's confirmation.
 | `S-7 AC-1`, `P-<slug> AC-1` | a scenario's or a profile scenario's criterion |
 | `D-12` | a design finding ([docs/ui-sweep.md](../../docs/ui-sweep.md)) |
 | `VAL-3` | a validation case of the newest validation run ([docs/validation.md](../../docs/validation.md)) |
+| `PROP-4` | a property of the newest property run, with its smallest breaking input ([docs/property.md](../../docs/property.md)) |
 | `STRESS-API-2` | a check of the newest stress run, on every target it failed ([docs/stress.md](../../docs/stress.md)) |
 
 `for the architect` adds `fix_label` (work/CONFIG.md; no default) — the label the software

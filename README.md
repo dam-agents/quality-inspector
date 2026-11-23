@@ -38,7 +38,7 @@ core (run types, schedules, invariants); the definition is versioned (`VERSION` 
   A weekly discovery run (off by default) proposes scenarios of its own
   ([docs/scenarios.md](docs/scenarios.md), [docs/judge.md](docs/judge.md)).
 - **Testing modules** (nightly, each off by default, switched from the dashboard) — UI sweep,
-  form validation, bounded stress, design checks, real-user UX signals, a deep test of one area
+  form validation, property-based checks with generated inputs, bounded stress, design checks, real-user UX signals, a deep test of one area
   ([docs/modules.md](docs/modules.md)).
 - **Audit** (weekly), **benchmark** (monthly), **Change radar** (every 3 hours) — all off by
   default ([docs/audit.md](docs/audit.md), [docs/benchmark.md](docs/benchmark.md),

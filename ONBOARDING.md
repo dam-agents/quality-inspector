@@ -346,6 +346,10 @@ Write the file in exactly this shape (the profile block shows `qi-profile-dam`'s
 - stress_checks: disabled
 - stress_max_concurrency: 10
 - stress_duration_s: 60
+- property_checks: disabled
+- property_runs: 50
+- property_max_properties: 12
+- property_max_seconds: 180
 - focus_max_checks: 12
 - consistency_radar: disabled
 - consistency_max_pages: 40
