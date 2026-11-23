@@ -7,6 +7,22 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.62.0 — 2026-11-23
+
+**Upgrade:**
+1. Nothing to run — docs are re-read per run, and `work/ESCAPES.md` and `work/RISKS.md` are made by the first
+   `scripts/escapes.mjs intake` and `scripts/risks.mjs add`. An issue run now checks the risk rules its issue
+   meets as explorations of heuristic `risk`; a new rule runs in `observe` (counted, not shown) until the
+   operator's "enforce R-k" ([docs/risks.md](docs/risks.md)). The weekly audit adds the `escapes` and `risks`
+   checks; a problem of the analysis may carry `pre_existing: true`, shown as "Pre-existing"
+   ([docs/reporting.md](docs/reporting.md)).
+2. **Offer** `incident_desk: enabled` with `incident_desk_channel` and `incident_desk_bot` when an Incident
+   Desk agent (it traces the product's bugs and incidents to their issues) writes in a conversation this
+   agent is bound to: its escaped-defect messages are recorded, their phase named and answered once
+   ([docs/escapes.md](docs/escapes.md)); then `bash "$HOME/scripts/verify-onboarding.sh" --config`.
+3. Nothing to run — `work/benchmark/cases.json` takes escape cases (`expected.bug`), graded stage by stage;
+   the score adds `escape_recall` and `lost_at` ([docs/benchmark.md](docs/benchmark.md) → **Escape cases**).
+
 ## 3.61.0 — 2026-11-23
 
 **Upgrade:**

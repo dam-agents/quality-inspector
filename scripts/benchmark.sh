@@ -9,6 +9,12 @@
 #                                    answers; JSON summary on stdout, one line appended to
 #                                    work/benchmark/history.jsonl
 #
+# A case whose `expected` names a `bug` (an escaped defect, docs/escapes.md) is graded by
+# stage in its grade.json — {"stages": {"criteria", "test", "flagged", "reported"}} each
+# true or false, written by the grader after the case ran (docs/benchmark.md → Escape cases).
+# The score adds `escape_recall` per stage and, per case, `lost_at`: the first stage that
+# did not hold the bug — so a loss between two stages shows, not only the end result.
+#
 # work/benchmark/cases.json is the operator's ground truth. Inputs never carry it, and the
 # pipeline that runs a case never reads it.
 
@@ -42,8 +48,9 @@ cmd_due() {
 cmd_prepare() {
   local run="${1:?run-id}" id
   [ -f "$CASES" ] || die "no $CASES"
-  jq -e 'type == "array" and all(.[]; .id and (.type == "issue" or .type == "criteria") and .expected)' "$CASES" >/dev/null \
-    || die "cases.json: every case needs id, type issue|criteria, expected"
+  jq -e 'type == "array" and all(.[]; .id and (.type == "issue" or .type == "criteria") and .expected
+         and ((.expected.bug // "") | type == "string"))' "$CASES" >/dev/null \
+    || die "cases.json: every case needs id, type issue|criteria, expected (a bug is one sentence)"
   for id in $(jq -r '.[].id' "$CASES"); do
     mkdir -p "$B/runs/$run/$id"
     jq --arg id "$id" '.[] | select(.id == $id) | del(.expected, .note) | . + {tag: ("issue-bench-" + .id)}' "$CASES" \
@@ -53,18 +60,23 @@ cmd_prepare() {
 }
 
 cmd_score() {
-  local run="${1:?run-id}" dir="$B/runs/${1:-}" per='[]' id exp got v
+  local run="${1:?run-id}" dir="$B/runs/${1:-}" per='[]' id exp got v gr
   [ -d "$dir" ] || die "no run $run"
   for id in $(jq -r '.[].id' "$CASES"); do
     exp="$(jq -c --arg id "$id" '.[] | select(.id == $id) | .expected' "$CASES")"
     v="$dir/$id/verdicts.json"
     if [ -f "$v" ]; then got="$(jq -c '{verdict, acs: ([.acs[]? | {(.id): .verdict}] | add // {}), minutes: .minutes, cost_usd: .cost_usd}' "$v")"
     else got='{"verdict":null,"acs":{},"missing":true}'; fi
-    per="$(jq -c --arg id "$id" --argjson e "$exp" --argjson g "$got" '. + [{
+    # An escape case's stages: each holds only while the one before it held.
+    gr="$(jq -c '[.stages.criteria, .stages.test, .stages.flagged, .stages.reported] | map(. == true)
+                 | {criteria: .[0], test: (.[0] and .[1]), flagged: (.[0] and .[1] and .[2]), reported: (.[0] and .[1] and .[2] and .[3])}' \
+           "$dir/$id/grade.json" 2>/dev/null || echo null)"
+    per="$(jq -c --arg id "$id" --argjson e "$exp" --argjson g "$got" --argjson gr "$gr" '. + [{
       id:$id, expected:$e, got:$g,
       issue_match: (if $e.verdict then ($e.verdict == $g.verdict) else null end),
       ac: [($e.acs // {}) | to_entries[] | {ac:.key, expected:.value, got:($g.acs[.key] // null)}]
-    }]' <<<"$per")"
+    } + (if $e.bug then {stages: $gr, lost_at: (if $gr == null then "ungraded"
+           else ([["criteria","test","flagged","reported"][] as $k | select($gr[$k] | not) | $k] | first // null) end)} else {} end)]' <<<"$per")"
   done
   local fp; fp="$(fingerprint)"
   jq -c --arg run "$run" --arg utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg fp "$fp" '
@@ -77,6 +89,10 @@ cmd_score() {
        false_verified: ($acs | map(select(.got == "verified" and .expected != "verified")) | length),
        false_failed:   ($acs | map(select(.got == "failed" and .expected != "failed")) | length),
        blocked_rate: (if ($acs | length) == 0 then null else ($acs | map(select(.got == "blocked" or .got == "flaky")) | length) / ($acs | length) end),
+       escape_cases: (map(select(.expected.bug)) | length),
+       escape_recall: (map(select(.expected.bug and .stages != null)) as $g
+         | if ($g | length) == 0 then null
+           else (["criteria","test","flagged","reported"] | map(. as $k | {($k): (($g | map(select(.stages[$k])) | length) / ($g | length))}) | add) end),
        minutes: (map(.got.minutes // 0) | add), cost_usd: (map(.got.cost_usd // 0) | add),
        per_case: .}' <<<"$per" | tee -a "$B/history.jsonl"
 }

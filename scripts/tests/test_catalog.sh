@@ -60,12 +60,20 @@ When the viewer opens the project
 Expected renaming is not offered
 surface: ui
 requires: viewer
+
+## EX-2 (from AC-1, heuristic: risk)
+risk: R-1
+Given a project with a 200-character name
+When the owner renames it
+Expected the whole name is saved
+surface: ui
+requires: nothing
 C
 cat > "$W/issues/42/verdicts-abc-c1.json" <<'J'
 {"issue":42,"title":"Rename <b>projects</b>","ac_hash":"abc","candidate":"c1","baseline":"b1","candidate_run":"cand","baseline_run":"base",
  "verdict":"partial","generated_utc":"2026-10-02T14:00:00Z","trigger":{"via":"github","who":null,"why":"label qa:ready on #42"},
  "acs":[{"id":"AC-1","name":"renamed","verdict":"verified"},{"id":"AC-2","name":"internal","testable":false,"verdict":"not-testable"}],
- "explorations":[{"id":"EX-1","verdict":"observation","note":"NOTE-SECRET"}],
+ "explorations":[{"id":"EX-1","verdict":"observation","note":"NOTE-SECRET"},{"id":"EX-2","risk":"R-1","mode":"observe","verdict":"observation"}],
  "notes":["NOTE-SECRET in the notes"]}
 J
 echo abc123 > "$W/issues/42/artifact.id"
@@ -285,6 +293,8 @@ assert "AC-1 from criteria, test and SUITE" "$i"' | .tier == "regression" and .t
 assert "AC-1 steps" "$i"' | [.steps[].kind] == ["open","act","shot","expect"] and (.steps[1].text | test("\\{name\\}-2"))' "$data"
 assert "AC-1 history: issue verdict, healed night, implied unchanged night" "$i"' | [.history[] | .run + ":" + .value] == ["issue:verified","regression:healed","regression:unchanged"] and .verdict.build == "c3"' "$data"
 assert "AC-1 heals and flakes" "$i"' | .heals == [{"utc":"2026-10-10T03:30:00Z","build":"c2","basis":"ui-map"}] and .flaky[0].passes == 2' "$data"
+assert "a risk check in observe mode is no item and no run entry" '([.items[] | select(.key == "issue-42/EX-2")] | length == 0)
+  and ([.runs[]? | .entries[]? | select(.key == "issue-42/EX-2")] | length == 0)' "$data"
 assert "AC-2 not testable" '.items[] | select(.key == "issue-42/AC-2") | .testable == false and .tier == "untracked" and .verdict.value == "not-testable"' "$data"
 assert "EX-1 exploration" '.items[] | select(.key == "issue-42/EX-1") | .kind == "exploration" and .tier == "exploratory" and (.history | all(.run != "regression")) and .session == "viewer" and .then == "renaming is not offered" and .checks.agent_asserts == 1' "$data"
 assert "scenario item" '.items[] | select(.key == "scenario-7/AC-1") | .origin == {"kind":"scenario","ref":"S-7","title":"upload a <i>large</i> file","source":"slack"} and .verdict.value == "passed"

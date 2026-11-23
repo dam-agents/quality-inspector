@@ -310,16 +310,19 @@ const acs = (v.acs ?? []).map((ac) => {
 });
 
 // Explorations: candidate only, never part of the verdict (docs/explorations.md).
-const exps = (v.explorations ?? []).map((ex) => agentMark({ ...ex, cand: evidence(runs.explore, ex, '-ex') }));
+// A risk check in observe mode (docs/risks.md) ran and counts in work/RISKS.md, but no reader sees it yet.
+const observed = (v.explorations ?? []).filter((ex) => ex.risk && ex.mode === 'observe');
+const exps = (v.explorations ?? []).filter((ex) => !observed.includes(ex)).map((ex) => agentMark({ ...ex, cand: evidence(runs.explore, ex, '-ex') }));
+const heur = (ex) => (ex.risk ? `risk ${ex.risk}` : ex.heuristic);
 const observations = exps.filter((ex) => ex.verdict === 'observation').length;
 const exHtml = !exps.length ? '' : `
 <section id="beyond-the-criteria">
 <h2>Beyond the criteria</h2>
 <p class="dim"><b>Not part of the verdict.</b> Checks the agent derived from the criteria (negative paths, persistence, roles…) and ran on the candidate only. An <b>observation</b> is something worth a look; it never changes a criterion's verdict.${v.ex_hash ? ` · checks <code>ex=${esc(v.ex_hash)}</code>` : ''}</p>
-<table><thead><tr><th>EX</th><th>From</th><th>Heuristic</th><th>Candidate</th><th>Result</th></tr></thead><tbody>${exps.map((ex) => `<tr><td><a href="#${esc(slug(key(ex)))}">${esc(ex.id)}</a></td><td>${esc(ex.from_ac)}</td><td>${esc(ex.heuristic)}</td><td>${stateBadge(ex.cand?.state ?? 'not-run')}</td><td>${badge(ex.verdict)} ${sevBadge(ex.severity)}</td></tr>`).join('')}</tbody></table>
+<table><thead><tr><th>EX</th><th>From</th><th>Heuristic</th><th>Candidate</th><th>Result</th></tr></thead><tbody>${exps.map((ex) => `<tr><td><a href="#${esc(slug(key(ex)))}">${esc(ex.id)}</a></td><td>${esc(ex.from_ac)}</td><td>${esc(heur(ex))}</td><td>${stateBadge(ex.cand?.state ?? 'not-run')}</td><td>${badge(ex.verdict)} ${sevBadge(ex.severity)}</td></tr>`).join('')}</tbody></table>
 ${exps.map((ex) => `
 <article class="ac" id="${esc(slug(key(ex)))}">
-  <header><h3>${esc(ex.id)} <span class="dim">from ${esc(ex.from_ac)} · ${esc(ex.heuristic)}${ex.surface ? ` · ${esc(ex.surface)}` : ''}</span></h3><span>${badge(ex.verdict)} ${sevBadge(ex.severity)}</span></header>
+  <header><h3>${esc(ex.id)} <span class="dim">from ${esc(ex.from_ac)} · ${esc(heur(ex))}${ex.surface ? ` · ${esc(ex.surface)}` : ''}</span></h3><span>${badge(ex.verdict)} ${sevBadge(ex.severity)}</span></header>
   <blockquote>${ex.given ? `<b>Given</b> ${esc(ex.given)}<br>` : ''}${ex.when ? `<b>When</b> ${esc(ex.when)}<br>` : ''}${ex.expected ? `<b>Expected</b> ${esc(ex.expected)}` : ''}</blockquote>
   ${ex.note ? `<p class="note">${esc(ex.note)}</p>` : ''}
   <div class="sides">${sideHtml(`Candidate ${v.candidate ?? ''}`, ex.cand)}</div>
@@ -420,7 +423,7 @@ const analysisHtml = !an || !(an.summary || anProblems.length || an.next) ? '' :
 <section class="agent" id="analysis">
 <h2>What the agent found</h2>
 ${an.summary ? `<p>${esc(an.summary)}</p>` : ''}
-${anProblems.map((p) => `<div class="problem"><h3>${CAUSE_TEXT[p.cause] ? `<span class="badge warn">${esc(CAUSE_TEXT[p.cause])}</span> ` : ''}${PROBLEM_SEVERITY.includes(p.severity) ? `${badge(p.severity)} ` : ''}${esc(p.title)}</h3>
+${anProblems.map((p) => `<div class="problem"><h3>${CAUSE_TEXT[p.cause] ? `<span class="badge warn">${esc(CAUSE_TEXT[p.cause])}</span> ` : ''}${PROBLEM_SEVERITY.includes(p.severity) ? `${badge(p.severity)} ` : ''}${p.pre_existing === true ? '<span class="badge muted" title="The baseline shows it too: it was there before this change">Pre-existing</span> ' : ''}${esc(p.title)}</h3>
 ${(p.about ?? []).length ? `<p class="dim">About: ${p.about.map((r) => esc(r)).join(', ')}</p>` : ''}
 <dl>${anRow('What happened', p.what)}${anRow('Where', p.where)}${anRow('Probable cause', p.why ? `${p.why}${p.certainty ? ` (certainty: ${p.certainty})` : ''}` : null)}${anRow('How to repair it', p.fix)}</dl></div>`).join('')}
 ${an.next ? `<p><b>Next step:</b> ${esc(an.next)}</p>` : ''}
@@ -532,6 +535,7 @@ if (!regression) {
 console.log(JSON.stringify({ out: outDir, acs: acs.length, ...(regression ? {} : { proof: Math.min(proofRows.length, PROOF_MAX) }), videos: acs.flatMap((a) => [a.cand?.video, a.base?.video]).filter(Boolean).length, screenshots: acs.flatMap((a) => [...(a.cand?.shots ?? []), ...(a.base?.shots ?? [])]).length,
   ...(intents.length || intentVerdict ? { intents: intents.length, intent_verdict: intentVerdict, intent_videos: intents.flatMap((x) => [x.cand?.video, x.base?.video]).filter(Boolean).length } : {}),
   ...(exps.length ? { explorations: exps.length, observations, exploration_videos: exps.filter((e) => e.cand?.video).length } : {}),
+  ...(observed.length ? { risk_checks_observed: observed.length } : {}),
   ...(noticed.length ? { noticed: noticed.length } : {}) }));
 
 // The security run's page: one severity-sorted table; e2e findings keep their video.

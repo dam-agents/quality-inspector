@@ -42,7 +42,8 @@
 #   run-mode         Write Edit …          work/env/RUN_MODE (only `precheck.sh slack <n>` writes it)
 #   scheduled-def    Write Edit … (sched.) work/CONFIG.md, work/OPERATOR.md (the operator's standing preferences),
 #                                          work/FOCUS.md, work/design/DISMISSED.md, work/design/CATEGORIES.md
-#                                          (docs/modules.md), work/FOUND.md (skills/create-issue)
+#                                          (docs/modules.md), work/FOUND.md (skills/create-issue), work/RISKS.md
+#                                          and work/benchmark/cases.json (scripts/risks.mjs, scripts/escapes.mjs)
 #   scheduled-git    Bash (scheduled)      git commit
 #   policy-tamper    Bash (scheduled)      any command naming RUN_MODE (the Slack marker), scripts/hooks/ or .claude/settings
 #   channel-write    Bash (channel turn)   a command naming github.sh, comment or unlabel in any spelling
@@ -499,8 +500,8 @@ check_write() {
     && deny channel-write "$p" "a channel turn writes no file that names github.sh (docs/slack.md)"
   [ "$p" = "$WORK/env/RUN_MODE" ] && deny run-mode "$p" "only precheck.sh slack <n> writes the Slack marker"
   if under "$p" "$WORK"; then
-    case "$p" in ("$WORK/CONFIG.md"|"$WORK/OPERATOR.md"|"$WORK/FOCUS.md"|"$WORK/design/DISMISSED.md"|"$WORK/design/CATEGORIES.md"|"$WORK/FOUND.md")
-      scheduled && deny scheduled-def "$p" "a scheduled run or a channel turn never changes the configuration, the operator's preferences, the focus queue, the design findings' triage or the found issues";; esac
+    case "$p" in ("$WORK/CONFIG.md"|"$WORK/OPERATOR.md"|"$WORK/FOCUS.md"|"$WORK/design/DISMISSED.md"|"$WORK/design/CATEGORIES.md"|"$WORK/FOUND.md"|"$WORK/RISKS.md"|"$WORK/benchmark/cases.json")
+      scheduled && deny scheduled-def "$p" "a scheduled run or a channel turn never changes the configuration, the operator's preferences, the focus queue, the design findings' triage, the found issues, the risk rules or the benchmark cases (their scripts write them: risks.mjs, escapes.mjs)";; esac
     return 0
   fi
   in_tmp_qi "$p" && return 0

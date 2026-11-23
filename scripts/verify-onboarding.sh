@@ -85,6 +85,7 @@ confirm_regressions bisect_max_steps max_wallclock_min_per_issue max_model_steps
 scenario_discovery scenario_channel profile_scenarios regression_channel blocker_alerts max_scenarios_per_run max_scenarios_per_day work_repo test_catalog radar_window_days
 lend_model nested_target live_browser slack_channel slack_tests_per_day slack_report_visibility report_visibility github_login found_label fix_label
 design_label design_desk_findings design_desk_channel design_desk_bot design_desk_max_per_run design_desk_min_severity
+incident_desk incident_desk_channel incident_desk_bot max_risk_checks_per_issue
 $(jq -r '[.global, (.modules[] | select(.kind == "modules" or .kind == "queue") | .settings)] | add | keys[]' "$SCRIPT_DIR/lib/modules.json" 2>/dev/null)"
 
 if [ "$STRUCTURE" = 1 ]; then
@@ -211,6 +212,18 @@ if [ -f "$CONFIG" ]; then
     elif [ -z "$v" ] && [ "$(cfg design_desk_findings)" = enabled ]; then fail "cfg:$n" "empty while design_desk_findings is enabled" "set $why, or disable design_desk_findings"
     else ok "cfg:$n" "${v:-empty}"; fi
   done
+  # Escaped defects from the Incident Desk (docs/escapes.md): off unless enabled, and then only with its conversation and bot.
+  enum incident_desk "enabled disabled"
+  for k in incident_desk_channel:'^[CDG][A-Z0-9]{6,20}$':"the C…/G…/D… id of the conversation the Incident Desk writes in" \
+           incident_desk_bot:'^[UWB][A-Z0-9]{6,20}$':"the Incident Desk bot's member id (U…), the one sender taken there"; do
+    n="${k%%:*}"; r="${k#*:}"; why="${r#*:}"; r="${r%%:*}"; v="$(cfg "$n")"
+    if [ -n "$v" ] && ! printf '%s' "$v" | grep -qE "$r"; then fail "cfg:$n" "'$v' is not $why" "set $why, or leave it empty"
+    elif [ -z "$v" ] && [ "$(cfg incident_desk)" = enabled ]; then fail "cfg:$n" "empty while incident_desk is enabled" "set $why, or disable incident_desk"
+    else ok "cfg:$n" "${v:-empty}"; fi
+  done
+  v="$(cfg max_risk_checks_per_issue)"
+  case "$v" in ('') ok cfg:max_risk_checks_per_issue default;; (*[!0-9]*) fail cfg:max_risk_checks_per_issue "'$v' is not a number" "set 0-10";;
+    (*) [ "$v" -le 10 ] && ok cfg:max_risk_checks_per_issue "$v" || fail cfg:max_risk_checks_per_issue "'$v' is not 0-10" "set 0-10";; esac
   v="$(cfg design_desk_max_per_run)"
   case "$v" in ('') ok cfg:design_desk_max_per_run default;; (*[!0-9]*) fail cfg:design_desk_max_per_run "'$v' is not a number" "set 1-20";;
     (*) [ "$v" -ge 1 ] && [ "$v" -le 20 ] && ok cfg:design_desk_max_per_run "$v" || fail cfg:design_desk_max_per_run "'$v' is not 1-20" "set 1-20";; esac

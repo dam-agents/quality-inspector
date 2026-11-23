@@ -145,17 +145,21 @@ cat > "$R/expl/report.json" <<'J'
 J
 jq '. + {explorations_run: "expl", ex_hash: "e0e0e0e0e0e0", explorations: [
   {id:"EX-1", from_ac:"AC-1", heuristic:"roles-isolation", given:"a viewer", when:"opens the agent", expected:"no rename <action>", surface:"ui", verdict:"observation", severity:"major", note:"confirmed 3/3"},
-  {id:"EX-2", from_ac:"AC-1", heuristic:"persistence", given:"a renamed agent", when:"reload", expected:"new name stays", surface:"ui", verdict:"observed-ok", severity:null}]}' \
+  {id:"EX-2", from_ac:"AC-1", heuristic:"persistence", given:"a renamed agent", when:"reload", expected:"new name stays", surface:"ui", verdict:"observed-ok", severity:null},
+  {id:"EX-3", from_ac:"AC-1", heuristic:"risk", risk:"R-1", mode:"observe", given:"a long name", when:"rename", expected:"saved whole", surface:"ui", verdict:"observation", severity:"minor"},
+  {id:"EX-4", from_ac:"AC-1", heuristic:"risk", risk:"R-2", mode:"enforce", given:"an emoji name", when:"rename", expected:"saved whole", surface:"ui", verdict:"observed-ok", severity:null}]}' \
   "$SANDBOX/v.json" > "$SANDBOX/vx.json"
 out="$(QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/vx.json" "$SANDBOX/outx")"
-assert "explorations counted apart from the ACs" '.videos == 2 and .screenshots == 2 and .explorations == 2 and .observations == 1 and .exploration_videos == 1' "$out"
+assert "explorations counted apart from the ACs" '.videos == 2 and .screenshots == 2 and .explorations == 3 and .observations == 1 and .exploration_videos == 1 and .risk_checks_observed == 1' "$out"
 hx="$(cat "$SANDBOX/outx/index.html")"
 case "$hx" in *'Beyond the criteria'*'Not part of the verdict'*) ;; *) echo "  explorations section or its label missing"; FAILED=1;; esac
 case "$hx" in *'rename offered to viewer'*'EX-1: the agent page as the viewer'*) ;; *) echo "  EX evidence missing"; FAILED=1;; esac
+case "$hx" in *'EX-3'*) echo "  a risk check in observe mode is shown"; FAILED=1;; esac
+case "$hx" in *'risk R-2'*) ;; *) echo "  an enforced risk check does not name its rule"; FAILED=1;; esac
 case "$hx" in *'no rename &lt;action&gt;'*) ;; *) echo "  EX expected not escaped"; FAILED=1;; esac
 case "$hx" in *'<h1>#42 — Rename &lt;b&gt;</h1><span class="badge ok">Verified</span>'*) ;; *) echo "  an observation changed the issue verdict"; FAILED=1;; esac
 [ "$(ls "$SANDBOX/outx/media" | wc -l | tr -d ' ')" = 6 ] || { echo "  expected the AC media plus EX-1's video and screenshot"; FAILED=1; }
-grep -qx '2 explorations beyond the criteria: 1 observations (see evidence)' "$SANDBOX/outx/comment.md" || { echo "  explorations comment line missing"; FAILED=1; }
+grep -qx '3 explorations beyond the criteria: 1 observations (see evidence)' "$SANDBOX/outx/comment.md" || { echo "  explorations comment line missing"; FAILED=1; }
 [ "$(grep -c 'EX-' "$SANDBOX/outx/comment.md")" = 0 ] || { echo "  the comment must not list explorations"; FAILED=1; }
 
 # Intent tests (docs/intent.md): red-green like a criterion, found by issue-<n> + in-<k> in the same
@@ -224,7 +228,8 @@ cat > "$SANDBOX/r2.json" <<'J'
  "acs":[{"issue":42,"id":"AC-1","name":"renamed","then":"the new name shows","verdict":"regression",
          "explanation":"passes on c1, fails on c2","regressed_between":{"from":"c1.5","to":"c2","builds_between":0}}],
  "analysis":{"summary":"One <b>regression</b>: the rename does not save.","next":"Send it to the team.","problems":[{"title":"The rename does not save","about":["#42 AC-1"],"severity":"high",
-   "cause":"product","what":"The new name shows, then the old name.","where":"/projects","why":"PUT /api/projects answered 500.","fix":"The product team repairs the save.","certainty":"high"}]}}
+   "cause":"product","what":"The new name shows, then the old name.","where":"/projects","why":"PUT /api/projects answered 500.","fix":"The product team repairs the save.","certainty":"high"},
+   {"title":"The project count is wrong","about":["#42 AC-1"],"severity":"low","cause":"product","pre_existing":true}]}}
 J
 QI_RUNS_ROOT="$R" node "$SCRIPTS/render-report.mjs" "$SANDBOX/r2.json" "$SANDBOX/rout2" >/dev/null
 h="$(cat "$SANDBOX/rout2/index.html")"
@@ -232,6 +237,8 @@ case "$h" in *'Regressed between</b> <code>c1.5</code> (passes) and <code>c2</co
 case "$h" in *'removed flag --force'*) ;; *) echo "  interface diff not rendered"; FAILED=1;; esac
 # The agent's analysis (docs/reporting.md → The agent's analysis): above the table, escaped.
 case "$h" in *'What the agent found'*'One &lt;b&gt;regression'*'Product defect'*'>High</span> The rename does not save'*'Probable cause</dt><dd>PUT /api/projects answered 500. (certainty: high)'*'How to repair it'*'Next step:</b> Send it to the team.'*'<table>'*) ;; *) echo "  the agent's analysis missing, unescaped or below the table"; FAILED=1;; esac
+case "$h" in *'Pre-existing</span> The project count is wrong'*) ;; *) echo "  a pre-existing problem is not marked"; FAILED=1;; esac
+case "$h" in *'Pre-existing</span> The rename'*) echo "  a new problem is marked pre-existing"; FAILED=1;; esac
 grep -q 'What the agent found' "$SANDBOX/rout/index.html" && { echo "  a report without an analysis shows the section"; FAILED=1; }
 
 # Scenario mode: tests tagged scenario-<k>, the judge's reading, the channel reply as comment.md.

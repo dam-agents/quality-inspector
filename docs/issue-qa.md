@@ -70,7 +70,8 @@ build **carries its change**: the change merged, and the candidate was published
    written **before** you look at the product; an existing one (a takeover or a retest of the
    same text) is reused unchanged. A contradiction adds `## Q-<k>` sections, never an AC change
    (→ **Contradictions**). Then the intent file, judged before it freezes ([intent.md](intent.md)),
-   and, unless `explorations: disabled`, the explorations file ([explorations.md](explorations.md)).
+   and, unless `explorations: disabled`, the explorations file ([explorations.md](explorations.md)),
+   with one `risk` EX per rule `risks.mjs match` returns for the issue ([risks.md](risks.md)).
    No testable AC → verdict `not-testable`, go to step 8.
 4. **Candidate environment.** `bash "$HOME/scripts/env.sh" wait <candidate>` — again while it exits 3
    ([nested-env.md](nested-env.md) → Shape) — then

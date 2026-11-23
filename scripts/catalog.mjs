@@ -175,6 +175,9 @@ function parseTestFile(src) {
 // --------------------------------------------------------------------- verdicts
 const history = new Map(); // item key -> [{build, run, value, utc}]
 const addHist = (key, h) => { if (!h.value) return; (history.get(key) ?? history.set(key, []).get(key)).push(h); };
+// A risk check in observe mode (docs/risks.md) counts in work/RISKS.md only: no reader sees it yet.
+const observedRisk = new Set(); // item keys
+const isObserved = (e) => !!(e?.risk && e.mode === 'observe');
 const stillRuns = new Map(); // item key -> [{label, utc, mark}] candidate runs, newest last; mark: the entry's agent mark
 const evidence = new Map(); // origin key -> artifact reference
 const titles = new Map(); // origin key -> title from a verdicts file
@@ -244,18 +247,19 @@ function readVerdicts(dir, okey, run, ref) {
     const utc = v.generated_utc ?? new Date(mtime(join(dir, f))).toISOString().replace(/\.\d+Z$/, 'Z');
     const build = v.candidate ?? v.build ?? null;
     if (v.title) titles.set(okey, v.title);
+    for (const ex of v.explorations ?? []) if (isObserved(ex)) observedRisk.add(`${okey}/${ex.id}`);
     // A scenario's file has no top verdict: its worst criterion stands for the run.
     const worst = (v.acs ?? []).map((e) => e?.verdict).filter(Boolean).sort((a, b) => rank(a) - rank(b))[0] ?? null;
     runs.push({ type: run, ref, build, baseline: v.baseline ?? null, utc, verdict: v.verdict ?? worst, report: artRef(dir), secs: secsOf(v, utc), cost_usd: costOf(v),
       analysis: analysisOf(v), trigger: triggerOf(v), _ev: { c: v.candidate_run ?? null, b: v.baseline_run ?? null, x: v.explorations_run ?? null },
-      entries: [...(v.acs ?? []), ...(v.intents ?? []), ...(v.explorations ?? [])].filter((e) => e?.id && e.verdict).map((e) => withWhy({ key: `${okey}/${e.id}`, value: e.verdict, cause: causeOf(e) }, whyOf(e))) });
+      entries: [...(v.acs ?? []), ...(v.intents ?? []), ...(v.explorations ?? []).filter((e) => !isObserved(e))].filter((e) => e?.id && e.verdict).map((e) => withWhy({ key: `${okey}/${e.id}`, value: e.verdict, cause: causeOf(e) }, whyOf(e))) });
     // An intent test (docs/intent.md) runs in the same candidate run as the criteria.
     for (const ac of [...(v.acs ?? []), ...(v.intents ?? [])]) {
       const key = `${okey}/${ac.id}`;
       addHist(key, withWhy({ build, run, value: ac.verdict, utc, cause: causeOf(ac) }, whyOf(ac)));
       if (v.candidate_run) (stillRuns.get(key) ?? stillRuns.set(key, []).get(key)).push({ label: v.candidate_run, utc, mark: ac.mark ?? null });
     }
-    for (const ex of v.explorations ?? []) {
+    for (const ex of (v.explorations ?? []).filter((e) => !isObserved(e))) {
       const key = `${okey}/${ex.id}`;
       addHist(key, withWhy({ build, run: 'exploration', value: ex.verdict, utc, cause: causeOf(ex) }, whyOf(ex)));
       if (v.explorations_run) (stillRuns.get(key) ?? stillRuns.set(key, []).get(key)).push({ label: v.explorations_run, utc, mark: ex.mark ?? null });
@@ -442,6 +446,7 @@ for (const okey of [...origins].sort((a, b) => a.localeCompare(b, 'en', { numeri
     const c = [...(crit?.acs ?? []), ...(ins?.acs ?? []), ...(exps?.acs ?? [])].find((a) => a.id === id) ?? {};
     const t = parsed.tests.find((x) => x.id === id);
     const key = `${okey}/${id}`;
+    if (observedRisk.has(key)) continue;
     const ex = id.startsWith('EX');
     const hist = (history.get(key) ?? []).slice();
     if (row?.tier === 'regression' && !ex && t) {

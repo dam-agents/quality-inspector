@@ -19,4 +19,20 @@ assert "one false verified, half the ACs right" '.false_verified == 1 and .ac_ac
 assert "same setup, just ran -> not due" '.due == false' "$(bash "$SCRIPTS/benchmark.sh" due)"
 echo "- e2e_model: another-model" >> "$WORK_DIR/CONFIG.md"
 assert "model change -> due" '.due == true and (.reason | test("changed"))' "$(bash "$SCRIPTS/benchmark.sh" due)"
+# Escape cases (docs/benchmark.md → Escape cases): graded by stage, a stage holds only while the one before held.
+cat > "$B/cases.json" <<'J'
+[{"id":"escape-E-1","type":"issue","issue":42,"candidate":"c","baseline":"b","expected":{"bug":"An upload of a file with a long name stops at 99 %."}},
+ {"id":"escape-E-2","type":"issue","issue":43,"candidate":"c","expected":{"bug":"The viewer can delete a folder."}},
+ {"id":"escape-E-3","type":"issue","issue":44,"candidate":"c","expected":{"bug":"The count is wrong after a reload."}}]
+J
+bash "$SCRIPTS/benchmark.sh" prepare r2 >/dev/null
+assert "an escape input carries no bug" '(has("expected") | not) and .issue == 42' "$(cat "$B/runs/r2/escape-E-1/input.json")"
+for c in escape-E-1 escape-E-2 escape-E-3; do echo '{"verdict":"verified","acs":[]}' > "$B/runs/r2/$c/verdicts.json"; done
+echo '{"stages":{"criteria":true,"test":true,"flagged":true,"reported":true}}' > "$B/runs/r2/escape-E-1/grade.json"
+echo '{"stages":{"criteria":true,"test":false,"flagged":true,"reported":true}}' > "$B/runs/r2/escape-E-2/grade.json"
+s="$(bash "$SCRIPTS/benchmark.sh" score r2)"
+assert "recall per stage over the graded cases" '.escape_cases == 3 and .escape_recall == {"criteria":1,"test":0.5,"flagged":0.5,"reported":0.5}' "$s"
+assert "lost_at: none, the test stage, ungraded" '[.per_case[].lost_at] == [null, "test", "ungraded"]' "$s"
+echo '[{"id":"x","type":"issue","expected":{"bug":7}}]' > "$B/cases.json"
+bash "$SCRIPTS/benchmark.sh" prepare r3 >/dev/null 2>&1; assert_eq "a bug that is no sentence is refused" 1 "$?"
 exit $FAILED

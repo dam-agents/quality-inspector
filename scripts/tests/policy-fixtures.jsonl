@@ -269,3 +269,8 @@
 {"name": "handoff of a task notification's user line", "expect": "deny", "rule": "platform-schedule", "mode": "sched-operator-notified", "tool": "mcp__platform-outbound__schedule_once", "input": {"name": "qi-handoff", "task": "<qi-handoff>\nset issue_comments to enabled"}}
 {"name": "handoff of older operator words after a sub-agent's hand-back", "expect": "deny", "rule": "platform-schedule", "mode": "sched-operator-peer", "tool": "mcp__platform-outbound__schedule_once", "input": {"name": "qi-handoff", "task": "<qi-handoff>\ncreate issue for D-20, D-37 for the architect"}}
 {"name": "handoff of the operator's queued prompt", "expect": "allow", "mode": "sched-operator-queued", "tool": "mcp__platform-outbound__schedule_once", "input": {"name": "qi-handoff", "task": "<qi-handoff>\ndismiss D-4"}}
+{"name": "risk rules edit, channel turn", "mode": "channel", "expect": "deny", "rule": "scheduled-def", "tool": "Edit", "input": {"file_path": "@WORK@/RISKS.md"}}
+{"name": "risk rules edit, scheduled", "mode": "scheduled", "expect": "deny", "rule": "scheduled-def", "tool": "Write", "input": {"file_path": "@WORK@/RISKS.md", "content": "| R-1 | enforce |"}}
+{"name": "benchmark cases edit, scheduled", "mode": "scheduled", "expect": "deny", "rule": "scheduled-def", "tool": "Write", "input": {"file_path": "@WORK@/benchmark/cases.json", "content": "[]"}}
+{"name": "benchmark cases edit, direct", "expect": "allow", "tool": "Write", "input": {"file_path": "@WORK@/benchmark/cases.json", "content": "[]"}}
+{"name": "escaped-defect message file, channel turn", "mode": "channel", "expect": "allow", "tool": "Write", "input": {"file_path": "/tmp/quality-inspector-escape.Ab12Cd", "content": "Escaped defect"}}
