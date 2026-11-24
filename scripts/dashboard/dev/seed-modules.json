@@ -1,0 +1,505 @@
+{
+ "schema": "qi-modules-status/v1",
+ "cadences": [
+  "disabled",
+  "per-build",
+  "weekly"
+ ],
+ "modules": [
+  {
+   "id": "issues",
+   "title": "Issue criteria",
+   "kind": "core",
+   "what": "Freezes each labelled issue's acceptance criteria and checks them red-green against the last release.",
+   "doc": "docs/issue-qa.md",
+   "switch": null,
+   "state": "on",
+   "schedule": null,
+   "last_run": null,
+   "settings": {
+    "max_issues_per_run": {
+     "type": "int",
+     "min": 1,
+     "max": 20,
+     "default": 1,
+     "value": "1"
+    },
+    "max_wallclock_min_per_issue": {
+     "type": "int",
+     "min": 1,
+     "max": 1440,
+     "default": 150,
+     "value": "150"
+    },
+    "max_model_steps_per_issue": {
+     "type": "int",
+     "min": 1,
+     "max": 5000,
+     "default": 400,
+     "value": "400"
+    }
+   }
+  },
+  {
+   "id": "edge-cases",
+   "title": "Edge cases",
+   "kind": "config",
+   "what": "Checks beyond each criterion: invalid input, persistence, roles, idempotence, boundaries. Never a verdict.",
+   "doc": "docs/explorations.md",
+   "switch": "explorations",
+   "state": "enabled",
+   "schedule": null,
+   "last_run": null,
+   "settings": {
+    "explorations": {
+     "type": "enum",
+     "values": [
+      "enabled",
+      "disabled"
+     ],
+     "default": "enabled",
+     "value": "enabled"
+    },
+    "max_explorations_per_ac": {
+     "type": "int",
+     "min": 0,
+     "max": 5,
+     "default": 3,
+     "value": "3"
+    }
+   }
+  },
+  {
+   "id": "regression",
+   "title": "Nightly regression",
+   "kind": "schedule",
+   "what": "Replays the promoted tests on every new build, aware of what changed.",
+   "doc": "docs/regression.md",
+   "switch": null,
+   "state": "on",
+   "schedule": {
+    "name": "quality-inspector-regression-nightly",
+    "enabled": true,
+    "cron": "0 3 * * *"
+   },
+   "last_run": {
+    "utc": "2026-10-13T03:00:00Z",
+    "candidate": "c4"
+   },
+   "settings": {
+    "confirm_regressions": {
+     "type": "enum",
+     "values": [
+      "disabled",
+      "enabled"
+     ],
+     "default": "disabled",
+     "value": "disabled"
+    },
+    "bisect_max_steps": {
+     "type": "int",
+     "min": 0,
+     "max": 20,
+     "default": 0,
+     "value": "0"
+    }
+   }
+  },
+  {
+   "id": "security",
+   "title": "Security checks",
+   "kind": "schedule",
+   "what": "Black-box OWASP checks of the nested product. Findings stay in a private report.",
+   "doc": "docs/security.md",
+   "switch": "security_checks",
+   "state": "on",
+   "schedule": {
+    "name": "quality-inspector-security-weekly",
+    "enabled": true,
+    "cron": "0 4 * * 0"
+   },
+   "last_run": null,
+   "settings": {
+    "security_checks": {
+     "type": "enum",
+     "values": [
+      "enabled",
+      "disabled"
+     ],
+     "default": "enabled",
+     "value": "on"
+    },
+    "security_failed_logins": {
+     "type": "int",
+     "min": 1,
+     "max": 100,
+     "default": 10,
+     "value": "10"
+    }
+   }
+  },
+  {
+   "id": "discovery",
+   "title": "Scenario discovery",
+   "kind": "schedule",
+   "what": "Proposes user flows nobody asked for yet, and tests them when allowed.",
+   "doc": "docs/scenarios.md",
+   "switch": "scenario_discovery",
+   "state": "propose",
+   "schedule": {
+    "name": "quality-inspector-scenarios-weekly",
+    "enabled": true,
+    "cron": "0 6 * * 3"
+   },
+   "last_run": null,
+   "settings": {
+    "scenario_discovery": {
+     "type": "enum",
+     "values": [
+      "disabled",
+      "propose",
+      "run"
+     ],
+     "default": "disabled",
+     "value": "propose"
+    },
+    "max_scenarios_per_run": {
+     "type": "int",
+     "min": 0,
+     "max": 50,
+     "default": 3,
+     "value": "3"
+    }
+   }
+  },
+  {
+   "id": "benchmark",
+   "title": "Benchmark",
+   "kind": "schedule",
+   "what": "Scores this agent's own verdicts on cases with a known answer.",
+   "doc": "docs/benchmark.md",
+   "switch": null,
+   "state": "unknown",
+   "schedule": {
+    "name": "quality-inspector-benchmark-monthly",
+    "enabled": false,
+    "cron": "0 5 1 * *"
+   },
+   "last_run": null,
+   "settings": {}
+  },
+  {
+   "id": "radar",
+   "title": "Change radar",
+   "kind": "schedule",
+   "what": "Reads the titles and descriptions of pull requests and proposes a review of the recurring tests that a change can affect.",
+   "doc": "docs/radar.md",
+   "switch": null,
+   "state": "unknown",
+   "schedule": {
+    "name": "quality-inspector-radar-3h",
+    "enabled": false,
+    "cron": "15 */3 * * *"
+   },
+   "last_run": null,
+   "settings": {
+    "radar_window_days": {
+     "type": "int",
+     "min": 1,
+     "max": 30,
+     "default": 3,
+     "value": "3"
+    }
+   }
+  },
+  {
+   "id": "audit",
+   "title": "Audit",
+   "kind": "schedule",
+   "what": "Weekly health check of the agent: schedules, logs, costs, the suite.",
+   "doc": "docs/audit.md",
+   "switch": null,
+   "state": "unknown",
+   "schedule": {
+    "name": "quality-inspector-audit-weekly",
+    "enabled": true,
+    "cron": "0 7 * * 5"
+   },
+   "last_run": null,
+   "settings": {}
+  },
+  {
+   "id": "ui-sweep",
+   "title": "UI sweep",
+   "kind": "modules",
+   "what": "Walks every mapped page at several screen sizes and finds layout, visual and accessibility defects for design.",
+   "doc": "docs/ui-sweep.md",
+   "switch": "ui_sweep",
+   "state": "weekly",
+   "schedule": null,
+   "last_run": null,
+   "settings": {
+    "ui_sweep": {
+     "type": "cadence",
+     "default": "disabled",
+     "value": "weekly"
+    },
+    "ui_sweep_viewports": {
+     "type": "viewports",
+     "default": "1440x900,768x1024,390x844",
+     "value": "1440x900,768x1024,390x844"
+    },
+    "ui_sweep_review_pages": {
+     "type": "int",
+     "min": 0,
+     "max": 30,
+     "default": 10,
+     "value": "10"
+    }
+   }
+  },
+  {
+   "id": "validation",
+   "title": "Form validation",
+   "kind": "modules",
+   "what": "Fills every mapped form with empty, too long, wrong-type, unicode and duplicate input.",
+   "doc": "docs/validation.md",
+   "switch": "validation_checks",
+   "state": "per-build",
+   "schedule": null,
+   "last_run": null,
+   "settings": {
+    "validation_checks": {
+     "type": "cadence",
+     "default": "disabled",
+     "value": "per-build"
+    },
+    "validation_max_cases": {
+     "type": "int",
+     "min": 1,
+     "max": 200,
+     "default": 60,
+     "value": "60"
+    }
+   }
+  },
+  {
+   "id": "property",
+   "title": "Property checks",
+   "kind": "modules",
+   "what": "Tries invariants the agent states (round trip, one effect for a double submit, counts and totals, the same state on two surfaces, a layout that holds at every width, zoom, text length and locale) with many generated inputs, and shrinks a failure to the smallest one.",
+   "doc": "docs/property.md",
+   "switch": "property_checks",
+   "state": "disabled",
+   "schedule": null,
+   "last_run": null,
+   "settings": {
+    "property_checks": {
+     "type": "cadence",
+     "default": "disabled",
+     "value": "disabled"
+    },
+    "property_runs": {
+     "type": "int",
+     "min": 1,
+     "max": 500,
+     "default": 50,
+     "value": "50"
+    },
+    "property_max_properties": {
+     "type": "int",
+     "min": 1,
+     "max": 50,
+     "default": 12,
+     "value": "12"
+    },
+    "property_max_seconds": {
+     "type": "int",
+     "min": 10,
+     "max": 1800,
+     "default": 180,
+     "value": "180"
+    }
+   }
+  },
+  {
+   "id": "stress",
+   "title": "Stress",
+   "kind": "modules",
+   "what": "Bounded concurrent load on the local product: errors, slowdowns, and whether it stays up.",
+   "doc": "docs/stress.md",
+   "switch": "stress_checks",
+   "state": "disabled",
+   "schedule": null,
+   "last_run": null,
+   "settings": {
+    "stress_checks": {
+     "type": "cadence",
+     "default": "disabled",
+     "value": "disabled"
+    },
+    "stress_max_concurrency": {
+     "type": "int",
+     "min": 1,
+     "max": 50,
+     "default": 10,
+     "value": "10"
+    },
+    "stress_duration_s": {
+     "type": "int",
+     "min": 1,
+     "max": 300,
+     "default": 60,
+     "value": "60"
+    }
+   }
+  },
+  {
+   "id": "consistency",
+   "title": "Inconsistency radar",
+   "kind": "modules",
+   "what": "Walks the main screens and finds patterns that look different for the same job: page headers, margins, buttons, empty states.",
+   "doc": "docs/design-checks.md",
+   "switch": "consistency_radar",
+   "state": "disabled",
+   "schedule": null,
+   "last_run": null,
+   "settings": {
+    "consistency_radar": {
+     "type": "cadence",
+     "default": "disabled",
+     "value": "disabled"
+    },
+    "consistency_max_pages": {
+     "type": "int",
+     "min": 5,
+     "max": 100,
+     "default": 40,
+     "value": "40"
+    }
+   }
+  },
+  {
+   "id": "design-check",
+   "title": "PR design check",
+   "kind": "modules",
+   "what": "Checks the screens that a labelled pull request changes, on the first main build after its merge (or its own build): missing states, accessibility in light and dark, design tokens, retired words.",
+   "doc": "docs/design-checks.md",
+   "switch": "design_checks",
+   "state": "enabled",
+   "schedule": null,
+   "last_run": null,
+   "settings": {
+    "design_checks": {
+     "type": "enum",
+     "values": [
+      "disabled",
+      "enabled"
+     ],
+     "default": "disabled",
+     "value": "enabled"
+    },
+    "design_check_max_prs": {
+     "type": "int",
+     "min": 1,
+     "max": 5,
+     "default": 1,
+     "value": "1"
+    },
+    "design_check_max_pages": {
+     "type": "int",
+     "min": 1,
+     "max": 20,
+     "default": 6,
+     "value": "6"
+    }
+   }
+  },
+  {
+   "id": "ux-signals",
+   "title": "Real-user UX signals",
+   "kind": "modules",
+   "what": "Reads how real users fare in the UI, replays the worst signals on the build they ran, and turns confirmed ones into design findings for Design Desk.",
+   "doc": "docs/ux-signals.md",
+   "switch": "ux_signals",
+   "state": "disabled",
+   "schedule": null,
+   "last_run": null,
+   "settings": {
+    "ux_signals": {
+     "type": "enum",
+     "values": [
+      "disabled",
+      "daily",
+      "weekly"
+     ],
+     "default": "disabled",
+     "value": "disabled"
+    },
+    "ux_period_days": {
+     "type": "int",
+     "min": 1,
+     "max": 90,
+     "default": 7,
+     "value": "7"
+    },
+    "ux_max_candidates": {
+     "type": "int",
+     "min": 0,
+     "max": 20,
+     "default": 3,
+     "value": "3"
+    },
+    "ux_handoff": {
+     "type": "enum",
+     "values": [
+      "manual",
+      "auto"
+     ],
+     "default": "manual",
+     "value": "manual"
+    }
+   }
+  },
+  {
+   "id": "feature-focus",
+   "title": "Feature focus",
+   "kind": "queue",
+   "what": "Tests one area of the product in depth, once, on request.",
+   "doc": "docs/modules.md",
+   "switch": null,
+   "state": "on",
+   "schedule": null,
+   "last_run": null,
+   "settings": {
+    "focus_max_checks": {
+     "type": "int",
+     "min": 1,
+     "max": 30,
+     "default": 12,
+     "value": "12"
+    }
+   }
+  }
+ ],
+ "global": {
+  "modules_max_wallclock_min": {
+   "type": "int",
+   "min": 15,
+   "max": 1440,
+   "default": 90,
+   "value": "90"
+  },
+  "dashboard_interactive": {
+   "type": "enum",
+   "values": [
+    "disabled",
+    "enabled"
+   ],
+   "default": "disabled",
+   "value": "enabled"
+  }
+ },
+ "focus": [],
+ "schedules_as_of": null
+}

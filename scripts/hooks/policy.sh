@@ -66,6 +66,9 @@
 #                                          dismissals are the operator's word (docs/modules.md → Control);
 #                                          the script refuses them outside the direct session itself, and
 #                                          the session variables it judges that by are never set by hand
+#   dashboard-api    Bash (scheduled)      a command whose text, its quoting gone (dash_names), names the dashboard
+#                                          server on loopback (an address with :5555), QI_DASHBOARD_PORT or its dev
+#                                          harness: the server writes the operator's actions for the relay's `owner` alone
 #   issue-create     Bash (scheduled)      a command whose text, its quotes, escapes and $'…' read as bash reads
 #                                          them (issue_names), holds create-issue: opening an issue
 #                                          (scripts/github.sh create-issue) is the operator's word in the direct
@@ -403,6 +406,19 @@ mod_names() { # <text> — 0 when it names modules.sh or a session variable dire
   NW_STAR_FREE=""
   return "$r"
 }
+# dashboard-api — the dashboard server in the text once bash's quoting is gone, as issue_names reads it:
+# a loopback address with its port (127.0.0.1, localhost, [::1] or 0.0.0.0, then :5555), its port's
+# variable (QI_DASHBOARD_PORT), or its dev harness. A product's own `/api/settings` on another host is no
+# match. Limit: an address or port built at run time is out of reach of text; the server's own checks
+# (the relay's caller headers) stay the first layer.
+RE_DASH='(127\.0\.0\.1|localhost|\[::1\]|0\.0\.0\.0):5555([^0-9]|$)'
+dash_names() { # <text>
+  local bsnl=$'\\\n'
+  ansi_c_decoded "$1"; X="${X//"$bsnl"/}"; X="${X//[\"\'\\]/}"
+  [[ "$X" =~ $RE_DASH ]] && return 0
+  case "$X" in (*QI_DASHBOARD_PORT*|*dashboard/dev/harness*) return 0;; esac
+  return 1
+}
 # issue-create — the text `create-issue` once bash's quoting is gone: each $'…' span decoded,
 # quotes, backslashes and line continuations dropped (create-"issue", cr\eate-issue). A glob or a
 # name joined at run time is out of reach of text; github.sh then refuses outside the direct session.
@@ -476,6 +492,8 @@ check_bash() {
   case "$CMD" in (*QI_TARGET_REPO*) deny github "QI_TARGET_REPO" "the target comes from work/CONFIG.md alone";; esac
   chan_names "$CMD" && channel_turn && check_channel_writes "$CMD"
   mod_names "$CMD" && scheduled && check_module_cmd "$CMD"
+  dash_names "$CMD" && scheduled \
+    && deny dashboard-api "the dashboard server" "a scheduled run or a channel turn never calls the dashboard server: it writes the operator's settings for the platform's relay only (docs/catalog.md → The server)"
   issue_names "$CMD" && scheduled \
     && deny issue-create "scripts/github.sh" "a new issue is opened only on the operator's word in the direct session (skills/create-issue)"
   case "$CMD" in (*'<<'*) strip_heredocs "$CMD"; CMD="$X";; esac

@@ -6,10 +6,12 @@
 //   open "http://localhost:5600/"                          (the operator)
 //   open "http://localhost:5600/?as=pat@example.com&role=viewer"
 //   open "http://localhost:5600/?static=1"                 (the static page, index.html, as published without the server)
+//   open "http://localhost:5600/?page=new"                 (the new page, scripts/dashboard/page.html: docs/dashboard-page.md)
 // The harness starts the server itself on the second port (QI_DASHBOARD_PORT), unless one answers
 // there already. The stand-in sets the caller headers the platform's relay would set; sendPrompt only
 // logs. It is never part of a deployment. The page is read again on every load.
 import { createServer } from 'node:http';
+import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,13 +19,17 @@ import { fileURLToPath } from 'node:url';
 const [port = '5600', apiPort = '5599'] = process.argv.slice(2);
 const HERE = dirname(fileURLToPath(import.meta.url));
 const viewer = join(HERE, '..', '..', 'catalog', 'viewer.html');
+const page = join(HERE, '..', 'page.html');
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 
 const up = await fetch(`http://127.0.0.1:${apiPort}/health`).then((r) => r.ok, () => false);
+// Its own process, as the Login item starts it: modules.sh writes the operator's settings only for a
+// child of scripts/dashboard/server.mjs (docs/modules.md → Control).
 if (!up) {
-  process.env.QI_DASHBOARD_PORT = apiPort;
-  const { server } = await import('../server.mjs');
-  server.listen(Number(apiPort), '127.0.0.1');
+  const child = spawn(process.execPath, [join(HERE, '..', 'server.mjs')], { env: { ...process.env, QI_DASHBOARD_PORT: apiPort, WORK_DIR: work }, stdio: ['ignore', 'inherit', 'inherit'] });
+  process.on('exit', () => child.kill());
+  for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { child.kill(); process.exit(0); });
+  for (let k = 0; k < 50 && !(await fetch(`http://127.0.0.1:${apiPort}/health`).then((r) => r.ok, () => false)); k++) await new Promise((ok) => setTimeout(ok, 100));
 }
 
 const shim = `<script>
@@ -63,6 +69,8 @@ createServer(async (req, res) => {
   let html;
   if (url.searchParams.get('static') === '1') {
     try { html = readFileSync(join(work, 'catalog', 'index.html'), 'utf8'); } catch { html = '<p>No work/catalog/index.html: run scripts/catalog.mjs first.</p>'; }
+  } else if (url.searchParams.get('page') === 'new') {
+    html = readFileSync(page, 'utf8').replace('<head>', `<head>${shim}`);
   } else {
     html = readFileSync(viewer, 'utf8').replace('__QI_CATALOG_DATA__', 'null').replace('<head>', `<head>${shim}`);
   }

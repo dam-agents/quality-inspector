@@ -87,8 +87,9 @@ The operator may share the page beyond themselves, so it carries only what conce
   (without one, the first path segment the test opens).
 - **Facets**, automatic: tier, origin, the issue or scenario, kind, verdict, run type, surface, area, page, session,
   issue labels and state, flags (flaky, healed, drift, quarantined, `agent.assert`, still).
-- **Collections**, the operator's, in `work/CATALOG.md` — changed only on their word in the
-  direct session ("add #42 and S-7 to the collection Upload"):
+- **Collections**, the operator's, in `work/CATALOG.md` — changed only on their word: in the direct
+  session (`scripts/collections.mjs`, "add #42 and S-7 to the collection Upload"), or pressed on the
+  dashboard, which the dashboard server writes at once with the same code (`scripts/lib/collections.mjs`):
 
   ```
   | collection | members |
@@ -219,6 +220,11 @@ catalog's Report column, cards, Home, the map's test lists, an item's and an ori
 Runs view and the run panel — and opens **on the page** (below), never in a new window, while the
 page keeps it; else as before, a link in a new tab or the "private" mark.
 
+**A run's number.** Each run is its report, `R-<n>`: its `id`, given by `catalog.mjs` in the order
+it first sees the runs (the oldest first in one build) and kept in `work/catalog/runs.json` by the
+run's kind, origin, build and time. A run keeps its number when older runs leave the page, and a
+number is never given twice; the new page links a report by it ([dashboard-page.md](dashboard-page.md)).
+
 **The report on the page.** A run's report is a panel of its own (🎬 Report, address `r=<run>&rp=1`;
 an origin's report opens its newest run's): the run's verdict, build and baseline, the agent's
 analysis, then per result its badge, cause, the agent's sentence and its test on the new build and
@@ -325,17 +331,36 @@ published once, and asks the server for everything it shows.
   (`kit.yaml` → `startupItems`, command `~/scripts/dashboard/serve.sh`). It listens on
   `127.0.0.1:5555`, the platform's Artifact API port, and answers only the platform's relay, which names
   the caller on every request (`owner` — the operator — or `viewer`, with the verified email); the page
-  cannot forge those headers. It writes only `work/dashboard/commands.jsonl` and never executes what a
-  page sends.
+  cannot forge those headers. It writes `work/dashboard/commands.jsonl`, and the operator's own settings
+  through `modules.sh` (below); it never executes what a page sends.
 - `bash "$HOME/scripts/dashboard-service.sh" check` says whether it answers; `install` writes the
   service for an agent created without it (before 3.63.0), `restart` restarts it. Its log is
   `~/.local/state/rc/quality-inspector-dashboard.log`.
 - **What it serves:** `GET /api/catalog` — `work/catalog/data.json`, the data of the newest build
   (the same data as the static page, every picture by reference, no 8 MiB budget); `GET
   /api/images/<id>` — one picture of it, only an image file under `work/catalog/thumbs/` or
-  `work/design/`; `GET /api/status` — what the agent does now, read from `work/env/LOCK`, `QA.md` and
+  `work/design/`; `GET /api/videos/<id>?part=<k>` — one part of a report's video (1.5 MiB, base64,
+  with its type, size and number of parts), only a `.webm` or `.mp4` under `work/suite/.e2e/runs/`,
+  named in the data's `videos` map (each report side's `video`; the static page has none); `GET /api/status` — what the agent does now, read from `work/env/LOCK`, `QA.md` and
   `SCENARIOS.md` at the moment of the question (the header's status is live, not as of the build);
-  `GET /api/me` — who looks.
+  `GET /api/me` — who looks; `POST /api/act` — `{command}`, an operator's action done without the
+  model (dismiss, reopen or categorize a design finding, a test into or out of a collection, a setting,
+  a focus area), which the server writes itself — the same rows as `modules.sh` and `collections.mjs`,
+  a setting checked first by `modules.sh valid` — and logs (`module_set … via=dashboard`), with the new
+  data back; a viewer gets 403; `GET /api/asks` — the caller's own questions from the
+  page's chat, each with its answer and its command; `POST /api/asks` — `{text, context, command?}`, a
+  question or a page command (checked as `/api/commands` checks it; its ping is the command itself) (at most 2000 characters, the
+  same limit of 20 in 10 minutes), recorded with who asked in `work/dashboard/asks.jsonl`; its ping
+  `answer dashboard question A-<n>` the page sends to the agent ([on-demand.md](on-demand.md)),
+  whose answer `scripts/dashboard/asks.mjs answer` writes to `answers.jsonl`; `POST /api/settings` — `{module, key, value}` or `{focus}`, the operator's
+  own change on Settings, for the caller `owner` only (a viewer: 403): `modules.sh valid` checks the key
+  and the value, read-only, and the server writes the bullet itself and logs it
+  (`module_set … via=dashboard`), and answers with the new state; it counts against the same 20 in 10
+  minutes as the commands. When `work/CONFIG.md` is newer than `data.json`, `GET /api/catalog` shows each
+  module setting's value from its CONFIG bullet (one that fits the setting) and a module's state from its
+  switch, under a new hash, until the next build; the same for a finding's dismissal (`work/design/DISMISSED.md`) and the collections (`work/CATALOG.md`). The policy hook refuses a scheduled run's or a channel
+  turn's command that names the server (`dashboard-api`): the relay's headers are the server's first layer,
+  and a process on the machine could set them.
 - **New results.** Each build writes `data.json`; the server serves it at once, so nothing is
   published after a run. The open page asks every minute and shows "The agent built new results.
   **Show them**". It asks for the agent's state every 30 s. A server that does not answer is said in
@@ -354,7 +379,8 @@ published once, and asks the server for everything it shows.
 
 ## The look
 
-The dashboard keeps Design Desk's scale (the section "The look" of `docs/desk-page.md` in the Design Desk repository), so the two
+A new, simpler page is being built from Design Desk's Desk: [dashboard-page.md](dashboard-page.md)
+(not published yet). The dashboard keeps Design Desk's scale (the section "The look" of `docs/desk-page.md` in the Design Desk repository), so the two
 agents read as one family: Design Desk's colour tokens under this page's names, in light and dark;
 text only in five sizes (`--fs-title` 26, `--fs-head` 17, `--fs-ui` 14, `--fs-meta` 12.5,
 `--fs-micro` 11; weights up to 600; IBM Plex Sans, else the system font); corners 4, 6, 8, 10, 12

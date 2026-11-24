@@ -27,7 +27,7 @@
 // JPEG for lists and cards, a sharp WebP for the panel, the zoom and the product map (rendered by
 // the suite's own playwright-core; none without it). Every small one is embedded first; then the
 // sharp ones in the same order, while the page stays under its limit.
-// `runs` lists every night, issue run, scenario run and run by hand with its build, verdicts and report
+// `runs` lists every night, issue run, scenario run and run by hand with its number (`id`, R-<n>), build, verdicts and report
 // reference — the page is the way into all of them; `rep` a run's report on the page (its tests' steps, errors and screenshots); `found` the issues opened from its problems; `pages[].hotspots` are the controls of the
 // newest UI map with the items that name them, or reach the page the control leads to (the product map). `modules`, `design` and
 // `findings` make it the control center (docs/modules.md): the modules' state, the design
@@ -395,6 +395,17 @@ for (const r of runs) {
   }
 }
 runs.sort((a, b) => String(b.utc).localeCompare(String(a.utc)));
+// Each run is its report, numbered R-1, R-2 … in the order the catalog first saw it (the oldest first
+// within one build of the catalog). work/catalog/runs.json keeps every number given, so a run keeps
+// its number, and a link to it its target, when older runs leave the page; a number is never given twice.
+const RUN_IDS = join(outDir, 'runs.json');
+const runIds = (() => { const r = readJson(RUN_IDS); return r && Number.isInteger(r.next) && r.next > 0 && r.ids && typeof r.ids === 'object' ? r : { next: 1, ids: {} }; })();
+const runIdKey = (r) => [r.type, r.ref ?? '', r.build ?? '', r.utc ?? ''].join('|');
+for (const r of runs.slice().reverse()) {
+  const k = runIdKey(r);
+  if (!/^R-\d+$/.test(runIds.ids[k] ?? '')) runIds.ids[k] = `R-${runIds.next++}`;
+  r.id = runIds.ids[k];
+}
 runs.splice(RUNS_MAX);
 
 // ------------------------------------------------------------------------ issues
@@ -793,6 +804,9 @@ const e2eRun = (label) => {
 };
 const STATES = new Set(['passed', 'failed', 'flaky', 'timed-out', 'interrupted', 'skipped']);
 const repShots = []; // [{shot, src}] in the order the runs come: newest first
+// A side's video, for the server's copy only (docs/catalog.md → The server): the page plays it from
+// there. The static page has none — a video does not fit in it.
+const sideVideo = new Map();
 function sideOf(label, key) {
   const run = e2eRun(label);
   if (!run) return label ? { st: 'missing' } : null;
@@ -815,8 +829,12 @@ function sideOf(label, key) {
   const picked = [...fail, ...shots.filter((x) => x.check && !fail.includes(x)), ...shots.filter((x) => !x.check)].slice(0, REPORT_SHOTS)
     .map(({ cap, a }) => { const src = fileOf(a); return src ? { cap, src } : null; }).filter(Boolean);
   const err = att.error ? said([att.error.code, att.error.message].filter((x) => typeof x === 'string' && x).join(': '), 600) : null;
-  return { st: STATES.has(res.status) ? res.status : 'failed', ms: Number.isFinite(att.durationMs) ? Math.round(att.durationMs) : null, err,
+  const side = { st: STATES.has(res.status) ? res.status : 'failed', ms: Number.isFinite(att.durationMs) ? Math.round(att.durationMs) : null, err,
     steps, more: Math.max(0, all.length - REPORT_STEPS), shots: picked.map(({ cap, src }) => { const shot = { cap, img: null }; repShots.push({ shot, src }); return shot; }) };
+  const video = (att.artifacts ?? []).find((a) => a?.kind === 'video' && a.path);
+  const vsrc = video ? fileOf(video) : null;
+  if (vsrc) sideVideo.set(side, vsrc);
+  return side;
 }
 let repUsed = 0; let repCut = 0;
 for (const r of runs) {
@@ -892,6 +910,11 @@ const refOf = (path) => {
   const id = `r${refSeq++}`; refs[id] = path.slice(work.length + 1); return id;
 };
 const pictureFields = (x, k, small, big) => ({ [k]: refOf(small), [`${k}_sharp`]: refOf(big) });
+// A report side's video by reference, in its own map: the server sends it in parts (docs/catalog.md → The server).
+const videoRefs = {}; let videoSeq = 0;
+const videoOf = (x) => { const path = sideVideo.get(x);
+  if (!path || !existsSync(path) || !path.startsWith(`${work}/`)) return null;
+  const id = `v${videoSeq++}`; videoRefs[id] = path.slice(work.length + 1); return id; };
 const live = {
   items: items.map((i) => ({ ...i, ...pictureFields(i, 'still', i._thumb, i._sharp) })),
   pages: pages.map((p) => ({ ...p, ...pictureFields(p, 'shot', p._thumb, p._sharp) })),
@@ -900,7 +923,7 @@ const live = {
   runs: (() => {
     const shotRef = new Map(); const byDst = new Map();
     for (const { shot, dst } of repShots) { if (!byDst.has(dst)) byDst.set(dst, refOf(dst)); shotRef.set(shot, byDst.get(dst)); }
-    const side = (x) => (x?.shots ? { ...x, shots: x.shots.map((sh) => ({ ...sh, img: shotRef.get(sh) ?? null })) } : x);
+    const side = (x) => (x?.shots ? { ...x, shots: x.shots.map((sh) => ({ ...sh, img: shotRef.get(sh) ?? null })), video: videoOf(x) } : x);
     return runs.map((r) => (r.rep ? { ...r, rep: { ...r.rep, results: Object.fromEntries(Object.entries(r.rep.results)
       .map(([k, v]) => [k, { ...v, c: side(v.c), b: side(v.b) }])) } } : r));
   })(),
@@ -955,8 +978,9 @@ writeFileSync(join(outDir, 'index.html.tmp'), html); renameSync(join(outDir, 'in
 // The interactive dashboard: data.json, which the server serves (the same data, every picture by
 // reference), and live.html, the page with no data, published once and again only when the page
 // itself changes (`page_hash`, compared with work/catalog/page.hash after a publish).
-const liveData = JSON.stringify({ ...data, ...live, images: refs, hash }, strip);
+const liveData = JSON.stringify({ ...data, ...live, images: refs, videos: videoRefs, hash }, strip);
 writeFileSync(join(outDir, 'data.json.tmp'), liveData); renameSync(join(outDir, 'data.json.tmp'), join(outDir, 'data.json'));
+writeFileSync(`${RUN_IDS}.tmp`, JSON.stringify(runIds)); renameSync(`${RUN_IDS}.tmp`, RUN_IDS);
 const liveHtml = template.replace('__QI_CATALOG_DATA__', 'null');
 writeFileSync(join(outDir, 'live.html.tmp'), liveHtml); renameSync(join(outDir, 'live.html.tmp'), join(outDir, 'live.html'));
 const pageHash = createHash('sha256').update(liveHtml).digest('hex').slice(0, 12);

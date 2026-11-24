@@ -7,6 +7,16 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.64.0 — 2026-11-24
+
+**Upgrade:**
+1. `bash "$HOME/scripts/dashboard-service.sh" restart` — once: the dashboard server gets a report's video in
+   parts (`GET /api/videos/<id>`) and the operator's own settings (`POST /api/settings`, written through
+   `modules.sh`; [docs/modules.md](docs/modules.md) → Control). It must say `ok`.
+2. Nothing else: the next catalog build numbers the runs (`R-<n>`, kept in `work/catalog/runs.json`) and
+   names each report side's video. The new page (`scripts/dashboard/page.html`,
+   [docs/dashboard-page.md](docs/dashboard-page.md)) is not published yet; the published dashboard stays.
+
 ## 3.63.0 — 2026-11-23
 
 **Upgrade:**
