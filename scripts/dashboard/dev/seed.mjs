@@ -368,6 +368,7 @@ data.hash = createHash('sha256').update(JSON.stringify(data)).digest('hex').slic
 // Written before the data, so the server reads the modules live only after a change.
 const bullets = modules.modules.filter((m) => m.switch && m.settings?.[m.switch]).map((m) => `- ${m.switch}: ${m.settings[m.switch].value}`);
 writeFileSync(join(W, 'CONFIG.md'), ['- profile: stub', '- target_repo: acme/tasklane', '- display_name: Quality Inspector', '- dashboard_interactive: enabled', ...bullets, ''].join('\n'));
+writeFileSync(join(W, 'CATALOG.md'), `# Catalog collections\n\n| collection | members |\n| --- | --- |\n${data.collections.map((c) => `| ${c.name} | ${c.members.join(', ')} |`).join('\n')}\n`);
 writeFileSync(join(W, 'schedules.json'), JSON.stringify({ taken_utc: iso(2 * H), schedules: Object.fromEntries(modules.modules.filter((m) => m.schedule?.name).map((m) => [m.schedule.name, { enabled: m.schedule.enabled, cron: m.schedule.cron }])) }));
 await new Promise((ok) => setTimeout(ok, 20));
 writeFileSync(join(W, 'catalog', 'data.json'), JSON.stringify(data, null, 1));

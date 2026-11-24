@@ -87,8 +87,9 @@ The operator may share the page beyond themselves, so it carries only what conce
   (without one, the first path segment the test opens).
 - **Facets**, automatic: tier, origin, the issue or scenario, kind, verdict, run type, surface, area, page, session,
   issue labels and state, flags (flaky, healed, drift, quarantined, `agent.assert`, still).
-- **Collections**, the operator's, in `work/CATALOG.md` — changed only on their word in the
-  direct session ("add #42 and S-7 to the collection Upload"):
+- **Collections**, the operator's, in `work/CATALOG.md` — changed only on their word: in the direct
+  session ("add #42 and S-7 to the collection Upload"), or pressed on the dashboard, which
+  `scripts/collections.mjs` writes at once:
 
   ```
   | collection | members |
@@ -342,8 +343,12 @@ published once, and asks the server for everything it shows.
   with its type, size and number of parts), only a `.webm` or `.mp4` under `work/suite/.e2e/runs/`,
   named in the data's `videos` map (each report side's `video`; the static page has none); `GET /api/status` — what the agent does now, read from `work/env/LOCK`, `QA.md` and
   `SCENARIOS.md` at the moment of the question (the header's status is live, not as of the build);
-  `GET /api/me` — who looks; `GET /api/asks` — the caller's own questions from the page's chat, each
-  with its answer; `POST /api/asks` — `{text, context}`, a question (at most 2000 characters, the
+  `GET /api/me` — who looks; `POST /api/act` — `{command}`, an operator's action a script does without
+  the model (dismiss, reopen or categorize a design finding, retry a blocker, a test into or out of a
+  collection, a setting, a focus area), run as the server's own child (`QI_DASHBOARD_WRITE=operator`),
+  with the new data back; a viewer gets 403; `GET /api/asks` — the caller's own questions from the
+  page's chat, each with its answer and its command; `POST /api/asks` — `{text, context, command?}`, a
+  question or a page command (checked as `/api/commands` checks it; its ping is the command itself) (at most 2000 characters, the
   same limit of 20 in 10 minutes), recorded with who asked in `work/dashboard/asks.jsonl`; its ping
   `answer dashboard question A-<n>` the page sends to the agent ([on-demand.md](on-demand.md)),
   whose answer `scripts/dashboard/asks.mjs answer` writes to `answers.jsonl`; `POST /api/settings` — `{module, key, value}` or `{focus}`, the operator's
@@ -352,7 +357,7 @@ published once, and asks the server for everything it shows.
   it (`module_set … via=dashboard`), and answers with the new state; it counts against the same 20 in 10
   minutes as the commands. When `work/CONFIG.md` is newer than `data.json`, `GET /api/catalog` shows each
   module setting's value from its CONFIG bullet (one that fits the setting) and a module's state from its
-  switch, under a new hash, until the next build. The policy hook refuses a scheduled run's or a channel
+  switch, under a new hash, until the next build; the same for a finding's dismissal (`work/design/DISMISSED.md`) and the collections (`work/CATALOG.md`). The policy hook refuses a scheduled run's or a channel
   turn's command that names the server (`dashboard-api`): the relay's headers are the server's first layer,
   and a process on the machine could set them.
 - **New results.** Each build writes `data.json`; the server serves it at once, so nothing is

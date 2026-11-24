@@ -65,10 +65,17 @@ new place is a page or a filter of these five tabs before it is a tab of its own
   number in the colour of who acts (the product's colour Quality Inspector, amber you, green done),
   and under **You can** the buttons a person presses there. A short tip ends it. Folding one folds
   every tab's, and the browser keeps it. **How it works** shows them all.
-- **Commands.** A button that asks Quality Inspector for something (run, keep, create an issue, a new
-  test) asks first, showing the exact message, then sends it through the server
-  ([catalog.md](catalog.md) → The server → Commands); a toast says it went. The page itself changes
-  nothing.
+- **Commands.** A button does one of two things, never a message the person cannot follow:
+  - **At once, without the model** — what a script does: a setting, Feature focus's area, a design
+    finding's dismissal, reopening or category, a blocker's retry, a test into or out of a
+    collection. The operator's press goes to the server (`POST /api/act`, `POST /api/settings`;
+    [catalog.md](catalog.md) → The server); a toast says what was done and the page shows it.
+  - **Through the chat** — work for Quality Inspector (run, repair, keep each night, create an issue,
+    a new test, an upkeep decision, a schedule on or off, Run now) and questions. The chat in the
+    corner opens with the request ready: its name, the exact message, room for a note; **Send** sends
+    it, and Quality Inspector's report or question comes into the same chat. A dialog (Ask for a test,
+    Add to a collection) sends at once and opens the chat on it. A viewer's press of an operator's
+    action goes this way too, as a request for the operator.
 - **Ask for a test** — the header's button, and a screen's on Product — opens one dialog with three
   kinds; the kind last used opens next time, a screen's button opens the second with its address:
   - **An issue or pull request** — its number → `test #N`. A pull request stands for the issues

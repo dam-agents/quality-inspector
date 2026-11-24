@@ -1795,6 +1795,9 @@
   .qi-gi { all: unset; box-sizing: border-box; cursor: pointer; display: grid; gap: 4px; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
   .qi-gi:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); } .qi-gi img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top; border-radius: var(--r-sm); background: var(--soft); }
   .qi-gi .t { font-weight: 600; font-size: var(--fs-meta); } .qi-gi .k { display: flex; gap: 8px; align-items: center; }
+  .ask-cmd { display: block; margin-top: 4px; padding: 2px 8px; border-radius: var(--r-xs); background: color-mix(in srgb, var(--panel) 18%, transparent); font-size: var(--fs-micro); overflow-wrap: anywhere; }
+  .ask-draft { display: flex; gap: 8px; align-items: flex-start; padding: 8px 12px; border-radius: var(--r-md); background: var(--info-soft); }
+  .ask-draft > div { flex: 1; display: grid; gap: 2px; min-width: 0; } .ask-draft code { font-size: var(--fs-micro); overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
@@ -1861,13 +1864,6 @@
   </form>
 </dialog>
 
-<dialog id="confirm-dialog">
-  <form method="dialog" id="confirm-form">
-    <h2 id="cf-title"></h2>
-    <div id="cf-body" class="md"></div>
-    <div class="actions"><button type="button" class="btn primary" data-close="ok" id="cf-ok"></button><button type="button" class="btn" data-close="cancel">Cancel</button></div>
-  </form>
-</dialog>
 
 <script>
 (() => {
@@ -2689,27 +2685,36 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
       else { const [id, k] = inp.dataset.set.split("|"); await writeSetting({ module: id, key: k, value: v }, `${SET_WORD[k] || human(k)} — ${v}`); }
       return;
     }
-    if (await confirm("Change a setting", `<p>Quality Inspector gets this message in its chat and confirms it with the operator:</p><pre class="qi-msg">${esc(cmd)}</pre>`, "Send")) await send(cmd);
+    await chatDraft(cmd, "Change a setting");
   }));
   const draw = () => { renderNav(); renderBanners(); renderList(); renderDetail(); keepPlace(); renderChat(); };
 
   // ---------- commands to Quality Inspector ----------
   const cmdOk = (t) => [CMD_RE, SCEN_RE, WALK_RE].some((re) => re.test(t));
-  // Every command asks first, with its words: the page only hands it to the agent's chat.
-  function confirm(title, body, ok) {
-    const dlg = $("#confirm-dialog");
-    $("#cf-title").textContent = title; $("#cf-body").innerHTML = body; $("#cf-ok").textContent = ok;
-    return new Promise((res) => { dlg.onclose = () => res(dlg.returnValue === "ok"); dlg.returnValue = ""; dlg.showModal(); });
+  // Where a command goes (docs/dashboard-page.md → Commands): what a script does without the model
+  // happens at once for the operator (POST /api/act); everything else — work for Quality Inspector, or
+  // a question — goes through the chat in the corner, where its answer comes.
+  const DIRECT = [/^dismiss D-\d{1,6}( as [a-z-]+)?$/, /^reopen D-\d{1,6}$/, /^categorize D-\d{1,6} \S+$/, /^retry B-\d{1,6}$/,
+    /^(add|remove) (#\d+( (AC|IN)-\d+)?|S-\d+( AC-\d+)?) (to|from) the collection .+$/, /^module [a-z-]+ set [a-z_]+=\S+$/, /^focus .+$/];
+  const isDirect = (cmd) => DIRECT.some((re) => re.test(cmd));
+  async function act(cmd, what) {
+    const r = await api("POST", "/api/act", { command: cmd });
+    if (r.data) { S.data = r.data; S.hash = r.hash; }
+    toast(`Done: ${what || cmd}.`); draw();
   }
-  async function send(cmd) {
+  // A command from a dialog: sent at once, and the chat opens to show it and its answer.
+  async function send(cmd, text = "") {
     if (!cmdOk(cmd)) throw new Said("This is not a command of the page.");
-    const r = await api("POST", "/api/commands", { command: cmd });
-    toast(`Sent to Quality Inspector${r.id ? ` (${r.id})` : ""}. Its answer comes in its chat.`);
+    if (isOp() && isDirect(cmd)) return act(cmd);
+    C.open = true; if (!C.loaded) await loadAsks();
+    await chatSend(text || cmd, cmd);
   }
+  // A button's command: the operator's direct action at once; else the chat opens with it, ready to send.
   document.addEventListener("click", guard(async (e) => {
     const b = e.target.closest?.("[data-cmd]"); if (!b) return;
-    const cmd = b.dataset.cmd;
-    if (await confirm(b.textContent.replace(/…$/, ""), `<p>Quality Inspector gets this message in its chat:</p><p><code>${esc(cmd)}</code></p>`, "Send")) await send(cmd);
+    const cmd = b.dataset.cmd, label = b.textContent.trim().replace(/…$/, "");
+    if (isOp() && isDirect(cmd)) return act(cmd, label);
+    await chatDraft(cmd, label);
   }));
   // Dialogs: Cancel and Escape close; a form with something typed asks before Escape closes it.
   document.addEventListener("click", (e) => {
@@ -2964,10 +2969,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
       const m = askMessage(f, v === "walk");
       const again = () => { dlg.returnValue = ""; dlg.showModal(); };
       if (m.why) { $("#ask-why").textContent = m.why; $("#ask-why").hidden = false; again(); return; }
-      const title = v === "walk" ? "Do the steps live" : "Ask for a test";
-      const lead = v === "walk" ? "Quality Inspector does the steps on the product in its browser and says what it saw. No result is kept." : "Quality Inspector writes the test, runs it on the newest build and shows the result under Tests.";
-      if (await confirm(title, `<p>${lead}</p><p>It gets this message in its chat:</p><pre class="qi-msg">${esc(m.cmd)}</pre>`, "Send")) await send(m.cmd);
-      else again();
+      await send(m.cmd, v === "walk" ? "Do these steps live, please." : ask.kind === "issue" ? `Test ${m.cmd.slice(5)}, please.` : "Test this scenario, please.");
     });
     dlg.returnValue = ""; dlg.showModal();
     $(`#ask-dialog .ask-pane[data-pane="${ask.kind}"] :is(input, textarea)`)?.focus();
@@ -2982,7 +2984,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     dlg.onclose = guard(async () => { if (dlg.returnValue !== "send") return;
       const cmd = `add ${ref} to the collection ${f.coll.value.trim()}`;
       if (!CMD_RE.test(cmd)) { toast("A collection's name has letters, digits, spaces and _ . - only, at most 40."); return; }
-      if (await confirm("Add to a collection", `<p>Quality Inspector gets this message in its chat:</p><pre class="qi-msg">${esc(cmd)}</pre>`, "Send")) await send(cmd); });
+      await send(cmd); });
     dlg.returnValue = ""; dlg.showModal(); f.coll.focus();
   }));
   document.addEventListener("click", guard(async (e) => {
@@ -3035,7 +3037,12 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
   // Questions only the asker and Quality Inspector see, about what is open now. The server records
   // each one and hands back its ping; Quality Inspector answers in its chat and the answer comes here.
   // It explains; it never changes anything from a question.
-  const C = { open: false, asks: [], loaded: false, drawn: "", sent: 0 };
+  const C = { open: false, asks: [], loaded: false, drawn: "", sent: 0, draft: null };
+  // A button's command waits in the chat: the person reads it, may add a note, and sends it.
+  async function chatDraft(cmd, label) {
+    C.draft = { command: cmd, label }; C.open = true; if (!C.loaded) await loadAsks();
+    C.drawn = ""; renderChat(); const t = $("#chat-text"); if (t) { t.value = ""; t.focus(); }
+  }
   function chatContext() {
     const it = findItem(S.item);
     const label = !it ? `${TABS[S.tab] || "The page"}${S.tab === "tests" ? ` · ${testKinds[S.testPage] || ""}` : S.tab === "product" ? ` · ${human(S.productPage)}` : ""}`
@@ -3058,7 +3065,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     let root = $("#ask"); if (!S.me) return;
     if (!root) { root = document.createElement("div"); root.id = "ask"; document.body.append(root); }
     const ctx = chatContext(), here = C.asks.filter((a) => sameCtx(ctx, a.context || {})), waiting = C.asks.some((a) => !a.answer);
-    const key = JSON.stringify([C.open, ctx, here, waiting]); if (key === C.drawn) return; C.drawn = key;
+    const key = JSON.stringify([C.open, ctx, here, waiting, C.draft]); if (key === C.drawn) return; C.drawn = key;
     if (!C.open) { root.innerHTML = `<button class="ask-fab" data-chat-open title="Ask Quality Inspector about ${esc(ctx.label)}. Only you see it.">${waiting ? '<span class="spin"></span>' : CHAT_ICON}Ask Quality Inspector${here.length ? `<span class="ask-count">${here.length}</span>` : ""}</button>`; return; }
     const box = $("#chat-text"), keep = box?.value || "", focus = document.activeElement === box;
     let size = null; try { size = JSON.parse(store.get("qi-chat-size") || "null"); } catch {}
@@ -3066,26 +3073,30 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
       <div class="ask-grip" data-chat-grip title="Drag to resize"></div>
       <header><div><b>Ask Quality Inspector</b> <span class="chip" title="Only you and Quality Inspector see these questions and answers. It explains; it changes nothing from here.">only you</span></div><button class="btn small" data-chat-close title="Closes the chat; the questions stay">✕</button></header>
       <div class="ask-ctx" title="Quality Inspector answers about what you had open when you asked">About: <b>${esc(ctx.label)}</b></div>
-      <div class="ask-body">${here.length ? here.map((a) => `<div class="ask-msg me">${mdLite(a.text)}<span class="ask-when">${esc(ago(a.utc))}</span></div>`
+      <div class="ask-body">${here.length ? here.map((a) => `<div class="ask-msg me">${a.command && a.text === a.command ? "" : mdLite(a.text)}${a.command ? `<code class="ask-cmd" title="The message Quality Inspector got">${esc(a.command)}</code>` : ""}<span class="ask-when">${esc(ago(a.utc))}</span></div>`
         + (a.answer ? `<div class="ask-row"><span class="ask-avatar" aria-hidden="true">QI</span><div class="ask-msg agent"><span class="ask-name">Quality Inspector</span><div class="md">${mdLite(a.answer.text)}</div></div></div>`
           : `<div class="ask-msg typing" title="Quality Inspector is answering"><i></i><i></i><i></i></div>`)).join("")
         : `<p class="hint k">Ask anything about what you have open: why a test fails, what a run found, what to do next. Only you see it.</p>`}</div>
-      <footer><div class="starters">${STARTERS().map((t) => `<button class="btn small" data-chat-starter="${esc(t)}">${esc(t)}</button>`).join("")}</div>
-        <textarea id="chat-text" data-kept maxlength="2000" placeholder="Your question…" title="Enter sends, Shift+Enter starts a new line"></textarea>
-        <div class="bar"><button class="btn primary" data-chat-send>Ask</button></div></footer></section>`;
+      <footer>${C.draft ? `<div class="ask-draft"><div><b>${esc(C.draft.label)}</b><code>${esc(C.draft.command)}</code><span class="k">Quality Inspector gets this message${isOp() ? "" : " for the operator"}; its answer comes here.</span></div><button class="btn small" data-chat-undraft title="Does not send it">✕</button></div>`
+        : `<div class="starters">${STARTERS().map((t) => `<button class="btn small" data-chat-starter="${esc(t)}">${esc(t)}</button>`).join("")}</div>`}
+        <textarea id="chat-text" data-kept maxlength="2000" placeholder="${C.draft ? "A note for Quality Inspector (optional)…" : "Your question…"}" title="Enter sends, Shift+Enter starts a new line"></textarea>
+        <div class="bar"><button class="btn primary" data-chat-send>${C.draft ? "Send" : "Ask"}</button></div></footer></section>`;
     const t = $("#chat-text"); t.value = keep; if (focus) t.focus();
     const body = root.querySelector(".ask-body"); body.scrollTop = body.scrollHeight;
   }
-  async function chatSend(text) {
-    text = String(text || "").trim(); if (!text) return;
-    const r = await api("POST", "/api/asks", { text, context: chatContext() });
+  async function chatSend(text, command = null) {
+    command = command || C.draft?.command || null;
+    text = String(text || "").trim() || (command && C.draft?.label ? `${C.draft.label}.` : "") || command || ""; if (!text) return;
+    const r = await api("POST", "/api/asks", { text, context: chatContext(), ...(command ? { command } : {}) });
     $("#chat-text") && ($("#chat-text").value = "");
-    C.asks.push({ id: r.id, utc: new Date().toISOString(), text, context: chatContext(), answer: null }); C.drawn = ""; renderChat();
+    C.draft = null;
+    C.asks.push({ id: r.id, utc: new Date().toISOString(), text, command, context: chatContext(), answer: null }); C.drawn = ""; renderChat();
   }
   document.addEventListener("click", guard(async (e) => {
-    const t = e.target.closest?.("[data-chat-open], [data-chat-close], [data-chat-send], [data-chat-starter]"); if (!t) return;
+    const t = e.target.closest?.("[data-chat-open], [data-chat-close], [data-chat-send], [data-chat-starter], [data-chat-undraft]"); if (!t) return;
+    if (t.matches("[data-chat-undraft]")) { C.draft = null; C.drawn = ""; renderChat(); return; }
     if (t.matches("[data-chat-open]")) { C.open = true; if (!C.loaded) await loadAsks(); C.drawn = ""; renderChat(); $("#chat-text")?.focus(); }
-    else if (t.matches("[data-chat-close]")) { C.open = false; C.drawn = ""; renderChat(); }
+    else if (t.matches("[data-chat-close]")) { C.open = false; C.draft = null; C.drawn = ""; renderChat(); }
     else if (t.matches("[data-chat-send]")) await chatSend($("#chat-text").value);
     else await chatSend(t.dataset.chatStarter);
   }));

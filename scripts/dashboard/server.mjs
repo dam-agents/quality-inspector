@@ -9,8 +9,12 @@
 //   GET  /api/images/<id>     one picture of that data, as a data URI
 //   GET  /api/videos/<id>?part=k  one part of a report's video (VIDEO_PART bytes, base64), with its size
 //   GET  /api/asks            the caller's own questions from the page's chat, each with its answer
-//   POST /api/asks            {text, context}: a question to Quality Inspector, recorded with who asked;
-//                             its ping (`answer dashboard question A-<n>`) the page sends to the agent
+//   POST /api/asks            {text, context, command?}: a question or a request to Quality Inspector,
+//                             recorded with who asked; its ping the page sends to the agent — the page's
+//                             command as it is, or `answer dashboard question A-<n>` for a question
+//   POST /api/act             {command}: one of the operator's own actions that a script does without the
+//                             model — dismiss, reopen or categorize D-<k>, retry B-<k>, add to or remove from
+//                             a collection — run as this server's child (owner only)
 //   POST /api/settings        {module, key, value} or {focus}: the operator's own change of a module's
 //                             setting, written at once through modules.sh (owner only); the new state back
 //   GET  /api/status          what the agent does now, read live from work/ (the lock, rows in progress)
@@ -99,17 +103,46 @@ function withConfig(modules) {
     return { ...m, settings, state: sw && m.kind !== 'schedule' && m.kind !== 'core' ? sw.value : m.state };
   }) };
 }
+// The operator's actions on the page show at once too: a dismissal or a reopened finding from
+// work/design/DISMISSED.md, the collections from work/CATALOG.md, when the file is newer than the data.
+const DISMISSED = join(WORK, 'design', 'DISMISSED.md'), COLLECTIONS = join(WORK, 'CATALOG.md');
+const tableOf = (text) => (text ?? '').split('\n').filter((l) => l.startsWith('|')).slice(2).map((l) => l.split('|').slice(1, -1).map((x) => x.trim()));
 function catalog() {
-  const t = mtime(DATA), c = mtime(CONFIG), key = `${t}|${c}`;
+  const t = mtime(DATA), c = mtime(CONFIG), d = mtime(DISMISSED), k = mtime(COLLECTIONS), key = `${t}|${c}|${d}|${k}`;
   if (key !== cache.at) {
     let data = null;
     try { data = JSON.parse(readFileSync(DATA, 'utf8')); } catch { data = null; }
     data = data && typeof data === 'object' && !Array.isArray(data) ? data : null;
-    const live = Boolean(data && c > t);
-    if (live) data.modules = withConfig(data.modules);
-    cache = { at: key, data, hash: data ? `${data.hash ?? t}${live ? `-${Math.round(c)}` : ''}` : null };
+    const newer = [c, d, k].filter((x) => data && x > t);
+    if (data && c > t) data.modules = withConfig(data.modules);
+    if (data && d > t && Array.isArray(data.design)) {
+      const off = new Map(tableOf(read(DISMISSED)).filter(([id]) => /^D-\d+$/.test(id ?? '')).map(([id, , reason]) => [id, reason || null]));
+      data.design = data.design.map((f) => (off.has(f.id) ? { ...f, status: 'dismissed', dismiss_reason: off.get(f.id) } : f.status === 'dismissed' ? { ...f, status: 'open', dismiss_reason: null } : f));
+    }
+    if (data && k > t) data.collections = tableOf(read(COLLECTIONS)).filter(([n]) => n).map(([name, members]) => ({ name, members: String(members ?? '').split(',').map((x) => x.trim()).filter(Boolean) }));
+    cache = { at: key, data, hash: data ? `${data.hash ?? t}${newer.length ? `-${Math.round(Math.max(...newer))}` : ''}` : null };
   }
   return cache;
+}
+// The operator's actions a script does without the model (docs/modules.md → Control): the command's
+// words, as the page's own pattern allows them, to the script's arguments.
+const ACTIONS = [
+  [/^dismiss (D-\d{1,6})(?: as (false-positive|wont-fix|duplicate|by-design))?$/, (m) => ['bash', MODULES_SH, 'dismiss', m[1], ...(m[2] ? [m[2]] : [])]],
+  [/^reopen (D-\d{1,6})$/, (m) => ['bash', MODULES_SH, 'reopen', m[1]]],
+  [/^categorize (D-\d{1,6}) ([a-z0-9][a-z0-9-]{0,29}|-)$/, (m) => ['bash', MODULES_SH, 'categorize', m[1], m[2]]],
+  [/^retry (B-\d{1,6})$/, (m) => [process.execPath, join(SCRIPTS, 'blockers.mjs'), 'retry', m[1]]],
+  [/^add (#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) to the collection ([A-Za-z0-9][A-Za-z0-9 _.-]{0,39})$/, (m) => [process.execPath, join(SCRIPTS, 'collections.mjs'), 'add', m[2], m[1]]],
+  [/^remove (#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) from the collection ([A-Za-z0-9][A-Za-z0-9 _.-]{0,39})$/, (m) => [process.execPath, join(SCRIPTS, 'collections.mjs'), 'remove', m[2], m[1]]],
+  [/^module ([a-z][a-z-]{1,30}) set ([a-z_]+)=([A-Za-z0-9,._-]{1,40})$/, (m) => ['bash', MODULES_SH, 'set', m[1], `${m[2]}=${m[3]}`]],
+  [/^focus ([A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39})$/, (m) => ['bash', MODULES_SH, 'focus', m[1]]],
+];
+function runAction(args) {
+  try {
+    return execFileSync(args[0], args.slice(1), { encoding: 'utf8', env: { ...process.env, WORK_DIR: WORK, QI_DASHBOARD_WRITE: 'operator' }, stdio: ['ignore', 'pipe', 'pipe'], timeout: 60000 });
+  } catch (e) {
+    const why = String(e.stderr || '').split('\n').find((l) => /^(modules\.sh|blockers\.mjs|collections\.mjs|blockers):/.test(l)) || 'It was not done.';
+    throw new Said(400, why.replace(/^[a-z.]+: /, '').replace(/^./, (x) => x.toUpperCase()));
+  }
 }
 
 // A picture of the data: its `images` map names a file under work/ (catalog.mjs → refs). Only an
@@ -167,9 +200,9 @@ const ASKS = join(DIR, 'asks.jsonl'), ANSWERS = join(DIR, 'answers.jsonl');
 const jsonl = (f) => (read(f) ?? '').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
 const asksOf = () => jsonl(ASKS);
 const answersOf = () => new Map(jsonl(ANSWERS).filter((a) => /^A-\d+$/.test(a.id ?? '') && typeof a.text === 'string').map((a) => [a.id, { text: a.text.slice(0, 6000), utc: a.utc ?? null }]));
-function recordAsk(who, text, context) {
+function recordAsk(who, text, context, command = null) {
   mkdirSync(DIR, { recursive: true });
-  const row = { id: `A-${asksOf().length + 1}`, utc: utc(), role: who.role, email: who.email, text, context };
+  const row = { id: `A-${asksOf().length + 1}`, utc: utc(), role: who.role, email: who.email, text, context, ...(command ? { command } : {}) };
   appendFileSync(ASKS, `${JSON.stringify(row)}\n`, { mode: 0o600 });
   return row;
 }
@@ -236,6 +269,19 @@ async function route(req, res, url, who) {
       return send(res, 200, { id, mime: v.mime, size, parts, part, b64: buf.toString('base64') });
     } finally { closeSync(fd); }
   }
+  if (m === 'POST' && p[1] === 'act') {
+    if (who.role !== 'owner') throw new Said(403, 'Only the operator does this. Ask the operator.');
+    const b = await body(req);
+    const text = typeof b.command === 'string' ? b.command : '';
+    const hit = ACTIONS.map(([re, args]) => [re.exec(text), args]).find(([x]) => x);
+    if (!hit || !allowed(text)) throw new Said(400, 'This is not an action the dashboard does by itself.');
+    spend(`act:${who.email}`);
+    const out = runAction(hit[1](hit[0]));
+    log('info', 'dashboard_act', `${text} by=${who.email || '-'}`);
+    cache.at = '';
+    const c = catalog();
+    return send(res, 200, { ok: true, done: (out || '').trim().slice(0, 400), hash: c.hash, data: c.data });
+  }
   if (m === 'POST' && p[1] === 'settings') {
     // The operator's own press is their word (docs/modules.md → Control): written at once by
     // modules.sh, which checks the key and the value. A viewer's press stays a request (POST /api/commands).
@@ -266,20 +312,24 @@ async function route(req, res, url, who) {
   if (m === 'GET' && p[1] === 'asks') {
     const answers = answersOf();
     const mine = asksOf().filter((r) => r.email && r.email === who.email).slice(-60)
-      .map(({ id, utc: at, text, context }) => ({ id, utc: at, text, context, answer: answers.get(id) ?? null }));
+      .map(({ id, utc: at, text, context, command }) => ({ id, utc: at, text, context, command: command ?? null, answer: answers.get(id) ?? null }));
     return send(res, 200, { asks: mine });
   }
   if (m === 'POST' && p[1] === 'asks') {
     const b = await body(req);
-    const text = typeof b.text === 'string' ? b.text.trim() : '';
+    const command = typeof b.command === 'string' && b.command ? b.command : null;
+    if (command && (command.length > 2200 || !allowed(command))) throw new Said(400, 'This is not a command of the dashboard. Use a button of the page.');
+    const text = typeof b.text === 'string' && b.text.trim() ? b.text.trim() : command ?? '';
     if (!text || text.length > 2000 || /[\u0000-\u0008\u000b-\u001f\u007f]/.test(text)) throw new Said(400, 'Write a question of at most 2000 letters.');
     spend(who.email || who.sub || who.role);
     const c = b.context && typeof b.context === 'object' ? b.context : {};
     const context = { tab: /^[a-z]{1,20}$/.test(c.tab ?? '') ? c.tab : null, item: typeof c.item === 'string' && c.item.length <= 200 && !/[\u0000-\u001f]/.test(c.item) ? c.item : null,
       label: typeof c.label === 'string' ? c.label.replace(/[\u0000-\u001f]/g, ' ').slice(0, 200) : null };
-    const row = recordAsk(who, text, context);
-    log('info', 'dashboard_ask', `${row.id} from ${who.role}`);
-    return send(res, 201, { id: row.id, ping: `answer dashboard question ${row.id}` });
+    const row = recordAsk(who, text, context, command);
+    log('info', 'dashboard_ask', `${row.id} from ${who.role}${command ? ' with a command' : ''}`);
+    // A command goes to the agent in its exact words, as the page's commands always did (a viewer's
+    // channel turn reads them so); the agent answers it in the chat (docs/on-demand.md).
+    return send(res, 201, { id: row.id, ping: command ?? `answer dashboard question ${row.id}` });
   }
   if (m === 'POST' && p[1] === 'commands') {
     const b = await body(req);

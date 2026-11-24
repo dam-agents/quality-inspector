@@ -84,6 +84,23 @@ printf 'It fails because the product does not check the size.\n' > "$W/answer.tx
 WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" answer A-1 "$W/answer.txt" >/dev/null; assert_eq "the answer is recorded" 0 "$?"
 WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" answer A-1 "$W/answer.txt" >/dev/null 2>&1; assert_eq "a second answer: refused" 2 "$?"
 assert "the asker sees the answer" '.asks[0].answer.text == "It fails because the product does not check the size."' "$(call "${VW[@]}" "$U/api/asks")"
+# A page command through the chat: its ping is the command itself; the agent finds its row to answer.
+assert "a command in the chat: its ping is the command" '.id == "A-2" and .ping == "run #42 AC-1"' "$(call "${OP[@]}" -X POST -d '{"text":"Run it again.","command":"run #42 AC-1"}' "$U/api/asks")"
+assert_eq "a command the page does not have: refused" 400 "$(code "${OP[@]}" -X POST -d '{"text":"x","command":"rm -rf /"}' "$U/api/asks")"
+assert "the agent finds the command's row" '.id == "A-2"' "$(WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" find --command "run #42 AC-1")"
+assert "a command with no row: none" '.id == null' "$(WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" find --command "run #43")"
+# The operator's direct actions (POST /api/act): done by a script, as the server's child; never for a viewer.
+A='{"command":"add #42 AC-1 to the collection Smoke"}'
+assert_eq "a viewer's action: refused" 403 "$(code "${VW[@]}" -X POST -d "$A" "$U/api/act")"
+assert "a test into a collection" '.ok == true and (.data.collections | map(select(.name == "Smoke")) | .[0].members) == ["#42 AC-1"]' "$(call "${OP[@]}" -X POST -d "$A" "$U/api/act")"
+grep -q '^| Smoke | #42 AC-1 |$' "$W/CATALOG.md"; assert_eq "the row is in CATALOG.md" 0 "$?"
+assert "out of it again: the emptied collection goes" '.ok == true and ((.data.collections // []) | map(select(.name == "Smoke")) | length) == 0' "$(call "${OP[@]}" -X POST -d '{"command":"remove #42 AC-1 from the collection Smoke"}' "$U/api/act")"
+assert_eq "work for the agent is no direct action" 400 "$(code "${OP[@]}" -X POST -d '{"command":"run #42 AC-1"}' "$U/api/act")"
+WORK_DIR="$W" QI_DASHBOARD_WRITE=operator node "$SCRIPTS/collections.mjs" add Smoke '#42' >/dev/null 2>&1
+assert_eq "the variable alone, not from the server, cannot write a collection" 2 "$?"
+sig="$(mktemp "$SANDBOX/quality-inspector-signature.XXXXXX")"; printf 'helm: a value is required' > "$sig"
+WORK_DIR="$W" QI_WORDS_DIR="$SANDBOX" node "$SCRIPTS/blockers.mjs" open --scope env --owner operator --stage up --build c1 --signature-file "$sig" >/dev/null
+assert "the operator's retry of a blocker" '.ok == true' "$(call "${OP[@]}" -X POST -d '{"command":"retry B-1"}' "$U/api/act")"
 assert "status: the lock and the issue in progress, never the session" '.lock == {owner:"agent", since:"2026-11-16T10:00:00Z"} and .issues[0].issue == 42 and (tostring | contains("sess") | not)' "$(call "${VW[@]}" "$U/api/status")"
 
 post() { call "$@" -H 'content-type: application/json' -X POST "$U/api/commands" -d "$(jq -nc --arg c "$CMD" '{command:$c}')"; }
