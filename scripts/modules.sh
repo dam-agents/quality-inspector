@@ -143,7 +143,18 @@ set_bullet() {
   mv "$tmp" "$CONFIG"
 }
 
-operator_only() { direct_session || die 2 "modules.sh: $1 is the operator's, in the direct session only ($WHY_NOT_DIRECT)"; }
+# The operator's word comes from the direct session, or from the operator's own press on the dashboard:
+# the dashboard server (docs/catalog.md → The server) runs `set` and `focus` itself for a caller the
+# platform's relay names `owner`, with QI_DASHBOARD_WRITE=operator, as its own child. The policy hook
+# refuses a command naming that variable in a scheduled run or a channel turn (module-set).
+dashboard_writer() {
+  [ "${QI_DASHBOARD_WRITE:-}" = operator ] || return 1
+  local a; a="$(tr '\0' ' ' <"/proc/$PPID/cmdline" 2>/dev/null)" || a=""
+  [ -n "$a" ] || a="$(ps -o args= -p "$PPID" 2>/dev/null)"
+  case "$a" in (*node*scripts/dashboard/server.mjs*) return 0;; esac
+  return 1
+}
+operator_only() { direct_session || dashboard_writer || die 2 "modules.sh: $1 is the operator's, in the direct session or on the dashboard only ($WHY_NOT_DIRECT)"; }
 
 cmd_set() {
   local id="${1:-}" s pair key val spec old changes='[]'
@@ -163,7 +174,7 @@ cmd_set() {
   for pair in "$@"; do
     key="${pair%%=*}"; val="${pair#*=}"; old="$(cfg "$key")"
     set_bullet "$key" "$val" || die 1 "modules.sh: cannot write $CONFIG"
-    logev info module_set "module=$id key=$key old=${old:--} new=$val"
+    logev info module_set "module=$id key=$key old=${old:--} new=$val${QI_DASHBOARD_WRITE:+ via=dashboard}"
     changes="$(jq -c --arg k "$key" --arg o "$old" --arg v "$val" '. + [{key:$k, old:(if $o == "" then null else $o end), new:$v}]' <<<"$changes")"
   done
   jq -nc --arg id "$id" --argjson c "$changes" '{module:$id, set:$c}'

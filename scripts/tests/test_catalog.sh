@@ -303,6 +303,8 @@ assert "profile scenario item" '.items[] | select(.key == "profile-sign-in/AC-1"
 assert "nights and builds" '(.nights | length) == 2 and .nights[0].counts.healed == 1 and ([.builds[].id] | index("c3")) != null' "$data"
 assert "runs: newest first; nights, an environment failure, issue and scenario runs" '[.runs[] | .type + ":" + (.ref // "-") + ":" + .build + ":" + .verdict]
   == ["regression:-:c3:unchanged","regression:-:c2:healed","regression:-:c2:environment","scenario:S-7:c1:passed","issue:#42:c1:partial"]' "$data"
+assert "runs: each its report's number, R-1 the oldest, kept in work/catalog/runs.json" '[.runs[] | .id] == ["R-5","R-4","R-3","R-2","R-1"]' "$data"
+assert "the numbers given" '.next == 6 and (.ids | length) == 5' "$(cat "$W/catalog/runs.json")"
 assert "an environment failure: its step, cause, repair, next step and evidence" '.runs[2].failure == {"stage":"up","exit":4,"cause":"The image pull was refused.","repair":"Reset and up again: the same refusal.","next":"The operator adds the registry to the egress.","evidence":["pull refused","x"]}
   and .runs[1].failure == null' "$data"
 assert "a run's length: a night from its due line, an issue run from issue_done, a scenario from its file with its cost" '[.runs[] | [.secs, .cost_usd]]
@@ -437,6 +439,8 @@ printf '| id | dismissed_utc | reason |\n| --- | --- | --- |\n| D-2 | 2026-10-14
 printf -- '- fix_label: architect:fix\n' >> "$W/CONFIG.md"
 node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a build with the triage and a run by hand" 0 "$?"
 data="$(page_data)"
+assert "new runs get the next numbers, the oldest first; every earlier run keeps its own" '([.runs[] | .build + ":" + .id] | .[:2]) == ["c3:R-7","c4:R-6"]
+  and ([.runs[] | .id] | .[2:]) == ["R-5","R-4","R-3","R-2","R-1"]' "$data"
 assert "a run by hand: in the history and the runs, its raw result only" '(.items[] | select(.key == "scenario-7/AC-1") | .history[-1] == {"build":"c3","run":"rerun","value":"failed","utc":"2026-10-14T12:00:00Z","cause":null})
   and ([.runs[] | select(.type == "rerun")] | length == 1 and .[0].ref == "S-7" and .[0].scope == "S-7 AC-1" and .[0].entries == [{"key":"scenario-7/AC-1","value":"failed","cause":null}] and .[0].report == null
     and .[0].trigger == {"via":"dashboard","who":null,"why":"run S-7 AC-1"})' "$data"

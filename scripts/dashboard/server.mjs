@@ -7,6 +7,12 @@
 //   GET  /api/me              who is looking (the platform's verified caller), the page's switches
 //   GET  /api/catalog?have=h  the newest catalog data (work/catalog/data.json, written by catalog.mjs)
 //   GET  /api/images/<id>     one picture of that data, as a data URI
+//   GET  /api/videos/<id>?part=k  one part of a report's video (VIDEO_PART bytes, base64), with its size
+//   GET  /api/asks            the caller's own questions from the page's chat, each with its answer
+//   POST /api/asks            {text, context}: a question to Quality Inspector, recorded with who asked;
+//                             its ping (`answer dashboard question A-<n>`) the page sends to the agent
+//   POST /api/settings        {module, key, value} or {focus}: the operator's own change of a module's
+//                             setting, written at once through modules.sh (owner only); the new state back
 //   GET  /api/status          what the agent does now, read live from work/ (the lock, rows in progress)
 //   POST /api/commands        a command of the page: checked against the page's own patterns,
 //                             recorded with who sent it, then handed back as the ping the page sends
@@ -14,9 +20,11 @@
 //
 // Only the platform relay reaches /api/: it sets x-platform-caller-role/-email/-sub on every
 // request from the page, which the page cannot forge. Loopback only. Nothing a viewer sends is
-// executed here: a command is stored as data and goes to the agent as the page's message.
+// executed here: a command is stored as data and goes to the agent as the page's message. The one
+// write is the operator's own setting, through modules.sh, which checks it (POST /api/settings).
 import { createServer } from 'node:http';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, statSync } from 'node:fs';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -70,13 +78,36 @@ function spend(key) {
 
 // ------------------------------------------------------------------ the catalog data
 // data.json is read again only when it changes on disk; its hash is the page's "have".
-let cache = { at: -1, data: null, hash: null };
+// A setting changed after the data shows at once: when work/CONFIG.md is newer than data.json, each
+// module setting's value is read from its CONFIG bullet (one that fits the setting's values or range,
+// as modules.sh wrote it), and a module's state follows its switch. The next build of the catalog
+// (modules.sh status) is the whole truth again.
+let cache = { at: '', data: null, hash: null };
+const CONFIG = join(WORK, 'CONFIG.md');
+const MODULES_SH = join(SCRIPTS, 'modules.sh');
+function withConfig(modules) {
+  if (!modules || !Array.isArray(modules.modules)) return modules;
+  const bullet = new Map((read(CONFIG) ?? '').split('\n').map((l) => /^- ([a-z_][a-z0-9_.]{0,60}):[ \t]*(.*?)[ \t]*$/.exec(l)).filter(Boolean).map((m) => [m[1], m[2].replace(/[ \t]+#.*$/, '').replace(/^(['"`])(.*)\1$/, '$2')]));
+  const fits = (spec, v) => (spec.type === 'cadence' ? (modules.cadences || []).includes(v) : spec.type === 'enum' ? (spec.values || []).includes(v)
+    : spec.type === 'int' ? /^\d{1,6}$/.test(v) && +v >= +spec.min && +v <= +spec.max : spec.type === 'viewports' ? /^\d{3,4}x\d{3,4}(,\d{3,4}x\d{3,4}){0,3}$/.test(v) : false);
+  const patch = (settings) => Object.fromEntries(Object.entries(settings || {}).map(([k, spec]) => {
+    const v = bullet.get(k);
+    return [k, v !== undefined && spec && fits(spec, v) ? { ...spec, value: v, invalid: false } : spec];
+  }));
+  return { ...modules, global: patch(modules.global), modules: modules.modules.map((m) => {
+    const settings = patch(m.settings), sw = m.switch && settings[m.switch];
+    return { ...m, settings, state: sw && m.kind !== 'schedule' && m.kind !== 'core' ? sw.value : m.state };
+  }) };
+}
 function catalog() {
-  const t = mtime(DATA);
-  if (t !== cache.at) {
+  const t = mtime(DATA), c = mtime(CONFIG), key = `${t}|${c}`;
+  if (key !== cache.at) {
     let data = null;
     try { data = JSON.parse(readFileSync(DATA, 'utf8')); } catch { data = null; }
-    cache = { at: t, data: data && typeof data === 'object' && !Array.isArray(data) ? data : null, hash: data?.hash ?? (t ? String(t) : null) };
+    data = data && typeof data === 'object' && !Array.isArray(data) ? data : null;
+    const live = Boolean(data && c > t);
+    if (live) data.modules = withConfig(data.modules);
+    cache = { at: key, data, hash: data ? `${data.hash ?? t}${live ? `-${Math.round(c)}` : ''}` : null };
   }
   return cache;
 }
@@ -94,6 +125,21 @@ export function imagePath(work, rel) {
   let base;
   try { base = realpathSync(work); } catch { return null; }
   return IMAGE_ROOTS.some((r) => real.startsWith(join(base, r) + sep)) ? { path: real, mime } : null;
+}
+
+// A report's video: its `videos` map names a file under work/ (catalog.mjs → videoRefs). Only a video
+// inside the e2e runs (work/suite/.e2e/runs/) is read. It goes in parts, so no answer of the relay is
+// large: the page joins them and plays the video on the page.
+const VIDEO_ROOT = join('suite', '.e2e', 'runs');
+const VIDEO_MIME = { '.webm': 'video/webm', '.mp4': 'video/mp4' };
+export const VIDEO_PART = 1536 * 1024;
+export function videoPath(work, rel) {
+  if (typeof rel !== 'string' || !rel || rel.includes('\0')) return null;
+  const mime = VIDEO_MIME[extname(rel).toLowerCase()];
+  if (!mime) return null;
+  let real, base;
+  try { real = realpathSync(resolve(work, rel)); base = realpathSync(work); } catch { return null; }
+  return real.startsWith(join(base, VIDEO_ROOT) + sep) ? { path: real, mime } : null;
 }
 
 // ------------------------------------------------------------------ live status
@@ -115,6 +161,18 @@ export function status(work) {
 
 // ------------------------------------------------------------------ commands from the page
 const LOG = join(DIR, 'commands.jsonl');
+// The page's chat (docs/catalog.md → The server → Questions): each question one line of asks.jsonl, with
+// who asked; the agent's answers lines of answers.jsonl, written by scripts/dashboard/asks.mjs.
+const ASKS = join(DIR, 'asks.jsonl'), ANSWERS = join(DIR, 'answers.jsonl');
+const jsonl = (f) => (read(f) ?? '').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+const asksOf = () => jsonl(ASKS);
+const answersOf = () => new Map(jsonl(ANSWERS).filter((a) => /^A-\d+$/.test(a.id ?? '') && typeof a.text === 'string').map((a) => [a.id, { text: a.text.slice(0, 6000), utc: a.utc ?? null }]));
+function recordAsk(who, text, context) {
+  mkdirSync(DIR, { recursive: true });
+  const row = { id: `A-${asksOf().length + 1}`, utc: utc(), role: who.role, email: who.email, text, context };
+  appendFileSync(ASKS, `${JSON.stringify(row)}\n`, { mode: 0o600 });
+  return row;
+}
 const commandsOf = () => (read(LOG) ?? '').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
 function record(who, text) {
   mkdirSync(DIR, { recursive: true });
@@ -163,11 +221,65 @@ async function route(req, res, url, who) {
     if (!img) throw new Said(404, 'There is no such picture.');
     return send(res, 200, { id, uri: `data:${img.mime};base64,${readFileSync(img.path).toString('base64')}` });
   }
+  if (m === 'GET' && p[1] === 'videos' && p[2] && !p[3]) {
+    const id = decodeURIComponent(p[2]);
+    const rel = Object.prototype.hasOwnProperty.call(catalog().data?.videos ?? {}, id) ? catalog().data.videos[id] : null;
+    const v = videoPath(WORK, rel);
+    if (!v) throw new Said(404, 'This video is no longer kept here. Its report keeps it.');
+    const size = statSync(v.path).size, parts = Math.max(1, Math.ceil(size / VIDEO_PART));
+    const part = Number(url.searchParams.get('part') ?? 0);
+    if (!Number.isInteger(part) || part < 0 || part >= parts) throw new Said(400, 'There is no such part of the video.');
+    const fd = openSync(v.path, 'r');
+    try {
+      const buf = Buffer.alloc(Math.min(VIDEO_PART, size - part * VIDEO_PART));
+      readSync(fd, buf, 0, buf.length, part * VIDEO_PART);
+      return send(res, 200, { id, mime: v.mime, size, parts, part, b64: buf.toString('base64') });
+    } finally { closeSync(fd); }
+  }
+  if (m === 'POST' && p[1] === 'settings') {
+    // The operator's own press is their word (docs/modules.md → Control): written at once by
+    // modules.sh, which checks the key and the value. A viewer's press stays a request (POST /api/commands).
+    if (who.role !== 'owner') throw new Said(403, 'Only the operator changes the settings. Ask the operator.');
+    const b = await body(req);
+    spend(`settings:${who.email}`);
+    const args = typeof b.focus === 'string' ? ['focus', b.focus]
+      : typeof b.module === 'string' && typeof b.key === 'string' && typeof b.value === 'string' ? ['set', b.module, `${b.key}=${b.value}`] : null;
+    if (!args || args.some((a) => a.length > 80 || /[\u0000-\u001f\u007f]/.test(a))) throw new Said(400, 'This is not a setting of the dashboard.');
+    let out;
+    try {
+      out = execFileSync('bash', [MODULES_SH, ...args], { encoding: 'utf8', env: { ...process.env, WORK_DIR: WORK, QI_DASHBOARD_WRITE: 'operator' }, stdio: ['ignore', 'pipe', 'pipe'], timeout: 60000 });
+    } catch (e) {
+      const why = String(e.stderr || '').split('\n').find((l) => l.startsWith('modules.sh:')) || 'The setting was not changed.';
+      throw new Said(400, why.replace(/^modules\.sh: /, '').replace(/^./, (x) => x.toUpperCase()));
+    }
+    log('info', 'dashboard_setting', `${args.join(' ')} by=${who.email || '-'}`);
+    cache.at = '';
+    const c = catalog();
+    return send(res, 200, { ok: true, done: (out || '').trim().slice(0, 400), hash: c.hash, modules: c.data?.modules ?? null });
+  }
   if (m === 'GET' && p[1] === 'status') return send(res, 200, status(WORK));
   if (m === 'GET' && p[1] === 'commands') {
     const mine = commandsOf().filter((r) => r.email && r.email === who.email).slice(-20).reverse()
       .map(({ id, utc: at, command }) => ({ id, utc: at, command }));
     return send(res, 200, { commands: mine });
+  }
+  if (m === 'GET' && p[1] === 'asks') {
+    const answers = answersOf();
+    const mine = asksOf().filter((r) => r.email && r.email === who.email).slice(-60)
+      .map(({ id, utc: at, text, context }) => ({ id, utc: at, text, context, answer: answers.get(id) ?? null }));
+    return send(res, 200, { asks: mine });
+  }
+  if (m === 'POST' && p[1] === 'asks') {
+    const b = await body(req);
+    const text = typeof b.text === 'string' ? b.text.trim() : '';
+    if (!text || text.length > 2000 || /[\u0000-\u0008\u000b-\u001f\u007f]/.test(text)) throw new Said(400, 'Write a question of at most 2000 letters.');
+    spend(who.email || who.sub || who.role);
+    const c = b.context && typeof b.context === 'object' ? b.context : {};
+    const context = { tab: /^[a-z]{1,20}$/.test(c.tab ?? '') ? c.tab : null, item: typeof c.item === 'string' && c.item.length <= 200 && !/[\u0000-\u001f]/.test(c.item) ? c.item : null,
+      label: typeof c.label === 'string' ? c.label.replace(/[\u0000-\u001f]/g, ' ').slice(0, 200) : null };
+    const row = recordAsk(who, text, context);
+    log('info', 'dashboard_ask', `${row.id} from ${who.role}`);
+    return send(res, 201, { id: row.id, ping: `answer dashboard question ${row.id}` });
   }
   if (m === 'POST' && p[1] === 'commands') {
     const b = await body(req);
