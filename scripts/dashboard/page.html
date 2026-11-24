@@ -62,7 +62,7 @@
   nav .count.warn { background: var(--warn); color: var(--bg); font-weight: 600; }
   .grow { flex: 1; }
   .me-menu .me { color: var(--muted); font-size: var(--fs-meta); }
-  /* Your name opens your menu: How it works, simple mode, day or night mode. */
+  /* Your name opens your menu: Settings, How it works, simple mode, day or night mode. */
   details.me-menu > summary.me { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: var(--r-md); }
   details.me-menu > summary.me:hover, details.me-menu[open] > summary.me { background: var(--soft); color: var(--ink); }
   details.me-menu > summary.me::after { content: "▾"; font-size: 10px; }
@@ -1808,7 +1808,7 @@
     <button class="btn primary" id="ask-test" type="button" title="[Opens a dialog] Describe what to try on a page; Quality Inspector writes the test and runs it on the newest build">+ Ask for a test</button>
     <div class="grow"></div>
     <div class="search"><input class="goto" id="goto" type="search" placeholder="Search, or #42, S-7, F-3" role="combobox" aria-expanded="false" aria-controls="hits" aria-label="Search tests, runs, problems and screens: words, an issue's number like #42, a scenario's like S-7, a problem's like F-3" autocomplete="off" spellcheck="false" /><div id="hits" role="listbox" hidden></div></div>
-    <details class="more me-menu"><summary class="me" id="me" aria-label="Your menu"></summary><div class="menu"><div class="me-who" id="me-who"></div><button class="btn" id="help" type="button" data-tab="guide" title="How Quality Inspector works, tab by tab">? How it works</button><button class="btn" id="theme" type="button"></button></div></details>
+    <details class="more me-menu"><summary class="me" id="me" aria-label="Your menu"></summary><div class="menu"><div class="me-who" id="me-who"></div><button class="btn" id="settings" type="button" data-tab="settings" title="What Quality Inspector does beside the issues, and when">⚙ Settings</button><button class="btn" id="help" type="button" data-tab="guide" title="How Quality Inspector works, tab by tab">? How it works</button><button class="btn" id="theme" type="button"></button></div></details>
   </header>
   <div class="banners" id="banners"></div>
   <main id="main">
@@ -2044,11 +2044,12 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     const open = probList("open").length, failing = testList("failing", "all").length;
     const tab = ([k, n, warn]) => `<button data-tab="${k}" aria-current="${S.tab === k}"${k === "problems" ? ` class="main"` : ""}>${esc(TABS[k])}${n ? `<span class="count${warn ? " warn" : ""}"${warn ? ` title="${esc(warn)}"` : ""}>${n}</span>` : ""}</button>`;
     const sep = `<span class="sep" aria-hidden="true"></span>`;
-    const html = [[["problems", open, open && `${plural(open, "problem is", "problems are")} still in the product`]], [["tests", failing], ["runs"]], [["product", openDesign().length]], [["settings"]]]
+    const html = [[["problems", open, open && `${plural(open, "problem is", "problems are")} still in the product`]], [["tests", failing], ["runs"]], [["product", openDesign().length]]]
       .map((g) => g.map(tab).join("")).join(sep);
     const nav = $("#nav");
     if (nav.drawn !== html) keepFocus(nav, () => { nav.innerHTML = html; nav.drawn = html; });
     $("#help").setAttribute("aria-current", String(S.tab === "guide"));
+    $("#settings").setAttribute("aria-current", String(S.tab === "settings"));
   }
   function renderBanners() {
     const out = [];
