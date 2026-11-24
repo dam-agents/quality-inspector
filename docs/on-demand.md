@@ -169,8 +169,12 @@ refused with a "start a new chat". A direct session's first request names it
   real test.
 - **"create issue for <ref>[, <ref>…][ for the architect]"** — one GitHub issue for one or more
   problems (a failed test, a design finding, a validation case, a stress check):
-  [skills/create-issue](../skills/create-issue/SKILL.md). The operator sees the draft and says yes
-  before anything is posted.
+  [skills/create-issue](../skills/create-issue/SKILL.md). The operator sees the draft — in the chat
+  and on the dashboard — and says yes before anything is posted.
+- **"send issue draft <id>[ for the architect]"**, **"revise issue draft <id>"**, **"discard issue
+  draft <id>"** — the operator's answer to a bug issue draft, `<id>` its folder in `work/found/`: open
+  it on GitHub (with `fix_label` for the architect), change it as the note says, or drop it
+  ([skills/create-issue](../skills/create-issue/SKILL.md) → step 4).
 - **"show the environment"** — `env.sh where`, `env.sh status` plus non-running pods (in an
   Environment over `ssh env-<name>`), and `env.sh kept`; read-only.
 - **"keep #N [for <d> days]"** / **"release #N"** — `env.sh extend issue-<n> <d>` (3 when no

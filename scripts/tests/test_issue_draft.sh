@@ -168,4 +168,12 @@ first="$(jq -r '.problems[0].media[0].caption' "$dir/draft.json")"
 case "$first" in ("AC-1: the page — the orange frame is the agent's mark: The Chat control shows.") ;; (*) echo "  the agent's mark is missing: $first"; FAILED=1;; esac
 assert_eq "the agent's frame is orange" "245,158,11" "$(pix "$dir/evidence/$(jq -r '.problems[0].media[0].src' "$dir/draft.json")")"
 assert_eq "the run's own screenshot stays unmarked" "255,255,255" "$(pix "$M/artifacts/a/s1.png")"
+# A person's "discard issue draft <id>": the draft stays, marked discarded; an id that is no draft is refused.
+id="$(basename "$dir")"
+assert_eq "the discard names the draft's folder" "$dir" "$(node "$D" --discard "$id" | jq -r .dir)"
+jq -e '.discarded_utc | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z$")' "$dir/draft.json" >/dev/null || { echo "  a discarded draft does not say when"; FAILED=1; }
+[ -f "$dir/body.md" ] || { echo "  a discard removed the draft's text"; FAILED=1; }
+jq -e '.utc | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z$")' "$dir/draft.json" >/dev/null || { echo "  a draft has no time it was written"; FAILED=1; }
+node "$D" --discard ../x 2>/dev/null; assert_eq "a path is no draft" 2 "$?"
+node "$D" --discard no-such-draft 2>/dev/null; assert_eq "an unknown draft is refused" 2 "$?"
 exit $FAILED

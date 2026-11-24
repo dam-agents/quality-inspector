@@ -78,10 +78,22 @@ architect picks up to fix the issue. Without `fix_label` say so and offer the is
    `artifact_reports: disabled`, or no image and no video, with "the evidence is kept by
    the agent — ask in its chat". GitHub's API takes no attachment, so the pictures are on
    that page, not inline.
-4. **Ask.** Show the operator the title, the labels (`found_label`, `fix_label` with
-   `for the architect`) and the whole body in the chat, with the evidence page's link, and
-   ask: open it? Changes requested → edit and show again. No yes → nothing is posted; the
-   draft stays in `work/found/`.
+4. **Ask.** Build and publish the catalog ([docs/catalog.md](../../docs/catalog.md) → Build and
+   publish): the draft shows on the dashboard under **Bug issue draft**, with its id (the folder's
+   name), title, labels and whole body ([docs/dashboard-page.md](../../docs/dashboard-page.md) → A bug
+   issue). Show the operator the same in the chat — the title, the labels (`found_label`, `fix_label`
+   with `for the architect`), the body and the evidence page's link — and ask: open it? The answer comes
+   in the chat or as one of the page's commands, the operator's own words:
+   - **`send issue draft <id>`** — yes, as it is: step 5 for `work/found/<id>/`.
+   - **`send issue draft <id> for the architect`** — yes, and send it to developers to fix: step 5 with
+     `--fix` (without `fix_label` say so and offer it without).
+   - **`revise issue draft <id>`** with a note, or changes in words — edit `body.md` (and `title.txt`)
+     as asked, check it again (step 2), build the catalog and ask again.
+   - **`discard issue draft <id>`** — `node "$HOME/scripts/issue-draft.mjs" --discard <id>`, build the
+     catalog: the draft leaves the page and nothing is posted.
+   No yes → nothing is posted; the draft stays in `work/found/` and on the page. A shared viewer's
+   press reaches you as a handoff, and the operator confirms it first. An `<id>` that is not a folder
+   of `work/found/` with `draft.json`, or a draft already opened or discarded: say so, post nothing.
 5. **Open it.** Ledger `surface=issue action=intent issue=- key=found@<slug> target=<target_repo>`,
    then `bash "$HOME/scripts/github.sh" create-issue "<dir>" [--fix] [--again]` →
    `{refs, number, url, labels}`, then `action=done issue=<number>` (or `failed`). github.sh

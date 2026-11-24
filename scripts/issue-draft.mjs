@@ -9,6 +9,9 @@
 //   node issue-draft.mjs <ref>[, <ref>…] [--fix]
 //     <ref>: `#42 AC-2`, `#42 EX-1`, `S-7 AC-1`, `P-sign-in AC-1`, `D-12`, `VAL-3`, `PROP-4`, `STRESS-API-2`
 //     -> {"dir", "refs", "build", "title", "labels", "images", "video", "missing", "already", "notes"}
+//   node issue-draft.mjs --discard <slug>
+//     -> {"dir", "discarded_utc"} — a person's "discard issue draft <slug>": the draft stays in
+//        work/found/<slug>/ but leaves the dashboard (draft.json gets `discarded_utc`); exit 2 = no such draft
 //
 // The draft: title.txt (one line), body.md (Markdown with the hidden marker
 // `<!-- <marker_prefix>-found refs="<ref>; <ref>" build=<b> -->` and the literal EVIDENCE_LINK where the
@@ -19,7 +22,7 @@
 // in `already`. What it copies is data the agent judged — an issue's criteria, a test's steps, the
 // product's screens — never a verdict's notes, a triage explanation, LESSONS.md or work/env/.
 
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { VIEWER_CSS, VIEWER_HTML } from './lib/media-viewer.mjs';
 import { AGENT_RGB, agentBoxes, drawMarks, splitMark } from './lib/shot-mark.mjs';
@@ -42,6 +45,18 @@ const cfg = (k) => {
   return m ? m[1].replace(/\s+#.*$/, '').trim().replace(/^[`"']|[`"']$/g, '') : '';
 };
 const mdq = (s) => String(s ?? '').replace(/([\\`*_[\]<>|])/g, '\\$1'); // product text in Markdown: shown, never markup
+
+// ------------------------------------------------------------------ discard
+if (process.argv[2] === '--discard') {
+  const id = process.argv[3] ?? '';
+  const file = join(work, 'found', id, 'draft.json');
+  const d = /^[a-z0-9][a-z0-9-]{0,59}$/.test(id) ? readJson(file) : null;
+  if (!d || typeof d !== 'object') { console.error(`issue-draft.mjs: no draft ${id || '(none)'} in work/found/`); process.exit(2); }
+  d.discarded_utc = iso(Date.now());
+  writeFileSync(`${file}.tmp`, `${JSON.stringify(d, null, 2)}\n`); renameSync(`${file}.tmp`, file);
+  console.log(JSON.stringify({ dir: join(work, 'found', id), discarded_utc: d.discarded_utc }));
+  process.exit(0);
+}
 
 // ------------------------------------------------------------------ arguments
 const args = process.argv.slice(2);
@@ -401,7 +416,7 @@ const body = [
 ].join('\n');
 writeFileSync(join(dir, 'title.txt'), `${title}\n`);
 writeFileSync(join(dir, 'body.md'), body);
-writeFileSync(join(dir, 'draft.json'), `${JSON.stringify({ refs: problems.map((p) => p.ref), build, labels, title,
+writeFileSync(join(dir, 'draft.json'), `${JSON.stringify({ refs: problems.map((p) => p.ref), build, labels, title, utc: iso(Date.now()),
   problems: problems.map(({ shots: _s, video: _v, media, ...p }) => ({ ...p, media })) }, null, 2)}\n`);
 
 // The evidence page: self-contained, one section per problem, the media beside it.

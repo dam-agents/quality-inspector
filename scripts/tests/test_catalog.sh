@@ -437,6 +437,13 @@ printf '| ref | issue | url | build | labels | created_utc |\n| --- | --- | --- 
 printf '| id | category | updated_utc |\n| --- | --- | --- |\n| D-1 | layout | 2026-10-14T13:00:00Z |\n| D-2 | Not A Slug | 2026-10-14T13:00:00Z |\n' > "$W/design/CATEGORIES.md"
 printf '| id | dismissed_utc | reason |\n| --- | --- | --- |\n| D-2 | 2026-10-14T13:00:00Z | duplicate |\n' > "$W/design/DISMISSED.md"
 printf -- '- fix_label: architect:fix\n' >> "$W/CONFIG.md"
+# Bug issue drafts that wait for a person (skills/create-issue → Ask): one written after the last issue of
+# its ref shows; one whose ref got an issue after it, one discarded and one without its text do not.
+for d in waits opened gone half; do mkdir -p "$W/found/$d"; echo 'A title' > "$W/found/$d/title.txt"; printf '<!-- m -->\nThe body.\n' > "$W/found/$d/body.md"; done
+echo '{"refs":["#42 AC-1"],"build":"c3","labels":["qa:found"],"utc":"2026-10-15T09:00:00Z"}' > "$W/found/waits/draft.json"
+echo '{"refs":["S-7 AC-1"],"build":"c3","labels":["qa:found"],"utc":"2026-10-14T12:30:00Z"}' > "$W/found/opened/draft.json"
+echo '{"refs":["#42 AC-1"],"build":"c3","labels":[],"utc":"2026-10-15T09:00:00Z","discarded_utc":"2026-10-15T10:00:00Z"}' > "$W/found/gone/draft.json"
+echo '{"refs":["#42 AC-1"],"build":"c3","labels":[],"utc":"2026-10-15T09:00:00Z"}' > "$W/found/half/draft.json"; rm "$W/found/half/body.md"
 node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a build with the triage and a run by hand" 0 "$?"
 data="$(page_data)"
 assert "new runs get the next numbers, the oldest first; every earlier run keeps its own" '([.runs[] | .build + ":" + .id] | .[:2]) == ["c3:R-7","c4:R-6"]
@@ -448,6 +455,7 @@ assert "found issues: a row per problem, a non-https address dropped" '[.found[]
 assert "design triage: a category, a dismissal reason, a malformed category dropped" '(.design[] | select(.id == "D-1") | .category == "layout" and .dismiss_reason == null)
   and (.design[] | select(.id == "D-2") | .category == null)' "$data"
 assert "the labels a new issue gets" '.issue_labels == {"found":"qa:found","fix":"architect:fix"}' "$data"
+assert "bug issue drafts: only the one that waits, with its text" '.drafts == [{"id":"waits","refs":["#42 AC-1"],"title":"A title","build":"c3","labels":["qa:found"],"utc":"2026-10-15T09:00:00Z","body":"<!-- m -->\nThe body.\n"}]' "$data"
 case "$(cat "$W/catalog/index.html")" in (*RERUN-ERROR-SECRET*) echo "  a run by hand's error message reached the page"; FAILED=1;; esac
 cmd="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const re=eval(s.match(/^const CMD_RE = (\/.*\/);$/m)[1]);
 const t=["run #42", "run #42 AC-1", "run S-7 AC-1", "run P-sign-in", "create issue for #42 AC-1", "create issue for #42 AC-1, D-3, VAL-2, STRESS-API-2, S-7 AC-1 for the architect",
@@ -458,6 +466,12 @@ const t=["run #42", "run #42 AC-1", "run S-7 AC-1", "run P-sign-in", "create iss
   "recheck D-3", "discuss D-3", "recheck D-3 now", "recheck #42", "discuss VAL-2"];
 process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "the managing commands: their shapes only, at most 20 problems" 1111111111110000000111001110011000 "$cmd"
+# A bug issue draft's answers (skills/create-issue → Ask): its folder's name, nothing around it.
+drafted="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const re=eval(s.match(/^const CMD_RE = (\/.*\/);$/m)[1]);
+const t=["send issue draft 42-ac-1-c3", "send issue draft 42-ac-1-c3 for the architect", "revise issue draft 2-problems-c3-x", "discard issue draft d-7-c3",
+  "send issue draft ../x", "send issue draft 42-AC-1", "discard issue draft 42-ac-1-c3 for the architect", "send issue draft 42-ac-1-c3; rm -rf ~", `send issue draft ${"a".repeat(61)}`];
+process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "a draft's answers: send, send for the architect, revise, discard — its id only" 111100000 "$drafted"
 # Run it again (docs/catalog.md → Managing from the page): a list of test cases, a repair, a
 # validation case, a profile scenario's full run — and nothing around them.
 again="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const re=eval(s.match(/^const CMD_RE = (\/.*\/);$/m)[1]);

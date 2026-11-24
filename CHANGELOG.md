@@ -7,6 +7,17 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.65.0 — 2026-11-24
+
+**Upgrade:**
+1. `bash "$HOME/scripts/dashboard-service.sh" restart` — once: `GET /api/me` gives the dashboard's share
+   link (`work/catalog/artifact.url`) for the new page's **Copy link**. It must say `ok`.
+2. Nothing else: the page's commands gain `send issue draft <id>[ for the architect]`, `revise issue
+   draft <id>` and `discard issue draft <id>` ([skills/create-issue](skills/create-issue/SKILL.md) →
+   step 4), read from `scripts/catalog/viewer.html` as always. The next catalog build adds the waiting
+   bug issue drafts (`drafts`) and each report screenshot's step (`at`). A draft written before this
+   version has no `utc`: its `draft.json`'s time stands for it.
+
 ## 3.64.2 — 2026-11-24
 
 **Upgrade:**

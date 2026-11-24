@@ -225,11 +225,20 @@ it first sees the runs (the oldest first in one build) and kept in `work/catalog
 run's kind, origin, build and time. A run keeps its number when older runs leave the page, and a
 number is never given twice; the new page links a report by it ([dashboard-page.md](dashboard-page.md)).
 
+**Bug issue drafts** (`drafts`): each `work/found/<id>/` with `draft.json`, `title.txt` and `body.md`
+that waits for a person — not discarded (`discarded_utc`, `issue-draft.mjs --discard`) and with a ref
+that has no issue in `work/FOUND.md` opened after it was written (`draft.json`'s `utc`) — as `{id,
+refs, title, build, labels, utc, body}`, the body at most 30000 characters; the secrets scan holds it
+like all the data. The new page shows it to read and send ([skills/create-issue](../skills/create-issue/SKILL.md)
+→ step 4, [dashboard-page.md](dashboard-page.md) → A bug issue).
+
 **The report on the page.** A run's report is a panel of its own (🎬 Report, address `r=<run>&rp=1`;
 an origin's report opens its newest run's): the run's verdict, build and baseline, the agent's
 analysis, then per result its badge, cause, the agent's sentence and its test on the new build and
 on the last release — the status, the length, the error, up to 6 screenshots (the screen at the
-failure first, a click shows it at its full size) and the steps (a failed one red, open when one
+failure first when they are picked, then shown in step order; each names its step, `at` (0-based),
+and the screen at the failure `fail: true`, so the new page shows the steps with their pictures —
+[dashboard-page.md](dashboard-page.md) → The walk; a click shows one at its full size) and the steps (a failed one red, open when one
 failed). Previous and next walk the reports of the same issue, scenario or night; "The test run"
 returns to the run's panel. The video does not fit in the page: the report artifact keeps it, and
 the panel's "The video and all screenshots" opens it (a link in a new tab, or the "private" mark).
@@ -343,7 +352,8 @@ published once, and asks the server for everything it shows.
   with its type, size and number of parts), only a `.webm` or `.mp4` under `work/suite/.e2e/runs/`,
   named in the data's `videos` map (each report side's `video`; the static page has none); `GET /api/status` — what the agent does now, read from `work/env/LOCK`, `QA.md` and
   `SCENARIOS.md` at the moment of the question (the header's status is live, not as of the build);
-  `GET /api/me` — who looks; `POST /api/act` — `{command}`, an operator's action done without the
+  `GET /api/me` — who looks, and the dashboard's share link (`link`: `work/catalog/artifact.url` when
+  it is an `https://` link, else null) the new page's **Copy link** builds an item's link from; `POST /api/act` — `{command}`, an operator's action done without the
   model (dismiss, reopen or categorize a design finding, a test into or out of a collection, a setting,
   a focus area), which the server writes itself — the same rows as `modules.sh` and `collections.mjs`,
   a setting checked first by `modules.sh valid` — and logs (`module_set … via=dashboard`), with the new

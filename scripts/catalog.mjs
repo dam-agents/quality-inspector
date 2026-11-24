@@ -605,6 +605,20 @@ const found = rows(join(work, 'FOUND.md')).filter(([ref, issue, url]) => ref && 
   .map(([ref, issue, url, build, labels, utc, title]) => ({ ref, issue: +issue.slice(1), url, build: build && build !== '-' ? build : null,
     labels: String(labels ?? '').split(',').map((x) => x.trim()).filter((x) => x && x !== '-'), utc: utc || null,
     title: title && title !== '-' ? title.slice(0, 200) : null }));
+// The drafts of bug issues that wait for a person (skills/create-issue → Ask): each work/found/<slug>/
+// with draft.json, title.txt and body.md, not discarded, whose refs have no issue opened since it was
+// written. The page shows its title, labels and text to read; a person opens it, sends it to developers,
+// asks for changes or discards it.
+const foundAt = new Map(found.map((f) => [f.ref, f.utc ?? '']));
+const drafts = (existsSync(join(work, 'found')) ? readdirSync(join(work, 'found'), { withFileTypes: true }) : []).filter((e) => e.isDirectory() && /^[a-z0-9][a-z0-9-]{0,59}$/.test(e.name)).map((e) => {
+  const dir = join(work, 'found', e.name), d = readJson(join(dir, 'draft.json')), body = read(join(dir, 'body.md')), title = (read(join(dir, 'title.txt')) ?? '').trim();
+  if (!d || typeof d !== 'object' || d.discarded_utc || !body || !title) return null;
+  const refs = (Array.isArray(d.refs) ? d.refs : []).map((r) => txt(r, 80)).filter(Boolean).slice(0, 20);
+  const utc = typeof d.utc === 'string' ? d.utc : new Date(mtime(join(dir, 'draft.json'))).toISOString().replace(/\.\d+Z$/, 'Z');
+  if (!refs.length || refs.every((r) => foundAt.has(r) && String(foundAt.get(r)) >= utc)) return null;
+  return { id: e.name, refs, title: title.slice(0, 200), build: typeof d.build === 'string' ? d.build.slice(0, 80) : null,
+    labels: (Array.isArray(d.labels) ? d.labels : []).map((l) => txt(l, 50)).filter(Boolean).slice(0, 6), utc, body: body.slice(0, 30000) };
+}).filter(Boolean).sort((a, b) => b.utc.localeCompare(a.utc));
 const valFile = newestOf('validation', 'results.json');
 const val = valFile ? readJson(valFile) : null;
 const propFile = newestOf('property', 'results.json');
@@ -821,16 +835,19 @@ function sideOf(label, key) {
   const all = att.steps ?? [];
   const steps = all.slice(0, REPORT_STEPS).map((s, n) => {
     const label = said(splitMark(String(s?.label ?? '')).label, 200) ?? '';
-    for (const a of (s?.artifacts ?? []).map((x) => arts.get(x)).filter(Boolean)) shots.push({ cap: s.api === 'app.screenshot' ? label : `After step ${n + 1}`, a, check: s.api === 'app.screenshot' });
+    for (const a of (s?.artifacts ?? []).map((x) => arts.get(x)).filter(Boolean)) shots.push({ cap: s.api === 'app.screenshot' ? label : `After step ${n + 1}`, a, check: s.api === 'app.screenshot', at: n });
     return [txt(s?.api, 40) ?? '', label, STATES.has(s?.status) ? s.status : null, Number.isFinite(s?.durationMs) ? Math.round(s.durationMs) : null];
   });
   // The screen at the failure first, then the screenshots the test took, then the ones after a step.
-  const fail = [...arts.values()].filter((a) => a.producer?.kind !== 'step' && !all.some((s) => s?.artifacts?.includes(a.id))).map((a) => ({ cap: 'The screen at the failure', a, check: true }));
+  // Each shot keeps the step it was taken at (`at`, 0-based), so the page shows the walk step by step; the
+  // screen at the failure is at the first step that failed (else the last one).
+  const failedAt = all.findIndex((s) => s?.status === 'failed' || s?.status === 'timed-out');
+  const fail = [...arts.values()].filter((a) => a.producer?.kind !== 'step' && !all.some((s) => s?.artifacts?.includes(a.id))).map((a) => ({ cap: 'The screen at the failure', a, check: true, at: failedAt >= 0 ? failedAt : Math.max(0, all.length - 1), fail: true }));
   const picked = [...fail, ...shots.filter((x) => x.check && !fail.includes(x)), ...shots.filter((x) => !x.check)].slice(0, REPORT_SHOTS)
-    .map(({ cap, a }) => { const src = fileOf(a); return src ? { cap, src } : null; }).filter(Boolean);
+    .sort((x, y) => x.at - y.at).map(({ cap, a, at, fail: f }) => { const src = fileOf(a); return src ? { cap, src, at, fail: !!f } : null; }).filter(Boolean);
   const err = att.error ? said([att.error.code, att.error.message].filter((x) => typeof x === 'string' && x).join(': '), 600) : null;
   const side = { st: STATES.has(res.status) ? res.status : 'failed', ms: Number.isFinite(att.durationMs) ? Math.round(att.durationMs) : null, err,
-    steps, more: Math.max(0, all.length - REPORT_STEPS), shots: picked.map(({ cap, src }) => { const shot = { cap, img: null }; repShots.push({ shot, src }); return shot; }) };
+    steps, more: Math.max(0, all.length - REPORT_STEPS), shots: picked.map(({ cap, src, at, fail: f }) => { const shot = { cap, img: null, at, ...(f ? { fail: true } : {}) }; repShots.push({ shot, src }); return shot; }) };
   const video = (att.artifacts ?? []).find((a) => a?.kind === 'video' && a.path);
   const vsrc = video ? fileOf(video) : null;
   if (vsrc) sideVideo.set(side, vsrc);
@@ -947,7 +964,7 @@ const data = {
   product, target: target || null,
   issue_url: target ? `https://${host}/${target.split('/').slice(-2).join('/')}/issues/{n}` : null,
   builds, collections, features, maintenance, blockers, items, pages, uncovered_nav: uncoveredNav, nights, runs,
-  modules, design, findings, activity, areas, found,
+  modules, design, findings, activity, areas, found, drafts,
   // The labels a new issue gets: found_label always, fix_label (the software architect's) on request.
   issue_labels: { found: cfg('found_label') || 'qa:found', fix: cfg('fix_label') || null },
   interactive: modules?.global?.dashboard_interactive?.value === 'enabled', images,

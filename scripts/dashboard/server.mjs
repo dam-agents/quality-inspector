@@ -264,7 +264,11 @@ async function route(req, res, url, who) {
   const p = url.pathname.split('/').filter(Boolean); // ['api', …]
   const m = req.method;
   if (m === 'GET' && p[1] === 'me') {
-    return send(res, 200, { role: who.role === 'owner' ? 'operator' : 'viewer', email: who.email, name: cfg('display_name') || 'Quality Inspector', version: version() });
+    // The dashboard's share link (work/catalog/artifact.url, written at its publish): the page builds an
+    // item's link from it ("Copy link"); none → the page uses its own address.
+    const link = (read(join(WORK, 'catalog', 'artifact.url')) ?? '').trim();
+    return send(res, 200, { role: who.role === 'owner' ? 'operator' : 'viewer', email: who.email, name: cfg('display_name') || 'Quality Inspector', version: version(),
+      link: /^https:\/\/[^\s#]{1,500}$/.test(link) ? link : null });
   }
   if (m === 'GET' && p[1] === 'catalog') {
     const c = catalog();
