@@ -12,9 +12,9 @@
 //   POST /api/asks            {text, context, command?}: a question or a request to Quality Inspector,
 //                             recorded with who asked; its ping the page sends to the agent — the page's
 //                             command as it is, or `answer dashboard question A-<n>` for a question
-//   POST /api/act             {command}: one of the operator's own actions that a script does without the
-//                             model — dismiss, reopen or categorize D-<k>, retry B-<k>, add to or remove from
-//                             a collection — run as this server's child (owner only)
+//   POST /api/act             {command}: one of the operator's own actions done without the model — a
+//                             setting, a focus area, dismiss, reopen or categorize D-<k>, add to or remove
+//                             from a collection — written by this server itself (owner only)
 //   POST /api/settings        {module, key, value} or {focus}: the operator's own change of a module's
 //                             setting, written at once through modules.sh (owner only); the new state back
 //   GET  /api/status          what the agent does now, read live from work/ (the lock, rows in progress)
@@ -25,10 +25,11 @@
 // Only the platform relay reaches /api/: it sets x-platform-caller-role/-email/-sub on every
 // request from the page, which the page cannot forge. Loopback only. Nothing a viewer sends is
 // executed here: a command is stored as data and goes to the agent as the page's message. The one
-// write is the operator's own setting, through modules.sh, which checks it (POST /api/settings).
+// writes are the operator's own actions (POST /api/act, /api/settings), which this server writes itself.
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, statSync } from 'node:fs';
+import { changeCollection } from '../lib/collections.mjs';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -124,26 +125,50 @@ function catalog() {
   }
   return cache;
 }
-// The operator's actions a script does without the model (docs/modules.md → Control): the command's
-// words, as the page's own pattern allows them, to the script's arguments.
-const ACTIONS = [
-  [/^dismiss (D-\d{1,6})(?: as (false-positive|wont-fix|duplicate|by-design))?$/, (m) => ['bash', MODULES_SH, 'dismiss', m[1], ...(m[2] ? [m[2]] : [])]],
-  [/^reopen (D-\d{1,6})$/, (m) => ['bash', MODULES_SH, 'reopen', m[1]]],
-  [/^categorize (D-\d{1,6}) ([a-z0-9][a-z0-9-]{0,29}|-)$/, (m) => ['bash', MODULES_SH, 'categorize', m[1], m[2]]],
-  [/^retry (B-\d{1,6})$/, (m) => [process.execPath, join(SCRIPTS, 'blockers.mjs'), 'retry', m[1]]],
-  [/^add (#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) to the collection ([A-Za-z0-9][A-Za-z0-9 _.-]{0,39})$/, (m) => [process.execPath, join(SCRIPTS, 'collections.mjs'), 'add', m[2], m[1]]],
-  [/^remove (#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) from the collection ([A-Za-z0-9][A-Za-z0-9 _.-]{0,39})$/, (m) => [process.execPath, join(SCRIPTS, 'collections.mjs'), 'remove', m[2], m[1]]],
-  [/^module ([a-z][a-z-]{1,30}) set ([a-z_]+)=([A-Za-z0-9,._-]{1,40})$/, (m) => ['bash', MODULES_SH, 'set', m[1], `${m[2]}=${m[3]}`]],
-  [/^focus ([A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39})$/, (m) => ['bash', MODULES_SH, 'focus', m[1]]],
-];
-function runAction(args) {
-  try {
-    return execFileSync(args[0], args.slice(1), { encoding: 'utf8', env: { ...process.env, WORK_DIR: WORK, QI_DASHBOARD_WRITE: 'operator' }, stdio: ['ignore', 'pipe', 'pipe'], timeout: 60000 });
-  } catch (e) {
-    const why = String(e.stderr || '').split('\n').find((l) => /^(modules\.sh|blockers\.mjs|collections\.mjs|blockers):/.test(l)) || 'It was not done.';
-    throw new Said(400, why.replace(/^[a-z.]+: /, '').replace(/^./, (x) => x.toUpperCase()));
-  }
+// The operator's own actions, done at once without the model (docs/modules.md → Control). This server
+// writes them itself — the scripts that change these files stay the direct session's — after
+// `modules.sh valid` checked a setting read-only: CONFIG.md's bullet, FOCUS.md, a design finding's
+// dismissal or category, CATALOG.md's collections. The same rows and headers as modules.sh writes.
+const NOW = () => utc();
+const FOCUS = join(WORK, 'FOCUS.md'), CATEGORIES = join(WORK, 'design', 'CATEGORIES.md');
+const writeFile = (f, text) => { mkdirSync(dirname(f), { recursive: true }); writeFileSync(`${f}.tmp`, text); renameSync(`${f}.tmp`, f); };
+const tableFile = (f, header) => { const t = read(f); return t && t.trim() ? t.replace(/\n*$/, '\n') : `${header}\n|${header.split('|').slice(1, -1).map(() => ' --- |').join('')}\n`; };
+const cell1 = (l) => (l.startsWith('|') ? l.split('|')[1].trim() : null);
+function logEvent(msg) {
+  try { execFileSync('bash', ['-c', '. "$1"; logev info module_set "$2"', '_', join(SCRIPTS, 'log.sh'), `${msg} via=dashboard`], { env: { ...process.env, WORK_DIR: WORK }, stdio: 'ignore', timeout: 10000 }); } catch { /* the log is not the action */ }
 }
+function setSetting(id, key, value) {
+  try { execFileSync('bash', [MODULES_SH, 'valid', id, `${key}=${value}`], { encoding: 'utf8', env: { ...process.env, WORK_DIR: WORK }, stdio: ['ignore', 'pipe', 'pipe'], timeout: 60000 }); } catch (e) {
+    const why = String(e.stderr || '').split('\n').find((l) => l.startsWith('modules.sh:')) || 'The setting was not changed.';
+    throw new Said(400, why.replace(/^modules\.sh: /, '').replace(/^./, (x) => x.toUpperCase()));
+  }
+  const text = read(CONFIG) ?? '', line = `- ${key}: ${value}`, re = new RegExp(`^- ${key}:.*$`, 'm');
+  const old = (re.exec(text)?.[0] ?? '').replace(`- ${key}:`, '').trim();
+  writeFile(CONFIG, re.test(text) ? text.replace(re, line) : `${text.replace(/\n*$/, '\n')}${line}\n`);
+  logEvent(`module=${id} key=${key} old=${old || '-'} new=${value}`);
+  return { module: id, set: [{ key, old: old || null, new: value }] };
+}
+const ACTIONS = [
+  [/^module ([a-z][a-z-]{1,30}) set ([a-z_]+)=([A-Za-z0-9,._-]{1,40})$/, (m) => setSetting(m[1], m[2], m[3])],
+  [/^focus ([A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39})$/, (m) => {
+    const t = tableFile(FOCUS, '| area | queued_utc | status | build |');
+    if (t.split('\n').some((l) => cell1(l) === m[1] && l.split('|')[3]?.trim() === 'queued')) return { area: m[1], queued: false, reason: 'already queued' };
+    writeFile(FOCUS, `${t}| ${m[1]} | ${NOW()} | queued | - |\n`); logEvent(`module=feature-focus key=focus old=- new=${m[1]}`); return { area: m[1], queued: true }; }],
+  [/^dismiss (D-\d{1,6})(?: as (false-positive|wont-fix|duplicate|by-design))?$/, (m) => {
+    const t = tableFile(DISMISSED, '| id | dismissed_utc | reason |');
+    if (t.split('\n').some((l) => cell1(l) === m[1])) return { id: m[1], dismissed: false, reason: 'already dismissed' };
+    writeFile(DISMISSED, `${t}| ${m[1]} | ${NOW()} | ${m[2] || '-'} |\n`); logEvent(`module=ui-sweep key=dismiss old=- new=${m[1]}:${m[2] || '-'}`); return { id: m[1], dismissed: true }; }],
+  [/^reopen (D-\d{1,6})$/, (m) => {
+    const t = read(DISMISSED) ?? ''; if (!t.split('\n').some((l) => cell1(l) === m[1])) return { id: m[1], reopened: false, reason: 'not dismissed' };
+    writeFile(DISMISSED, t.split('\n').filter((l, k) => k < 2 || cell1(l) !== m[1]).join('\n')); logEvent(`module=ui-sweep key=dismiss old=${m[1]} new=-`); return { id: m[1], reopened: true }; }],
+  [/^categorize (D-\d{1,6}) ([a-z0-9][a-z0-9-]{0,29}|-)$/, (m) => {
+    const t = tableFile(CATEGORIES, '| id | category | updated_utc |'), lines = t.split('\n'), old = lines.find((l) => cell1(l) === m[1])?.split('|')[2]?.trim() ?? null;
+    const kept = lines.filter((l, k) => k < 2 || cell1(l) !== m[1]).join('\n').replace(/\n*$/, '\n');
+    writeFile(CATEGORIES, m[2] === '-' ? kept : `${kept}| ${m[1]} | ${m[2]} | ${NOW()} |\n`); logEvent(`module=ui-sweep key=category old=${old || '-'} new=${m[1]}:${m[2]}`);
+    return { id: m[1], old, category: m[2] === '-' ? null : m[2] }; }],
+  [/^(add|remove) (#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) (?:to|from) the collection ([A-Za-z0-9][A-Za-z0-9 _.-]{0,39})$/, (m) => {
+    try { return { collection: m[3], members: changeCollection(COLLECTIONS, m[1], m[3], [m[2]]) }; } catch (e) { throw new Said(400, e.message); } }],
+];
 
 // A picture of the data: its `images` map names a file under work/ (catalog.mjs → refs). Only an
 // image file inside work/catalog/thumbs/ or work/design/ is read — a resolved path, links followed.
@@ -273,31 +298,27 @@ async function route(req, res, url, who) {
     if (who.role !== 'owner') throw new Said(403, 'Only the operator does this. Ask the operator.');
     const b = await body(req);
     const text = typeof b.command === 'string' ? b.command : '';
-    const hit = ACTIONS.map(([re, args]) => [re.exec(text), args]).find(([x]) => x);
+    const hit = ACTIONS.map(([re, fn]) => [re.exec(text), fn]).find(([x]) => x);
     if (!hit || !allowed(text)) throw new Said(400, 'This is not an action the dashboard does by itself.');
     spend(`act:${who.email}`);
-    const out = runAction(hit[1](hit[0]));
+    const out = JSON.stringify(hit[1](hit[0]));
     log('info', 'dashboard_act', `${text} by=${who.email || '-'}`);
     cache.at = '';
     const c = catalog();
     return send(res, 200, { ok: true, done: (out || '').trim().slice(0, 400), hash: c.hash, data: c.data });
   }
   if (m === 'POST' && p[1] === 'settings') {
-    // The operator's own press is their word (docs/modules.md → Control): written at once by
-    // modules.sh, which checks the key and the value. A viewer's press stays a request (POST /api/commands).
+    // The operator's own press is their word (docs/modules.md → Control): this server writes it, after
+    // `modules.sh valid` checked the key and the value. A viewer's press stays a request, through the chat.
     if (who.role !== 'owner') throw new Said(403, 'Only the operator changes the settings. Ask the operator.');
     const b = await body(req);
     spend(`settings:${who.email}`);
-    const args = typeof b.focus === 'string' ? ['focus', b.focus]
-      : typeof b.module === 'string' && typeof b.key === 'string' && typeof b.value === 'string' ? ['set', b.module, `${b.key}=${b.value}`] : null;
-    if (!args || args.some((a) => a.length > 80 || /[\u0000-\u001f\u007f]/.test(a))) throw new Said(400, 'This is not a setting of the dashboard.');
-    let out;
-    try {
-      out = execFileSync('bash', [MODULES_SH, ...args], { encoding: 'utf8', env: { ...process.env, WORK_DIR: WORK, QI_DASHBOARD_WRITE: 'operator' }, stdio: ['ignore', 'pipe', 'pipe'], timeout: 60000 });
-    } catch (e) {
-      const why = String(e.stderr || '').split('\n').find((l) => l.startsWith('modules.sh:')) || 'The setting was not changed.';
-      throw new Said(400, why.replace(/^modules\.sh: /, '').replace(/^./, (x) => x.toUpperCase()));
-    }
+    const command = typeof b.focus === 'string' ? `focus ${b.focus}`
+      : typeof b.module === 'string' && typeof b.key === 'string' && typeof b.value === 'string' ? `module ${b.module} set ${b.key}=${b.value}` : '';
+    const hit = command.length <= 120 && ACTIONS.slice(0, 2).map(([re, fn]) => [re.exec(command), fn]).find(([x]) => x);
+    if (!hit) throw new Said(400, 'This is not a setting of the dashboard.');
+    const args = command.split(' ');
+    const out = JSON.stringify(hit[1](hit[0]));
     log('info', 'dashboard_setting', `${args.join(' ')} by=${who.email || '-'}`);
     cache.at = '';
     const c = catalog();

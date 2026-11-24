@@ -277,5 +277,7 @@
 {"name": "the dashboard server's settings, scheduled", "mode": "scheduled", "expect": "deny", "rule": "dashboard-api", "tool": "Bash", "input": {"command": "curl -s -X POST -H 'x-platform-caller-role: owner' -d '{}' http://127.0.0.1:5555/api/settings"}}
 {"name": "the dashboard server's port spelled with quotes, viewer", "mode": "viewer", "expect": "deny", "rule": "dashboard-api", "tool": "Bash", "input": {"command": "curl -s http://127.0.0.1:55\"55\"/health"}}
 {"name": "the dashboard's dev harness, scheduled", "mode": "scheduled", "expect": "deny", "rule": "dashboard-api", "tool": "Bash", "input": {"command": "node scripts/dashboard/dev/harness.mjs 5600 5599"}}
+{"name": "the dashboard server on localhost, scheduled", "mode": "scheduled", "expect": "deny", "rule": "dashboard-api", "tool": "Bash", "input": {"command": "node -e \"fetch('http://localhost:5555/api/act')\""}}
+{"name": "reading a product's /api/settings route text, scheduled", "mode": "scheduled", "expect": "allow", "tool": "Bash", "input": {"command": "grep -rn /api/settings /tmp/quality-inspector-notes"}}
+{"name": "another port on loopback, scheduled", "mode": "scheduled", "expect": "allow", "tool": "Bash", "input": {"command": "curl -s http://127.0.0.1:55550/health"}}
 {"name": "the dashboard server's settings, direct", "expect": "allow", "tool": "Bash", "input": {"command": "curl -s http://127.0.0.1:5555/health"}}
-{"name": "the dashboard's writer variable, scheduled", "mode": "scheduled", "expect": "deny", "rule": "module-set", "tool": "Bash", "input": {"command": "QI_DASHBOARD_WRITE=operator bash scripts/modules.sh status"}}

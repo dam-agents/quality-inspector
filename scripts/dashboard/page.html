@@ -2694,7 +2694,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
   // Where a command goes (docs/dashboard-page.md → Commands): what a script does without the model
   // happens at once for the operator (POST /api/act); everything else — work for Quality Inspector, or
   // a question — goes through the chat in the corner, where its answer comes.
-  const DIRECT = [/^dismiss D-\d{1,6}( as [a-z-]+)?$/, /^reopen D-\d{1,6}$/, /^categorize D-\d{1,6} \S+$/, /^retry B-\d{1,6}$/,
+  const DIRECT = [/^dismiss D-\d{1,6}( as [a-z-]+)?$/, /^reopen D-\d{1,6}$/, /^categorize D-\d{1,6} \S+$/,
     /^(add|remove) (#\d+( (AC|IN)-\d+)?|S-\d+( AC-\d+)?) (to|from) the collection .+$/, /^module [a-z-]+ set [a-z_]+=\S+$/, /^focus .+$/];
   const isDirect = (cmd) => DIRECT.some((re) => re.test(cmd));
   async function act(cmd, what) {

@@ -67,7 +67,7 @@ new place is a page or a filter of these five tabs before it is a tab of its own
   every tab's, and the browser keeps it. **How it works** shows them all.
 - **Commands.** A button does one of two things, never a message the person cannot follow:
   - **At once, without the model** — what a script does: a setting, Feature focus's area, a design
-    finding's dismissal, reopening or category, a blocker's retry, a test into or out of a
+    finding's dismissal, reopening or category, a test into or out of a
     collection. The operator's press goes to the server (`POST /api/act`, `POST /api/settings`;
     [catalog.md](catalog.md) → The server); a toast says what was done and the page shows it.
   - **Through the chat** — work for Quality Inspector (run, repair, keep each night, create an issue,

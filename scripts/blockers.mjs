@@ -35,8 +35,7 @@
 // Notices (docs/autonomy.md → Telling the operator): `opened` is due for an open row not told yet whose owner
 // is not the agent, or that struck twice — a `preflight` row only once it struck twice, so one failed listing
 // tells no one; `resolved` for a resolved or closed row that was told it opened.
-// `retry` and `close` are the operator's, in the direct session only (lib/config.sh → direct_session); `retry` also
-// from the operator's press on the dashboard, as the dashboard server's own child (util.mjs → dashboardWriter).
+// `retry` and `close` are the operator's, in the direct session only (lib/config.sh → direct_session).
 // Every write holds the register's mutex (lib/mutex.mjs). Exit 2: usage or a malformed value, the file left
 // as it was; exit 1: locked.
 
@@ -45,7 +44,7 @@ import { readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withMutex, writeAtomic } from './lib/mutex.mjs';
-import { WORK as work, dashboardWriter, read, sh, tableRows } from './lib/util.mjs';
+import { WORK as work, read, sh, tableRows } from './lib/util.mjs';
 import { takeWords } from './lib/words.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -128,8 +127,7 @@ const flags = (name) => args.flatMap((a, i) => (a === name ? [args[i + 1]] : [])
 const testsArg = () => { const t = flags('--test'); for (const x of t) if (!TEST_RE.test(x ?? '')) die(`--test "${x}" is not a test (#N, S-k, P-<slug>)`); return t; };
 const idArg = () => { const id = args[0]; if (!ID_RE.test(id ?? '')) die(`usage: blockers.mjs ${cmd} <B-k>`); return id; };
 const find = (list, id) => list.find((b) => b.id === id) ?? die(`no ${id} in work/BLOCKERS.md`);
-// The operator's: in the direct session, or `retry` pressed on the dashboard (the server's own child).
-const operatorOnly = () => { if (sh('direct_session && echo yes') !== 'yes' && !(cmd === 'retry' && dashboardWriter())) die(`${cmd} is the operator's, in the direct session only`); };
+const operatorOnly = () => { if (sh('direct_session && echo yes') !== 'yes') die(`${cmd} is the operator's, in the direct session only`); };
 const locked = (fn) => withMutex(`${FILE}.lock`, fn);
 
 function main() {

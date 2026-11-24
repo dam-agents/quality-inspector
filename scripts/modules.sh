@@ -13,6 +13,8 @@
 #                                           run's worklist; without a candidate nothing is due. A
 #                                           module with `due` in the registry is never due here:
 #                                           the pre-flight asks its own script
+#   modules.sh valid <id|global> <key>=<value>…
+#                                          the checks of `set` only, nothing written: read-only, in any session
 #   modules.sh set <id|global> <key>=<value>…
 #                                          write each key of that module (or `global`) to
 #                                          work/CONFIG.md; refuses a key outside the module, a
@@ -143,18 +145,25 @@ set_bullet() {
   mv "$tmp" "$CONFIG"
 }
 
-# The operator's word comes from the direct session, or from the operator's own press on the dashboard:
-# the dashboard server (docs/catalog.md → The server) runs `set` and `focus` itself for a caller the
-# platform's relay names `owner`, with QI_DASHBOARD_WRITE=operator, as its own child. The policy hook
-# refuses a command naming that variable in a scheduled run or a channel turn (module-set).
-dashboard_writer() {
-  [ "${QI_DASHBOARD_WRITE:-}" = operator ] || return 1
-  local a; a="$(tr '\0' ' ' <"/proc/$PPID/cmdline" 2>/dev/null)" || a=""
-  [ -n "$a" ] || a="$(ps -o args= -p "$PPID" 2>/dev/null)"
-  case "$a" in (*node*scripts/dashboard/server.mjs*) return 0;; esac
-  return 1
+operator_only() { direct_session || die 2 "modules.sh: $1 is the operator's, in the direct session only ($WHY_NOT_DIRECT)"; }
+
+# valid <id|global> <key>=<value>…: the checks of `set`, nothing written — read-only, in any session. The
+# dashboard server asks it before it writes the operator's own setting itself (docs/modules.md → Control).
+cmd_valid() {
+  local id="${1:-}" s pair key val spec
+  [ -n "$id" ] && [ $# -ge 2 ] || die 2 "usage: modules.sh valid <id|global> <key>=<value>…"
+  s="$(specs "$id")"; [ -n "$s" ] && [ "$s" != null ] || die 2 "modules.sh: unknown module '$id'"
+  shift
+  for pair in "$@"; do
+    key="${pair%%=*}"; val="${pair#*=}"
+    [ "$key" != "$pair" ] || die 2 "modules.sh: '$pair' is not <key>=<value>"
+    case "$val" in (*$'\n'*|*$'\r'*|*'|'*|*'#'*) die 2 "modules.sh: a value is one plain word";; esac
+    spec="$(jq -c --arg k "$key" '.[$k] // empty' <<<"$s")"
+    [ -n "$spec" ] || die 2 "modules.sh: '$key' is not a setting of '$id'"
+    valid "$spec" "$val" || die 2 "modules.sh: '$val' is not a valid $key ($(jq -c 'del(.default)' <<<"$spec"))"
+  done
+  jq -nc --arg id "$id" '{module:$id, valid:true}'
 }
-operator_only() { direct_session || dashboard_writer || die 2 "modules.sh: $1 is the operator's, in the direct session or on the dashboard only ($WHY_NOT_DIRECT)"; }
 
 cmd_set() {
   local id="${1:-}" s pair key val spec old changes='[]'
@@ -174,7 +183,7 @@ cmd_set() {
   for pair in "$@"; do
     key="${pair%%=*}"; val="${pair#*=}"; old="$(cfg "$key")"
     set_bullet "$key" "$val" || die 1 "modules.sh: cannot write $CONFIG"
-    logev info module_set "module=$id key=$key old=${old:--} new=$val${QI_DASHBOARD_WRITE:+ via=dashboard}"
+    logev info module_set "module=$id key=$key old=${old:--} new=$val"
     changes="$(jq -c --arg k "$key" --arg o "$old" --arg v "$val" '. + [{key:$k, old:(if $o == "" then null else $o end), new:$v}]' <<<"$changes")"
   done
   jq -nc --arg id "$id" --argjson c "$changes" '{module:$id, set:$c}'
@@ -294,6 +303,7 @@ case "${1:-}" in
   status) cmd_status ;;
   due) shift; cmd_due "$@" ;;
   set) shift; cmd_set "$@" ;;
+  valid) shift; cmd_valid "$@" ;;
   focus) shift; cmd_focus "$@" ;;
   focus-done) shift; cmd_focus_done "$@" ;;
   ran) shift; cmd_ran "$@" ;;

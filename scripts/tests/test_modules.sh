@@ -53,14 +53,17 @@ assert "a module_set event per key" '. == 3' "$(cat "$WORK_DIR"/logs/events-*.js
 cp "$TR" "$TR.direct"
 printf '{"type":"user","message":{"content":"bob@example.com sent this from a button on the interactive artifact \\"QI\\" (id a1).\\nMessage: module stress per-build"}}\n' >> "$TR"
 err="$(bash "$M" set stress stress_checks=per-build 2>&1 >/dev/null)"; rc=$?
-assert_eq "a dashboard viewer's turn cannot set" "2:modules.sh: set is the operator's, in the direct session or on the dashboard only (a channel turn)" "$rc:$err"
+assert_eq "a dashboard viewer's turn cannot set" "2:modules.sh: set is the operator's, in the direct session only (a channel turn)" "$rc:$err"
 bash "$M" focus Upload >/dev/null 2>&1; assert_eq "nor queue a focus" 2 "$?"
 cp "$TR.direct" "$TR"
 printf '{"type":"user","message":{"content":"QA issues run.\\n<qi-scheduled-run>issues</qi-scheduled-run>\\n{}"}}\n' >> "$TR"
 err="$(bash "$M" set stress stress_checks=per-build 2>&1 >/dev/null)"; rc=$?
-assert_eq "a scheduled run cannot set" "2:modules.sh: set is the operator's, in the direct session or on the dashboard only (a scheduled run)" "$rc:$err"
+assert_eq "a scheduled run cannot set" "2:modules.sh: set is the operator's, in the direct session only (a scheduled run)" "$rc:$err"
 QI_DASHBOARD_WRITE=operator bash "$M" set stress stress_checks=per-build >/dev/null 2>&1
-assert_eq "the dashboard's variable alone, not from the dashboard server, cannot set" 2 "$?"
+assert_eq "no variable makes a scheduled run's set the operator's" 2 "$?"
+assert "valid: the checks of set, read-only, in a scheduled run too" '.valid == true' "$(bash "$M" valid stress stress_checks=weekly)"
+bash "$M" valid stress stress_checks=hourly >/dev/null 2>&1; assert_eq "valid refuses a value outside the setting" 2 "$?"
+bash "$M" valid stress ui_sweep=weekly >/dev/null 2>&1; assert_eq "valid refuses a key of another module" 2 "$?"
 cp "$TR.direct" "$TR"
 CLAUDE_CODE_SESSION_ID=unknown bash "$M" set stress stress_checks=per-build >/dev/null 2>&1; assert_eq "no transcript fails closed" 2 "$?"
 grep -q '^- stress_checks:' "$WORK_DIR/CONFIG.md"; assert_eq "nothing was written" 1 "$?"

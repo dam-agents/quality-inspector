@@ -67,8 +67,8 @@
 #                                          the script refuses them outside the direct session itself, and
 #                                          the session variables it judges that by are never set by hand
 #   dashboard-api    Bash (scheduled)      a command whose text, its quoting gone (dash_names), names the dashboard
-#                                          server's port, its api/settings or api/commands path, or its dev harness: the server
-#                                          writes the operator's settings for the relay's `owner` alone
+#                                          server on loopback (an address with :5555), QI_DASHBOARD_PORT or its dev
+#                                          harness: the server writes the operator's actions for the relay's `owner` alone
 #   issue-create     Bash (scheduled)      a command whose text, its quotes, escapes and $'…' read as bash reads
 #                                          them (issue_names), holds create-issue: opening an issue
 #                                          (scripts/github.sh create-issue) is the operator's word in the direct
@@ -401,18 +401,22 @@ ansi_c_decoded() { # <text> → $X: every $'…' span replaced by the text bash 
 mod_names() { # <text> — 0 when it names modules.sh or a session variable direct_session reads
   local t="$1" dq="\$'" sq="'" r=1
   ansi_c_decoded "$t"; NW_STAR_FREE=1
-  names_words "$X" modules.sh CLAUDE_CODE_SESSION_ID CLAUDE_CONFIG_DIR QI_DASHBOARD_WRITE && r=0
-  [ "$r" = 0 ] || { names_words "${t//"$dq"/$sq}" modules.sh CLAUDE_CODE_SESSION_ID CLAUDE_CONFIG_DIR QI_DASHBOARD_WRITE && r=0; }
+  names_words "$X" modules.sh CLAUDE_CODE_SESSION_ID CLAUDE_CONFIG_DIR && r=0
+  [ "$r" = 0 ] || { names_words "${t//"$dq"/$sq}" modules.sh CLAUDE_CODE_SESSION_ID CLAUDE_CONFIG_DIR && r=0; }
   NW_STAR_FREE=""
   return "$r"
 }
-# dashboard-api — the server's API in the text once bash's quoting is gone, as issue_names reads it: its
-# port (5555, QI_DASHBOARD_PORT) or an `api/` path of it. Limit: a port or path built at run time is out
-# of reach of text; the server's own checks (the relay's caller headers) stay the first layer.
+# dashboard-api — the dashboard server in the text once bash's quoting is gone, as issue_names reads it:
+# a loopback address with its port (127.0.0.1, localhost, [::1] or 0.0.0.0, then :5555), its port's
+# variable (QI_DASHBOARD_PORT), or its dev harness. A product's own `/api/settings` on another host is no
+# match. Limit: an address or port built at run time is out of reach of text; the server's own checks
+# (the relay's caller headers) stay the first layer.
+RE_DASH='(127\.0\.0\.1|localhost|\[::1\]|0\.0\.0\.0):5555([^0-9]|$)'
 dash_names() { # <text>
   local bsnl=$'\\\n'
   ansi_c_decoded "$1"; X="${X//"$bsnl"/}"; X="${X//[\"\'\\]/}"
-  case "$X" in (*:5555*|*QI_DASHBOARD_PORT*|*/api/settings*|*/api/commands*|*dashboard/dev/*) return 0;; esac
+  [[ "$X" =~ $RE_DASH ]] && return 0
+  case "$X" in (*QI_DASHBOARD_PORT*|*dashboard/dev/harness*) return 0;; esac
   return 1
 }
 # issue-create — the text `create-issue` once bash's quoting is gone: each $'…' span decoded,

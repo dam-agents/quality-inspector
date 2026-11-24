@@ -65,7 +65,7 @@ assert_eq "a video id the data does not name: refused" 404 "$(code "${VW[@]}" "$
 # The operator's own settings: written at once by modules.sh, as the server's child (docs/modules.md → Control).
 S='{"module":"stress","key":"stress_checks","value":"weekly"}'
 assert_eq "a viewer's setting: refused" 403 "$(code "${VW[@]}" -X POST -d "$S" "$U/api/settings")"
-assert "the operator's setting: written" '.ok == true and (.done | fromjson | .set[0].new == "weekly")' "$(call "${OP[@]}" -X POST -d "$S" "$U/api/settings")"
+assert "the operator's setting: written by the server, checked by modules.sh valid" '.ok == true and (.done | fromjson | .set[0].new == "weekly")' "$(call "${OP[@]}" -X POST -d "$S" "$U/api/settings")"
 grep -q '^- stress_checks: weekly$' "$W/CONFIG.md"; assert_eq "the bullet is in CONFIG.md" 0 "$?"
 assert "the data shows it at once: a new hash" '.hash != "h1"' "$(call "${VW[@]}" "$U/api/catalog")"
 assert_eq "a value outside the setting: refused" 400 "$(code "${OP[@]}" -X POST -d '{"module":"stress","key":"stress_checks","value":"hourly"}' "$U/api/settings")"
@@ -97,10 +97,14 @@ grep -q '^| Smoke | #42 AC-1 |$' "$W/CATALOG.md"; assert_eq "the row is in CATAL
 assert "out of it again: the emptied collection goes" '.ok == true and ((.data.collections // []) | map(select(.name == "Smoke")) | length) == 0' "$(call "${OP[@]}" -X POST -d '{"command":"remove #42 AC-1 from the collection Smoke"}' "$U/api/act")"
 assert_eq "work for the agent is no direct action" 400 "$(code "${OP[@]}" -X POST -d '{"command":"run #42 AC-1"}' "$U/api/act")"
 WORK_DIR="$W" QI_DASHBOARD_WRITE=operator node "$SCRIPTS/collections.mjs" add Smoke '#42' >/dev/null 2>&1
-assert_eq "the variable alone, not from the server, cannot write a collection" 2 "$?"
-sig="$(mktemp "$SANDBOX/quality-inspector-signature.XXXXXX")"; printf 'helm: a value is required' > "$sig"
-WORK_DIR="$W" QI_WORDS_DIR="$SANDBOX" node "$SCRIPTS/blockers.mjs" open --scope env --owner operator --stage up --build c1 --signature-file "$sig" >/dev/null
-assert "the operator's retry of a blocker" '.ok == true' "$(call "${OP[@]}" -X POST -d '{"command":"retry B-1"}' "$U/api/act")"
+assert_eq "outside the direct session collections.mjs writes nothing, whatever the variables" 2 "$?"
+assert_eq "a blocker's retry is work for the agent, no direct action" 400 "$(code "${OP[@]}" -X POST -d '{"command":"retry B-1"}' "$U/api/act")"
+mkdir -p "$W/design"
+assert "the operator's dismissal: written by the server" '.ok == true' "$(call "${OP[@]}" -X POST -d '{"command":"dismiss D-7 as by-design"}' "$U/api/act")"
+grep -q '^| D-7 | .* | by-design |$' "$W/design/DISMISSED.md"; assert_eq "the row is in DISMISSED.md, as modules.sh writes it" 0 "$?"
+assert "reopened again" '.ok == true and (.done | fromjson | .reopened) == true' "$(call "${OP[@]}" -X POST -d '{"command":"reopen D-7"}' "$U/api/act")"
+grep -q '^| D-7 ' "$W/design/DISMISSED.md"; assert_eq "its row is gone" 1 "$?"
+assert "a category, then none" '(.done | fromjson | .category) == "layout"' "$(call "${OP[@]}" -X POST -d '{"command":"categorize D-7 layout"}' "$U/api/act")"
 assert "status: the lock and the issue in progress, never the session" '.lock == {owner:"agent", since:"2026-11-16T10:00:00Z"} and .issues[0].issue == 42 and (tostring | contains("sess") | not)' "$(call "${VW[@]}" "$U/api/status")"
 
 post() { call "$@" -H 'content-type: application/json' -X POST "$U/api/commands" -d "$(jq -nc --arg c "$CMD" '{command:$c}')"; }

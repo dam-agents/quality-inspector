@@ -24,17 +24,6 @@ export const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 
 export const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-// The operator's press on the dashboard (docs/modules.md → Control): this process runs as the dashboard
-// server's own child with QI_DASHBOARD_WRITE=operator. The policy hook refuses a scheduled or channel
-// command that names the variable; the parent's command line is the second check.
-export function dashboardWriter() {
-  if (process.env.QI_DASHBOARD_WRITE !== 'operator') return false;
-  let a = '';
-  try { a = readFileSync(`/proc/${process.ppid}/cmdline`, 'utf8').replace(/\0/g, ' '); } catch { /* not Linux */ }
-  if (!a) { try { a = execFileSync('ps', ['-o', 'args=', '-p', String(process.ppid)], { encoding: 'utf8' }); } catch { a = ''; } }
-  return /node.*scripts\/dashboard\/server\.mjs/.test(a);
-}
-
 // An error's first line, at most 160 characters.
 export const msg = (e) => String(e?.message ?? e).split('\n')[0].slice(0, 160);
 
