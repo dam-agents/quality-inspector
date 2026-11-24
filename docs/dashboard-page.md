@@ -131,10 +131,13 @@ new place is a page or a filter of these five tabs before it is a tab of its own
   dialog]*.
 - **Dialogs** close with Cancel and Escape; one with something typed asks before Escape closes it.
 - **Redraws keep your place.** The page asks the server every 16 s; what did not change is not
-  redrawn, and keyboard focus stays where it was.
-- **Not reached.** No answer within 15 s shows *Can't reach Quality Inspector right now. Retrying…*
-  with **Reload the page**, and the page asks every 4 s; after 20 s it loads itself anew unless a
-  dialog is open or a field holds text.
+  redrawn, and keyboard focus stays where it was. New data never takes away your work on the open
+  item: while a field there has focus or holds typed text, a video plays or text is selected, the
+  item waits for the next redraw; else the folds you opened stay open and the scroll stays.
+- **Not reached.** No answer within 15 s (60 s for the catalog data) shows *Can't reach Quality
+  Inspector right now. Retrying…* with **Reload the page**, and the page asks every 4 s. The page
+  never loads itself anew: when the server answers again, the new data comes in place. A first load
+  that fails tries again every 4 s in place.
 - **The list folds** with the arrow on its edge, and its edge drags 30 px wider or narrower (arrow
   keys 10 px, double click back); the browser keeps both.
 

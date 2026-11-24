@@ -1906,12 +1906,13 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
   // ---------- bridge ----------
   const bridge = window.platform;
   class Said extends Error {}
-  const REQUEST_WAIT = 15000;
-  async function api(method, path, body) {
+  // A GET waits 15 s; the catalog, the one big answer, waits 60 s (a slow relay is not "not reached").
+  const REQUEST_WAIT = 15000, CATALOG_WAIT = 60000;
+  async function api(method, path, body, wait = REQUEST_WAIT) {
     if (!bridge) throw new Said("The page can't load here. Open it from the link the operator shared with you.");
     let res;
     const call = bridge.request({ method, path, body: body === undefined ? undefined : JSON.stringify(body), contentType: body === undefined ? undefined : "application/json" });
-    try { res = method === "GET" ? await Promise.race([call, new Promise((_, no) => setTimeout(() => no(new Error("offline")), REQUEST_WAIT))]) : await call; }
+    try { res = method === "GET" ? await Promise.race([call, new Promise((_, no) => setTimeout(() => no(new Error("offline")), wait))]) : await call; }
     catch { throw new Error("offline"); }
     let data = {};
     try { data = JSON.parse(res.body || "{}"); } catch { data = {}; }
@@ -2077,7 +2078,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     $("#main").classList.toggle("wide", S.tab === "guide" || S.tab === "settings");
     const view = [S.tab, S.probFilter, S.testPage, S.testFilter, S.runPage, S.runFilter, S.productPage].join("|");
     if (S.listView !== view) { S.listView = view; S.listLimit = LIST_PAGE; }
-    if (S.tab === "guide" || S.tab === "settings") { list.innerHTML = ""; return; }
+    if (S.tab === "guide" || S.tab === "settings") { list.innerHTML = ""; list.drawn = ""; return; }
     let head = "", rows = [], empty = "";
     if (S.tab === "problems") {
       head = seg("probFilter", [["open", "Still there", probList("open").length, "Problems the newest run still found"], ["gone", "Not seen now", probList("gone").length, "Problems the newest run did not find again"], ["all", "All", problems().length]]);
@@ -2123,7 +2124,9 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     const at = rows.findIndex((r) => r.includes(`aria-current="true"`));
     if (at >= S.listLimit) S.listLimit = Math.ceil((at + 1) / LIST_PAGE) * LIST_PAGE;
     const drawn = rows.slice(0, S.listLimit);
-    list.innerHTML = `<div class="listhead">${head}</div>` + (rows.length ? drawn.join("") + (drawn.length < rows.length ? `<div class="list-more" data-list-more>Loading more…</div>` : "") : `<div class="empty">${esc(empty)}</div>`);
+    const html = `<div class="listhead">${head}</div>` + (rows.length ? drawn.join("") + (drawn.length < rows.length ? `<div class="list-more" data-list-more>Loading more…</div>` : "") : `<div class="empty">${esc(empty)}</div>`);
+    if (list.drawn === html) return;
+    list.innerHTML = html; list.drawn = html;
     requestAnimationFrame(() => markScrolls(list));
     listMore.disconnect();
     const more = list.querySelector("[data-list-more]"); if (more) listMore.observe(more);
@@ -2591,16 +2594,37 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     return `<p class="pick">${n ? "Pick something on the left." : ""}</p>${now}${tiles}${extra}${renderIntro()}`;
   }
   let shown = "", entered = 0;
+  // New data from the timer never takes away what the person is doing on the open item: while a field there has focus
+  // or holds typed text, a video plays or text is selected, the item waits for the next redraw; else the
+  // folds they opened stay open and the scroll stays.
+  const busy = (d) => {
+    const a = document.activeElement;
+    if (a && d.contains(a) && a.matches("input, textarea, select, [contenteditable]")) return true;
+    if ([...d.querySelectorAll("input, textarea")].some((f) => f.type !== "checkbox" && f.type !== "radio" && f.value !== f.defaultValue)) return true;
+    if ([...d.querySelectorAll("select")].some((f) => [...f.options].some((o) => o.selected !== o.defaultSelected))) return true;
+    if ([...d.querySelectorAll("video, audio")].some((v) => !v.paused && !v.ended)) return true;
+    const sel = getSelection(); return Boolean(sel && !sel.isCollapsed && sel.anchorNode && d.contains(sel.anchorNode));
+  };
+  const foldKey = (x, i) => x.dataset.key || x.id || (x.dataset.intro && `intro:${x.dataset.intro}`) || `#${i}`;
+  function keepWork(d, redraw) {
+    const open = new Map([...d.querySelectorAll("details")].map((x, i) => [foldKey(x, i), x.open])), top = d.scrollTop;
+    redraw();
+    d.querySelectorAll("details").forEach((x, i) => { const k = foldKey(x, i); if (open.has(k)) x.open = open.get(k); });
+    d.scrollTop = top;
+  }
   function renderDetail() {
     const d = $("#detail");
     const it = findItem(S.item);
+    // Only a redraw the timer starts (S.quiet) waits or keeps the folds: the person's own click redraws as it says.
+    const same = S.quiet && S.item === shown && S.tab === d.tab && d.drawn !== undefined;
     if (S.item && !it && S.data) S.item = null; // without data yet, the address keeps its item
     d.classList.toggle("fill", Boolean(it) || S.tab === "guide" || S.tab === "settings");
     if (S.item !== shown) { shown = S.item; d.scrollTop = 0; d.classList.remove("enter"); void d.offsetWidth; d.classList.add("enter"); clearTimeout(entered); entered = setTimeout(() => d.classList.remove("enter"), 400); }
     $("#main").classList.toggle("has-detail", Boolean(it) || S.tab === "guide" || S.tab === "settings");
     const html = S.tab === "guide" ? `<div class="guide">${GUIDE()}</div>` : S.tab === "settings" ? `<div class="guide qi-settings">${renderSettings()}</div>` : !it ? renderEmpty()
       : it.kind === "test" ? renderTest(it.x) : it.kind === "run" ? renderRun(it.x, it.focus) : it.kind === "problem" ? renderProblem(it.x) : it.kind === "screen" ? renderScreen(it.x) : it.kind === "design" ? renderDesign(it.x) : it.kind === "upkeep" ? renderUpkeep(it.x) : it.kind === "feature" || it.kind === "collection" ? renderGroup(it.kind, it.x) : renderBuild(it.x);
-    if (d.drawn !== html) { keepFocus(d, () => { d.innerHTML = html; d.drawn = html; }); loadImages(d);
+    if (d.drawn !== html && same && busy(d)) return; // the next redraw brings it
+    if (d.drawn !== html) { const put = () => keepFocus(d, () => { d.innerHTML = html; d.drawn = html; d.tab = S.tab; }); if (same) keepWork(d, put); else put(); loadImages(d);
       // A link to one test of a report: its result opens and comes into view.
       if (S.scrollMod) { d.querySelector(`#mod-${CSS.escape(S.scrollMod)}`)?.scrollIntoView({ block: "start", behavior: "smooth" }); S.scrollMod = null; }
       const f = it?.focus && d.querySelector(`.qi-res[data-key="${CSS.escape(it.focus)}"]`); if (f && S.item !== d.focused) { d.focused = S.item; f.open = true; f.scrollIntoView({ block: "start" }); } }
@@ -3201,26 +3225,41 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
 
   // ---------- loading ----------
   async function refresh() {
-    const r = await api("GET", `/api/catalog${S.hash ? `?have=${encodeURIComponent(S.hash)}` : ""}`);
+    const r = await api("GET", `/api/catalog${S.hash ? `?have=${encodeURIComponent(S.hash)}` : ""}`, undefined, CATALOG_WAIT);
     if (!r.unchanged) { S.data = r.data; S.hash = r.hash; S.note = r.data ? null : r.note || null; }
     try { S.status = await api("GET", "/api/status"); } catch (e) { if (!(e instanceof Said)) throw e; }
   }
-  const RELOAD_AFTER = 20000;
-  let offlineSince = 0, tick = 0;
-  const writing = () => Boolean(document.querySelector("dialog[open]")) || [...document.querySelectorAll("textarea, input")].some((x) => x.value.trim());
-  // One timer: every 16 s, every 4 s while Quality Inspector can't be reached.
+  let tick = 0, asking = false;
+  // One timer: every 16 s, every 4 s while Quality Inspector can't be reached. The page never loads
+  // itself anew: what the person has open, typed or played stays; when the server answers again, the
+  // new data comes in place. Only "Reload the page" loads it anew.
   async function poll() {
     tick += 1;
-    if (document.hidden || (!S.offline && tick % 4 !== 0)) return;
-    try { await refresh(); if (S.offline) S.offline = false; draw(); }
-    catch (e) {
-      if (e instanceof Said) return;
-      if (!S.offline) { S.offline = true; offlineSince = Date.now(); renderBanners(); return; }
-      if (Date.now() - offlineSince > RELOAD_AFTER && !writing()) location.reload();
-    }
+    if (asking || document.hidden || (!S.offline && tick % 4 !== 0)) return;
+    asking = true;
+    try { await refresh(); if (S.offline) S.offline = false; S.quiet = true; draw(); }
+    catch (e) { if (!(e instanceof Said) && !S.offline) { S.offline = true; renderBanners(); } }
+    finally { asking = false; S.quiet = false; }
   }
   async function start() {
     if (!bridge) { $("#detail").innerHTML = `<div class="panel">The page can't load here. Open it from the link the operator shared with you.</div>`; $("#main").classList.add("has-detail"); return; }
+    await boot();
+    setInterval(() => { poll().catch(() => {}); }, 4000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) { tick = -1; poll().catch(() => {}); } });
+  }
+  // The first load tries again every 4 s in place until the server answers.
+  async function boot() {
+    for (;;) {
+      try { await load(); return; }
+      catch (e) {
+        $("#detail").innerHTML = `<div class="panel">${esc(e instanceof Said ? e.message : "Quality Inspector can't be reached right now. Retrying…")}</div>`; $("#detail").drawn = undefined;
+        $("#main").classList.add("has-detail");
+        if (e instanceof Said) throw e;
+        await new Promise((ok) => setTimeout(ok, 4000));
+      }
+    }
+  }
+  async function load() {
     S.me = await api("GET", "/api/me");
     const who = S.me.email || (S.me.role === "operator" ? "Operator" : "Viewer");
     $("#me").innerHTML = `<span class="who-full">${esc(who)}</span><span class="av">${esc(who[0].toUpperCase())}</span>`; $("#me-who").textContent = who;
@@ -3229,13 +3268,8 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     renderTheme();
     await refresh();
     if (!goTo(location.hash)) draw();
-    setInterval(() => { poll().catch(() => {}); }, 4000);
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) { tick = -1; poll().catch(() => {}); } });
   }
-  start().catch((e) => {
-    $("#detail").innerHTML = `<div class="panel">${esc(e instanceof Said ? e.message : "Quality Inspector can't be reached right now. Retrying…")}</div>`;
-    if (!(e instanceof Said)) setTimeout(() => location.reload(), RELOAD_AFTER);
-  });
+  start().catch(() => {});
 })();
 </script>
 </body>
