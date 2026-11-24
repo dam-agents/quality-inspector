@@ -12,6 +12,11 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 **Upgrade:**
 Nothing — the new page (`scripts/dashboard/page.html`) is read again on every load and is not published yet.
 
+## 3.64.1 — 2026-11-24
+
+**Upgrade:**
+Nothing — the new page (`scripts/dashboard/page.html`) is read again on every load and is not published yet.
+
 ## 3.64.0 — 2026-11-24
 
 **Upgrade:**

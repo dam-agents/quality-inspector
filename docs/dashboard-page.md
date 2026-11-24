@@ -20,8 +20,8 @@ WORK_DIR=<work> node scripts/dashboard/dev/harness.mjs 5600 5599   # then http:/
 ## The menu
 
 One row, the same on every tab: **Problems** leads (the page opens on it), then **Tests** and **Runs**, then **Product**,
-then **Settings**, each group behind a thin separator; **+ Ask for a test** follows behind one more. At the right: the
-search, then the person's menu (**How it works**, day or night). Only the open tab is marked; every
+each group behind a thin separator; **+ Ask for a test** follows behind one more. At the right: the
+search, then the person's menu (**Settings**, **How it works**, day or night): Settings is not a tab in the row. Only the open tab is marked; every
 count is grey and counts only what still needs someone; Problems' count is amber while a problem is
 still in the product.
 
