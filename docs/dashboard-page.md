@@ -27,9 +27,9 @@ still in the product.
 
 | Tab | The question it answers | Pages (tabs on the list) | Filter (segmented, with counts) | An item's page |
 | --- | --- | --- | --- | --- |
-| **Problems** | What is wrong in the product now? | — | **Still there** (default), **Not seen now**, All | what happens, where, why, what fixes it, the runs that found it; **Create a bug issue…**, **Run the tests again** |
+| **Problems** | What is wrong in the product now? | — | **Still there** (default), **Not seen now**, All | a row: *Seen*, the *Test* that found it (`#42 AC-1`, `+2` for more), its *Issue* as a link and its *Bug* (an opened bug issue's link, or *Draft*); where it is, in words, only on its page. The page: the bug issue (**A bug issue**), **What happened, step by step** (**The walk**), what happens, where, why, what fixes it, the tests and runs that found it; **Create a bug issue…**, **Run the tests again** |
 | **Tests** | What do we test, and does it pass? | All, Nightly, From issues, Scenarios, **Upkeep**, **Features** | **Failing** (default; failing or needing a person), Passing, Not decided, All | a test: what it checks (Given / When / Then and the issue's own words), how it is kept (Nightly, Ready to keep, Ran once, Set aside, Retired), **why** a result is not a pass (a product defect, the test is wrong, the product did not run), every result with its report's number, the screens it opens, the features and collections it is in; the first button follows the cause — **Create a bug issue…**, **Repair the test**, **Keep it each night**, else **Run it again** — then **Report R-n**, ⋯ **Stop running it each night**, **Add to a collection…**, **Change these steps…**. **Upkeep**: each proposal `M-n` (what changed, what Quality Inspector proposes; **Accept**, **Keep it as it is**, ⋯ **Rewrite**, **Retire**) and the tests ready to keep (**Keep all … ready**). **Features**: each feature and collection — its tests and their states, **Run them all** (`run feature <id>`, or the tests of a collection), **Copy as Gherkin**, a collection's ✕ per test |
-| **Runs** | When was the product tested, and how did it go? Each run is its report, `R-n` | All, Nightly, Issues, Scenarios | All, With problems | the report (below): the result, the agent's summary, **since the run before** (tests newly failing, fixed, still failing and new; how the product's screens changed; new errors in the browser console), the counts, why it could not start, the problems, each test's result; ◀ ▶ the reports before and after. A row says how many tests fail newly |
+| **Runs** | When was the product tested, and how did it go? Each run is its report, `R-n` | All, Nightly, Issues, Scenarios | All, With problems | the report (below): the result, the agent's summary, **since the run before** (tests newly failing, fixed, still failing and new; how the product's screens changed; new errors in the browser console), the counts in their states' inks, why it could not start, the problems, each test's result, the issues in the build as links. The list at the left is the only way from one report to another: a report has no Previous or Next. A row says how many tests fail newly |
 | **Product** | What does the product have, what do the tests reach, how does it look? | **Map**, **Coverage**, **Screenshots**, **Design**, **Builds** | Design: **Open** (default), Fixed, Dismissed, All | a screen (Map and Coverage): its picture with each control outlined in its coverage's ink (each night green, once amber, none grey and dashed); a click on a control shows its kind and name, where it leads and its tests, **+ Ask about it**; the tests that open the screen, what looks wrong there; **Build a test from here**, **+ Ask for a test**. Coverage lists the screens worst first, with a bar of their controls; nothing open shows the counts of screens and controls and the menu items no nightly test goes through. A design finding (`D-n`): its picture, where, the screen size, who found it, first and last seen; **Send to design**, **Check it again**, ⋯ **Create a bug issue…**, **Dismiss: …**; a dismissed one **Open it again**. **Screenshots**: every test's newest picture as a gallery, a click opens the test. A build: its runs |
 | **Settings** | What does Quality Inspector do beside the issues, and when? | — (one page, the whole width, no list) | — | **The week at a glance:** each check that is on, Mon–Sun, its days in the product's colour and its time; one a week or a month says so in words; a name opens its row. **The checks, grouped by when they run** (With each issue, Each night, During the day, Each week or month, When you ask): a row is its name, when it runs and its last run, and at the right its switch — a schedule's on and off, a module's own on-off, or its cadence as a segmented control. A click on the name opens the row in place: what it does, each other setting in words (a choice segmented, a number or sizes with **Change**, the range and the default), **Run now**, Feature focus's area. **Limits** last: the settings for all. **The operator's change of a value applies at once** — the server writes it ([catalog.md](catalog.md) → The server), a toast says what was saved, the page shows it; a schedule's on and off and **Run now** stay commands to Quality Inspector, asked first. A viewer sees the same page; each change they press is a command, asked first, for the operator |
 
@@ -44,6 +44,40 @@ new place is a page or a filter of these five tabs before it is a tab of its own
   state's dot at the right end; one line under it with its facts, each a grey label and its value
   (*Last run:* Today, *Build:* c3, *Kept:* Nightly). Newest first. 20 rows, then 20 more as the end
   scrolls into view. Pointing at a dot unfolds it into its word.
+- **A value filters, as on the Desk.** A value with its label in a row's line stays in ink and
+  underlines on hover; a click filters the list to the rows with the same value, under a **Filtered
+  by** bar whose **×** shows every row again. A link in the value (an issue) still opens. The filter
+  holds on the tab's page it was set on, looks through every row, and the open item stays shown.
+- **A state's word in its ink.** Wherever a result's word stands — a report's test, a side's status,
+  the counts, a history — it reads in its state's ink: *Passed* and *Passing* green, *Failed* and
+  *Regression* red, *Flaky* and *Needs a look* amber, *Not testable*, *Blocked* and *Timed out*
+  slate, *No test* and *No result* grey.
+- **The title's link.** Every item's title has the link icon beside its number, and the bar above it
+  **🔗 Copy link**, as on the Desk: both copy a link that opens the item — the dashboard's share
+  link (`/api/me` → `link`, from `work/catalog/artifact.url`) with the item's place, else the page's
+  own address.
+- **An issue is a link, and previews.** An issue's number anywhere (a problem's row, a report's
+  issues in its build, a bug issue) opens the issue on GitHub in a new tab; pointing at it for half a
+  second shows, as on the Desk, what Quality Inspector knows of it: its title, its tests and how they
+  do, the open problems they found, the bug issues opened from them.
+- **The walk.** A problem's page, a failing test's page and a failing result in a report show the
+  evidence before the words: **Expected** (the test's Given, When and Then) beside **What
+  happened** (the agent's sentence, else the error), above them the screen with the error marked
+  (the test's own red frame, or Quality Inspector's amber one with what it saw; docs/reporting.md →
+  The mark), then every step the test did, in order, each with the screenshot taken at it; the
+  step that failed is red and the screen at the failure has a red frame. A click shows a picture at
+  its full size. The steps' screenshots are catalog.mjs's `rep` (each with its step, `at`); a report
+  built before that shows its pictures and steps apart.
+- **A bug issue, as Design Desk sends a design.** **Create a bug issue…** asks Quality Inspector for a
+  draft ([skills/create-issue](../skills/create-issue/SKILL.md)); nothing goes to GitHub yet. The draft
+  shows on the problem's, the test's or the finding's page under **Bug issue draft**: its stages
+  (**Draft** → **Opened** → **With developers**), *Draft — read it, then open it*, when and on which
+  build it was written, its labels, and its whole text. The ways on: **Open the issue** (`send issue
+  draft <id>`), **Send to developers to fix** (`send issue draft <id> for the architect`: also
+  `fix_label`; without that key the box says the operator sets it), **Ask for changes…** (`revise issue
+  draft <id>` with the person's note), ⋯ **Discard the draft** (`discard issue draft <id>`). While a
+  press waits for its answer the box says *Opening it on GitHub…*. Once opened, the box links the issue,
+  its labels and its stage; the item's button becomes **Bug issue #N ↗**.
 - **An item's state.** The box under the title says where the item stands, in one word in its state's
   ink, and what happened last (*Nightly regression on build c3 · 2 days ago*); its buttons stand at
   the right. Pointing at the word says what it means. One primary button per view, the next step.

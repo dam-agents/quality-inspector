@@ -231,7 +231,9 @@ function side(i, v) {
     ...(st === 'timed-out' ? [] : [['app.screenshot', `${i.id}: ${i.name}`, 'passed', 300], ['agent.assert', i.then, last, 1500 + Math.floor(rnd() * 2000)]])];
   return { st, ms: steps.reduce((a, s) => a + s[3], 0), more: 0, steps,
     err: st === 'failed' ? `The check did not hold: ${i.then}. ${why || ''}`.trim() : st === 'timed-out' ? 'The page did not answer within 60 s.' : null,
-    shots: [{ cap: st === 'passed' ? `${i.id}: ${i.name}` : 'The screen at the failure', img: shotOf(page) }, ...(st === 'passed' ? [{ cap: 'After step 1', img: shotOf(page) }] : [])] };
+    // Each shot at its step (`at`): after the page opened, the test's own screenshot, the screen at the failure.
+    shots: [{ cap: 'After step 1', img: shotOf(page), at: 0 }, ...(st === 'timed-out' ? [] : [{ cap: `${i.id}: ${i.name}`, img: shotOf(page), at: steps.length - 2 }]),
+      ...(st === 'passed' ? [] : [{ cap: 'The screen at the failure', img: shotOf(page), at: steps.length - 1, fail: true }])] };
 }
 for (const r of runs) {
   const results = {}, entries = [];
@@ -283,8 +285,13 @@ const pages = SCREENS.map(([pattern, title, covered], k) => {
 const data = {
   schema: 'qi-catalog/v1', agent: 2, product: 'Tasklane', target: 'acme/tasklane', issue_url: 'https://github.com/acme/tasklane/issues/{n}',
   builds: BUILDS, collections: [], features: [], maintenance: [], blockers: [], items, pages, uncovered_nav: [], nights: [], runs,
-  modules: {}, design: [], findings: [], activity: {}, areas: [], found: [], issue_labels: [], interactive: true, images, videos, generated_utc: iso(0),
+  modules: {}, design: [], findings: [], activity: {}, areas: [], found: [], drafts: [], issue_labels: { found: 'qa:found', fix: 'fix:architect' }, interactive: true, images, videos, generated_utc: iso(0),
 };
+// A failing test's still with the error marked; one bug issue opened, one draft waiting (skills/create-issue).
+for (const i of items) if (['failed', 'regression'].includes(i.verdict?.value)) { i.still = shotOf(i.pages[0]); i.marked = rnd() < 0.5 ? 'test' : 'agent'; i.mark_saw = i.marked === 'agent' ? 'The name field is empty, and the project was saved anyway.' : null; }
+data.found = [{ ref: '#104 AC-2', issue: 140, url: 'https://github.com/acme/tasklane/issues/140', build: NEWEST, labels: ['qa:found', 'fix:architect'], utc: iso(2 * DAY), title: 'A moved task jumps back after a reload' }];
+data.drafts = [{ id: '101-ac-2-r1841', refs: ['#101 AC-2'], title: 'An empty project name is saved', build: NEWEST, labels: ['qa:found'], utc: iso(3 * H),
+  body: '<!-- quality-inspector-found refs="#101 AC-2" build=r1841 -->\n## The problem\n\nA member can save a project with an empty name. The check did not hold: **the page says “Name is required”**.\n\n## The correct function\n\n- Given a member on the new project form\n- When the member saves it without a name\n- Then the page says “Name is required”\n\n## Steps to reproduce\n\n- Open `/projects/new` on build r1841.\n- Leave the name empty.\n- Click **Save**.\n\n## Done when\n\n- Given an empty name, When a member saves, Then the page says “Name is required”.' }];
 // ------------------------------------------------------------------ the modules (Settings) and the design findings (Product → Design)
 const modules = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'seed-modules.json'), 'utf8'));
 for (const m of modules.modules) {

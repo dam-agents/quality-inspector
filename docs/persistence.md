@@ -167,7 +167,7 @@ modules' settings, the live browser) answers no.
 
 The operator often reads the dashboard beside a scheduled run's chat, and its buttons then
 send their words into that session. A request there that only the direct session does
-("create issue for …", "module … set", "focus …", "dismiss D-`<k>`", "recheck D-`<k>`",
+("create issue for …", "send issue draft …", "revise issue draft …", "discard issue draft …", "module … set", "focus …", "dismiss D-`<k>`", "recheck D-`<k>`",
 "recheck VAL-`<k>`", "run …", "discuss D-`<k>`", a configuration change — [on-demand.md](on-demand.md))
 is not refused with a "start a new chat": hand the operator's words to a fresh session.
 
