@@ -7,14 +7,17 @@ the Desk's simple mode is not taken over): one product, one family of pages. Onl
 colour differs (The look). The page's `<style>` is the Desk's stylesheet as it is; a rule both pages
 share changes in both.
 
-**Where it stands.** The first step: the skeleton with the four menu tabs, their lists and an item's
-page, on the data the dashboard server already serves ([catalog.md](catalog.md) → The server). The
-published dashboard is still `scripts/catalog/viewer.html`; this page is not built or published by
-`scripts/catalog.mjs` yet. Open it in development:
+**Where it stands.** This page is the interactive dashboard: `scripts/catalog.mjs` copies it to
+`work/catalog/live.html`, which the agent publishes when `page_changed` ([catalog.md](catalog.md) →
+**Build and publish**). It asks the dashboard server for all it shows, so it does not work without
+the server. The static dashboard (`dashboard_interactive: disabled`), and the stand-in while the
+server does not answer, stay the old page `scripts/catalog/viewer.html` with its data
+(`work/catalog/index.html`); its command list (`CMD_RE` and the others) is still the one the server
+and `lib/channel.sh` read, and the two pages keep it the same. Open it in development:
 
 ```bash
 WORK_DIR=<work> node scripts/catalog.mjs
-WORK_DIR=<work> node scripts/dashboard/dev/harness.mjs 5600 5599   # then http://localhost:5600/?page=new
+WORK_DIR=<work> node scripts/dashboard/dev/harness.mjs 5600 5599   # then http://localhost:5600/ (the old page: ?page=old)
 ```
 
 ## The menu

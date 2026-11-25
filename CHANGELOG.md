@@ -7,6 +7,16 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.66.0 — 2026-11-25
+
+**Upgrade:**
+Nothing to run by hand. The interactive dashboard (`dashboard_interactive: enabled`) is now the new
+page `scripts/dashboard/page.html`: `scripts/catalog.mjs` writes it as `work/catalog/live.html`, so
+the next catalog build gives `page_changed: true` and the run publishes it in place of the old page
+([docs/catalog.md](docs/catalog.md) → **Build and publish**). To see it before the next issues run,
+build and publish the catalog now. The static dashboard (`disabled`) stays the old page
+`scripts/catalog/viewer.html`.
+
 ## 3.65.1 — 2026-11-24
 
 **Upgrade:**
