@@ -70,7 +70,7 @@ it after 7 days.
    - `env.sh reset`, then `up`: a stale helm operation, an install stuck half-way, disk held by old images;
    - a repair that `work/LESSONS.md` or the profile's README names for this signature (a runtime
      directory, a service restart) — the command it names, never a new one on the product;
-   - a test's steps, by the heal and rework rules of [triage.md](triage.md) alone;
+   - a test's check, by the heal rules of [triage.md](triage.md) alone; replaced steps only as a `rework` proposal for the operator;
    - your own state: a cache, a stale port in a file of `work/`, a lock past its TTL.
 
    Never the product, the profile's files, the platform, the configuration, or a frozen block

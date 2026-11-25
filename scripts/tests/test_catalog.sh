@@ -72,7 +72,7 @@ C
 cat > "$W/issues/42/verdicts-abc-c1.json" <<'J'
 {"issue":42,"title":"Rename <b>projects</b>","ac_hash":"abc","candidate":"c1","baseline":"b1","candidate_run":"cand","baseline_run":"base",
  "verdict":"partial","generated_utc":"2026-10-02T14:00:00Z","trigger":{"via":"github","who":null,"why":"label qa:ready on #42"},
- "acs":[{"id":"AC-1","name":"renamed","verdict":"verified"},{"id":"AC-2","name":"internal","testable":false,"verdict":"not-testable"}],
+ "acs":[{"id":"AC-1","name":"renamed","verdict":"verified","wrong":"A PASS HAS NO WRONG"},{"id":"AC-2","name":"internal","testable":false,"verdict":"not-testable"}],
  "explorations":[{"id":"EX-1","verdict":"observation","note":"NOTE-SECRET"},{"id":"EX-2","risk":"R-1","mode":"observe","verdict":"observation"}],
  "notes":["NOTE-SECRET in the notes"]}
 J
@@ -498,13 +498,24 @@ assert_eq "discuss with a question: printable, one line, at most 1000 characters
 # docs/maintenance.md): a malformed feature id and a closed proposal stay out; a feature run joins the
 # runs and the history with its criteria's raw results, a malformed key dropped.
 printf '# Features\n\n| feature | name | aliases | members | updated_utc |\n| --- | --- | --- | --- | --- |\n| renaming | Renaming projects | Přejmenování | #42 AC-1, S-7 | 2026-10-20T00:00:00Z |\n| Bad Id | x | - | #42 | - |\n' > "$W/FEATURES.md"
-printf '# Maintenance\n\n| id | test | kind | build | basis | proposal | state | opened_utc | closed_utc |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| M-1 | #42 AC-1 | needs-review | c3 | ui-map: tab moved | heal | open | 2026-10-20T00:00:00Z | - |\n| M-2 | S-7 | drift | c3 | x | re-promote | kept | 2026-10-20T00:00:00Z | 2026-10-21T00:00:00Z |\n' > "$W/MAINTENANCE.md"
+printf '# Maintenance\n\n| id | test | kind | build | basis | proposal | state | opened_utc | closed_utc |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| M-1 | #42 AC-1 | needs-review | c3 | ui-map: tab moved | heal | open | 2026-10-20T00:00:00Z | - |\n| M-2 | S-7 | drift | c3 | x | re-promote | kept | 2026-10-20T00:00:00Z | 2026-10-21T00:00:00Z |\n| M-3 | #42 AC-2 | rework | c3 | no specification: the Export button is gone | rewrite | open | 2026-10-20T00:00:00Z | - |\n| M-4 | S-7 AC-1 | rework | c3 | #9 | rewrite | open | 2026-10-20T00:00:00Z | - |\n| M-5 | #42 IN-1 | rework | c3 | x | rewrite | open | 2026-10-20T00:00:00Z | - |\n' > "$W/MAINTENANCE.md"
+# A rework's details (docs/maintenance.md → The proposal's details): spec false keeps no reason; a reason
+# without a number is dropped, and spec true with none left reads as false; a file of another shape is out.
+mkdir -p "$W/maintenance"
+echo '{"spec":false,"because":[{"issue":9,"quote":"q"}],"before":["Open /projects","Click Export"],"after":["Open /projects","Click Share"],"found":"The share menu."}' > "$W/maintenance/M-3.json"
+printf -- '--- a/x.e2e.ts\n+++ b/x.e2e.ts\n-  await click("Export")\n+  await click("Share")\n' > "$W/maintenance/M-3.diff"
+echo '{"spec":true,"because":[{"issue":"9","quote":"no number"},{"pr":12,"quote":"The export becomes a share link."}],"before":[],"after":["a"]}' > "$W/maintenance/M-4.json"
+echo '{"spec":"yes"}' > "$W/maintenance/M-5.json"
 mkdir -p "$W/reruns/feature-renaming"
 echo '{"label":"feature-renaming-c3-1300","feature":"renaming","build":"c3","utc":"2026-10-14T13:00:00Z","results":{"issue-42/AC-1":{"status":"passed","error":null},"../x/AC-1":{"status":"failed"}}}' > "$W/reruns/feature-renaming/feature-renaming-c3-1300.json"
 node "$SCRIPTS/catalog.mjs" >/dev/null; assert_eq "a build with features, maintenance and a feature run" 0 "$?"
 data="$(page_data)"
 assert "features: the well-formed rows" '.features == [{"id":"renaming","name":"Renaming projects","aliases":["Přejmenování"],"members":["#42 AC-1","S-7"]}]' "$data"
-assert "maintenance: the open proposals only" '[.maintenance[] | .id + ":" + .test + ":" + .kind + ":" + .proposal + ":" + .basis] == ["M-1:#42 AC-1:needs-review:heal:ui-map: tab moved"]' "$data"
+assert "maintenance: the open proposals only" '[.maintenance[] | .id + ":" + .test + ":" + .kind + ":" + .proposal] == ["M-1:#42 AC-1:needs-review:heal","M-3:#42 AC-2:rework:rewrite","M-4:S-7 AC-1:rework:rewrite","M-5:#42 IN-1:rework:rewrite"]
+  and .maintenance[0].basis == "ui-map: tab moved" and (.maintenance[0] | has("spec") or has("diff") | not)' "$data"
+assert "a rework's details: no specification, its steps, its diff; a reason with a number only; another shape left out" '(.maintenance[1] | .spec == false and .because == [] and .before == ["Open /projects","Click Export"] and .after == ["Open /projects","Click Share"] and .found == "The share menu." and (.diff | contains("+  await click(\"Share\")")))
+  and (.maintenance[2] | .spec == true and .because == [{"pr":12,"quote":"The export becomes a share link."}] and .found == null and (has("diff") | not))
+  and (.maintenance[3] | has("spec") | not)' "$data"
 assert "a feature run: in the runs and the history" '([.runs[] | select(.type == "feature")] | length == 1 and .[0].ref == "renaming" and .[0].entries == [{"key":"issue-42/AC-1","value":"passed","cause":null}])
   and (.items[] | select(.key == "issue-42/AC-1") | [.history[] | select(.run == "feature")] | length == 1)' "$data"
 

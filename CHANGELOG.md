@@ -7,6 +7,22 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.68.0 — 2026-11-25
+
+**Upgrade:**
+1. Nothing to run: the new page (`scripts/dashboard/page.html`) is read again on every load, and the next
+   catalog build passes a verdict entry's new optional `wrong` ([docs/reporting.md](docs/reporting.md) →
+   **What is wrong**). A failure shows its screen first with only what is wrong, how it should look where
+   the test passes, and the steps folded.
+2. Nothing to run for the reworks: from this version a step before a frozen block that no longer works is
+   never rewritten alone. The night proves a new way in a copy, the test stays `needs-review`, and a `rework`
+   proposal carries the diff and `work/maintenance/M-<k>.json` — the old and new steps, the issue or pull
+   request behind it, or `"spec": false` ([docs/triage.md](docs/triage.md) → **Reworking the steps before
+   a block**). An open `rework` row from before stays valid; its page shows the basis and the diff only.
+3. Nothing to run: a test's page shows its steps on the product map's screens, the control each step uses
+   or checks marked, and plays them, also before the test's first run
+   ([docs/dashboard-page.md](docs/dashboard-page.md), the walk on the map).
+
 ## 3.67.0 — 2026-11-25
 
 **Upgrade:**

@@ -1,8 +1,8 @@
 # Triage — redesign or regression
 
 Every regression-tier criterion that did not simply pass — an `AC-<k>` or an intent test's
-`IN-<k>` ([intent.md](intent.md)), alike — gets exactly one category: a reworked UI never
-fails the suite, and a broken product never hides behind "the UI changed". In doubt,
+`IN-<k>` ([intent.md](intent.md)), alike — gets exactly one category: a moved control never
+fails the suite, a replaced flow waits for the operator's word, and a broken product never hides behind "the UI changed". In doubt,
 **regression**: a false alarm costs one look; a hidden regression costs users.
 
 ## What each test already tells you
@@ -19,7 +19,7 @@ the step list and screenshots in `report.json`.
 | `unchanged` | passed, nothing judged, nothing re-learned | nothing |
 | `relearned` | passed; only steps outside AC blocks were re-learned | nothing — the next passing run re-records; note which steps moved |
 | `healed` | passed with `judged` checks, and the healing rules below hold | repair the check, log it |
-| `reworked` | did not reach its frozen block because a step before it no longer works (`cause` `test`), and the rework rules below hold | rewrite those steps, log it |
+| `reworked` | not assigned by the agent since 3.68.0: a step before the frozen block that no longer works is a `needs-review` with a `rework` proposal (below); older nights keep the word | — |
 | `needs-review` | passed with `judged` checks, but a healing rule fails; or fails on the previous build too (step 5) | leave the file; open a proposal for the operator ([maintenance.md](maintenance.md)) |
 | `superseded` | the criterion is false, and a completed issue in the window that `may_supersede` changes exactly this behaviour on purpose | retire the test (below) and open a proposal |
 | `regression` | the criterion is false (strict re-run fails and the judge agrees), and nothing in the context explains it | report it with both screens |
@@ -44,7 +44,7 @@ evidence for a cause, leave it out.
    --tag ac-<k> --tag-mode all --repeat-each 3 --no-cache` (an intent test: `--tag in-<k>`),
    and read `by_test[].stability`.
    `flaky` ends the triage of this criterion as `flaky`; only `stable-fail` can become a
-   `regression`, `superseded` or `reworked` (a fail before the frozen block), and only `stable-pass` (non-strict for a judged check)
+   `regression`, `superseded` or a `rework` proposal (a fail before the frozen block), and only `stable-pass` (non-strict for a judged check)
    `relearned` or `healed`. The re-run is uncached, so a stale recording is no finding.
 2. **Look at the evidence**: the AC screenshot, the failing step, the previous build's
    screenshot of the same page (`work/inventory/<previous>/shots/`).
@@ -105,31 +105,44 @@ A heal never touches a criteria file. Three heals of the same test inside a mont
 ## Reworking the steps before a block
 
 A test that stops at a step outside every frozen block — a field, a dialog or a sequence the
-product replaced — is out of date, not broken product. The agent rewrites those steps without the
-operator when all of these hold:
+product replaced — is out of date, or the product lost a way its users had. The agent never
+changes the test alone: it finds the new way, and the operator decides. The test does not pass on
+this night: its entry is `needs-review`, `cause` `test`, and the night's report says that a new way
+waits for a decision.
 
-- The confirmation re-run (step 1) stops **at the same step outside the frozen blocks** each time.
-- The change is **explained**: a completed issue in the window (its `issue_hits` or
-  `changes.json`) or a merged pull request of the Change radar ([radar.md](radar.md)) states the
-  new flow, quoted; or the UI map shows the step's control removed or moved.
-- The rewritten steps reach **the state the criterion's Given and When describe**, through the
-  nested product alone (its UI, and its CLI or API as [test-authoring.md](test-authoring.md)
-  allows). A flow that needs a surface the test cannot drive — another product's app, a mailbox,
-  a chat client — is no rework.
-- The frozen blocks stay **byte-identical**: `scripts/check-asserts.sh --hash` prints the same
-  value before and after.
-- The rewritten file **passes strict** (`suite.sh run rework-<candidate> --strict --tag <its tag>`).
+1. **Confirm** — the confirmation re-run (step 1) stops **at the same step outside the frozen
+   blocks** each time. Else it is `flaky` or `blocked`, not a rework.
+2. **Find the new way** through the nested product alone (its UI, and its CLI or API as
+   [test-authoring.md](test-authoring.md) allows), helped by what may say how the product does it now:
+   the profile ([profile-contract.md](profile-contract.md); its `SKILL.md` and the references it names),
+   the text of the completed issues in the window, and the Change radar's pull request text
+   ([radar.md](radar.md)). A flow that needs a surface the test cannot drive — another product's app,
+   a mailbox, a chat client — is no new way.
+3. **Prove it, then put the test back**: copy the test file to
+   `mktemp /tmp/quality-inspector-rework.XXXXXX`, write the new steps in the test file, and check that
+   the rewritten steps reach **the state the criterion's Given and When describe**, the frozen blocks stay
+   **byte-identical** (`scripts/check-asserts.sh --hash` prints the same value as for the copy), and the
+   file **passes strict** (`suite.sh run rework-<candidate> --strict --tag <its tag>`). Then write
+   `diff -u <copy> <test file>` to `mktemp /tmp/quality-inspector-diff.XXXXXX` and copy the old file
+   back, also when a check failed: the night ends with the test as it was.
+4. **Name the reason** — the issue or the merged pull request that states the new flow, quoted. The
+   UI map's line that shows the step's control removed or moved says what changed, not why. **No issue or
+   pull request found → the change has no specification**: the proposal shows a warning (`"spec": false`, maintenance.md → **The
+   proposal's details**), since a lost way with no issue behind it may be a regression. The agent never
+   guesses a reason.
+5. **Open the proposal**: `maintenance.mjs open <test> --kind rework --proposal rewrite`; the saved diff
+   becomes `work/maintenance/M-<k>.diff`, the details `M-<k>.json`, and both `/tmp` files are removed ([maintenance.md](maintenance.md)). The basis
+   is the reason (`#<n> "<quoted sentence>"`, `PR #<n>: <title>`), or `no specification: <what changed
+   on the screen>` (the UI-map line when there is one).
 
-Then save the file and append a `work/HEALS.md` row with `old_hash` = `new_hash` and basis
-`rework: #<n> "<quoted sentence>"` (or the UI-map line). A rework counts as a heal for the
-three-heals rule above. Its verdicts entry: `reworked`, `cause: null`, `because_issue`.
+Step 2 or 3 fails → the same entry, and a `rework` proposal `review` whose basis names what is missing
+(*"#3810: the channel is bound in the chat client — no product surface"*), with a `tests` blocker of the
+same cause when no build can repair it ([autonomy.md](autonomy.md)), so the next nights do not replay
+it; `blocked` (`cause` `environment`) when the environment stopped the strict run. For a profile
+scenario (`P-<slug>`) the report also tells the product team what its profile must give the test.
 
-Any rule fails → `needs-review` (`cause` `test`), or `blocked` (`cause` `environment`) when the
-environment stopped the strict run, and a `rework` proposal ([maintenance.md](maintenance.md) →
-What opens a proposal) — with a `tests` blocker of the same cause when no build can repair it
-([autonomy.md](autonomy.md)), so the next nights do not replay it —, its basis naming what is missing (*"#3810: the channel is bound in the chat
-client — no product surface"*). For a profile scenario (`P-<slug>`) the report also tells the
-product team what its profile must give the test.
+The operator's "accept M-<k>" applies the diff ([maintenance.md](maintenance.md) → **The operator
+decides**); it counts as a heal for the three-heals rule above.
 
 ## Flaky tests and quarantine
 
