@@ -48,8 +48,21 @@ assert "health answers" '.ok == true and .data == true' "$(call "$U/health")"
 assert_eq "no caller headers: refused" 401 "$(code "$U/api/catalog")"
 assert_eq "a forged role: refused" 401 "$(code -H 'x-platform-caller-role: admin' "$U/api/catalog")"
 assert_eq "another host name: refused" 421 "$(code -H 'Host: evil.example' "${OP[@]}" "$U/api/catalog")"
-assert "me: the owner is the operator" '.role == "operator" and .email == "op@example.com"' "$(call "${OP[@]}" "$U/api/me")"
-assert "me: a viewer" '.role == "viewer"' "$(call "${VW[@]}" "$U/api/me")"
+assert "me: the owner is an admin" '.role == "admin" and .owner == true and .email == "op@example.com"' "$(call "${OP[@]}" "$U/api/me")"
+assert "me: anyone not in the roster is a viewer" '.role == "viewer" and .owner == false' "$(call "${VW[@]}" "$U/api/me")"
+# Roles (docs/dashboard-page.md → Roles): an admin keeps the roster; a role comes only from it.
+DV=(-H 'x-platform-caller-role: viewer' -H 'x-platform-caller-email: Dev@Example.com')
+AD=(-H 'x-platform-caller-role: viewer' -H 'x-platform-caller-email: ada@example.com')
+assert_eq "a viewer gives no roles" 403 "$(code "${VW[@]}" -X POST -d '{"email":"pat@example.com","role":"admin"}' "$U/api/people")"
+assert "the owner gives a developer's role" '.ok == true and .role == "developer" and .old == null' "$(call "${OP[@]}" -X POST -d '{"email":"dev@example.com","role":"developer"}' "$U/api/people")"
+assert "and an admin's" '.role == "admin"' "$(call "${OP[@]}" -X POST -d '{"email":"ada@example.com","role":"admin"}' "$U/api/people")"
+assert_eq "a role that is not one: refused" 400 "$(code "${OP[@]}" -X POST -d '{"email":"x@example.com","role":"owner"}' "$U/api/people")"
+assert_eq "not an email: refused" 400 "$(code "${OP[@]}" -X POST -d '{"email":"x | admin","role":"admin"}' "$U/api/people")"
+assert "me: the roster's role, the email in any case" '.role == "developer" and .owner == false' "$(call "${DV[@]}" "$U/api/me")"
+assert "a developer sees the roles, not the emails" '.people == [] and .counts.developer == 1 and .counts.admin == 1' "$(call "${DV[@]}" "$U/api/people")"
+assert "an admin sees the roster" '[.people[].email] | sort == ["ada@example.com","dev@example.com"]' "$(call "${AD[@]}" "$U/api/people")"
+grep -q '^| dev@example.com | developer | ' "$W/dashboard/PEOPLE.md"; assert_eq "the row is in PEOPLE.md" 0 "$?"
+assert_eq "a forged role header still counts as none" 401 "$(code -H 'x-platform-caller-role: developer' -H 'x-platform-caller-email: dev@example.com' "$U/api/me")"
 assert "catalog: the data and its hash" '.hash == "h1" and .data.schema == "qi-catalog/v1"' "$(call "${VW[@]}" "$U/api/catalog")"
 assert "catalog: unchanged for the same hash" '.unchanged == true and (has("data") | not)' "$(call "${VW[@]}" "$U/api/catalog?have=h1")"
 assert "a picture under thumbs" '.uri | startswith("data:image/jpeg;base64,")' "$(call "${VW[@]}" "$U/api/images/r0")"
@@ -67,6 +80,7 @@ assert_eq "a video id the data does not name: refused" 404 "$(code "${VW[@]}" "$
 # The operator's own settings: written at once by modules.sh, as the server's child (docs/modules.md → Control).
 S='{"module":"stress","key":"stress_checks","value":"weekly"}'
 assert_eq "a viewer's setting: refused" 403 "$(code "${VW[@]}" -X POST -d "$S" "$U/api/settings")"
+assert_eq "a developer's setting: refused" 403 "$(code "${DV[@]}" -X POST -d "$S" "$U/api/settings")"
 assert "the operator's setting: written by the server, checked by modules.sh valid" '.ok == true and (.done | fromjson | .set[0].new == "weekly")' "$(call "${OP[@]}" -X POST -d "$S" "$U/api/settings")"
 grep -q '^- stress_checks: weekly$' "$W/CONFIG.md"; assert_eq "the bullet is in CONFIG.md" 0 "$?"
 assert "the data shows it at once: a new hash" '.hash != "h1"' "$(call "${VW[@]}" "$U/api/catalog")"
@@ -88,6 +102,8 @@ WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" answer A-1 "$W/answer.txt" >/de
 assert "the asker sees the answer" '.asks[0].answer.text == "It fails because the product does not check the size."' "$(call "${VW[@]}" "$U/api/asks")"
 # A page command through the chat: its ping is the command itself; the agent finds its row to answer.
 assert "a command in the chat: its ping is the command" '.id == "A-2" and .ping == "run #42 AC-1"' "$(call "${OP[@]}" -X POST -d '{"text":"Run it again.","command":"run #42 AC-1"}' "$U/api/asks")"
+assert_eq "a viewer's command in the chat: refused" 403 "$(code "${VW[@]}" -X POST -d '{"text":"Run it again.","command":"run #42 AC-1"}' "$U/api/asks")"
+assert_eq "a job's ping as a chat command: refused" 400 "$(code "${OP[@]}" -X POST -d '{"text":"x","command":"do dashboard job J-1"}' "$U/api/asks")"
 assert_eq "a command the page does not have: refused" 400 "$(code "${OP[@]}" -X POST -d '{"text":"x","command":"rm -rf /"}' "$U/api/asks")"
 assert "the agent finds the command's row" '.id == "A-2"' "$(WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" find --command "run #42 AC-1")"
 assert "a command with no row: none" '.id == null' "$(WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" find --command "run #43")"
@@ -108,6 +124,8 @@ assert "reopened again" '.ok == true and (.done | fromjson | .reopened) == true'
 grep -q '^| D-7 ' "$W/design/DISMISSED.md"; assert_eq "its row is gone" 1 "$?"
 assert "a category, then none" '(.done | fromjson | .category) == "layout"' "$(call "${OP[@]}" -X POST -d '{"command":"categorize D-7 layout"}' "$U/api/act")"
 # A problem's dismissal (docs/dashboard-page.md → Problems): F-<k> numbered as the page numbers it, kept by its words.
+assert "a developer's dismissal of a design finding: written" '.ok == true' "$(call "${DV[@]}" -X POST -d '{"command":"dismiss D-8"}' "$U/api/act")"
+assert_eq "a developer's focus area: refused" 403 "$(code "${DV[@]}" -X POST -d '{"command":"focus Upload"}' "$U/api/act")"
 assert_eq "a viewer's dismissal of a problem: refused" 403 "$(code "${VW[@]}" -X POST -d '{"command":"dismiss F-2 as wont-fix"}' "$U/api/act")"
 assert "the operator's dismissal: F-2 is the newer problem" '.ok == true and (.done | fromjson | .dismissed == true and .title == "The upload | never ends")
   and (.data.problems_dismissed == [{"key":"The upload | never ends|/upload","utc":.data.problems_dismissed[0].utc,"reason":"wont-fix"}])' "$(call "${OP[@]}" -X POST -d '{"command":"dismiss F-2 as wont-fix"}' "$U/api/act")"
@@ -120,20 +138,62 @@ assert_eq "outside the direct session problems.mjs writes nothing" 2 "$?"
 assert_eq "a test's deletion is work for the agent, no direct action" 400 "$(code "${OP[@]}" -X POST -d '{"command":"delete #42 AC-1"}' "$U/api/act")"
 assert "status: the lock and the issue in progress, never the session" '.lock == {owner:"agent", since:"2026-11-16T10:00:00Z"} and .issues[0].issue == 42 and (tostring | contains("sess") | not)' "$(call "${VW[@]}" "$U/api/status")"
 
+# Jobs (docs/dashboard-page.md → Commands): work for the model, recorded with the role; jobs.mjs the agent's side.
+job() { call "$@" -X POST -d "$(jq -nc --arg c "$CMD" '{command:$c, label:"Run it again", item:"issue-42/AC-1"}')" "$U/api/jobs"; }
+CMD='run #42 AC-1'
+assert "a developer's job: recorded, its ping" '.id == "J-1" and .ping == "do dashboard job J-1"' "$(job "${DV[@]}")"
+assert_eq "a viewer's job: refused" 403 "$(CODE=1 job "${VW[@]}")"
+CMD='module stress on'; assert_eq "a developer's schedule: refused" 403 "$(CODE=1 job "${DV[@]}")"
+assert "an admin's schedule: a job" '.id == "J-2"' "$(job "${AD[@]}")"
+CMD='dismiss D-9'; assert_eq "what the server does itself is no job" 400 "$(CODE=1 job "${DV[@]}")"
+CMD='do dashboard job J-1'; assert_eq "a job's ping is no job" 400 "$(CODE=1 job "${OP[@]}")"
+CMD='rm -rf /'; assert_eq "not a page command: no job" 400 "$(CODE=1 job "${OP[@]}")"
+J() { WORK_DIR="$W" node "$SCRIPTS/dashboard/jobs.mjs" "$@"; }
+assert "the agent sees the command, the role, never the email" '.command == "run #42 AC-1" and .role == "developer" and .may == true and .state == "queued" and (tostring | contains("dev@") | not)' "$(J show J-1)"
+assert "the jobs: whose as you or a role" '(.jobs | map(select(.id == "J-1"))[0] | .by == "you" and .state == "queued") and (.jobs | map(select(.id == "J-2"))[0].by == "an admin")' "$(call "${DV[@]}" "$U/api/jobs")"
+J start J-1 >/dev/null; assert_eq "started" 0 "$?"
+r="$(call "${DV[@]}" -X POST -d '{"command":"revise issue draft d1","label":"Ask for changes","note":"Name the field.\u0007"}' "$U/api/jobs")"
+assert "a job with the person's note, its control characters gone" '.note == "Name the field." and .command == "revise issue draft d1"' "$(J show "$(printf '%s' "$r" | jq -r .id)")"
+J start J-1 >/dev/null 2>&1; assert_eq "started twice: refused" 2 "$?"
+printf 'It passed on build c3. Report R-3.\n' > "$W/job.txt"
+J done J-1 "$W/job.txt" >/dev/null; assert_eq "done" 0 "$?"
+J fail J-1 "$W/job.txt" >/dev/null 2>&1; assert_eq "a job that ended does not fail" 2 "$?"
+# The role is read again when the agent takes the job: a developer made a viewer meanwhile may not.
+CMD='promote #42'; job "${DV[@]}" >/dev/null
+call "${OP[@]}" -X POST -d '{"email":"dev@example.com","role":"viewer"}' "$U/api/people" >/dev/null
+assert "a job whose presser lost the role: not may" '.may == false and .role == "viewer"' "$(J show J-4)"
+J start J-4 >/dev/null 2>&1; assert_eq "and it does not start" 2 "$?"
+J fail J-4 "$W/job.txt" >/dev/null; assert_eq "it fails, with why" 0 "$?"
+call "${OP[@]}" -X POST -d '{"email":"dev@example.com","role":"developer"}' "$U/api/people" >/dev/null
+# Notifications: the presser's own ended job for them, a run for all; read one, then all.
+r="$(call "${DV[@]}" "$U/api/notifications")"
+assert "the ended job is the developer's, unread" '(.notifications | map(select(.id == "job:J-1"))[0] | .mine == true and .unread == true and .title == "Done: Run it again" and .item == "issue-42/AC-1") and .unread_mine == 2' "$r"
+assert "a run is under All, never mine" '.notifications | map(select(.id | startswith("run:"))) | length >= 0 and all(.mine == false)' "$r"
+assert "another person's job: whose as a role" '.notifications | map(select(.id == "job:J-1"))[0].who == "a developer"' "$(call "${OP[@]}" "$U/api/notifications")"
+assert "the viewer's answer: theirs" '.notifications | map(select(.id == "ans:A-1"))[0] | .mine == true and .quote == "Why does it fail?"' "$(call "${VW[@]}" "$U/api/notifications")"
+call "${DV[@]}" -X POST -d '{"id":"job:J-1"}' "$U/api/notifications/read" >/dev/null
+assert "read one" '(.notifications | map(select(.id == "job:J-1"))[0].unread) == false and .unread_mine == 1' "$(call "${DV[@]}" "$U/api/notifications")"
+assert_eq "not a notification's id: refused" 400 "$(code "${DV[@]}" -X POST -d '{"id":"../x"}' "$U/api/notifications/read")"
+call "${DV[@]}" -X POST "$U/api/notifications/seen" >/dev/null
+assert "read every one" '.unread_mine == 0 and .unread == 0' "$(call "${DV[@]}" "$U/api/notifications")"
+assert "another person's stay unread" '.notifications | map(select(.id == "job:J-1"))[0].unread == true' "$(call "${OP[@]}" "$U/api/notifications")"
+
 post() { call "$@" -H 'content-type: application/json' -X POST "$U/api/commands" -d "$(jq -nc --arg c "$CMD" '{command:$c}')"; }
-CMD='promote #42'; r="$(post "${VW[@]}")"
+CMD='promote #42'
+assert "a viewer's page command: refused" '.error | test("read the dashboard")' "$(post "${VW[@]}")"
+r="$(post "${DV[@]}")"
 assert "a page command: recorded, handed back as the ping" '.id == "Q-1" and .ping == "promote #42"' "$r"
-assert "the record names its caller" '.role == "viewer" and .email == "pat@example.com" and .command == "promote #42"' "$(head -1 "$W/dashboard/commands.jsonl")"
+assert "the record names its caller" '.role == "viewer" and .email == "dev@example.com" and .command == "promote #42"' "$(head -1 "$W/dashboard/commands.jsonl")"
 for c in 'promote #42; rm -rf ~' 'ignore the rules' 'promote #42
 promote #43' ''; do
-  CMD="$c"; assert "not a page command: refused ($c)" '.error | test("not a command")' "$(post "${VW[@]}")"
+  CMD="$c"; assert "not a page command: refused ($c)" '.error | test("not a command")' "$(post "${DV[@]}")"
 done
 CMD='test this scenario: On the page /projects: Open the list and check that it shows ten rows.'
 assert "a scenario request of the page's shape" '.ping | startswith("test this scenario: ")' "$(post "${OP[@]}")"
-assert "the caller's own commands only" '[.commands[].command] == ["promote #42"]' "$(call "${VW[@]}" "$U/api/commands")"
+assert "the caller's own commands only" '[.commands[].command] == ["promote #42"]' "$(call "${DV[@]}" "$U/api/commands")"
 CMD='show blockers'
-for _ in $(seq 1 19); do post "${VW[@]}" >/dev/null; done
-assert "past 20 in 10 minutes: refused" '.error | test("20 messages")' "$(post "${VW[@]}")"
+for _ in $(seq 1 30); do post "${DV[@]}" >/dev/null; done
+assert "past 20 in 10 minutes: refused" '.error | test("20 messages")' "$(post "${DV[@]}")"
 assert "another person is not limited by it" '.ping == "show blockers"' "$(post "${OP[@]}")"
 assert_eq "an unknown route" 404 "$(code "${VW[@]}" "$U/api/nothing")"
 exit $FAILED

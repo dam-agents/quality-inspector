@@ -283,3 +283,6 @@
 {"name": "reading a product's /api/settings route text, scheduled", "mode": "scheduled", "expect": "allow", "tool": "Bash", "input": {"command": "grep -rn /api/settings /tmp/quality-inspector-notes"}}
 {"name": "another port on loopback, scheduled", "mode": "scheduled", "expect": "allow", "tool": "Bash", "input": {"command": "curl -s http://127.0.0.1:55550/health"}}
 {"name": "the dashboard server's settings, direct", "expect": "allow", "tool": "Bash", "input": {"command": "curl -s http://127.0.0.1:5555/health"}}
+{"name": "dashboard roster edit, scheduled", "expect": "deny", "mode": "scheduled", "rule": "scheduled-def", "tool": "Write", "input": {"file_path": "@WORK@/dashboard/PEOPLE.md", "content": "| a@b.cz | admin | - |"}}
+{"name": "dashboard jobs edit, scheduled", "expect": "deny", "mode": "scheduled", "rule": "scheduled-def", "tool": "Edit", "input": {"file_path": "@WORK@/dashboard/jobs.jsonl", "old_string": "tester", "new_string": "admin"}}
+{"name": "dashboard roster edit, direct", "expect": "allow", "tool": "Write", "input": {"file_path": "@WORK@/dashboard/PEOPLE.md", "content": "| a@b.cz | admin | - |"}}

@@ -7,6 +7,18 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.70.0 — 2026-11-25
+
+**Upgrade:**
+1. `bash "$HOME/scripts/dashboard-service.sh" restart` — once: the server gives each caller a role (admin,
+   developer, tester, viewer — `work/dashboard/PEOPLE.md`, kept on Settings → People), records work as jobs
+   `J-<n>` (`POST /api/jobs`, `work/dashboard/jobs.jsonl`) and serves the notifications. It must say `ok`.
+2. Nothing else: the page is read again on every load. A press now does its work at once, as on Design Desk:
+   no chat draft. The agent does `do dashboard job J-<n>` as `scripts/dashboard/jobs.mjs` says the role may,
+   without asking again ([docs/on-demand.md](docs/on-demand.md)). **Behaviour change:** a person the
+   dashboard is shared with is a viewer, and reads only, until an admin gives them a role; an older page's
+   bare command from a shared person is declined.
+
 ## 3.68.0 — 2026-11-25
 
 **Upgrade:**

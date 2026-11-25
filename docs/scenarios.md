@@ -195,7 +195,7 @@ stay as produced.
 ## Saving
 
 Saving queues a scenario's test for the regression tier; anyone in its conversation may ask.
-**Only the operator promotes** ("promote S-<k>", "promote all pending" —
+**Only the operator promotes**, or a dashboard job of a role that may ("promote S-<k>", "promote all pending" —
 [on-demand.md](on-demand.md)); `auto_promote` never applies (no scenario is `verified`). The file qualifies when its latest verdict is `passed`, the judge agreed on every
 AC, its candidate run passed `--strict` with no `judged` step, and
 `bash "$HOME/scripts/check-asserts.sh" --agent-asserts <file>` prints nothing. Then set its

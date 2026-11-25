@@ -34,17 +34,17 @@ that is still too long is cut with … and never pushes its title into a narrow 
 
 One row, the same on every tab: **Problems** leads (the page opens on it), then **Tests** and **Runs**, then **Product**,
 each group behind a thin separator; **+ Ask for a test** follows behind one more. At the right: the
-search, then the person's menu (**Settings**, **How it works**, day or night): Settings is not a tab in the row. Only the open tab is marked; every
+search, the bell (**Notifications**), then the person's menu (their role, **Settings**, **How it works**, day or night): Settings is not a tab in the row. Only the open tab is marked; every
 count is grey and counts only what still needs someone; Problems' count is amber while a problem is
 still in the product.
 
 | Tab | The question it answers | Pages (tabs on the list) | Filter (segmented, with counts) | An item's page |
 | --- | --- | --- | --- | --- |
-| **Problems** | What is wrong in the product now? | — | **Still there** (default), **Not seen now**, **Dismissed**, All | a row: *Seen*, the *Test* that found it (`#42 AC-1`, `+2` for more), its *Issue* as a link and its *Bug* (an opened bug issue's link, or *Draft*); where it is, in words, only on its page. The page: the bug issue (**A bug issue**), **What happened, step by step** (**The walk**), what happens, where, why, what fixes it, the tests and runs that found it; **Create a bug issue…**, **Run the tests again**, ⋯ **Dismiss: …** with a reason (`dismiss F-<k> as <reason>`); a dismissed problem's **Open it again** (`reopen F-<k>`). A dismissal is a row of `work/PROBLEMS.md` by the problem's words (its title and where), not its number: `lib/problems.mjs` numbers the problems as the page does, the dashboard server writes the operator's press at once, `scripts/problems.mjs` the operator's word in the direct session. A dismissed problem is out of **Still there**, of the tab's count and of an issue's preview |
+| **Problems** | What is wrong in the product now? | — | **Still there** (default), **Not seen now**, **Dismissed**, All | a row: *Seen*, the *Test* that found it (`#42 AC-1`, `+2` for more), its *Issue* as a link and its *Bug* (an opened bug issue's link, or *Draft*); where it is, in words, only on its page. The page: the bug issue (**A bug issue**), **What happened, step by step** (**The walk**), what happens, where, why, what fixes it, the tests and runs that found it; **Create a bug issue…**, **Run the tests again**, ⋯ **Dismiss: …** with a reason (`dismiss F-<k> as <reason>`); a dismissed problem's **Open it again** (`reopen F-<k>`). A dismissal is a row of `work/PROBLEMS.md` by the problem's words (its title and where), not its number: `lib/problems.mjs` numbers the problems as the page does, the dashboard server writes the press of an admin, a developer or a tester at once, `scripts/problems.mjs` the operator's word in the direct session. A dismissed problem is out of **Still there**, of the tab's count and of an issue's preview |
 | **Tests** | What do we test, and does it pass? | All, Nightly, From issues, Scenarios, **Needs a change**, **Features** | **Failing** (default; failing or needing a person), Passing, Not decided, All | a test: what it checks (Given / When / Then and the issue's own words), how it is kept (Nightly, Ready to keep, Ran once, Set aside, Retired), **why** a result is not a pass (a product defect, the test is wrong, the product did not run), every result with its report's number, the screens it opens, the features and collections it is in; the first button follows the cause — **Create a bug issue…**, **Repair the test**, **Keep it each night**, else **Run it again** — then **Report R-n**, ⋯ **Stop running it each night**, **Add to a collection…**, **Change these steps…**, **Delete the test…** (`delete <ref>`, through the chat: Quality Inspector shows what goes and waits for a yes — [on-demand.md](on-demand.md)). **Needs a change**: each proposal `M-n` (what changed, what Quality Inspector proposes; **Accept**, **Keep it as it is**, ⋯ **Rewrite**, **Retire**) and the tests ready to keep (**Keep all … ready**); the Tests tab counts the proposals (✎ n, a click opens this list), and a test's page and its result in a report link its open proposal. A rework's new way (docs/maintenance.md → The proposal's details) shows the old and the new steps side by side, the issue or pull request behind it, or a large warning that none asks for the change, and the diff folded; its **Use the new way** is `accept M-n`. **Features**: each feature and collection — its tests and their states, **Run them all** (`run feature <id>`, or the tests of a collection), **Copy as Gherkin**, a collection's ✕ per test |
 | **Runs** | When was the product tested, and how did it go? Each run is its report, `R-n` | All, Nightly, Issues, Scenarios | All, With problems | the report (below): the result, the agent's summary, **since the run before** (tests newly failing, fixed, still failing and new; how the product's screens changed; new errors in the browser console), the counts in their states' inks, why it could not start, the problems, each test's result, the issues in the build as links. The list at the left is the only way from one report to another: a report has no Previous or Next. A row says how many tests fail newly |
 | **Product** | What does the product have, what do the tests reach, how does it look? | **Map**, **Coverage**, **Screenshots**, **Design**, **Builds** | Design: **Open** (default), Fixed, Dismissed, All | a screen (Map and Coverage): its picture with each control outlined in its coverage's ink (each night green, once amber, none grey and dashed); a click on a control shows its kind and name, where it leads and its tests, **+ Ask about it**; the tests that open the screen, what looks wrong there; **Build a test from here**, **+ Ask for a test**. Coverage lists the screens worst first, with a bar of their controls; nothing open shows the counts of screens and controls and the menu items no nightly test goes through. A design finding (`D-n`): its picture, where, the screen size, who found it, first and last seen; **Send to design**, **Check it again**, ⋯ **Create a bug issue…**, **Dismiss: …**; a dismissed one **Open it again**. **Screenshots**: every test's newest picture as a gallery, a click opens the test. A build: its runs |
-| **Settings** | What does Quality Inspector do beside the issues, and when? | — (one page, the whole width, no list) | — | **The week at a glance:** each check that is on, Mon–Sun, its days in the product's colour and its time; one a week or a month says so in words; a name opens its row. **The checks, grouped by when they run** (With each issue, Each night, During the day, Each week or month, When you ask): a row is its name, when it runs and its last run, and at the right its switch — a schedule's on and off, a module's own on-off, or its cadence as a segmented control. A click on the name opens the row in place: what it does, each other setting in words (a choice segmented, a number or sizes with **Change**, the range and the default), **Run now**, Feature focus's area. **Limits** last: the settings for all. **The operator's change of a value applies at once** — the server writes it ([catalog.md](catalog.md) → The server), a toast says what was saved, the page shows it; a schedule's on and off and **Run now** stay commands to Quality Inspector, asked first. A viewer sees the same page; each change they press is a command, asked first, for the operator |
+| **Settings** | What does Quality Inspector do beside the issues, and when? | — (one page, the whole width, no list) | — | **The week at a glance:** each check that is on, Mon–Sun, its days in the product's colour and its time; one a week or a month says so in words; a name opens its row. **The checks, grouped by when they run** (With each issue, Each night, During the day, Each week or month, When you ask): a row is its name, when it runs and its last run, and at the right its switch — a schedule's on and off, a module's own on-off, or its cadence as a segmented control. A click on the name opens the row in place: what it does, each other setting in words (a choice segmented, a number or sizes with **Change**, the range and the default), **Run now**, Feature focus's area. **Limits**: the settings for all. **People** last (**Roles**). **An admin's change of a value applies at once** — the server writes it ([catalog.md](catalog.md) → The server), a toast says what was saved, the page shows it; a schedule's on and off and **Run now** are an admin's jobs. Anyone else sees the same page, its values without a way to change them |
 
 Not in the menu yet, and where each goes when it comes: the validation, property and
 stress results (Product → **Findings**); the whole page as of an earlier build. A
@@ -121,17 +121,47 @@ new place is a page or a filter of these five tabs before it is a tab of its own
   number in the colour of who acts (the product's colour Quality Inspector, amber you, green done),
   and under **You can** the buttons a person presses there. A short tip ends it. Folding one folds
   every tab's, and the browser keeps it. **How it works** shows them all.
-- **Commands.** A button does one of two things, never a message the person cannot follow:
+- **Commands.** A button does its work at once, as on Design Desk; the chat is for questions. One of two ways:
   - **At once, without the model** — what a script does: a setting, Feature focus's area, a design
-    finding's dismissal, reopening or category, a test into or out of a
-    collection. The operator's press goes to the server (`POST /api/act`, `POST /api/settings`;
+    finding's dismissal, reopening or category, a problem's dismissal, a test into or out of a
+    collection. The press goes to the server (`POST /api/act`, `POST /api/settings`;
     [catalog.md](catalog.md) → The server); a toast says what was done and the page shows it.
-  - **Through the chat** — work for Quality Inspector (run, repair, keep each night, create an issue,
-    a new test, an upkeep decision, a schedule on or off, Run now) and questions. The chat in the
-    corner opens with the request ready: its name, the exact message, room for a note; **Send** sends
-    it, and Quality Inspector's report or question comes into the same chat. A dialog (Ask for a test,
-    Add to a collection) sends at once and opens the chat on it. A viewer's press of an operator's
-    action goes this way too, as a request for the operator.
+  - **A job for Quality Inspector** — run, repair, keep each night, a bug issue's draft and its opening,
+    an upkeep decision, delete, a new test from an issue's number, a schedule on or off, Run now. The press
+    sends it at once (`POST /api/jobs`): the server records `J-<n>` with who pressed and their role, and the
+    page sends its ping `do dashboard job J-<n>` ([on-demand.md](on-demand.md)). A toast says it went; the
+    item shows it above its title — *Waiting for Quality Inspector*, *Quality Inspector works on it*, then
+    *Done* or *Did not work* with Quality Inspector's two or three sentences, an hour after it ended — and
+    the bell tells the person when it ends. Quality Inspector never asks again: what cannot be taken back
+    or writes outside asks first, on the page, in one dialog that says what happens — **Delete the
+    test…**, **Open the issue** (on GitHub), **Discard the draft**, **Retire**, **Stop running it each
+    night**, **Keep all … ready**, a schedule off. A scenario in words or steps keeps its own way, through
+    the chat (**Ask for a test**).
+- **Roles.** Each person has one, from the roster an admin keeps on Settings → **People**
+  (`work/dashboard/PEOPLE.md`, `scripts/lib/people.mjs`); the dashboard's owner on the platform is always
+  an admin, anyone not in the roster a viewer. The person's menu says their role.
+
+  | Role | Does |
+  | --- | --- |
+  | **Admin** | everything: the settings, the schedules, Run now, the focus area, a blocker's **Try again**, **Do the steps live**, and the people |
+  | **Developer** | the work of the page: run, repair, keep, upkeep decisions, bug issues, delete, dismiss and reopen, collections, Ask for a test |
+  | **Tester** | the same as a developer, for now |
+  | **Viewer** | reads every page and asks questions in the chat; no button that changes anything shows |
+
+  A button the role may not press is not drawn; Settings shows its values without a way to change
+  them. The server checks the role again on every press (403), and `jobs.mjs` again before the work.
+  **People** lists each person with a role to change at once, **Remove** (they read only), and a row to
+  add an email with its role; anyone else sees what each role does. A change applies on the person's
+  next press.
+- **Notifications.** The bell at the right of the header, as Design Desk's: what happened in the last
+  30 days, newest first, at most 50 (`GET /api/notifications`). Nothing new is logged: each row is read
+  from what the server keeps. A row is a job that ended (*Done: Run it again* · you, its text), an
+  answer to the person's question (*Quality Inspector answered your question*, the question's words), or
+  a run (*Nightly regression finished: 2 problems*, its summary). **For you** (the bell opens on it): the
+  person's own jobs and questions; **All** adds the runs and everyone's jobs, whose as a role, never an
+  email. The red count is the unread rows For you. A click opens the row's item and reads it; **Mark as
+  read** reads every one, for that person alone (`work/dashboard/notes.json`). A row is at most three
+  lines: what and who with how long ago, then what was said, cut with ….
 - **Ask for a test** — the header's button, and a screen's on Product — opens one dialog with three
   kinds; the kind last used opens next time, a screen's button opens the second with its address:
   - **An issue or pull request** — its number → `test #N`. A pull request stands for the issues
@@ -158,8 +188,8 @@ new place is a page or a filter of these five tabs before it is a tab of its own
     A test's ⋯ **Change these steps…** and a screen's **Build a test from here** open it with that
     test's steps or that screen; the draft before stays for Restore.
 
-  What is missing is said in amber under the fields; nothing goes until it is right. Send asks
-  first with the exact message (Commands); Cancel there goes back to the filled dialog.
+  What is missing is said in amber under the fields; nothing goes until it is right. Send sends it
+  (Commands): an issue's number as a job, a scenario through the chat. A viewer has no **Ask for a test**.
 - **Reports on the page.** Every run is its report, numbered `R-1`, `R-2` … in the order the
   catalog first saw it, and opens in Runs at its own address (`#runs/R-12`). A test's **Report R-n** and
   each result in its history open that report at the test's own result (`#runs/R-12@issue-42/AC-1`).

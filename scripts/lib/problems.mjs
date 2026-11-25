@@ -52,3 +52,4 @@ export function changeProblem(file, runs, cmd, id, reason, now) {
   writeFileSync(`${file}.tmp`, out); renameSync(`${file}.tmp`, file);
   return cmd === 'dismiss' ? { id, title: p.title, dismissed: true } : { id, title: p.title, reopened: true };
 }
+export { ordered as orderedRuns };
