@@ -104,8 +104,9 @@ line) — their words like any other: what a Check states is the oracle, a Do is
    day's cap and stop.
 2. **Record.** `scenarios.sh new <source>` → `S-<k>`; write `request.md`; then
    `scenarios.sh lint work/scenarios/S-<k>/request.md`. A request from the dashboard's Ask for a test
-   has a page of its own that follows the scenario from now on: `asks.mjs find --command "<the
-   request>"` names its row, then `node "$HOME/scripts/dashboard/asks.mjs" link A-<n> S-<k>` — before
+   has a page of its own that follows the scenario from now on: `asks.mjs find --command-file <file>`
+   names its row ([on-demand.md](on-demand.md) → "answer dashboard question": the request in a file,
+   never on the command line), then `node "$HOME/scripts/dashboard/asks.mjs" link A-<n> S-<k>` — before
    step 3, so the person sees each next step there ([dashboard-page.md](dashboard-page.md) → A
    request's page). No row (a request typed in the chat): nothing to link.
 3. **Draft the criteria** from `request.md` alone, before you look at the product:

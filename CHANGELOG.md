@@ -18,6 +18,9 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    `A-<n>` on Tests → Scenarios. The agent links that row to its scenario with
    `asks.mjs link A-<n> S-<k>` ([docs/scenarios.md](docs/scenarios.md) → The pipeline, step 2); a request
    from before has no link and shows only Sent and its answer.
+3. `asks.mjs find` takes the command only from a file now (`--command-file <file>`, written with the file
+   tool); `--command` is refused. A command can hold a person's free text, which never goes on a shell
+   command line ([docs/on-demand.md](docs/on-demand.md) → "answer dashboard question").
 
 ## 3.68.0 — 2026-11-25
 

@@ -159,7 +159,11 @@ refused with a "start a new chat". A direct session's first request names it
   that page's chat — answer it short and say so. **A command from the page** comes
   through the same chat: its message is the command itself, and its chat row holds the person's note.
   When the command's work ends — its result, its report's `R-<n>`, a draft that waits for a yes, or
-  why it could not be done — `asks.mjs find --command "<the command>"` names its row: `show` it for the
+  why it could not be done — its row: write the command, exactly as it came, to a
+  `mktemp "/tmp/quality-inspector-find.XXXXXX"` file with the file tool, then
+  `node "$HOME/scripts/dashboard/asks.mjs" find --command-file <file>` names it. **Never put a
+  command's text on a shell command line** (an argument, an `echo`, a heredoc): a scenario's or a
+  walk's words are a person's free text, and `$(…)` or a backtick in them would run. `show` the row for the
   note, and answer it there the same way. The operator's reply in that chat ("Yes, create it") comes as
   a new question; it is their word for the confirmation the row asked. A viewer's reply never is: their
   command went to a fresh session, whose confirmations wait for the operator.

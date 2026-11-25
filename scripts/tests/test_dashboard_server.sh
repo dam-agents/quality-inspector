@@ -89,8 +89,12 @@ assert "the asker sees the answer" '.asks[0].answer.text == "It fails because th
 # A page command through the chat: its ping is the command itself; the agent finds its row to answer.
 assert "a command in the chat: its ping is the command" '.id == "A-2" and .ping == "run #42 AC-1"' "$(call "${OP[@]}" -X POST -d '{"text":"Run it again.","command":"run #42 AC-1"}' "$U/api/asks")"
 assert_eq "a command the page does not have: refused" 400 "$(code "${OP[@]}" -X POST -d '{"text":"x","command":"rm -rf /"}' "$U/api/asks")"
-assert "the agent finds the command's row" '.id == "A-2"' "$(WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" find --command "run #42 AC-1")"
-assert "a command with no row: none" '.id == null' "$(WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" find --command "run #43")"
+# The command comes in a file, never on the command line: a scenario's words are a person's free text.
+printf 'run #42 AC-1\n' > "$W/find.txt"
+assert "the agent finds the command's row" '.id == "A-2"' "$(WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" find --command-file "$W/find.txt")"
+printf 'run #43' > "$W/find.txt"
+assert "a command with no row: none" '.id == null' "$(WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" find --command-file "$W/find.txt")"
+WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" find --command "run #42 AC-1" >/dev/null 2>&1; assert_eq "a command on the command line: refused" 2 "$?"
 # Each page its own session (docs/dashboard-page.md → The chat): the ping's conversation is the item,
 # else the tab's page, in the platform's key shape; a scenario request is its own page and session.
 assert "a question's session: its item" '.ping_conversation | test("^item\\.issue-42-AC-1\\.[0-9a-f]{8}$")' "$(call "${VW[@]}" -X POST -d '{"text":"And now?","context":{"tab":"tests","item":"issue-42/AC-1"}}' "$U/api/asks")"
@@ -103,6 +107,8 @@ assert "a scenario request: its own page and session, the command as the ping" "
 assert "its page: the request, not what was open" ".asks | map(select(.id == \"$RID\")) | .[0] | .context.item == \"$RID\" and .request == {scenario: null}" "$(call "${VW[@]}" "$U/api/asks")"
 assert "request with another command: a plain chat row" '.ping_conversation != .id' "$(call "${OP[@]}" -X POST -d '{"text":"x","command":"run #42 AC-1","request":true,"context":{"tab":"runs"}}' "$U/api/asks")"
 WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" link A-2 S-9 >/dev/null 2>&1; assert_eq "a link from a row that is no scenario request: refused" 2 "$?"
+printf '%s\n' "$SC" > "$W/find.txt"
+assert "the agent finds the request's row from the file" ".id == \"$RID\"" "$(WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" find --command-file "$W/find.txt")"
 WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" link "$RID" S-9 >/dev/null; assert_eq "the agent links the request to its scenario" 0 "$?"
 WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" link "$RID" S-9 >/dev/null; assert_eq "the same link again: fine" 0 "$?"
 WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" link "$RID" S-8 >/dev/null 2>&1; assert_eq "another scenario: refused" 2 "$?"
