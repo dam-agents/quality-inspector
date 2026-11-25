@@ -93,6 +93,28 @@ step — so a person signs in and looks, beyond the video and screenshots.
   email, a single user…) is in the profile's `SKILL.md`; it decides `testable: no`
   ([acceptance-criteria.md](acceptance-criteria.md)).
 
+## One running product
+
+The product is **one installation that stays up between runs**, moved to each newer build in
+place. A run starts with `env.sh up <candidate>` and **no reset**: the same build with the same
+values answers at once, a newer build is a `helm upgrade` over the running product (its data
+kept, the images it already has not pulled again). A reset wipes the data and uninstalls the
+product; a fresh install after it takes minutes longer. So a run resets only where the data
+or the build order needs it:
+
+- **Before an older build** — the baseline in red-green ([issue-qa.md](issue-qa.md) step 6),
+  a scenario's baseline, the previous candidate and the bisection ([triage.md](triage.md)), a
+  pull request's build ([design-checks.md](design-checks.md)): **Builds move forward only**
+  (**Shape**).
+- **After a run whose data must not reach the next one** — the modules run, the security run,
+  a validation recheck — and before the security run's own checks, which need a fresh product.
+- **As a repair** ([autonomy.md](autonomy.md) → **Diagnosis**, **Failures** below).
+
+A run that resets brings a build back up before it unlocks: its last run ends on the candidate
+(red-green), or it runs `env.sh up <candidate>` and `wait` after its closing reset — the next
+run finds the product running. Tests never rely on a fresh product: what they create is named
+for the run (`{stamp}`, `qa-*`), and what they check is what they made.
+
 ## After a VM restart
 
 The platform hibernates an idle agent VM and boots it at the next session; the boot stops k3s
@@ -153,7 +175,8 @@ has less than `min_free_disk_gi` free. Before giving up on the entry, diagnose i
    profile's README names (read-only commands only).
 2. Up to three repairs, each from another hypothesis the evidence supports — usually first
    `env.sh reset`, then `up` again, for an install stuck half-way or refused for disk space (on
-   the `helm-k3s` engine a reset also removes every image no container uses — the earlier builds').
+   the `helm-k3s` engine a reset also removes every image no container uses — the earlier builds' —
+   while the disk has less than its `prune_below_gi` free).
 3. Still failing → register its cause (`blockers.mjs open` or `hit`, scope `env`; the pre-flight then
    holds every install until its retry time or a fix) and abort the entry ([issue-qa.md](issue-qa.md)
    step 4) with the evidence in the log. A cause you reproduced goes to `work/LESSONS.md`; a profile

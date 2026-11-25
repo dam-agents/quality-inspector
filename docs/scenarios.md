@@ -269,9 +269,8 @@ is the product team's to update in the scenario's file — report it `regression
 explanation naming `scenarios/<slug>.md` (or `.feature`). Heals stay as triage allows (locators only).
 
 **On demand** — "test scenario <slug>" in the direct session or a bound Slack conversation:
-`scenarios.sh admit` (Slack only), `env.sh lock P-<slug>`, `env.sh reset` (a fresh platform, as
-the nightly run's [regression.md](regression.md) step 2), the candidate up as **The pipeline**
-steps 5–6, **Adopt** steps 1–4 (an unchanged text reuses its frozen criteria and test: only step
+`scenarios.sh admit` (Slack only), `env.sh lock P-<slug>`, the candidate up as **The pipeline**
+steps 5–6 (no reset: the running product, [nested-env.md](nested-env.md) → **One running product**), **Adopt** steps 1–4 (an unchanged text reuses its frozen criteria and test: only step
 1 and step 4's run), the verdicts and report as **The pipeline** steps 9–10 and 12 — the reply in
 the requester's turn, or the chat UI. It releases its own lock, `env.sh unlock P-<slug>`, at step
 12 and on every abort. It writes no `P-<slug>` row — no status write of pipeline steps 5 and 12
@@ -285,7 +284,7 @@ direct session. The pre-flight's `discovery` mode is due when `scenario_discover
 `propose` or `run`, the candidate was not explored yet and the environment is free; its
 worklist carries `discovery`, `candidate`, `baseline`, `previous_candidate` and `budget`.
 
-1. `env.sh lock discovery`, `env.sh reset`, `env.sh up <candidate>`, the smoke run. An
+1. `env.sh lock discovery`, `env.sh up <candidate>` (no reset), the smoke run. An
    environment failure → `<ISO> ERROR: environment candidate=<c>` to `work/DISCOVERY.log`,
    unlock, end.
 2. **Gather, black-box only**:
