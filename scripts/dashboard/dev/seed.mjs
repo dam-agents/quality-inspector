@@ -3,7 +3,7 @@
 // page can be tuned on realistic amounts of data: about 50 tests, 40 runs, problems still there and gone,
 // 10 screens with pictures, a run in progress. Dates are relative to now, so "Today" and "Yesterday" show.
 //   node scripts/dashboard/dev/seed.mjs /tmp/qi-dev-work
-//   WORK_DIR=/tmp/qi-dev-work node scripts/dashboard/dev/harness.mjs 5600 5599   → http://localhost:5600/?page=new
+//   WORK_DIR=/tmp/qi-dev-work node scripts/dashboard/dev/harness.mjs 5600 5599   → http://localhost:5600/
 // Nothing here is real: the product "Tasklane", its issues and people are invented.
 import { createHash } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

@@ -600,12 +600,15 @@ jq '.acs[0].mark = {box: {x: 1, y: 1, w: 4, h: 4}, saw: "The Chat control shows.
 node "$SCRIPTS/catalog.mjs" >/dev/null; data="$(page_data)"
 assert "an undrawn test frame: the agent's mark is tried" '(.items[] | select(.key == "issue-42/AC-1") | .marked == "agent")' "$data"
 # The interactive dashboard (docs/catalog.md → The server): data.json with every picture by reference
-# under work/, live.html with no data, a page hash that only the page itself changes.
+# under work/, live.html the new page (scripts/dashboard/page.html) with no data, a page hash that
+# only the page itself changes; index.html stays the old page with its data.
 out="$(node "$SCRIPTS/catalog.mjs")"
 assert "the build names data.json, live.html and the page's hash" '(.data | endswith("catalog/data.json")) and (.live | endswith("catalog/live.html")) and (.page_hash | test("^[0-9a-f]{12}$")) and .page_changed == true' "$out"
 assert "data.json: the same items, every picture a path under work/" '(.items | length) > 0 and ([.images[]] | all(test("^(catalog/thumbs|design/crops)/[^/]+\\.(jpg|webp|png)$"))) and .hash != null' "$(cat "$W/catalog/data.json")"
 assert "data.json: a still names a reference of its images" '[.items[] | select(.still != null) | .still] as $s | ($s | length) > 0 and ($s | all(test("^r[0-9]+$")))' "$(cat "$W/catalog/data.json")"
-grep -q '<script type="application/json" id="qi-catalog-data">null</script>' "$W/catalog/live.html" || { echo "  live.html carries data"; FAILED=1; }
+cmp -s "$W/catalog/live.html" "$SCRIPTS/dashboard/page.html" || { echo "  live.html is not the new page (scripts/dashboard/page.html)"; FAILED=1; }
+grep -q 'qi-catalog-data' "$W/catalog/live.html" && { echo "  live.html carries data"; FAILED=1; }
+grep -q '<script type="application/json" id="qi-catalog-data">{' "$W/catalog/index.html" || { echo "  index.html is not the old page with its data"; FAILED=1; }
 ph="$(jq -r .page_hash <<<"$out")"; echo "$ph" > "$W/catalog/page.hash"
 assert "the same page: page_changed false" '.page_changed == false' "$(node "$SCRIPTS/catalog.mjs")"
 grep -o '"[^"]*_[a-z]*":"/[^"]*"' "$W/catalog/data.json" | head -1 | grep -q . && { echo "  data.json carries a private path field"; FAILED=1; }

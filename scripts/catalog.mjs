@@ -9,8 +9,8 @@
 //                          "page_changed"}
 //
 // Two pages of one data: index.html carries the data and its pictures (within the render limit),
-// for a static artifact; data.json carries every picture by reference and live.html none, for the
-// interactive dashboard, whose server (scripts/dashboard/server.mjs) serves data.json at once —
+// for a static artifact (scripts/catalog/viewer.html); data.json carries every picture by reference
+// and live.html none, for the interactive dashboard (scripts/dashboard/page.html), whose server (scripts/dashboard/server.mjs) serves data.json at once —
 // the agent publishes live.html again only when `page_changed` (docs/catalog.md → The server).
 //
 // `notes` names every source that could not be read (the issues listing, the drift check, the
@@ -974,6 +974,8 @@ data.generated_utc = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 
 const template = read(join(HERE, 'catalog', 'viewer.html'));
 if (!template || !template.includes('__QI_CATALOG_DATA__')) { console.error('catalog: scripts/catalog/viewer.html missing or without its data token'); process.exit(1); }
+const livePage = read(join(HERE, 'dashboard', 'page.html'));
+if (!livePage) { console.error('catalog: scripts/dashboard/page.html missing'); process.exit(1); }
 // The page may be shared: a credential value of work/env/credentials.env or a token in its data
 // (the images aside — base64 would match short values by chance) refuses the page, as the backup
 // refuses the snapshot. A scan that cannot run refuses too; the last page stays as it was.
@@ -993,12 +995,15 @@ mkdirSync(outDir, { recursive: true });
 const html = template.replace('__QI_CATALOG_DATA__', () => JSON.stringify(data).replace(/</g, '\\u003c'));
 writeFileSync(join(outDir, 'index.html.tmp'), html); renameSync(join(outDir, 'index.html.tmp'), join(outDir, 'index.html'));
 // The interactive dashboard: data.json, which the server serves (the same data, every picture by
-// reference), and live.html, the page with no data, published once and again only when the page
+// reference), and live.html, the page with no data (the new page), published once and again only when the page
 // itself changes (`page_hash`, compared with work/catalog/page.hash after a publish).
 const liveData = JSON.stringify({ ...data, ...live, images: refs, videos: videoRefs, hash }, strip);
 writeFileSync(join(outDir, 'data.json.tmp'), liveData); renameSync(join(outDir, 'data.json.tmp'), join(outDir, 'data.json'));
 writeFileSync(`${RUN_IDS}.tmp`, JSON.stringify(runIds)); renameSync(`${RUN_IDS}.tmp`, RUN_IDS);
-const liveHtml = template.replace('__QI_CATALOG_DATA__', 'null');
+// live.html is the new page (scripts/dashboard/page.html, docs/dashboard-page.md): it asks the server
+// for everything it shows. index.html stays the old page with its data, for a static dashboard and
+// for the time the server does not answer: the new page cannot work without the server.
+const liveHtml = livePage;
 writeFileSync(join(outDir, 'live.html.tmp'), liveHtml); renameSync(join(outDir, 'live.html.tmp'), join(outDir, 'live.html'));
 const pageHash = createHash('sha256').update(liveHtml).digest('hex').slice(0, 12);
 const pagePublished = (read(join(outDir, 'page.hash')) ?? '').trim();
