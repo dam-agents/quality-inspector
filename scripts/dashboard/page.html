@@ -1698,6 +1698,20 @@
   .qi-now { display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; border-radius: var(--radius); background: var(--info-soft); max-width: 900px; margin: 0 auto 16px; }
   .qi-shot { max-width: 100%; border: 1px solid var(--line); border-radius: var(--radius); display: block; }
   .qi-list { margin: 0; padding-left: 20px; } .qi-list li { margin-bottom: 4px; }
+  /* A scenario request's steps: done green, now in the product's colour and moving, to come grey, stopped slate. */
+  .qi-req { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+  .qi-req li { position: relative; display: grid; gap: 2px; padding: 0 0 14px 28px; }
+  .qi-req li::before { content: ""; position: absolute; left: 4px; top: 4px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); background: var(--panel); box-sizing: border-box; }
+  .qi-req li:not(:last-child)::after { content: ""; position: absolute; left: 9px; top: 18px; bottom: 0; width: 2px; background: var(--line); }
+  .qi-req li > span { color: var(--muted); font-size: var(--fs-meta); }
+  .qi-req li[data-st="todo"] > b { color: var(--muted); font-weight: 500; }
+  .qi-req li[data-st="done"]::before { background: var(--approved); border-color: var(--approved); }
+  .qi-req li[data-st="done"]:not(:last-child)::after { background: var(--approved); }
+  .qi-req li[data-st="now"]::before { border-color: var(--accent); background: var(--accent); animation: qi-pulse 1.4s infinite ease-in-out; }
+  .qi-req li[data-st="stop"]::before { background: var(--decided); border-color: var(--decided); }
+  @keyframes qi-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); } 50% { box-shadow: 0 0 0 6px transparent; } }
+  @media (prefers-reduced-motion: reduce) { .qi-req li[data-st="now"]::before { animation: none; } }
+  .qi-quote { margin: 8px 0 0; padding: 8px 12px; border-left: 3px solid var(--line); color: var(--ink); white-space: pre-wrap; }
   #ask-dialog { width: min(640px, calc(100% - 32px)); }
   #ask-dialog textarea { min-height: 120px; }
   #ask-dialog .ask-pane { display: grid; gap: 12px; }
@@ -1983,10 +1997,12 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     try { data = JSON.parse(res.body || "{}"); } catch { data = {}; }
     if (res.status >= 400 && res.status < 500 && data.error) throw new Said(data.error);
     if (res.status >= 400) throw new Error(`${res.status}`);
-    // The server hands a command back as the message for the agent: the page sends it to its chat.
+    // The server hands a command back as the message for the agent: the page sends it to the session
+    // of the page it came from — one platform session per page, and one per scenario request, as on Design Desk.
     if (data.ping) {
       const missed = () => toast("Quality Inspector could not be called right away. Send it again in a minute.");
-      try { const sent = bridge.sendPrompt(data.ping); if (sent && typeof sent.catch === "function") sent.catch(missed); } catch { missed(); }
+      const opts = data.ping_conversation ? { conversation: data.ping_conversation } : undefined;
+      try { const sent = bridge.sendPrompt(data.ping, opts); if (sent && typeof sent.catch === "function") sent.catch(missed); } catch { missed(); }
     }
     return data;
   }
@@ -2226,9 +2242,10 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     } else if (S.tab === "tests") {
       head = pages("testPage", testPages())
         + `<div class="filterbar">${seg("testFilter", [["failing", "Failing", testList("failing").length, "Failing, or the result needs a person"], ["passing", "Passing", testList("passing").length], ["other", "Not decided", testList("other").length, "Blocked, running, or not run yet"], ["all", "All", testList("all").length]])}</div>`;
-      rows = testList().map((i) => { const s = testState(i), [w] = running(i) ? ["Running"] : verdictOf(i.verdict?.value);
+      rows = (S.testPage === "scenarios" ? requests().filter(reqListed).map((a) => { const [s, w] = reqState(a), sc = a.request?.scenario;
+        return row(a.id, reqTitle(a), sc?.id || a.id, dot(s, w), [fact("request", a.id), whenFact("sent", a.utc), sc?.build ? fact("build", sc.build) : ""].join("")); }) : []).concat(testList().map((i) => { const s = testState(i), [w] = running(i) ? ["Running"] : verdictOf(i.verdict?.value);
         const c = ["fail", "look", "blocked"].includes(s) && CAUSE_WORD[i.verdict?.cause];
-        return row(i.key, i.name || i.summary || i.id, testLabel(i), dot(s, w), [whenFact("last run", i.verdict?.utc), fact("build", i.verdict?.build), fact("kept", TIER[i.tier]), c ? fact("why", c[0]) : ""].join("")); });
+        return row(i.key, i.name || i.summary || i.id, testLabel(i), dot(s, w), [whenFact("last run", i.verdict?.utc), fact("build", i.verdict?.build), fact("kept", TIER[i.tier]), c ? fact("why", c[0]) : ""].join("")); }));
       empty = S.testFilter === "failing" ? "No test fails right now." : "No tests here yet. They appear after Quality Inspector tests an issue or a scenario.";
     } else if (S.tab === "runs") {
       head = pages("runPage", Object.entries(runKinds).map(([k, l]) => [k, l])) + `<div class="filterbar">${seg("runFilter", [["all", "All", runList("all").length], ["problems", "With problems", runList("problems").length]])}</div>`;
@@ -2376,6 +2393,64 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
       + (ways ? sect("The steps before the check", ways + (m.found ? `<p class="k">Where Quality Inspector found the new way: ${esc(m.found)}</p>` : "")) : sect("What Quality Inspector proposes", `<p>${esc(upkeepDo(m))}.</p>`))
       + diff
       + sect("The test", t ? `<p><button class="anchor" data-item="${esc(t.key)}">${esc(t.name || t.id)} <span class="num">${esc(testLabel(t))}</span></button></p>` : "");
+  }
+  // ---------- a scenario request's own page (docs/dashboard-page.md → A request's page) ----------
+  // The person's own requests from Ask for a test, from the server (GET /api/asks): their words, and
+  // how Quality Inspector prepares and runs each, read from what its pipeline writes.
+  const requests = () => C.asks.filter((a) => a.request && REQUEST_RE.test(a.command || "")).slice().reverse();
+  const isWalk = (a) => /^walk these steps live: /.test(a.command || "");
+  const reqDone = (a) => { const sc = a.request?.scenario;
+    return sc ? ["reported", "rejected", "retired"].includes(sc.status) || (sc.status === "report_pending" && Boolean(a.answer)) : Boolean(a.answer); };
+  // On Scenarios while it runs, and three days after.
+  const reqListed = (a) => !reqDone(a) || Date.now() - Date.parse(a.request?.scenario?.updated || a.answer?.utc || a.utc) < 3 * 864e5;
+  // Its words: the page it starts on, then the person's words or numbered steps.
+  const reqParts = (a) => { const m = /^(?:test this scenario|walk these steps live): On the page (\S+?)(?:, the ([a-z ]{2,20}) "([^"]*)")?: ([\s\S]*)$/.exec(a.command || "");
+    return m ? { page: m[1], control: m[2] ? `the ${m[2]} “${m[3]}”` : "", words: m[4] } : { page: "", control: "", words: a.command || "" }; };
+  const reqTitle = (a) => { const w = reqParts(a).words, n = /^Name: (.+?)(?= \d+\. |$)/.exec(w);
+    const t = (n ? n[1] : w).trim(); return t.length > 90 ? `${t.slice(0, 88)}…` : t || `Scenario request ${a.id}`; };
+  const VERDICT_STATE = { passed: ["pass", "Passed"], failed: ["fail", "Failed"], regression: ["fail", "Regression"], "needs-review": ["look", "Needs a person"], blocked: ["blocked", "Blocked"], flaky: ["look", "Unstable"], "not-testable": ["blocked", "Not testable"] };
+  function reqState(a) {
+    const sc = a.request?.scenario;
+    if (isWalk(a)) return a.answer ? ["pass", "Done"] : ["running", "Doing the steps"];
+    if (sc?.status === "rejected") return ["blocked", "Turned down"];
+    if (sc?.verdict && ["report_pending", "reported"].includes(sc.status)) return VERDICT_STATE[sc.verdict] || ["none", human(sc.verdict)];
+    if (sc?.status === "in_progress") return ["running", "Testing"];
+    if (sc?.status === "queued") return ["none", "Waiting for the product"];
+    if (sc) return ["running", "Preparing"];
+    return a.answer ? ["none", "Answered"] : ["running", "Sent"];
+  }
+  // The steps of the request, each done, now, still to come, or where it stopped.
+  function reqSteps(a) {
+    const sc = a.request?.scenario, st = sc?.status, ans = Boolean(a.answer);
+    if (isWalk(a)) return [["done", "Sent", `Your steps went to Quality Inspector ${ago(a.utc)}.`],
+      [ans ? "done" : "now", "Doing the steps live", "Quality Inspector does them on its copy of the product, in the Browser Panel beside its chat."],
+      [ans ? "done" : "todo", "Done", ans ? "Its answer is below." : "It answers here when it is done."]];
+    const frozen = sc && (sc.criteria.length || ["queued", "in_progress", "report_pending", "reported"].includes(st));
+    const testing = ["in_progress", "report_pending", "reported"].includes(st), result = ["report_pending", "reported"].includes(st);
+    const bad = st === "rejected";
+    return [
+      ["done", "Sent", `Your request went to Quality Inspector ${ago(a.utc)}.`],
+      [sc ? "done" : ans ? "stop" : "now", "Recorded", sc ? `It is scenario ${sc.id}.` : ans ? "Quality Inspector answered without a scenario: read why below." : "Quality Inspector reads it and gives it a number."],
+      [bad ? "stop" : frozen ? "done" : sc ? "now" : "todo", "What the test checks", bad ? "An independent judge turned the criteria down. Quality Inspector asks you below what to change." : frozen ? `${plural(sc.criteria.length || 0, "criterion", "criteria")}, from your words only, checked by an independent judge.` : "Quality Inspector writes the criteria from your words only, before it looks at the product, and an independent judge checks them."],
+      [bad ? "todo" : testing ? "done" : st === "queued" ? "now" : "todo", "Waiting for the product", st === "queued" ? "Another test uses the product's copy now. It starts when that one ends." : "Quality Inspector brings up its own copy of the newest build."],
+      [testing && !result ? "now" : result ? "done" : "todo", "Testing", testing ? `On build ${sc.build || "?"}: ${sc.test ? "the test is written" : "it writes the test"}${sc.ran ? ", it ran" : sc.test ? ", it runs it" : ""}.` : "It writes a test of each criterion and runs it, with a video and screenshots."],
+      [result ? "done" : "todo", "Result", result ? `${(VERDICT_STATE[sc.verdict] || ["", human(sc.verdict || "-")])[1]}${sc.report ? ", with its report" : ""}.` : "The result, the report and the test show here."]];
+  }
+  function renderRequest(a) {
+    const [s, w] = reqState(a), sc = a.request?.scenario, parts = reqParts(a), done = reqDone(a);
+    const help = done ? "Quality Inspector finished this request." : s === "running" ? "Quality Inspector works on it now. This page shows each step as it comes." : "It waits. This page shows each step as it comes.";
+    const its = sc ? tests().filter((i) => i.origin?.ref === sc.id) : [], run = sc ? runs().filter((r) => r.type === "scenario" && r.ref === sc.id).at(-1) : null;
+    const steps = /\s\d{1,2}\. /.test(` ${parts.words}`) ? parts.words.split(/\s+(?=\d{1,2}\. )/) : [parts.words];
+    const asked = `<p class="k">${parts.page && parts.page !== "/" ? `Starts on the page <code>${esc(parts.page)}</code>${parts.control ? `, about ${esc(parts.control)}` : ""}.` : "On any page: Quality Inspector finds where your words lead."}</p>`
+      + (steps.length > 1 ? `<ol class="qi-list">${steps.filter((x) => !/^Name: /.test(x)).map((x) => `<li>${esc(x.replace(/^\d{1,2}\. /, ""))}</li>`).join("")}</ol>` : `<blockquote class="qi-quote">${esc(parts.words)}</blockquote>`);
+    return head(reqTitle(a), sc?.id || a.id, `${isWalk(a) ? "Steps done live" : "A scenario you asked for"} · ${esc(a.id)}`)
+      + statusBox(s, w, help, run ? runA(run, `Report ${run.id}`) : "", `sent ${esc(ago(a.utc))}${sc?.updated ? ` · last step ${esc(ago(sc.updated))}` : ""}`)
+      + sect("How it goes", `<ol class="qi-req" aria-label="The steps of the request">${reqSteps(a).map(([st, t, d]) => `<li data-st="${st}"${st === "now" ? ' aria-current="step"' : ""}><b>${esc(t)}</b><span>${esc(d)}</span></li>`).join("")}</ol>`)
+      + (sc?.criteria.length ? sect("What the test checks", `<ul class="qi-list">${sc.criteria.map((c) => `<li><span class="num">${esc(c.id)}</span> ${esc(c.name)}</li>`).join("")}</ul>`) : "")
+      + (its.length ? sect("Its tests", `<ul class="qi-list">${its.map((i) => `<li><button class="anchor" data-item="${esc(i.key)}">${esc(i.name || i.id)} <span class="num">${esc(testLabel(i))}</span></button> ${stw(testState(i), verdictOf(i.verdict?.value)[0])}</li>`).join("")}</ul>`) : "")
+      + (a.answer ? sect("Quality Inspector's answer", `<div class="md">${mdLite(a.answer.text)}</div>`) : "")
+      + sect("What you asked", asked)
+      + `<p class="hint">Questions about this request go to its own chat: <b>Ask Quality Inspector</b> in the corner.</p>`;
   }
   // A test's open proposals as a box on its page and in a report: what waits, with its warning.
   const upkeepBox = (i) => { const ms = i ? upkeepFor(i) : []; if (!ms.length) return "";
@@ -2900,12 +2975,12 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     const it = findItem(S.item);
     // Only a redraw the timer starts (S.quiet) waits or keeps the folds: the person's own click redraws as it says.
     const same = S.quiet && S.item === shown && S.tab === d.tab && d.drawn !== undefined;
-    if (S.item && !it && S.data) S.item = null; // without data yet, the address keeps its item
+    if (S.item && !it && S.data && !(/^A-\d+$/.test(S.item) && !C.loaded)) S.item = null; // without data yet, the address keeps its item
     d.classList.toggle("fill", Boolean(it) || S.tab === "guide" || S.tab === "settings");
     if (S.item !== shown) { shown = S.item; d.scrollTop = 0; d.classList.remove("enter"); void d.offsetWidth; d.classList.add("enter"); clearTimeout(entered); entered = setTimeout(() => d.classList.remove("enter"), 400); }
     $("#main").classList.toggle("has-detail", Boolean(it) || S.tab === "guide" || S.tab === "settings");
     const html = S.tab === "guide" ? `<div class="guide">${GUIDE()}</div>` : S.tab === "settings" ? `<div class="guide qi-settings">${renderSettings()}</div>` : !it ? renderEmpty()
-      : it.kind === "test" ? renderTest(it.x) : it.kind === "run" ? renderRun(it.x, it.focus) : it.kind === "problem" ? renderProblem(it.x) : it.kind === "screen" ? renderScreen(it.x) : it.kind === "design" ? renderDesign(it.x) : it.kind === "upkeep" ? renderUpkeep(it.x) : it.kind === "feature" || it.kind === "collection" ? renderGroup(it.kind, it.x) : renderBuild(it.x);
+      : it.kind === "test" ? renderTest(it.x) : it.kind === "request" ? renderRequest(it.x) : it.kind === "run" ? renderRun(it.x, it.focus) : it.kind === "problem" ? renderProblem(it.x) : it.kind === "screen" ? renderScreen(it.x) : it.kind === "design" ? renderDesign(it.x) : it.kind === "upkeep" ? renderUpkeep(it.x) : it.kind === "feature" || it.kind === "collection" ? renderGroup(it.kind, it.x) : renderBuild(it.x);
     if (d.drawn !== html && same && busy(d)) return; // the next redraw brings it
     if (d.drawn !== html) { const put = () => keepFocus(d, () => { d.innerHTML = html; d.drawn = html; d.tab = S.tab; }); if (same) keepWork(d, put); else put(); loadImages(d);
       // A link to one test of a report: its result opens and comes into view.
@@ -2921,6 +2996,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     if (/^M-\d+$/.test(id)) { const x = upkeep().find((m) => m.id === id); return x && { kind: "upkeep", x }; }
     if (id.startsWith("feature:")) { const x = features().find((f) => f.id === id.slice(8)); return x && { kind: "feature", x }; }
     if (id.startsWith("collection:")) { const x = collections().find((c) => c.name === id.slice(11)); return x && { kind: "collection", x }; }
+    if (/^A-\d+$/.test(id)) { const x = requests().find((a) => a.id === id); return x && { kind: "request", x }; }
     const t = tests().find((i) => i.key === id); if (t) return { kind: "test", x: t };
     const m = /^(R-\d+)(?:@(.+))?$/.exec(id); if (!m) return null;
     const r = runs().find((x) => x.id === m[1]); return r && { kind: "run", x: r, focus: m[2] || null };
@@ -2956,6 +3032,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     S.tab = tab; S.item = rest.length ? decodeURIComponent(rest.join("/")) : null;
     if (S.item?.startsWith("build:")) S.productPage = "builds";
     if (/^D-\d+$/.test(S.item || "")) S.productPage = "design";
+    if (/^A-\d+$/.test(S.item || "")) { S.tab = "tests"; S.testPage = "scenarios"; }
     draw(); return true;
   }
   // An item of Product opens on its own page of the tab: a build in Builds, a finding in Design, a screen in Map (or Coverage).
@@ -3030,6 +3107,18 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     if (isOp() && isDirect(cmd)) return act(cmd);
     C.open = true; if (!C.loaded) await loadAsks();
     await chatSend(text || cmd, cmd);
+  }
+  // A new scenario has a page of its own at once (docs/dashboard-page.md → A request's page): its
+  // preparation and its run show there, and its work goes to a session of its own, not to the chat
+  // of the page the person had open.
+  const REQUEST_RE = /^(?:test this scenario|walk these steps live): /;
+  async function sendRequest(cmd, text) {
+    if (!cmdOk(cmd) || !REQUEST_RE.test(cmd)) throw new Said("This is not a command of the page.");
+    const r = await api("POST", "/api/asks", { text, command: cmd, request: true });
+    C.asks.push({ id: r.id, utc: new Date().toISOString(), text, command: cmd, context: { tab: "tests", page: "tests/scenarios", item: r.id, label: `Scenario request ${r.id}` }, answer: null, request: { scenario: null } });
+    C.loaded = true; C.open = false; C.draft = null; C.drawn = "";
+    moreClose(); S.tab = "tests"; S.testPage = "scenarios"; S.item = r.id; draw();
+    toast(`Sent. ${r.id} shows how Quality Inspector prepares and runs it.`);
   }
   // A button's command: the operator's direct action at once; else the chat opens with it, ready to send.
   document.addEventListener("click", guard(async (e) => {
@@ -3329,7 +3418,8 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
       const m = askMessage(f, v === "walk");
       const again = () => { dlg.returnValue = ""; dlg.showModal(); };
       if (m.why) { $("#ask-why").textContent = m.why; $("#ask-why").hidden = false; again(); return; }
-      await send(m.cmd, v === "walk" ? "Do these steps live, please." : ask.kind === "issue" ? `Test ${m.cmd.slice(5)}, please.` : "Test this scenario, please.");
+      if (ask.kind === "issue") await send(m.cmd, `Test ${m.cmd.slice(5)}, please.`);
+      else await sendRequest(m.cmd, v === "walk" ? "Do these steps live, please." : "Test this scenario, please.");
     });
     dlg.returnValue = ""; dlg.showModal();
     $(`#ask-dialog .ask-pane[data-pane="${ask.kind}"] :is(input, textarea)`)?.focus();
@@ -3408,14 +3498,17 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     const label = !it ? `${TABS[S.tab] || "The page"}${S.tab === "tests" ? ` · ${testKinds[S.testPage] || ""}` : S.tab === "product" ? ` · ${human(S.productPage)}` : ""}`
       : it.kind === "test" ? `${testNum(it.x)} ${it.x.name || ""}` : it.kind === "run" ? `${it.x.id} ${runTitle(it.x)}` : it.kind === "problem" ? `${it.x.id} ${it.x.title}`
       : it.kind === "screen" ? `The screen ${it.x.title || it.x.pattern}` : it.kind === "design" ? `${it.x.id} ${it.x.saw}` : it.kind === "upkeep" ? `${it.x.id} ${it.x.test}`
-      : it.kind === "feature" || it.kind === "collection" ? `${it.x.name}` : `Build ${it.x.id}`;
-    return { tab: S.tab, item: S.item || null, label: label.slice(0, 200) };
+      : it.kind === "feature" || it.kind === "collection" ? `${it.x.name}` : it.kind === "request" ? `Scenario request ${it.x.id}` : `Build ${it.x.id}`;
+    return { tab: S.tab, page: chatPage(), item: S.item || null, label: label.slice(0, 200) };
   }
-  const sameCtx = (a, b) => (a.item || null) === (b.item || null) && (a.item || a.tab === b.tab);
+  // The page's own part of the tab: Tests · Nightly, Product · Map. Each has its own chat and session.
+  const chatPage = () => S.tab === "tests" ? `tests/${S.testPage}` : S.tab === "product" ? `product/${S.productPage}` : S.tab === "runs" ? `runs/${S.runPage}` : S.tab;
+  const sameCtx = (a, b) => (a.item || null) === (b.item || null) && (a.item || (a.page || a.tab) === (b.page || b.tab));
   const STARTERS = () => { const it = findItem(S.item);
     return it?.kind === "test" ? ["Explain this test simply", "Why does it fail?", "What should I do about it?"]
       : it?.kind === "run" ? ["What happened in this run?", "What is new since the run before?", "What should I do about it?"]
       : it?.kind === "problem" ? ["Explain this problem simply", "Who should fix it?", "How sure is it?"]
+      : it?.kind === "request" ? ["What does it check?", "Where is it now?", "Why does it wait?"]
       : ["What needs me now?", "Explain this page", "What did Quality Inspector do today?"]; };
   const mdLite = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>")
     .split(/\n{2,}/).map((p) => /^- /m.test(p) ? `<ul>${p.split("\n").filter((l) => l.trim()).map((l) => `<li>${l.replace(/^- /, "")}</li>`).join("")}</ul>` : `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
@@ -3469,7 +3562,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     addEventListener("pointermove", move); addEventListener("pointerup", up);
   });
   // While a question waits, its answer is looked for every 5 s.
-  setInterval(() => { if (C.loaded && C.asks.some((a) => !a.answer)) loadAsks().then(renderChat); }, 5000);
+  setInterval(() => { if (C.loaded && !document.hidden && C.asks.some((a) => !a.answer || (a.request && !reqDone(a)))) loadAsks().then(() => { S.quiet = true; renderList(); renderDetail(); S.quiet = false; renderChat(); }); }, 5000);
   // ---------- events ----------
   document.addEventListener("click", (e) => {
     const t = e.target.closest?.("[data-tab], [data-item], [data-filter], [data-back], [data-reload], [data-ask-page]");
@@ -3526,6 +3619,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     if (it.kind === "upkeep") return top(UPKEEP_KIND[x.kind] || human(x.kind), x.id, `<span>${esc(x.test || "")}</span>`) + `<p>${esc(UPKEEP_DO[x.proposal] || x.proposal || "")}</p>` + txt(x.basis);
     if (it.kind === "build") { const rs = runs().filter((r) => r.build === x.id); return top(`Build ${x.id}`, "", `<span>First tested ${esc(when(x.utc))}</span>`) + `<p>${plural(rs.length, "run", "runs")} on it</p>`; }
     if (it.kind === "screen") { const [w, s] = coverOf(x); return top(x.title || x.pattern, x.pattern, "") + line(s, w); }
+    if (it.kind === "request") { const [s, w] = reqState(x); return top(reqTitle(x), x.request?.scenario?.id || x.id, `<span>Sent ${esc(ago(x.utc))}</span>`) + line(s, w); }
     const its = membersOf(x.members); return top(x.name || x.id, "", `<span>${it.kind === "feature" ? "Feature" : "Collection"}</span>`) + `<p>${plural(its.length, "test", "tests")}</p>`;
   }
   let peekTimer = null, peekFor = null;
@@ -3664,7 +3758,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     for (const k of ["probFilter", "testPage", "testFilter", "runPage", "runFilter", "productPage", "designFilter"]) { const v = store.get(`qi-${k}`); if (v) S[k] = v; }
     if (!["map", "coverage", "screenshots", "design", "builds"].includes(S.productPage)) S.productPage = "map";
     renderTheme();
-    await refresh();
+    await Promise.all([refresh(), loadAsks()]);
     if (!goTo(location.hash)) draw();
   }
   start().catch(() => {});
