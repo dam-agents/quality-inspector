@@ -472,6 +472,14 @@ const t=["send issue draft 42-ac-1-c3", "send issue draft 42-ac-1-c3 for the arc
   "send issue draft ../x", "send issue draft 42-AC-1", "discard issue draft 42-ac-1-c3 for the architect", "send issue draft 42-ac-1-c3; rm -rf ~", `send issue draft ${"a".repeat(61)}`];
 process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
 assert_eq "a draft's answers: send, send for the architect, revise, discard — its id only" 111100000 "$drafted"
+# A problem's dismissal and a test's deletion (docs/dashboard-page.md): a problem's number, a test's ref, nothing around them.
+gone="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const re=eval(s.match(/^const CMD_RE = (\/.*\/);$/m)[1]);
+const t=["dismiss F-3", "dismiss F-3 as wont-fix", "reopen F-3", "delete #42", "delete #42 AC-1", "delete #42 IN-2", "delete S-7", "delete S-7 AC-1",
+  "dismiss F-3 as boring", "reopen F-3 as wont-fix", "delete P-sign-in", "delete #42 EX-1", "delete #42; rm -rf ~", "delete D-3", "dismiss F-"];
+process.stdout.write(t.map((x)=>re.test(x)?1:0).join(""))' "$SCRIPTS/catalog/viewer.html" 2>/dev/null)"
+assert_eq "dismiss or reopen F-<k>, delete a test: their shapes only" 111111110000000 "$gone"
+same="$(node -e 'const f=require("fs"),r=(p)=>f.readFileSync(p,"utf8").match(/^\s*const CMD_RE = (\/.*\/);$/m)[1];process.stdout.write(String(r(process.argv[1])===r(process.argv[2])))' "$SCRIPTS/catalog/viewer.html" "$SCRIPTS/dashboard/page.html" 2>/dev/null)"
+assert_eq "the new page and the server read the same commands" true "$same"
 # Run it again (docs/catalog.md → Managing from the page): a list of test cases, a repair, a
 # validation case, a profile scenario's full run — and nothing around them.
 again="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const re=eval(s.match(/^const CMD_RE = (\/.*\/);$/m)[1]);

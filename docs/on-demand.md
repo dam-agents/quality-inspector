@@ -37,6 +37,15 @@ refused with a "start a new chat". A direct session's first request names it
 - **"promote #N --with-explorations"** — not available in this version: explorations are
   never replayed nightly ([explorations.md](explorations.md)); say so, then "promote #N".
 - **"demote #N"** — tier back to `exploratory`, `promoted_utc` `-`.
+- **"delete #N"**, **"delete #N AC-<k>"** (or `IN-<k>`), **"delete S-<k>"**, **"delete S-<k> AC-<j>"** (the
+  dashboard's **Delete the test…**) — show what goes (the file, or the one `// AC-<k>` / `// IN-<k>` block
+  and its test), then on a yes: a whole test — its file `work/suite/tests/issue-<n>.e2e.ts` (a scenario's
+  `scenario-<k>.e2e.ts`) and its `work/SUITE.md` row; one block — that test out of the file and, when the
+  file is a promoted one, a new `assert_hash` (`check-asserts.sh --hash`). Then its refs out of every
+  collection (`collections.mjs remove`), `maintenance.mjs sweep` and the catalog
+  ([catalog.md](catalog.md) → **Build and publish**). The reports and their evidence stay: a past result is
+  history. A profile scenario (`P-<slug>`) is the profile's and is never deleted here; nor is a test
+  while an issue run holds the lock for its issue. Never without the operator's yes in the direct session.
 - **"show blockers"**, **"retry B-<k>"**, **"close B-<k>"** — what stops the agent's work
   ([autonomy.md](autonomy.md)): `blockers.mjs list --open` with each `work/blockers/B-<k>.md`;
   `blockers.mjs retry B-<k>` after the operator's fix that no file shows (egress, disk, a
@@ -102,6 +111,8 @@ refused with a "start a new chat". A direct session's first request names it
 - **"module <id> set|on|off|run now …"**, **"focus <area>"**, **"dismiss D-<k> [as <reason>]"**,
   **"reopen D-<k>"**, **"categorize D-<k> <category>"** — the testing modules and the design
   findings' triage ([modules.md](modules.md) → **Control**); the dashboard's buttons send the same words.
+- **"dismiss F-<k> [as <reason>]"**, **"reopen F-<k>"** — a dashboard problem: `node "$HOME/scripts/problems.mjs" dismiss F-<k> [<reason>]` / `reopen F-<k>`
+  ([dashboard-page.md](dashboard-page.md) → Problems); the reasons are those of a design finding.
 - **"recheck VAL-<k>"** — that validation case again on the candidate now
   ([validation.md](validation.md) → **Recheck**).
 - **"replay PROP-<k>"** — that property's smallest breaking input again on the candidate now

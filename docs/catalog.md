@@ -354,8 +354,9 @@ published once, and asks the server for everything it shows.
   `SCENARIOS.md` at the moment of the question (the header's status is live, not as of the build);
   `GET /api/me` — who looks, and the dashboard's share link (`link`: `work/catalog/artifact.url` when
   it is an `https://` link, else null) the new page's **Copy link** builds an item's link from; `POST /api/act` — `{command}`, an operator's action done without the
-  model (dismiss, reopen or categorize a design finding, a test into or out of a collection, a setting,
-  a focus area), which the server writes itself — the same rows as `modules.sh` and `collections.mjs`,
+  model (dismiss, reopen or categorize a design finding, dismiss or reopen a problem `F-<k>`, a test into or out
+  of a collection, a setting, a focus area), which the server writes itself — the same rows as `modules.sh`,
+  `collections.mjs` and `problems.mjs`,
   a setting checked first by `modules.sh valid` — and logs (`module_set … via=dashboard`), with the new
   data back; a viewer gets 403; `GET /api/asks` — the caller's own questions from the
   page's chat, each with its answer and its command; `POST /api/asks` — `{text, context, command?}`, a
@@ -368,7 +369,7 @@ published once, and asks the server for everything it shows.
   (`module_set … via=dashboard`), and answers with the new state; it counts against the same 20 in 10
   minutes as the commands. When `work/CONFIG.md` is newer than `data.json`, `GET /api/catalog` shows each
   module setting's value from its CONFIG bullet (one that fits the setting) and a module's state from its
-  switch, under a new hash, until the next build; the same for a finding's dismissal (`work/design/DISMISSED.md`) and the collections (`work/CATALOG.md`). The policy hook refuses a scheduled run's or a channel
+  switch, under a new hash, until the next build; the same for a finding's dismissal (`work/design/DISMISSED.md`) and the collections (`work/CATALOG.md`); the dismissed problems (`work/PROBLEMS.md`) are always read from the file. The policy hook refuses a scheduled run's or a channel
   turn's command that names the server (`dashboard-api`): the relay's headers are the server's first layer,
   and a process on the machine could set them.
 - **New results.** Each build writes `data.json`; the server serves it at once, so nothing is

@@ -13,8 +13,8 @@
 //                             recorded with who asked; its ping the page sends to the agent — the page's
 //                             command as it is, or `answer dashboard question A-<n>` for a question
 //   POST /api/act             {command}: one of the operator's own actions done without the model — a
-//                             setting, a focus area, dismiss, reopen or categorize D-<k>, add to or remove
-//                             from a collection — written by this server itself (owner only)
+//                             setting, a focus area, dismiss, reopen or categorize D-<k>, dismiss or reopen
+//                             a problem F-<k>, add to or remove from a collection — written by this server itself (owner only)
 //   POST /api/settings        {module, key, value} or {focus}: the operator's own change of a module's
 //                             setting, written at once through modules.sh (owner only); the new state back
 //   GET  /api/status          what the agent does now, read live from work/ (the lock, rows in progress)
@@ -29,6 +29,7 @@
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
 import { changeCollection } from '../lib/collections.mjs';
+import { changeProblem, dismissedProblems } from '../lib/problems.mjs';
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -106,21 +107,23 @@ function withConfig(modules) {
 }
 // The operator's actions on the page show at once too: a dismissal or a reopened finding from
 // work/design/DISMISSED.md, the collections from work/CATALOG.md, when the file is newer than the data.
-const DISMISSED = join(WORK, 'design', 'DISMISSED.md'), COLLECTIONS = join(WORK, 'CATALOG.md');
+// The dismissed problems (work/PROBLEMS.md) are always the file's: the catalog build does not read it.
+const DISMISSED = join(WORK, 'design', 'DISMISSED.md'), COLLECTIONS = join(WORK, 'CATALOG.md'), PROBLEMS = join(WORK, 'PROBLEMS.md');
 const tableOf = (text) => (text ?? '').split('\n').filter((l) => l.startsWith('|')).slice(2).map((l) => l.split('|').slice(1, -1).map((x) => x.trim()));
 function catalog() {
-  const t = mtime(DATA), c = mtime(CONFIG), d = mtime(DISMISSED), k = mtime(COLLECTIONS), key = `${t}|${c}|${d}|${k}`;
+  const t = mtime(DATA), c = mtime(CONFIG), d = mtime(DISMISSED), k = mtime(COLLECTIONS), p = mtime(PROBLEMS), key = `${t}|${c}|${d}|${k}|${p}`;
   if (key !== cache.at) {
     let data = null;
     try { data = JSON.parse(readFileSync(DATA, 'utf8')); } catch { data = null; }
     data = data && typeof data === 'object' && !Array.isArray(data) ? data : null;
-    const newer = [c, d, k].filter((x) => data && x > t);
+    const newer = [c, d, k, p].filter((x) => data && x > t);
     if (data && c > t) data.modules = withConfig(data.modules);
     if (data && d > t && Array.isArray(data.design)) {
       const off = new Map(tableOf(read(DISMISSED)).filter(([id]) => /^D-\d+$/.test(id ?? '')).map(([id, , reason]) => [id, reason || null]));
       data.design = data.design.map((f) => (off.has(f.id) ? { ...f, status: 'dismissed', dismiss_reason: off.get(f.id) } : f.status === 'dismissed' ? { ...f, status: 'open', dismiss_reason: null } : f));
     }
     if (data && k > t) data.collections = tableOf(read(COLLECTIONS)).filter(([n]) => n).map(([name, members]) => ({ name, members: String(members ?? '').split(',').map((x) => x.trim()).filter(Boolean) }));
+    if (data) data.problems_dismissed = dismissedProblems(PROBLEMS);
     cache = { at: key, data, hash: data ? `${data.hash ?? t}${newer.length ? `-${Math.round(Math.max(...newer))}` : ''}` : null };
   }
   return cache;
@@ -166,6 +169,12 @@ const ACTIONS = [
     const kept = lines.filter((l, k) => k < 2 || cell1(l) !== m[1]).join('\n').replace(/\n*$/, '\n');
     writeFile(CATEGORIES, m[2] === '-' ? kept : `${kept}| ${m[1]} | ${m[2]} | ${NOW()} |\n`); logEvent(`module=ui-sweep key=category old=${old || '-'} new=${m[1]}:${m[2]}`);
     return { id: m[1], old, category: m[2] === '-' ? null : m[2] }; }],
+  [/^(dismiss|reopen) (F-\d{1,6})(?: as (false-positive|wont-fix|duplicate|by-design))?$/, (m) => {
+    if (m[1] === 'reopen' && m[3]) throw new Said(400, 'A problem opens again without a reason.');
+    let done;
+    try { done = changeProblem(PROBLEMS, catalog().data?.runs, m[1], m[2], m[3] ?? null, NOW()); } catch (e) { throw new Said(400, e.message); }
+    if (done.dismissed || done.reopened) logEvent(`module=problems key=dismiss old=${m[1] === 'dismiss' ? '-' : m[2]} new=${m[1] === 'dismiss' ? `${m[2]}:${m[3] || '-'}` : '-'}`);
+    return done; }],
   [/^(add|remove) (#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) (?:to|from) the collection ([A-Za-z0-9][A-Za-z0-9 _.-]{0,39})$/, (m) => {
     try { return { collection: m[3], members: changeCollection(COLLECTIONS, m[1], m[3], [m[2]]) }; } catch (e) { throw new Said(400, e.message); } }],
 ];
