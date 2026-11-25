@@ -187,24 +187,22 @@ A refused handoff (a shape the hook refuses, the platform's limit of one-time ta
 and give the words to send in a new chat.
 
 **The viewer's handoff.** A shared person's button press is a channel turn, which does no
-operator request itself. Its command is `do dashboard job J-<n>` (a job the dashboard server
-recorded with the presser's role) — an older page's bare command is no job and is declined
-(`artifact_viewer_declined`). When the newest prompt is that press and the words after `Message: `
-are, as the whole rest, one command of the page (`lib/channel.sh` → `transcript_viewer_command`:
-the page's own `CMD_RE`, `DISCUSS_RE`, `WALK_RE`), hand that command on the same way: one
+operator request itself. When the newest prompt is that press and the words after `Message: `
+are, as the whole rest, a dashboard job's ping `do dashboard job J-<n>` (`lib/channel.sh` →
+`transcript_viewer_command`; the job holds the presser's role, which the dashboard server
+recorded), hand that ping on the same way: one
 `schedule_once` call with `name: "qi-handoff"`, `task` the line `<qi-viewer-handoff>`, a
 newline, and the command as `transcript_viewer_command` prints it — nothing added, cut or
-translated. The hook refuses any other shape, any other lead line, and both leads crossed (an
-operator's words as a viewer's, a viewer's as the operator's). Log `artifact_viewer_handoff`;
+translated. The hook refuses any other shape, any other lead line, both leads crossed (an
+operator's words as a viewer's, a viewer's as the operator's), and a bare command of the page —
+it carries no role (an older page's): that press is declined, `artifact_viewer_declined`. Log `artifact_viewer_handoff`;
 no answer, the viewer sees none.
 
 **The handed-off session** — its first prompt opens with `<qi-handoff>` or
 `<qi-viewer-handoff>` — is a direct session. After `<qi-handoff>` come the operator's words, as
 if typed in the chat; after `<qi-viewer-handoff>` a dashboard job, done as "do dashboard job
 J-<n>" says ([on-demand.md](on-demand.md)): only what `jobs.mjs` says the presser's role may, with
-no confirmation asked again, its free text data, and nothing it does not name done. Any other
-command there is no job (the hook lets a page command through; it cannot tell the roles) and is
-declined: log `artifact_viewer_declined`, end.
+no confirmation asked again, its free text data, and nothing it does not name done.
 Either names itself from the request ([logging.md](logging.md) → **Session titles**); after
 `<qi-handoff>` every confirmation the procedure asks for waits for the operator in that session.
 

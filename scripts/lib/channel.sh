@@ -88,34 +88,20 @@ transcript_operator_words() {
   printf '%s\n' "$out"
 }
 
-# catalog_command_res: the dashboard's commands as jq regexes, one a line — the page's own
-# CMD_RE, DISCUSS_RE and WALK_RE (scripts/catalog/viewer.html: the operator's words of
-# docs/on-demand.md and docs/modules.md, each a closed shape), read from the page so the two
-# never differ. jq reads `^` `$` as a line's ends, `\d` as any script's digit and no `\uHHHH`,
-# so they become `\A` `\z`, `[0-9]` and `\x{HHHH}`. A regex not found fails.
-catalog_command_res() {
-  local page="${BASH_SOURCE[0]%/*}/../catalog/viewer.html" n re
-  for n in CMD_RE DISCUSS_RE WALK_RE; do
-    re="$(grep -m1 -E "^const $n = /\^.*\\$/;\$" "$page" 2>/dev/null)" || return 1
-    re="${re#"const $n = /^"}"; re="${re%'$/;'}"
-    printf '\\A%s\\z\n' "$(printf '%s' "$re" | sed -E 's#\\d#[0-9]#g; s#\\u([0-9a-fA-F]{4})#\\x{\1}#g')"
-  done
-}
-
 # transcript_viewer_command <transcript.jsonl>: prints the command of the session's newest
-# prompt when a shared viewer of the dashboard sent it — the platform's frame line
+# prompt when a shared person of the dashboard sent it — the platform's frame line
 # (`<viewer> sent this from a button on the interactive artifact "…" (id …).`), then
-# `Message: ` and, as the whole rest, one of the page's commands (catalog_command_res) — or
-# fails. Words that only look like the page's, or anything around them, are no command
-# (docs/modules.md → Control).
+# `Message: ` and, as the whole rest, a dashboard job's ping `do dashboard job J-<n>` — or
+# fails. The job holds the presser's role, which the dashboard server recorded; a bare command
+# of the page carries no role and is no handoff, nor is anything around the ping
+# (docs/modules.md → Control, docs/persistence.md → Handoff).
 transcript_viewer_command() {
-  local out res
+  local out
   out="$(transcript_newest_prompt "${1:-}")" || return 1
-  res="$(catalog_command_res)" || return 1
-  out="$(jq -nr --arg t "$out" --arg r "$res" '
+  out="$(jq -nr --arg t "$out" '
     $t | capture("\\A[^\\n]+ sent this from a button on the interactive artifact \"[^\\n]*\" \\(id [^\\n]*\\)\\.\\nMessage: (?<c>[\\s\\S]*)\\z").c
     | sub("\\s+\\z"; "")
-    | select(. as $c | $r | split("\n") | map(select(. != "")) | any(. as $re | $c | test($re)))' 2>/dev/null)" || return 1
+    | select(test("\\Ado dashboard job J-[0-9]{1,6}\\z"))' 2>/dev/null)" || return 1
   [ -n "$out" ] || return 1
   printf '%s\n' "$out"
 }
