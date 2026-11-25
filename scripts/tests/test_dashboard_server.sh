@@ -13,7 +13,9 @@ printf 'x' > "$W/catalog/thumbs/a.jpg"; printf 'secret' > "$W/env/credentials.en
 ln -s "$W/env/credentials.env" "$W/catalog/thumbs/link.jpg"
 mkdir -p "$W/suite/.e2e/runs/r1"; head -c 2000000 /dev/zero > "$W/suite/.e2e/runs/r1/v.webm"; printf 'x' > "$W/env/v.webm"
 ln -s "$W/env/v.webm" "$W/suite/.e2e/runs/r1/link.webm"
-jq -n '{schema:"qi-catalog/v1", hash:"h1", items:[], images:{r0:"catalog/thumbs/a.jpg", r1:"env/credentials.env", r2:"catalog/thumbs/link.jpg", r3:"../etc/passwd.jpg"},
+jq -n '{schema:"qi-catalog/v1", hash:"h1", items:[],
+  runs:[{type:"issue", ref:"#42", utc:"2026-11-16T09:00:00Z", analysis:{problems:[{title:"The upload | never ends", where:"/upload"}]}},
+        {type:"issue", ref:"#43", utc:"2026-11-15T09:00:00Z", analysis:{problems:[{title:"First seen", where:null}]}}], images:{r0:"catalog/thumbs/a.jpg", r1:"env/credentials.env", r2:"catalog/thumbs/link.jpg", r3:"../etc/passwd.jpg"},
   videos:{v0:"suite/.e2e/runs/r1/v.webm", v1:"env/v.webm", v2:"suite/.e2e/runs/r1/link.webm", v3:"catalog/thumbs/a.jpg"}}' > "$W/catalog/data.json"
 printf 'agent 2026-11-16T10:00:00Z sess\n' > "$W/env/LOCK"
 printf '| 42 | abc | c1 | b1 | - | in_progress | 2026-11-16T10:00:00Z |\n' >> "$W/QA.md"
@@ -105,6 +107,17 @@ grep -q '^| D-7 | .* | by-design |$' "$W/design/DISMISSED.md"; assert_eq "the ro
 assert "reopened again" '.ok == true and (.done | fromjson | .reopened) == true' "$(call "${OP[@]}" -X POST -d '{"command":"reopen D-7"}' "$U/api/act")"
 grep -q '^| D-7 ' "$W/design/DISMISSED.md"; assert_eq "its row is gone" 1 "$?"
 assert "a category, then none" '(.done | fromjson | .category) == "layout"' "$(call "${OP[@]}" -X POST -d '{"command":"categorize D-7 layout"}' "$U/api/act")"
+# A problem's dismissal (docs/dashboard-page.md → Problems): F-<k> numbered as the page numbers it, kept by its words.
+assert_eq "a viewer's dismissal of a problem: refused" 403 "$(code "${VW[@]}" -X POST -d '{"command":"dismiss F-2 as wont-fix"}' "$U/api/act")"
+assert "the operator's dismissal: F-2 is the newer problem" '.ok == true and (.done | fromjson | .dismissed == true and .title == "The upload | never ends")
+  and (.data.problems_dismissed == [{"key":"The upload | never ends|/upload","utc":.data.problems_dismissed[0].utc,"reason":"wont-fix"}])' "$(call "${OP[@]}" -X POST -d '{"command":"dismiss F-2 as wont-fix"}' "$U/api/act")"
+grep -q '^| The upload \\p never ends\\p/upload | .* | wont-fix |$' "$W/PROBLEMS.md"; assert_eq "its row in PROBLEMS.md, the pipe kept apart" 0 "$?"
+assert "dismissed again: nothing new" '(.done | fromjson | .dismissed) == false' "$(call "${OP[@]}" -X POST -d '{"command":"dismiss F-2"}' "$U/api/act")"
+assert_eq "a problem the page does not show: refused" 400 "$(code "${OP[@]}" -X POST -d '{"command":"dismiss F-9"}' "$U/api/act")"
+assert "reopened: its row is gone" '(.done | fromjson | .reopened) == true and .data.problems_dismissed == []' "$(call "${OP[@]}" -X POST -d '{"command":"reopen F-2"}' "$U/api/act")"
+WORK_DIR="$W" node "$SCRIPTS/problems.mjs" dismiss F-1 >/dev/null 2>&1
+assert_eq "outside the direct session problems.mjs writes nothing" 2 "$?"
+assert_eq "a test's deletion is work for the agent, no direct action" 400 "$(code "${OP[@]}" -X POST -d '{"command":"delete #42 AC-1"}' "$U/api/act")"
 assert "status: the lock and the issue in progress, never the session" '.lock == {owner:"agent", since:"2026-11-16T10:00:00Z"} and .issues[0].issue == 42 and (tostring | contains("sess") | not)' "$(call "${VW[@]}" "$U/api/status")"
 
 post() { call "$@" -H 'content-type: application/json' -X POST "$U/api/commands" -d "$(jq -nc --arg c "$CMD" '{command:$c}')"; }

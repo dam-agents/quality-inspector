@@ -219,6 +219,8 @@
 {"name": "modules.sh run under a mixed-case ${Home}, scheduled", "expect": "deny", "mode": "scheduled", "rule": "module-set", "tool": "Bash", "input": {"command": "bash \"${Home}/scripts/modules.sh\" status"}}
 {"name": "dismissed findings edit, scheduled", "expect": "deny", "mode": "scheduled", "rule": "scheduled-def", "tool": "Write", "input": {"file_path": "@WORK@/design/DISMISSED.md", "content": "| D-1 | x |"}}
 {"name": "dismissed findings edit, direct", "expect": "allow", "tool": "Write", "input": {"file_path": "@WORK@/design/DISMISSED.md", "content": "| D-1 | x |"}}
+{"name": "dismissed problems edit, scheduled", "expect": "deny", "mode": "scheduled", "rule": "scheduled-def", "tool": "Write", "input": {"file_path": "@WORK@/PROBLEMS.md", "content": "| x | y | - |"}}
+{"name": "dismissed problems edit, direct", "expect": "allow", "tool": "Write", "input": {"file_path": "@WORK@/PROBLEMS.md", "content": "| x | y | - |"}}
 {"name": "an ANSI-C tab in a loop, scheduled", "expect": "allow", "mode": "scheduled", "tool": "Bash", "input": {"command": "jq -r '.a' work/x.json | while IFS=$'\\t' read -r a b; do echo \"$a\"; done"}}
 {"name": "a *.sh glob, scheduled", "expect": "allow", "mode": "scheduled", "tool": "Bash", "input": {"command": "node scripts/coverage.mjs work/suite/tests/*.sh"}}
 {"name": "a * glob, scheduled", "expect": "allow", "mode": "scheduled", "tool": "Bash", "input": {"command": "cp work/suite/out/* /tmp/quality-inspector-x/"}}

@@ -7,6 +7,17 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.66.0 — 2026-11-25
+
+**Upgrade:**
+1. `bash "$HOME/scripts/dashboard-service.sh" restart` — once: the server writes the operator's
+   `dismiss F-<k> [as <reason>]` and `reopen F-<k>` (a dashboard problem, `work/PROBLEMS.md`, made on the
+   first dismissal) and gives the page the dismissed problems. It must say `ok`.
+2. Nothing else: the page's commands gain `dismiss F-<k>`, `reopen F-<k>` and `delete <test ref>`
+   ([docs/on-demand.md](docs/on-demand.md)), read from `scripts/catalog/viewer.html` as always. The new page
+   (`scripts/dashboard/page.html`) is read again on every load; it shows a profile scenario as `P-<n>`, its
+   slug on its page.
+
 ## 3.65.1 — 2026-11-24
 
 **Upgrade:**
