@@ -153,7 +153,7 @@ API) gets no mark; leave `mark` out.
 **What is wrong — `wrong`.** An entry that is not a pass gets one short sentence of what is
 wrong, and only that: what the user sees or does not get, no steps before it, no criteria it
 stopped ("The Connect Slack channels dialog lists no channel."). The dashboard puts it beside
-the screen at the failure (dashboard-page.md → **The walk**); the full story stays in `note` or
+the screen at the failure (a failure's page, [dashboard-page.md](dashboard-page.md)); the full story stays in `note` or
 `explanation`. With a `mark`, its `saw` is shown instead. Leave it out and the page names the step
 that failed.
 

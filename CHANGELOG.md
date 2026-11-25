@@ -21,7 +21,7 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    a block**). An open `rework` row from before stays valid; its page shows the basis and the diff only.
 3. Nothing to run: a test's page shows its steps on the product map's screens, the control each step uses
    or checks marked, and plays them, also before the test's first run
-   ([docs/dashboard-page.md](docs/dashboard-page.md) → **The walk on the map**).
+   ([docs/dashboard-page.md](docs/dashboard-page.md), the walk on the map).
 
 ## 3.67.0 — 2026-11-25
 
