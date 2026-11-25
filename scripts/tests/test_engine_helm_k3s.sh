@@ -186,7 +186,7 @@ grep -q 'already up' "$SANDBOX/uperr" || { echo "  fast path not taken: $(cat "$
 assert_eq "other values: installs again" 1 "$(up '{"img":"y","mock":""}')"
 [ -f "$E/STATE.json" ] && { echo "  the old build stayed recorded through a failed upgrade"; FAILED=1; }
 
-# Images no container uses: removed by every reset, and after an up only below prune_below_gi free.
+# Images no container uses: removed after an up and a reset only below prune_below_gi free.
 G="$SANDBOX/okbin"; mkdir -p "$G"; cp "$U/curl" "$G/curl"
 printf '#!/usr/bin/env bash\necho "$*" >> "%s/k3s-ok.log"\n' "$SANDBOX" > "$G/k3s"
 printf '#!/usr/bin/env bash\n[ "$1" = version ] && echo "v3.19.0+gstub"\n[ "$1" = pull ] && while [ $# -gt 0 ]; do [ "$1" = --untardir ] && mkdir -p "$2/chart"; shift; done\nexit 0\n' > "$G/helm"
@@ -198,10 +198,14 @@ assert_eq "an up with the stubbed cluster succeeds" 0 "$(okup 1000000)"
 grep -qx "crictl rmi --prune" "$SANDBOX/k3s-ok.log" || { echo "  up below prune_below_gi free: unused images must be removed"; FAILED=1; }
 assert_eq "an up with room to spare succeeds" 0 "$(okup 0)"
 grep -q "crictl" "$SANDBOX/k3s-ok.log" && { echo "  up above prune_below_gi free: images must stay"; FAILED=1; }
-rm -f "$SANDBOX/k3s-ok.log"
-PATH="$G:$PATH" HOME="$SANDBOX/home" QI_ENV_DIR="$SANDBOX/envg" QI_PROFILE_CONFIG='{"img":"x","mock":""}' QI_ENGINE_CONFIG="$(cfg oci)" \
-  bash "$ENG/bin/env" reset >/dev/null 2>"$SANDBOX/reseterr"
-grep -qx "crictl rmi --prune" "$SANDBOX/k3s-ok.log" || { echo "  reset: unused images must be removed: $(cat "$SANDBOX/reseterr")"; FAILED=1; }
+okreset() { rm -f "$SANDBOX/k3s-ok.log"
+  PATH="$G:$PATH" HOME="$SANDBOX/home" QI_ENV_DIR="$SANDBOX/envg" QI_PROFILE_CONFIG='{"img":"x","mock":""}' \
+    QI_ENGINE_CONFIG="$(cfg oci | jq -c --argjson p "$1" '.prune_below_gi = $p')" bash "$ENG/bin/env" reset >/dev/null 2>"$SANDBOX/reseterr"; echo $?; }
+assert_eq "a reset below prune_below_gi free succeeds" 0 "$(okreset 1000000)"
+grep -qx "crictl rmi --prune" "$SANDBOX/k3s-ok.log" || { echo "  reset below prune_below_gi free: unused images must be removed: $(cat "$SANDBOX/reseterr")"; FAILED=1; }
+assert_eq "a reset with room to spare succeeds" 0 "$(okreset 0)"
+grep -q "crictl" "$SANDBOX/k3s-ok.log" && { echo "  reset above prune_below_gi free: images must stay"; FAILED=1; }
+[ -f "$SANDBOX/envg/STATE.json" ] && { echo "  reset: the build stayed recorded"; FAILED=1; }
 
 # status: `kvm` appears only when the profile asks for it, as whether this VM has the device.
 st() { PATH="$G:$PATH" HOME="$SANDBOX/home" QI_ENV_DIR="$SANDBOX/envg" QI_PROFILE_CONFIG='{"img":"x","mock":""}' \

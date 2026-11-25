@@ -75,7 +75,9 @@ candidate has no `ran candidate=` line in `work/SECURITY.log`. Worklist: `candid
    Confirm each failure with `--repeat-each 3 --no-cache`: a check that stays false →
    `fail`; mixed → `skipped` (flaky); a test that never reached its check → `skipped` with
    the reason, never `pass`.
-6. `env.sh reset` — payloads, lockouts and replayed writes must not reach the next run.
+6. `env.sh reset` — payloads, lockouts and replayed writes must not reach the next run —, then
+   `env.sh up <candidate>` and `wait`: the next run finds the product running
+   ([nested-env.md](nested-env.md) → **One running product**).
 7. `work/security/<c>/verdicts.json`: `{"mode": "security", "candidate", "generated_utc",
    "display_name", "candidate_run": "security-<c>", "counts", "findings": [...], "notes"}` —
    one finding per `fail` or `skipped` check of `findings.json` and of the e2e run
