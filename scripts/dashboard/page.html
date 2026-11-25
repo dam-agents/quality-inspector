@@ -2832,7 +2832,9 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
   }
   document.addEventListener("click", guard(async (e) => { if (!e.target.closest?.("[data-copy-link]")) return; await copyText(itemLink(), `the link to ${S.item || TABS[S.tab]}`); }));
   document.addEventListener("click", (e) => { const b = e.target.closest?.("[data-scroll-to]"); if (b) document.getElementById(b.dataset.scrollTo)?.scrollIntoView({ behavior: "smooth", block: "start" }); });
-  const keepPlace = () => { const h = `#${S.tab}${S.item ? `/${encodeURIComponent(S.item)}` : ""}`; if (location.hash !== h) history.replaceState(null, "", h); };
+  // The platform renders the page in a sandboxed frame with an opaque origin (about:srcdoc), where
+  // history.replaceState throws a SecurityError: then the address simply keeps the value it has.
+  const keepPlace = () => { const h = `#${S.tab}${S.item ? `/${encodeURIComponent(S.item)}` : ""}`; if (location.hash !== h) { try { history.replaceState(null, "", h); } catch { /* opaque origin */ } } };
   function goTo(hash) {
     const [tab, ...rest] = String(hash || "").replace(/^#/, "").split("/");
     if (!TABS[tab]) return false;
