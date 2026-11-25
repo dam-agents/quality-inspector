@@ -153,7 +153,10 @@ refused with a "start a new chat". A direct session's first request names it
   viewer's answer holds only what the page shows them: no credentials, no paths, no operator notes,
   no source. Write it to a `mktemp "/tmp/quality-inspector-answer.XXXXXX"` file with the file tool,
   then `node "$HOME/scripts/dashboard/asks.mjs" answer A-<n> <file>`; the page shows it within
-  seconds. One answer a question; a follow-up is a new question. **A command from the page** comes
+  seconds. One answer a question; a follow-up is a new question. **Each dashboard page has its own
+  session** (the ping's conversation, [dashboard-page.md](dashboard-page.md) → The chat): this
+  session's earlier questions are about the same page, and a question about another page belongs in
+  that page's chat — answer it short and say so. **A command from the page** comes
   through the same chat: its message is the command itself, and its chat row holds the person's note.
   When the command's work ends — its result, its report's `R-<n>`, a draft that waits for a yes, or
   why it could not be done — `asks.mjs find --command "<the command>"` names its row: `show` it for the

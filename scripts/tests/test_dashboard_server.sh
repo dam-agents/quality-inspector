@@ -91,6 +91,26 @@ assert "a command in the chat: its ping is the command" '.id == "A-2" and .ping 
 assert_eq "a command the page does not have: refused" 400 "$(code "${OP[@]}" -X POST -d '{"text":"x","command":"rm -rf /"}' "$U/api/asks")"
 assert "the agent finds the command's row" '.id == "A-2"' "$(WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" find --command "run #42 AC-1")"
 assert "a command with no row: none" '.id == null' "$(WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" find --command "run #43")"
+# Each page its own session (docs/dashboard-page.md → The chat): the ping's conversation is the item,
+# else the tab's page, in the platform's key shape; a scenario request is its own page and session.
+assert "a question's session: its item" '.ping_conversation | test("^item\\.issue-42-AC-1\\.[0-9a-f]{8}$")' "$(call "${VW[@]}" -X POST -d '{"text":"And now?","context":{"tab":"tests","item":"issue-42/AC-1"}}' "$U/api/asks")"
+assert "a page's session: the tab and its page" '.ping_conversation | test("^page\\.tests-nightly\\.[0-9a-f]{8}$")' "$(call "${VW[@]}" -X POST -d '{"text":"What is this?","context":{"tab":"tests","page":"tests/nightly"}}' "$U/api/asks")"
+assert "a plain tab: its name" '.ping_conversation == "page.settings"' "$(call "${VW[@]}" -X POST -d '{"text":"What is this?","context":{"tab":"settings","page":"settings"}}' "$U/api/asks")"
+SC='test this scenario: On the page /projects: Rename a project and see the new name in the list.'
+R="$(call "${VW[@]}" -X POST -d "$(jq -nc --arg c "$SC" '{text:"Test this scenario, please.", command:$c, request:true, context:{tab:"problems"}}')" "$U/api/asks")"
+RID="$(jq -r .id <<<"$R")"
+assert "a scenario request: its own page and session, the command as the ping" ".ping == \"$SC\" and .ping_conversation == \"$RID\"" "$R"
+assert "its page: the request, not what was open" ".asks | map(select(.id == \"$RID\")) | .[0] | .context.item == \"$RID\" and .request == {scenario: null}" "$(call "${VW[@]}" "$U/api/asks")"
+assert "request with another command: a plain chat row" '.ping_conversation != .id' "$(call "${OP[@]}" -X POST -d '{"text":"x","command":"run #42 AC-1","request":true,"context":{"tab":"runs"}}' "$U/api/asks")"
+WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" link A-2 S-9 >/dev/null 2>&1; assert_eq "a link from a row that is no scenario request: refused" 2 "$?"
+WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" link "$RID" S-9 >/dev/null; assert_eq "the agent links the request to its scenario" 0 "$?"
+WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" link "$RID" S-9 >/dev/null; assert_eq "the same link again: fine" 0 "$?"
+WORK_DIR="$W" node "$SCRIPTS/dashboard/asks.mjs" link "$RID" S-8 >/dev/null 2>&1; assert_eq "another scenario: refused" 2 "$?"
+assert "linked, nothing written yet" ".asks | map(select(.id == \"$RID\")) | .[0].request.scenario | .id == \"S-9\" and .status == null and .criteria == []" "$(call "${VW[@]}" "$U/api/asks")"
+mkdir -p "$W/scenarios/S-9"; printf '# S-9 — Rename\n\n## AC-1 — The new name shows\nquote: x\n\n## AC-2 — The old name is gone\n' > "$W/scenarios/S-9/criteria-abc123.md"
+printf '| id | source | requester | thread | spec_hash | build | verdict | status | updated_utc |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| S-9 | dashboard | - | - | abc123 | - | - | queued | 2026-11-25T10:00:00Z |\n' > "$W/SCENARIOS.md"
+assert "its progress: the row and the frozen criteria" ".asks | map(select(.id == \"$RID\")) | .[0].request.scenario | .status == \"queued\" and .build == null and (.criteria | map(.id)) == [\"AC-1\",\"AC-2\"] and .test == false and .ran == false" "$(call "${VW[@]}" "$U/api/asks")"
+assert "another person sees none of the request" ".asks | map(select(.id == \"$RID\")) == []" "$(call "${OP[@]}" "$U/api/asks")"
 # The operator's direct actions (POST /api/act): done by a script, as the server's child; never for a viewer.
 A='{"command":"add #42 AC-1 to the collection Smoke"}'
 assert_eq "a viewer's action: refused" 403 "$(code "${VW[@]}" -X POST -d "$A" "$U/api/act")"
