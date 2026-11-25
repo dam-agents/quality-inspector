@@ -100,8 +100,9 @@ of the test resolves it (`replaced`), the sweep closes a prediction that did not
 
 ## The operator decides
 
-Only in the direct session — the dashboard's buttons send the same words (a shared viewer's press
-by the viewer's handoff, [persistence.md](persistence.md) → **Handoff**); a Slack request to
+Only in the direct session — the dashboard's buttons send the same words as a job of a role that may
+(an admin, a developer or a tester; "do dashboard job J-<n>", [on-demand.md](on-demand.md)), a shared
+person's by the viewer's handoff ([persistence.md](persistence.md) → **Handoff**); a Slack request to
 decide one is declined. Show `M-<k>.md` (and the diff) first.
 
 | Words | What happens | `close` state |

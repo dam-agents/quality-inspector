@@ -17,10 +17,10 @@ description: >-
 The operator's word alone opens an issue (CLAUDE.md → trust boundary), in the direct session
 only: `scripts/github.sh create-issue` refuses elsewhere, and the policy hook refuses the
 command in a scheduled or channel turn (rule `issue-create`). The operator's request beside a
-scheduled run (the dashboard by its chat), or a shared viewer's button with exactly the page's
-words, goes as it is to a fresh session ([docs/persistence.md](../../docs/persistence.md) →
-**Handoff**, [docs/modules.md](../../docs/modules.md) → Control), where this procedure runs and
-the draft waits for the operator's confirmation.
+scheduled run (the dashboard by its chat), or a dashboard job of a shared person's role, goes as it
+is to a fresh session ([docs/persistence.md](../../docs/persistence.md) → **Handoff**,
+[docs/modules.md](../../docs/modules.md) → Control), where this procedure runs. The draft waits for a
+yes: the operator's, or an admin's, a developer's or a tester's **Open the issue** job on the dashboard.
 
 ## The request
 
@@ -87,12 +87,12 @@ architect picks up to fix the issue. Without `fix_label` say so and offer the is
    - **`send issue draft <id>`** — yes, as it is: step 5 for `work/found/<id>/`.
    - **`send issue draft <id> for the architect`** — yes, and send it to developers to fix: step 5 with
      `--fix` (without `fix_label` say so and offer it without).
-   - **`revise issue draft <id>`** with a note, or changes in words — edit `body.md` (and `title.txt`)
+   - **`revise issue draft <id>`** with a note (a dashboard job's `note`), or changes in words — edit `body.md` (and `title.txt`)
      as asked, check it again (step 2), build the catalog and ask again.
    - **`discard issue draft <id>`** — `node "$HOME/scripts/issue-draft.mjs" --discard <id>`, build the
      catalog: the draft leaves the page and nothing is posted.
-   No yes → nothing is posted; the draft stays in `work/found/` and on the page. A shared viewer's
-   press reaches you as a handoff, and the operator confirms it first. An `<id>` that is not a folder
+   No yes → nothing is posted; the draft stays in `work/found/` and on the page. A dashboard job's
+   command is the yes of a role that may give it ("do dashboard job J-<n>"); a viewer gives none. An `<id>` that is not a folder
    of `work/found/` with `draft.json`, or a draft already opened or discarded: say so, post nothing.
 5. **Open it.** Ledger `surface=issue action=intent issue=- key=found@<slug> target=<target_repo>`,
    then `bash "$HOME/scripts/github.sh" create-issue "<dir>" [--fix] [--again]` →

@@ -340,8 +340,10 @@ published once, and asks the server for everything it shows.
   (`kit.yaml` → `startupItems`, command `~/scripts/dashboard/serve.sh`). It listens on
   `127.0.0.1:5555`, the platform's Artifact API port, and answers only the platform's relay, which names
   the caller on every request (`owner` — the operator — or `viewer`, with the verified email); the page
-  cannot forge those headers. It writes `work/dashboard/commands.jsonl`, and the operator's own settings
-  through `modules.sh` (below); it never executes what a page sends.
+  cannot forge those headers. The caller's role is the roster's (`work/dashboard/PEOPLE.md`,
+  `scripts/lib/people.mjs`; the owner an admin, anyone not in it a viewer —
+  [dashboard-page.md](dashboard-page.md) → Roles). It writes `work/dashboard/commands.jsonl` and
+  `jobs.jsonl`, the roster, and the actions that need no model (below); it never executes what a page sends.
 - `bash "$HOME/scripts/dashboard-service.sh" check` says whether it answers; `install` writes the
   service for an agent created without it (before 3.63.0), `restart` restarts it. Its log is
   `~/.local/state/rc/quality-inspector-dashboard.log`.
@@ -353,27 +355,39 @@ published once, and asks the server for everything it shows.
   named in the data's `videos` map (each report side's `video`; the static page has none); `GET /api/status` — what the agent does now, read from `work/env/LOCK`, `QA.md` and
   `SCENARIOS.md` at the moment of the question (the header's status is live, not as of the build);
   `GET /api/me` — who looks, and the dashboard's share link (`link`: `work/catalog/artifact.url` when
-  it is an `https://` link, else null) the new page's **Copy link** builds an item's link from; `POST /api/act` — `{command}`, an operator's action done without the
+  it is an `https://` link, else null) the new page's **Copy link** builds an item's link from, and the
+  caller's `role` (admin, developer, tester, viewer) and `owner`; `POST /api/act` — `{command}`, an action done without the
   model (dismiss, reopen or categorize a design finding, dismiss or reopen a problem `F-<k>`, a test into or out
   of a collection, a setting, a focus area), which the server writes itself — the same rows as `modules.sh`,
   `collections.mjs` and `problems.mjs`,
   a setting checked first by `modules.sh valid` — and logs (`module_set … via=dashboard`), with the new
-  data back; a viewer gets 403; `GET /api/asks` — the caller's own questions from the
+  data back; a viewer gets 403, and so does a developer or tester for a setting or a focus area; `GET /api/asks` — the caller's own questions from the
   page's chat, each with its answer and its command, and a scenario request's `request.scenario` — its
   `S-<k>` (linked by `asks.mjs link` in `links.jsonl`), status, verdict, build, the frozen criteria's
   names, and whether the test file, the runs and the report exist; `POST /api/asks` — `{text, context, command?, request?}`, a
-  question or a page command (checked as `/api/commands` checks it; its ping is the command itself) (at most 2000 characters, the
+  question or a page command (checked as `/api/commands` checks it, and against the role; its ping is the command itself) (at most 2000 characters, the
   same limit of 20 in 10 minutes), recorded with who asked in `work/dashboard/asks.jsonl`; its ping
   `answer dashboard question A-<n>` the page sends to the agent ([on-demand.md](on-demand.md)),
   whose answer `scripts/dashboard/asks.mjs answer` writes to `answers.jsonl`, with `ping_conversation`
   — the page's own platform session: the item of `context`, else its `page` (the tab and its page), in
   the platform's key shape (`[A-Za-z0-9._-]{1,64}`, a short hash where it had to change); `request: true`
   with a `test this scenario` or `walk these steps live` command makes the row a request's page, its
-  context and its conversation `A-<n>` ([dashboard-page.md](dashboard-page.md) → A request's page); `POST /api/settings` — `{module, key, value}` or `{focus}`, the operator's
-  own change on Settings, for the caller `owner` only (a viewer: 403): `modules.sh valid` checks the key
+  context and its conversation `A-<n>` ([dashboard-page.md](dashboard-page.md) → A request's page); `POST /api/settings` — `{module, key, value}` or `{focus}`, an admin's
+  own change on Settings (anyone else: 403): `modules.sh valid` checks the key
   and the value, read-only, and the server writes the bullet itself and logs it
   (`module_set … via=dashboard`), and answers with the new state; it counts against the same 20 in 10
-  minutes as the commands. When `work/CONFIG.md` is newer than `data.json`, `GET /api/catalog` shows each
+  minutes as the commands. `POST /api/jobs` — `{command, label?, item?}`, work for the model: a page
+  command (not one `/api/act` does) the caller's role may give, recorded as `J-<n>` with the role, the
+  button's label and the open item in `work/dashboard/jobs.jsonl` (`scripts/lib/jobs.mjs`; the same 20 in
+  10 minutes); its ping `do dashboard job J-<n>`, whose state `scripts/dashboard/jobs.mjs` writes
+  ([on-demand.md](on-demand.md)); `GET /api/jobs` — the newest 80, each with its state and its end's text,
+  whose as "you" or a role, never another's email. `GET /api/people` — the roles, how many people hold
+  each and, for an admin, the roster; `POST /api/people` — `{email, role}` or `{email, role: null}`, an
+  admin's change, written at once. `GET /api/notifications` — the caller's last 30 days, newest first, at
+  most 50, built from what the server keeps (a job that ended, an answer to the caller's question, a run
+  of the data), each marked `mine` (the caller's own job or question) and `unread`; `POST
+  /api/notifications/read` `{id}` and `/seen` read one or every one, for that caller only
+  (`work/dashboard/notes.json`). When `work/CONFIG.md` is newer than `data.json`, `GET /api/catalog` shows each
   module setting's value from its CONFIG bullet (one that fits the setting) and a module's state from its
   switch, under a new hash, until the next build; the same for a finding's dismissal (`work/design/DISMISSED.md`) and the collections (`work/CATALOG.md`); the dismissed problems (`work/PROBLEMS.md`) are always read from the file. The policy hook refuses a scheduled run's or a channel
   turn's command that names the server (`dashboard-api`): the relay's headers are the server's first layer,

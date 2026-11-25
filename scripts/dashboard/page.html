@@ -1873,6 +1873,50 @@
   .ask-cmd { display: block; margin-top: 4px; padding: 2px 8px; border-radius: var(--r-xs); background: color-mix(in srgb, var(--panel) 18%, transparent); font-size: var(--fs-micro); overflow-wrap: anywhere; }
   .ask-draft { display: flex; gap: 8px; align-items: flex-start; padding: 8px 12px; border-radius: var(--r-md); background: var(--info-soft); }
   .ask-draft > div { flex: 1; display: grid; gap: 2px; min-width: 0; } .ask-draft code { font-size: var(--fs-micro); overflow-wrap: anywhere; }
+  /* The bell (docs/dashboard-page.md → Notifications), as Design Desk's: one row per event, the same facts in the same places. */
+  details.bell { position: relative; }
+  details.bell > summary { list-style: none; position: relative; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r-md); cursor: pointer; color: var(--muted); }
+  details.bell > summary::-webkit-details-marker { display: none; }
+  details.bell > summary:hover, details.bell[open] > summary { background: var(--soft); color: var(--ink); }
+  details.bell > summary svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  details.bell .badge { position: absolute; top: -3px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border-radius: 999px; background: var(--bad); color: var(--bg); font-size: var(--fs-micro); font-weight: 600; line-height: 14px; text-align: center; white-space: nowrap; border: 2px solid var(--panel); }
+  details.bell .menu.notes { left: auto; right: 0; width: min(420px, calc(100vw - 24px)); max-width: none; padding: 0; gap: 0; overflow: hidden; }
+  #notes .nh { display: flex; align-items: center; gap: 8px; padding: 12px 12px 8px 16px; border-bottom: 1px solid var(--line); }
+  #notes .nh b { font-size: var(--fs-ui); flex: 1; }
+  #notes .nh .nmark { font-size: var(--fs-meta); color: var(--ink); background: none; border: 0; padding: 0; cursor: pointer; } #notes .nh .nmark:hover { text-decoration: underline; }
+  #notes .nh .tabs2 { display: flex; gap: 2px; background: var(--soft); padding: 2px; border-radius: var(--r-sm); }
+  #notes .nh .tabs2 button { border: 0; background: transparent; padding: 2px 12px; border-radius: var(--r-xs); font-size: var(--fs-meta); color: var(--muted); cursor: pointer; }
+  #notes .nh .tabs2 button[aria-pressed="true"] { background: var(--panel); color: var(--ink); font-weight: 600; box-shadow: var(--shadow); }
+  #notes .nl { max-height: min(560px, 70vh); overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding: 4px 8px 12px; }
+  #notes .note { --c: var(--muted); display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; column-gap: 12px; width: 100%; padding: 12px; border: 0; border-left: 3px solid transparent; border-radius: var(--r-md); background: transparent; text-align: left; cursor: pointer; font-size: var(--fs-meta); line-height: 1.4; color: var(--ink); }
+  #notes .note:hover { background: var(--soft); }
+  #notes .note.unread { border-left-color: var(--accent); background: color-mix(in srgb, var(--info-soft) 55%, transparent); }
+  #notes .note .ic { grid-row: 1 / span 2; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); font-size: var(--fs-meta); font-weight: 600; }
+  #notes .note .ev { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #notes .note .ev span { font-weight: 400; color: var(--muted); }
+  #notes .note time { font-size: var(--fs-micro); color: var(--muted); white-space: nowrap; }
+  #notes .note .q { grid-column: 2 / span 2; font-size: var(--fs-meta); color: var(--muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  #notes .empty { padding: 28px 16px; text-align: center; color: var(--muted); font-size: var(--fs-meta); }
+  #notes .note[data-g="done"] { --c: var(--approved); } #notes .note[data-g="failed"] { --c: var(--closed); } #notes .note[data-g="answer"] { --c: var(--accent); }
+  #notes .note[data-g="run"] { --c: var(--decided); } #notes .note[data-g="run-problems"] { --c: var(--waiting); }
+  /* A job on its item (docs/dashboard-page.md → Commands): what was asked, its state and who asked. */
+  .qi-jobs { display: grid; gap: 4px; margin: 0 0 16px; }
+  .qi-job { --c: var(--accent); display: flex; gap: 8px; align-items: baseline; padding: 8px 12px; border-radius: var(--r-md); border-left: 3px solid var(--c); background: color-mix(in srgb, var(--c) 8%, var(--panel)); font-size: var(--fs-meta); }
+  .qi-job b { font-weight: 600; } .qi-job .k { color: var(--muted); } .qi-job p { margin: 4px 0 0; color: var(--ink); white-space: pre-line; }
+  .qi-job[data-s="done"] { --c: var(--approved); } .qi-job[data-s="failed"] { --c: var(--closed); }
+  .qi-job .spin { flex: none; }
+  /* Settings → People: who may do what. */
+  .qi-people { display: grid; gap: 4px; }
+  .qi-person { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--panel); font-size: var(--fs-ui); }
+  .qi-person .e { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .qi-person select, .qi-person input { font: inherit; font-size: var(--fs-meta); padding: 4px 8px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--bg); color: var(--ink); }
+  .qi-person select { flex: none; width: 128px; }
+  .qi-person input { flex: 1; min-width: 0; width: auto; }
+  .qi-roles { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 8px 0 12px; font-size: var(--fs-meta); }
+  .qi-roles b { font-weight: 600; } .qi-roles span { color: var(--muted); }
+  /* A viewer reads: no button that changes anything (docs/dashboard-page.md → Roles). */
+  body.ro [data-cmd], body.ro #ask-test, body.ro [data-ask-page], body.ro [data-coll-add], body.ro [data-build-item], body.ro [data-build-page], body.na [data-set-go], body.na [data-focus-go] { display: none !important; }
+  body.na [data-setting], body.na [data-set] { pointer-events: none; }
 </style>
 </head>
 <body>
@@ -1883,6 +1927,7 @@
     <button class="btn primary" id="ask-test" type="button" title="[Opens a dialog] Describe what to try on a page; Quality Inspector writes the test and runs it on the newest build">+ Ask for a test</button>
     <div class="grow"></div>
     <div class="search"><input class="goto" id="goto" type="search" placeholder="Search, or #42, S-7, F-3" role="combobox" aria-expanded="false" aria-controls="hits" aria-label="Search tests, runs, problems and screens: words, an issue's number like #42, a scenario's like S-7, a problem's like F-3" autocomplete="off" spellcheck="false" /><div id="hits" role="listbox" hidden></div></div>
+    <details class="more bell" id="bell"><summary id="bell-btn" aria-label="Notifications" title="Notifications: what happened lately"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg><span class="badge" id="bell-count" hidden></span></summary><div class="menu notes" id="notes" role="dialog" aria-label="Notifications"></div></details>
     <details class="more me-menu"><summary class="me" id="me" aria-label="Your menu"></summary><div class="menu"><div class="me-who" id="me-who"></div><button class="btn" id="settings" type="button" data-tab="settings" title="What Quality Inspector does beside the issues, and when">⚙ Settings</button><button class="btn" id="help" type="button" data-tab="guide" title="How Quality Inspector works, tab by tab">? How it works</button><button class="btn" id="theme" type="button"></button></div></details>
   </header>
   <div class="banners" id="banners"></div>
@@ -1929,6 +1974,15 @@
   <form method="dialog"><figure><video id="video-player" controls playsinline preload="auto"></video><p class="k" id="video-load" hidden></p><figcaption id="video-cap"></figcaption></figure><div class="actions"><button type="button" class="btn" data-close="cancel">Close</button></div></form>
 </dialog>
 
+<dialog id="confirm-dialog">
+  <form method="dialog">
+    <h2 id="confirm-title"></h2>
+    <p class="sub" id="confirm-text"></p>
+    <label id="confirm-note-l" hidden><span>What should change?</span><textarea id="confirm-note" maxlength="1000"></textarea></label>
+    <div class="actions"><button type="button" class="btn primary" data-close="yes" id="confirm-yes"></button><button type="button" class="btn" data-close="cancel">Cancel</button></div>
+  </form>
+</dialog>
+
 <dialog id="coll-dialog">
   <form method="dialog" id="coll-form">
     <h2>Add to a collection</h2>
@@ -1945,7 +1999,7 @@
   "use strict";
   // The page's commands: the closed set the dashboard server accepts (scripts/dashboard/server.mjs
   // reads them from the published page). The same patterns as scripts/catalog/viewer.html.
-const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|run (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)(?:, (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)){0,19}|repair (?:#\d+(?: (?:AC|IN)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: AC-\d+)?)|test scenario [a-z0-9][a-z0-9-]{0,40}|create issue for (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|PROP-\d{1,4}|STRESS-[A-Z]{1,20}-\d{1,3})(?:, (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|PROP-\d{1,4}|STRESS-[A-Z]{1,20}-\d{1,3})){0,19}(?: for the architect)?|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+(?: as (?:false-positive|wont-fix|duplicate|by-design))?|(?:reopen|recheck|discuss) D-\d+|send D-\d+ to design|recheck VAL-\d{1,6}|categorize D-\d+ (?:[a-z0-9][a-z0-9-]{0,29}|-)|(?:add (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) to|remove (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) from) the collection [A-Za-z0-9][A-Za-z0-9 _.-]{0,39}|run feature [a-z0-9][a-z0-9-]{0,39}|(?:accept|rewrite|retire|keep) M-\d{1,6}|send issue draft [a-z0-9][a-z0-9-]{0,59}(?: for the architect)?|(?:revise|discard) issue draft [a-z0-9][a-z0-9-]{0,59}|dismiss F-\d{1,6}(?: as (?:false-positive|wont-fix|duplicate|by-design))?|reopen F-\d{1,6}|delete (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?)|look into what needs attention|show blockers|retry B-\d{1,6})$/;
+const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|run (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)(?:, (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)){0,19}|repair (?:#\d+(?: (?:AC|IN)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: AC-\d+)?)|test scenario [a-z0-9][a-z0-9-]{0,40}|create issue for (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|PROP-\d{1,4}|STRESS-[A-Z]{1,20}-\d{1,3})(?:, (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|PROP-\d{1,4}|STRESS-[A-Z]{1,20}-\d{1,3})){0,19}(?: for the architect)?|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+(?: as (?:false-positive|wont-fix|duplicate|by-design))?|(?:reopen|recheck|discuss) D-\d+|send D-\d+ to design|recheck VAL-\d{1,6}|categorize D-\d+ (?:[a-z0-9][a-z0-9-]{0,29}|-)|(?:add (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) to|remove (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) from) the collection [A-Za-z0-9][A-Za-z0-9 _.-]{0,39}|run feature [a-z0-9][a-z0-9-]{0,39}|(?:accept|rewrite|retire|keep) M-\d{1,6}|send issue draft [a-z0-9][a-z0-9-]{0,59}(?: for the architect)?|(?:revise|discard) issue draft [a-z0-9][a-z0-9-]{0,59}|dismiss F-\d{1,6}(?: as (?:false-positive|wont-fix|duplicate|by-design))?|reopen F-\d{1,6}|delete (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?)|look into what needs attention|show blockers|retry B-\d{1,6}|do dashboard job J-\d{1,6})$/;
 const SCEN_RE = /^test this scenario: On the page \/[A-Za-z0-9_./:-]{0,120}(?:, the [a-z ]{2,20} "[^"\n]{1,80}")?: [^\u0000-\u0009\u000b-\u001f\u007f]{10,2000}$/;
 const WALK_RE = /^walk these steps live: On the page \/[A-Za-z0-9_./:-]{0,120}: [^\u0000-\u0009\u000b-\u001f\u007f]{10,2000}$/;
 const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
@@ -2327,7 +2381,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
   const statusBox = (o, word, help, actions = "", now = "") => `<div class="standing"><div class="status" data-o="${esc(o)}"${o === "running" ? " data-busy" : ""}><div class="s-line"><div class="s-word"><span class="help" tabindex="0" role="note" aria-label="${esc(help)}"><span class="s-mark"></span>${esc(word)}<span class="tip" aria-hidden="true"><span class="t-now">${esc(help)}</span></span></span></div>${now ? `<span class="s-act">${now}</span>` : ""}<div class="grow"></div><div class="actions">${actions}</div></div></div></div>`;
   const DISMISS_WHY = [["by-design", "It is on purpose"], ["false-positive", "It is not a problem"], ["wont-fix", "We will not fix it"], ["duplicate", "Another finding has it"]];
   const more = (btns) => (btns.length ? `<details class="more"><summary class="btn" aria-label="More" title="More things to do with it">⋯</summary><div class="menu">${btns.join("")}</div></details>` : "");
-  const cmdBtn = (cmd, label, tip, primary = false) => (cmdOk(cmd) ? `<button class="btn${primary ? " primary" : ""}" data-cmd="${esc(cmd)}" title="${esc(tip)}">${esc(label)}</button>` : "");
+  const cmdBtn = (cmd, label, tip, primary = false) => (cmdOk(cmd) && mayCmd(cmd) ? `<button class="btn${primary ? " primary" : ""}" data-cmd="${esc(cmd)}" title="${esc(tip)}">${esc(label)}</button>` : "");
   // A state's word in its state's ink: Failed red, Flaky amber, Not testable and Blocked slate, No test grey, Passed green.
   const TAG_INK = { pass: "t-approved", fail: "t-closed", look: "t-waiting", blocked: "t-decided", running: "t-checking", none: "" };
   const stw = (s, w) => `<span class="stw" data-s="${esc(s)}">${esc(w)}</span>`;
@@ -2808,7 +2862,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     return `<div class="filters" role="group" aria-label="${esc(label)}">${valuesOf(v).map((x) => x === val
       ? `<button type="button" class="btn small on" aria-pressed="true" title="The current value">${esc(STATE_WORD[x] || human(x))}</button>`
       : `<button type="button" class="btn small" data-setting="${esc(`${id}|${k}|${x}`)}" data-cmd="${esc(`module ${id} set ${k}=${x}`)}" title="${esc(`${isOp() ? "Sets it" : "Asks Quality Inspector to set it"} to ${STATE_WORD[x] || x}`)}">${esc(STATE_WORD[x] || human(x))}</button>`).join("")}</div>`; };
-  const isOp = () => S.me?.role === "operator";
+  const isOp = () => S.me?.role === "admin";
   function settingRow(id, m, k, v) {
     const val = String(v.value ?? ""), vals = valuesOf(v);
     const label = m && k === m.switch ? (v.type === "cadence" ? "When it runs" : (v.values || []).includes("enabled") ? "On or off" : "What it does") : SET_WORD[k] || human(k.replace(/^(ui_sweep|validation|property|stress|consistency|design_check|ux|security|scenario|radar|focus|modules)_/, ""));
@@ -2864,12 +2918,40 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     if (/^module:/.test(S.item || "")) { S.openMods.add(S.item.slice(7)); S.scrollMod = S.item.slice(7); S.item = null; }
     if (!D().modules) return `<h2>Settings</h2><p class="lead">The settings were not in the data when the dashboard was built.</p>`;
     const all = mods(), on = all.filter((m) => modOn(m)).length, g = D().modules.global ? settingsOf(null) : [];
-    return `<h2>Settings</h2><p class="lead">What Quality Inspector does beside the issues, and when. ${isOp() ? "Your changes apply at once. Starting or stopping a schedule, and Run now, go to Quality Inspector as a message." : "The operator changes them; a change you make goes to Quality Inspector as a request for the operator."}</p>`
+    return `<h2>Settings</h2><p class="lead">What Quality Inspector does beside the issues, and when. ${isOp() ? "Your changes apply at once. Starting or stopping a schedule, and Run now, go to Quality Inspector as a job." : "Only an admin changes them. You see what is set."}</p>`
       + `<p class="k">${on} of ${all.length} checks on${D().modules.schedules_as_of ? ` · schedules as of ${esc(ago(D().modules.schedules_as_of))}` : ""}</p>`
       + weekStrip()
       + GROUPS.map(([k, label]) => { const ms = all.filter((m) => groupOf(m) === k); return ms.length ? `<section class="qi-grp"><h3>${esc(label)}</h3>${ms.map(modRow).join("")}</section>` : ""; }).join("")
-      + (g.length ? `<section class="qi-grp"><h3>Limits</h3><div class="qi-mod open"><div class="qi-mod-b">${g.map(([k, v]) => settingRow("global", null, k, v)).join("")}</div></div></section>` : "");
+      + (g.length ? `<section class="qi-grp"><h3>Limits</h3><div class="qi-mod open"><div class="qi-mod-b">${g.map(([k, v]) => settingRow("global", null, k, v)).join("")}</div></div></section>` : "")
+      + peopleSection();
   }
+  // Settings → People (docs/dashboard-page.md → Roles): an admin gives each person a role; anyone else sees the roles.
+  const ROLE_DO = { admin: "Does everything: the settings, the schedules and the people too.", developer: "Runs, repairs and keeps tests, decides proposals, opens bug issues, dismisses problems.",
+    tester: "The same as a developer, for now.", viewer: "Reads the dashboard and asks questions. Presses nothing that changes anything." };
+  function peopleSection() {
+    const P = S.people, roles = P?.roles || ["admin", "developer", "tester", "viewer"];
+    const key = `<div class="qi-roles">${roles.map((r) => `<b>${esc(human(r))}</b><span>${esc(ROLE_DO[r] || "")}</span>`).join("")}</div>`;
+    const sel = (cur, attr) => `<select ${attr} aria-label="Role">${roles.map((r) => `<option value="${r}"${r === cur ? " selected" : ""}>${esc(human(r))}</option>`).join("")}</select>`;
+    if (!isOp()) return `<section class="qi-grp"><h3>People</h3><p class="k">You are ${esc(S.me?.role === "admin" ? "an admin" : `a ${S.me?.role || "viewer"}`)}. An admin gives each person a role.</p>${key}</section>`;
+    const list = (P?.people || []).slice().sort((a, b) => a.email.localeCompare(b.email));
+    return `<section class="qi-grp"><h3>People</h3><p class="k">Who may do what on this dashboard. You${S.me?.owner ? ", its owner," : ""} are an admin. A person not in the list reads only.</p>${key}
+      <div class="qi-people">${list.map((x) => `<div class="qi-person"><span class="e">${esc(x.email)}</span>${sel(x.role, `data-person-role="${esc(x.email)}"`)}<button class="btn small" data-person-remove="${esc(x.email)}" title="Takes the row out: the person reads only">Remove</button></div>`).join("")}
+      <div class="qi-person"><input id="person-email" type="email" maxlength="200" placeholder="name@example.com" autocomplete="off" aria-label="Email" />${sel("developer", `id="person-role"`)}<button class="btn small primary" data-person-add title="Gives this person the role at once">Add</button></div></div></section>`;
+  }
+  async function loadPeople() { try { S.people = await api("GET", "/api/people"); } catch { /* the section shows the roles */ } }
+  async function setPerson(email, role) {
+    const r = await api("POST", "/api/people", { email, role });
+    S.people = { ...(S.people || {}), people: r.people };
+    toast(role ? `Saved: ${r.email} is ${role === "admin" ? "an admin" : `a ${role}`}.` : `Saved: ${r.email} reads only.`); draw();
+  }
+  document.addEventListener("click", guard(async (e) => {
+    const b = e.target.closest?.("[data-person-add], [data-person-remove]"); if (!b) return;
+    if (b.matches("[data-person-remove]")) return setPerson(b.dataset.personRemove, null);
+    const email = $("#person-email").value.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast("Write an email address, like pat@example.com."); $("#person-email").focus(); return; }
+    await setPerson(email, $("#person-role").value);
+  }));
+  document.addEventListener("change", guard(async (e) => { const s = e.target.closest?.("[data-person-role]"); if (s) await setPerson(s.dataset.personRole, s.value); }));
   function renderBuild(b) {
     const rs = runs().filter((r) => r.build === b.id);
     return head(`Build ${b.id}`, "", `First tested ${esc(when(b.utc))}`)
@@ -2980,7 +3062,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     if (S.item !== shown) { shown = S.item; d.scrollTop = 0; d.classList.remove("enter"); void d.offsetWidth; d.classList.add("enter"); clearTimeout(entered); entered = setTimeout(() => d.classList.remove("enter"), 400); }
     $("#main").classList.toggle("has-detail", Boolean(it) || S.tab === "guide" || S.tab === "settings");
     const html = S.tab === "guide" ? `<div class="guide">${GUIDE()}</div>` : S.tab === "settings" ? `<div class="guide qi-settings">${renderSettings()}</div>` : !it ? renderEmpty()
-      : it.kind === "test" ? renderTest(it.x) : it.kind === "request" ? renderRequest(it.x) : it.kind === "run" ? renderRun(it.x, it.focus) : it.kind === "problem" ? renderProblem(it.x) : it.kind === "screen" ? renderScreen(it.x) : it.kind === "design" ? renderDesign(it.x) : it.kind === "upkeep" ? renderUpkeep(it.x) : it.kind === "feature" || it.kind === "collection" ? renderGroup(it.kind, it.x) : renderBuild(it.x);
+      : jobStrip(S.item) + (it.kind === "test" ? renderTest(it.x) : it.kind === "request" ? renderRequest(it.x) : it.kind === "run" ? renderRun(it.x, it.focus) : it.kind === "problem" ? renderProblem(it.x) : it.kind === "screen" ? renderScreen(it.x) : it.kind === "design" ? renderDesign(it.x) : it.kind === "upkeep" ? renderUpkeep(it.x) : it.kind === "feature" || it.kind === "collection" ? renderGroup(it.kind, it.x) : renderBuild(it.x));
     if (d.drawn !== html && same && busy(d)) return; // the next redraw brings it
     if (d.drawn !== html) { const put = () => keepFocus(d, () => { d.innerHTML = html; d.drawn = html; d.tab = S.tab; }); if (same) keepWork(d, put); else put(); loadImages(d);
       // A link to one test of a report: its result opens and comes into view.
@@ -3033,7 +3115,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     if (S.item?.startsWith("build:")) S.productPage = "builds";
     if (/^D-\d+$/.test(S.item || "")) S.productPage = "design";
     if (/^A-\d+$/.test(S.item || "")) { S.tab = "tests"; S.testPage = "scenarios"; }
-    draw(); return true;
+    draw(); if (tab === "settings") loadPeople().then(draw); return true;
   }
   // An item of Product opens on its own page of the tab: a build in Builds, a finding in Design, a screen in Map (or Coverage).
   const placeProduct = () => { const id = S.item || "";
@@ -3084,15 +3166,14 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
       else { const [id, k] = inp.dataset.set.split("|"); await writeSetting({ module: id, key: k, value: v }, `${SET_WORD[k] || human(k)} — ${v}`); }
       return;
     }
-    await chatDraft(cmd, "Change a setting");
+    throw new Said("Only an admin changes the settings. Ask an admin.");
   }));
-  const draw = () => { renderNav(); renderBanners(); renderList(); renderDetail(); keepPlace(); renderChat(); };
+  const draw = () => { renderNav(); renderBanners(); renderList(); renderDetail(); keepPlace(); renderChat(); renderBell(); };
 
   // ---------- commands to Quality Inspector ----------
   const cmdOk = (t) => [CMD_RE, SCEN_RE, WALK_RE].some((re) => re.test(t));
   // Where a command goes (docs/dashboard-page.md → Commands): what a script does without the model
-  // happens at once for the operator (POST /api/act); everything else — work for Quality Inspector, or
-  // a question — goes through the chat in the corner, where its answer comes.
+  // happens at once (POST /api/act); work for Quality Inspector is a job (doCmd below).
   const DIRECT = [/^dismiss D-\d{1,6}( as [a-z-]+)?$/, /^reopen D-\d{1,6}$/, /^dismiss F-\d{1,6}( as [a-z-]+)?$/, /^reopen F-\d{1,6}$/, /^categorize D-\d{1,6} \S+$/,
     /^(add|remove) (#\d+( (AC|IN)-\d+)?|S-\d+( AC-\d+)?) (to|from) the collection .+$/, /^module [a-z-]+ set [a-z_]+=\S+$/, /^focus .+$/];
   const isDirect = (cmd) => DIRECT.some((re) => re.test(cmd));
@@ -3101,12 +3182,34 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     if (r.data) { S.data = r.data; S.hash = r.hash; }
     toast(`Done: ${what || cmd}.`); draw();
   }
-  // A command from a dialog: sent at once, and the chat opens to show it and its answer.
-  async function send(cmd, text = "") {
-    if (!cmdOk(cmd)) throw new Said("This is not a command of the page.");
-    if (isOp() && isDirect(cmd)) return act(cmd);
-    C.open = true; if (!C.loaded) await loadAsks();
-    await chatSend(text || cmd, cmd);
+  // Roles (docs/dashboard-page.md → Roles): an admin does everything; a developer and a tester the work
+  // of the page, not the settings, schedules, focus or a blocker's retry; a viewer reads. The server checks it again.
+  const canAct = () => ["admin", "developer", "tester"].includes(S.me?.role);
+  const ADMIN_ONLY = [/^module /, /^focus /, /^retry B-/, /^walk these steps live: /];
+  const mayCmd = (cmd) => S.me?.role === "admin" || (canAct() && !ADMIN_ONLY.some((re) => re.test(cmd)));
+  // A press that cannot be taken back, or that writes outside, asks first, on the page; after that Quality Inspector does not ask again.
+  const CONFIRM = [
+    [/^delete (.+)$/, (m) => [`Delete the test ${m[1]}?`, "Quality Inspector deletes its test file, or its part of it, and its result. It cannot be taken back.", "Delete"]],
+    [/^send issue draft \S+( for the architect)?$/, (m) => ["Open the issue on GitHub?", `Quality Inspector opens the draft as an issue in the product's repository${m[1] ? " and gives it to the developers" : ""}. Everyone who can see the repository sees it.`, "Open the issue"]],
+    [/^discard issue draft /, () => ["Discard the draft?", "The draft is deleted. Nothing went to GitHub.", "Discard"]],
+    [/^retire (M-\d+)$/, (m) => [`Retire the test of ${m[1]}?`, "It does not run each night any more.", "Retire"]],
+    [/^demote /, () => ["Stop running it each night?", "The test stays, but it does not run each night any more.", "Stop it"]],
+    [/^promote all pending$/, () => ["Keep every test that is ready?", "Each of them then runs each night.", "Keep them all"]],
+    [/^module \S+ off$/, () => ["Stop this schedule?", "It does not run until an admin starts it again.", "Stop it"]],
+    [/^revise issue draft /, () => ["Ask for changes", "Say what to change. Quality Inspector writes the draft again, and it waits here again.", "Send", true]],
+  ];
+  // → false (cancelled), or {note}: the person's words where the command needs them.
+  async function confirmPress(cmd) {
+    const hit = CONFIRM.map(([re, fn]) => [re.exec(cmd), fn]).find(([m]) => m); if (!hit) return {};
+    const [title, text, yes, withNote] = hit[1](hit[0]), dlg = $("#confirm-dialog"), note = $("#confirm-note");
+    $("#confirm-title").textContent = title; $("#confirm-text").textContent = text; $("#confirm-yes").textContent = yes;
+    $("#confirm-note-l").hidden = !withNote; note.value = "";
+    dlg.showModal(); if (withNote) note.focus();
+    return new Promise((ok) => dlg.addEventListener("close", () => {
+      if (dlg.returnValue !== "yes") return ok(false);
+      if (withNote && !note.value.trim()) { toast("Say what to change."); return ok(false); }
+      ok(withNote ? { note: note.value.trim() } : {});
+    }, { once: true }));
   }
   // A new scenario has a page of its own at once (docs/dashboard-page.md → A request's page): its
   // preparation and its run show there, and its work goes to a session of its own, not to the chat
@@ -3114,19 +3217,71 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
   const REQUEST_RE = /^(?:test this scenario|walk these steps live): /;
   async function sendRequest(cmd, text) {
     if (!cmdOk(cmd) || !REQUEST_RE.test(cmd)) throw new Said("This is not a command of the page.");
+    if (!mayCmd(cmd)) throw new Said(canAct() ? "Only an admin does this. Ask an admin." : "You can read the dashboard and ask questions. An admin gives you a role to do more.");
     const r = await api("POST", "/api/asks", { text, command: cmd, request: true });
     C.asks.push({ id: r.id, utc: new Date().toISOString(), text, command: cmd, context: { tab: "tests", page: "tests/scenarios", item: r.id, label: `Scenario request ${r.id}` }, answer: null, request: { scenario: null } });
     C.loaded = true; C.open = false; C.draft = null; C.drawn = "";
     moreClose(); S.tab = "tests"; S.testPage = "scenarios"; S.item = r.id; draw();
     toast(`Sent. ${r.id} shows how Quality Inspector prepares and runs it.`);
   }
-  // A button's command: the operator's direct action at once; else the chat opens with it, ready to send.
+  // Work for Quality Inspector is a job J-<n>: sent at once, as on Design Desk; its state shows on its item
+  // and its end comes to the bell. A scenario request has its own page (sendRequest).
+  async function doCmd(cmd, label) {
+    if (!cmdOk(cmd)) throw new Said("This is not a command of the page.");
+    if (!canAct()) throw new Said("You can read the dashboard and ask questions. An admin gives you a role to do more.");
+    if (!mayCmd(cmd)) throw new Said("Only an admin does this. Ask an admin.");
+    if (isDirect(cmd)) return act(cmd, label);
+    if (REQUEST_RE.test(cmd)) return sendRequest(cmd, label || "Test this scenario, please.");
+    const yes = await confirmPress(cmd); if (!yes) return;
+    const r = await api("POST", "/api/jobs", { command: cmd, label: label || null, item: S.item || null, ...yes });
+    J.list.unshift({ id: r.id, utc: new Date().toISOString(), command: cmd, label, item: S.item || null, state: "queued", state_word: "Waiting", mine: true, by: "you" });
+    toast(`Sent to Quality Inspector: ${label || cmd}. The bell tells you when it is done.`); draw();
+  }
+  // A command from a dialog (Ask for a test, Add to a collection).
+  async function send(cmd, text = "") { await doCmd(cmd, text || ""); }
+  // A button's command: at once, as its role allows.
   document.addEventListener("click", guard(async (e) => {
     const b = e.target.closest?.("[data-cmd]"); if (!b) return;
-    const cmd = b.dataset.cmd, label = b.textContent.trim().replace(/…$/, "");
-    if (isOp() && isDirect(cmd)) return act(cmd, label);
-    await chatDraft(cmd, label);
+    await doCmd(b.dataset.cmd, b.textContent.trim().replace(/…$/, ""));
   }));
+  // ---------- jobs ----------
+  const J = { list: [] };
+  async function loadJobs() { try { J.list = (await api("GET", "/api/jobs")).jobs || []; } catch { /* the next poll */ } }
+  // The jobs of the open item: while they wait or work, and an hour after they ended.
+  function jobStrip(id) {
+    if (!id) return "";
+    const hour = Date.now() - 3600e3, list = J.list.filter((j) => j.item === id && (j.state === "queued" || j.state === "started" || new Date(j.finished || 0) > hour)).slice(0, 4);
+    if (!list.length) return "";
+    const WORD = { queued: "Waiting for Quality Inspector", started: "Quality Inspector works on it", done: "Done", failed: "Did not work" };
+    return `<div class="qi-jobs">${list.map((j) => `<div class="qi-job" data-s="${esc(j.state)}">${j.state === "queued" || j.state === "started" ? '<span class="spin"></span>' : ""}<div><b>${esc(j.label || j.command)}</b> <span class="num">${esc(j.id)}</span>
+      <span class="k"> · ${esc(WORD[j.state] || j.state)} · ${esc(j.by)} · ${esc(ago(j.finished || j.started || j.utc))}</span>${j.text ? `<p>${esc(j.text)}</p>` : ""}</div></div>`).join("")}</div>`;
+  }
+  // ---------- notifications ----------
+  const N = { list: [], unread_mine: 0, tab: store.get("qi-notes-tab") || "mine", drawn: "" };
+  async function loadNotes() { try { const r = await api("GET", "/api/notifications"); N.list = r.notifications || []; N.unread_mine = r.unread_mine || 0; } catch { /* the next poll */ } }
+  const NOTE_IC = { done: "✓", failed: "!", answer: "?", run: "▶", "run-problems": "▶" };
+  const goOf = (id) => (!id ? null : /^R-\d+(@.+)?$/.test(id) || id.startsWith("build:") ? "runs" : /^F-\d+$/.test(id) ? "problems" : /^D-\d+$/.test(id) || id.startsWith("screen:") ? "product" : "tests");
+  function renderBell() {
+    const c = $("#bell-count"); c.hidden = !N.unread_mine; c.textContent = N.unread_mine > 99 ? "99+" : String(N.unread_mine);
+    $("#bell-btn").dataset.tip = N.unread_mine ? `Notifications: ${plural(N.unread_mine, "new one", "new ones")} for you` : "Notifications: what happened lately";
+    const rows = N.list.filter((x) => N.tab === "all" || x.mine), unread = N.list.some((x) => x.unread && (N.tab === "all" || x.mine));
+    const html = `<div class="nh"><b>Notifications</b>${unread ? `<button class="nmark" data-notes-seen title="Marks every notification as read">Mark as read</button>` : ""}<div class="tabs2"><button data-notes-tab="mine" aria-pressed="${N.tab === "mine"}" title="Your jobs and the answers to your questions">For you</button><button data-notes-tab="all" aria-pressed="${N.tab === "all"}" title="Also the runs and everyone's jobs">All</button></div></div>
+      <div class="nl">${rows.length ? rows.map((x) => { const go = goOf(x.item);
+        return `<button class="note${x.unread ? " unread" : ""}" data-g="${esc(x.kind)}" data-note="${esc(x.id)}"${go ? ` data-goto="${go}" data-item="${esc(x.item)}"` : ""}><span class="ic" aria-hidden="true">${NOTE_IC[x.kind] || "•"}</span>
+          <span class="ev">${esc(x.title)}${x.who ? ` <span>· ${esc(x.who)}</span>` : ""}</span><time title="${esc(when(x.utc))}">${esc(ago(x.utc))}</time>
+          ${x.quote ? `<span class="q">“${esc(x.quote)}”</span>` : x.text ? `<span class="q">${esc(x.text)}</span>` : ""}</button>`; }).join("")
+        : `<p class="empty">${N.tab === "mine" ? "Nothing for you in the last 30 days. Your jobs and the answers to your questions come here." : "Nothing in the last 30 days."}</p>`}</div>`;
+    if (N.drawn !== html) { const n = $("#notes"), top = n.querySelector(".nl")?.scrollTop || 0; n.innerHTML = html; N.drawn = html; const l = n.querySelector(".nl"); if (l) l.scrollTop = top; }
+  }
+  document.addEventListener("click", guard(async (e) => {
+    const t = e.target.closest?.("[data-notes-tab], [data-notes-seen], [data-note]"); if (!t) return;
+    if (t.matches("[data-notes-tab]")) { N.tab = t.dataset.notesTab; store.set("qi-notes-tab", N.tab); renderBell(); return; }
+    if (t.matches("[data-notes-seen]")) { await api("POST", "/api/notifications/seen", {}); for (const x of N.list) x.unread = false; N.unread_mine = 0; renderBell(); return; }
+    $("#bell").open = false;
+    const x = N.list.find((y) => y.id === t.dataset.note);
+    if (x?.unread) { x.unread = false; if (x.mine) N.unread_mine = Math.max(0, N.unread_mine - 1); renderBell(); api("POST", "/api/notifications/read", { id: x.id }).catch(() => {}); }
+  }));
+  document.addEventListener("toggle", (e) => { if (e.target.id === "bell" && e.target.open) loadNotes().then(renderBell); }, true);
   // Dialogs: Cancel and Escape close; a form with something typed asks before Escape closes it.
   document.addEventListener("click", (e) => {
     const x = e.target.closest?.("[data-close]"); if (!x) return;
@@ -3379,7 +3534,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     for (const b of document.querySelectorAll("[data-ask-kind]")) { b.classList.toggle("on", b.dataset.askKind === kind); b.setAttribute("aria-pressed", String(b.dataset.askKind === kind)); }
     for (const p of document.querySelectorAll("#ask-dialog .ask-pane")) p.hidden = p.dataset.pane !== kind;
     $("#ask-dialog").classList.toggle("wide", kind === "steps");
-    $("#ask-walk").hidden = !(kind === "steps" && S.me?.role === "operator");
+    $("#ask-walk").hidden = !(kind === "steps" && isOp());
     $("#ask-why").hidden = true;
     if (kind === "steps") bDraw(); else bStop();
   };
@@ -3488,11 +3643,6 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
   // each one and hands back its ping; Quality Inspector answers in its chat and the answer comes here.
   // It explains; it never changes anything from a question.
   const C = { open: false, asks: [], loaded: false, drawn: "", sent: 0, draft: null };
-  // A button's command waits in the chat: the person reads it, may add a note, and sends it.
-  async function chatDraft(cmd, label) {
-    C.draft = { command: cmd, label }; C.open = true; if (!C.loaded) await loadAsks();
-    C.drawn = ""; renderChat(); const t = $("#chat-text"); if (t) { t.value = ""; t.focus(); }
-  }
   function chatContext() {
     const it = findItem(S.item);
     const label = !it ? `${TABS[S.tab] || "The page"}${S.tab === "tests" ? ` · ${testKinds[S.testPage] || ""}` : S.tab === "product" ? ` · ${human(S.productPage)}` : ""}`
@@ -3567,7 +3717,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
   document.addEventListener("click", (e) => {
     const t = e.target.closest?.("[data-tab], [data-item], [data-filter], [data-back], [data-reload], [data-ask-page]");
     if (!t) return;
-    if (t.matches("a[data-tab], [data-tab]")) { e.preventDefault(); moreClose(); S.tab = t.dataset.tab; S.item = null; if (e.target.closest("[data-upkeep]")) S.testPage = "upkeep"; draw(); return; }
+    if (t.matches("a[data-tab], [data-tab]")) { e.preventDefault(); moreClose(); S.tab = t.dataset.tab; S.item = null; if (e.target.closest("[data-upkeep]")) S.testPage = "upkeep"; draw(); if (S.tab === "settings") loadPeople().then(draw); return; }
     if (t.matches("[data-back]")) { S.item = null; draw(); return; }
     if (t.matches("[data-reload]")) { location.reload(); return; }
     if (t.matches("[data-ask-page]")) { askTest({ page: t.dataset.askPage, control: t.dataset.askControl }); return; }
@@ -3582,7 +3732,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     if (r.bottom > vh - 8 && d.getBoundingClientRect().top - r.height - 4 > 8) m.classList.add("flip-y"); };
   document.addEventListener("toggle", (e) => { if (e.target.matches?.("details.more") && e.target.open) moreFit(e.target); }, true);
   const moreClose = () => { for (const d of document.querySelectorAll("details.more[open]")) d.open = false; };
-  document.addEventListener("click", (e) => { for (const d of document.querySelectorAll("details.more[open]")) if (!d.contains(e.target) || e.target.closest(".menu button")) d.open = false; }, true);
+  document.addEventListener("click", (e) => { for (const d of document.querySelectorAll("details.more[open]")) if (!d.contains(e.target) || e.target.closest(".menu button:not([data-notes-tab]):not([data-notes-seen])")) d.open = false; }, true);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") moreClose(); });
   window.addEventListener("hashchange", () => goTo(location.hash));
 
@@ -3720,7 +3870,10 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     const r = await api("GET", `/api/catalog${S.hash ? `?have=${encodeURIComponent(S.hash)}` : ""}`, undefined, CATALOG_WAIT);
     if (!r.unchanged) { S.data = r.data; S.hash = r.hash; S.note = r.data ? null : r.note || null; }
     try { S.status = await api("GET", "/api/status"); } catch (e) { if (!(e instanceof Said)) throw e; }
+    await Promise.all([loadJobs(), loadNotes(), S.tab === "settings" ? loadPeople() : null]);
   }
+  // While a job of the person's waits or works, its state comes every 4 s.
+  setInterval(() => { if (!document.hidden && J.list.some((j) => j.mine && (j.state === "queued" || j.state === "started"))) Promise.all([loadJobs(), loadNotes()]).then(() => { S.quiet = true; renderDetail(); renderBell(); S.quiet = false; }); }, 4000);
   let tick = 0, asking = false;
   // One timer: every 16 s, every 4 s while Quality Inspector can't be reached. The page never loads
   // itself anew: what the person has open, typed or played stays; when the server answers again, the
@@ -3753,8 +3906,10 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
   }
   async function load() {
     S.me = await api("GET", "/api/me");
-    const who = S.me.email || (S.me.role === "operator" ? "Operator" : "Viewer");
-    $("#me").innerHTML = `<span class="who-full">${esc(who)}</span><span class="av">${esc(who[0].toUpperCase())}</span>`; $("#me-who").textContent = who;
+    const who = S.me.email || human(S.me.role || "viewer");
+    $("#me").innerHTML = `<span class="who-full">${esc(who)}</span><span class="av">${esc(who[0].toUpperCase())}</span>`; $("#me-who").textContent = `${who} · ${human(S.me.role || "viewer")}`;
+    $("#me").dataset.tip = `You are ${S.me.role === "admin" ? "an admin" : `a ${S.me.role || "viewer"}`}. ${ROLE_DO[S.me.role] || ""}`;
+    document.body.classList.toggle("ro", !canAct()); document.body.classList.toggle("na", !isOp());
     for (const k of ["probFilter", "testPage", "testFilter", "runPage", "runFilter", "productPage", "designFilter"]) { const v = store.get(`qi-${k}`); if (v) S[k] = v; }
     if (!["map", "coverage", "screenshots", "design", "builds"].includes(S.productPage)) S.productPage = "map";
     renderTheme();

@@ -4,7 +4,7 @@
 // when it exits. The same pattern as Design Desk's Desk server.
 //
 // The page is published once and asks this server for everything it shows:
-//   GET  /api/me              who is looking (the platform's verified caller), the page's switches
+//   GET  /api/me              who is looking (the platform's verified caller), their role, the page's switches
 //   GET  /api/catalog?have=h  the newest catalog data (work/catalog/data.json, written by catalog.mjs)
 //   GET  /api/images/<id>     one picture of that data, as a data URI
 //   GET  /api/videos/<id>?part=k  one part of a report's video (VIDEO_PART bytes, base64), with its size
@@ -13,24 +13,34 @@
 //                             recorded with who asked; its ping the page sends to the agent — the page's
 //                             command as it is, or `answer dashboard question A-<n>` for a question — and
 //                             `ping_conversation`, the page's own session (`request: true`: the request's own)
-//   POST /api/act             {command}: one of the operator's own actions done without the model — a
-//                             setting, a focus area, dismiss, reopen or categorize D-<k>, dismiss or reopen
-//                             a problem F-<k>, add to or remove from a collection — written by this server itself (owner only)
-//   POST /api/settings        {module, key, value} or {focus}: the operator's own change of a module's
-//                             setting, written at once through modules.sh (owner only); the new state back
+//   POST /api/act             {command}: an action done without the model — a setting, a focus area (an
+//                             admin's), dismiss, reopen or categorize D-<k>, dismiss or reopen a problem F-<k>,
+//                             add to or remove from a collection — written by this server itself (not a viewer)
+//   POST /api/settings        {module, key, value} or {focus}: an admin's change of a module's setting,
+//                             written at once through modules.sh; the new state back
+//   POST /api/jobs            {command, label?, item?, note?}: work for Quality Inspector, a job J-<n> recorded with
+//                             who pressed and their role (lib/jobs.mjs); its ping `do dashboard job J-<n>`
+//   GET  /api/jobs            the newest jobs, each with its state; whose: "you" or a role, never an email
+//   GET  /api/people          the roster (lib/people.mjs; an admin sees the emails)
+//   POST /api/people          {email, role|null}: an admin gives a person a role, or takes the row out
+//   GET  /api/notifications   what happened in the last 30 days, newest first, read or not, for the caller
+//   POST /api/notifications/read {id} · /api/notifications/seen   the caller reads one, or every one
 //   GET  /api/status          what the agent does now, read live from work/ (the lock, rows in progress)
 //   POST /api/commands        a command of the page: checked against the page's own patterns,
 //                             recorded with who sent it, then handed back as the ping the page sends
 //   GET  /api/commands        the caller's own commands from the page, newest first
 //
 // Only the platform relay reaches /api/: it sets x-platform-caller-role/-email/-sub on every
-// request from the page, which the page cannot forge. Loopback only. Nothing a viewer sends is
-// executed here: a command is stored as data and goes to the agent as the page's message. The one
-// writes are the operator's own actions (POST /api/act, /api/settings), which this server writes itself.
+// request from the page, which the page cannot forge. Loopback only. The caller's role is the roster's
+// (lib/people.mjs; the platform's owner is an admin). Nothing sent here is executed here but the actions
+// of POST /api/act, /api/settings and /api/people, which this server writes itself for a role that may;
+// a job is stored as data and goes to the agent as the page's message, `do dashboard job J-<n>`.
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
 import { changeCollection } from '../lib/collections.mjs';
-import { changeProblem, dismissedProblems } from '../lib/problems.mjs';
+import { changeProblem, dismissedProblems, orderedRuns } from '../lib/problems.mjs';
+import { jobs as jobsOf, queue as queueJob, STATES as JOB_STATES } from '../lib/jobs.mjs';
+import { may, people, roleOf, setRole, ROLES } from '../lib/people.mjs';
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, readSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, extname, join, resolve, sep } from 'node:path';
@@ -281,13 +291,57 @@ function record(who, text) {
   return row;
 }
 
+// ------------------------------------------------------------------ roles, jobs, notifications
+// The ping of a job: never a command of its own from the chat or the old commands route.
+const JOB_PING = /^do dashboard job /;
+const refusal = (access) => (access === 'viewer' ? 'You can read the dashboard and ask questions. An admin gives you a role to do more.'
+  : 'Only an admin does this. Ask an admin.');
+// A job as the page shows it: whose is "you" or a role, never another person's email.
+const jobView = (j, who) => ({ id: j.id, utc: j.utc, command: j.command, label: j.label, item: j.item, state: j.state, state_word: JOB_STATES[j.state],
+  started: j.started, finished: j.finished, text: j.text, mine: !!who.email && j.email === who.email, by: !!who.email && j.email === who.email ? 'you' : `a${j.role === 'admin' ? 'n' : ''} ${j.role}` });
+const readNotes = () => { try { const o = JSON.parse(read(NOTES) ?? '{}'); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch { return {}; } };
+// What happened in the last 30 days, built from what the server keeps anyway (docs/dashboard-page.md →
+// Notifications): a job ended, a question answered, a run finished. For you: the caller's own jobs and
+// questions; the rest is under All. Read: clicked, or before the caller's "Mark as read".
+const NOTE_DAYS = 30;
+export function notifications(work, who, data) {
+  const since = new Date(Date.now() - NOTE_DAYS * 864e5).toISOString(), out = [];
+  const mine = (e) => !!who.email && e === who.email;
+  for (const j of jobsOf(join(work, 'dashboard', 'jobs.jsonl'))) {
+    if (!j.finished || j.finished < since) continue;
+    out.push({ id: `job:${j.id}`, utc: j.finished, kind: j.state === 'done' ? 'done' : 'failed', mine: mine(j.email),
+      title: `${j.state === 'done' ? 'Done' : 'Did not work'}: ${j.label || j.command}`, text: j.text, who: mine(j.email) ? 'you' : `a${j.role === 'admin' ? 'n' : ''} ${j.role}`, item: j.item, ref: j.id });
+  }
+  const asked = new Map(jsonl(join(work, 'dashboard', 'asks.jsonl')).filter((r) => mine(r.email)).map((r) => [r.id, r]));
+  for (const a of jsonl(join(work, 'dashboard', 'answers.jsonl'))) {
+    const q = asked.get(a.id); if (!q || !a.utc || a.utc < since) continue;
+    out.push({ id: `ans:${a.id}`, utc: a.utc, kind: 'answer', mine: true, title: 'Quality Inspector answered your question', text: String(a.text ?? '').slice(0, 300), quote: String(q.text ?? '').slice(0, 160), item: q.context?.item ?? null, ref: a.id });
+  }
+  for (const r of orderedRuns(data?.runs)) {
+    if (!r.utc || r.utc < since) continue;
+    const probs = (r.analysis?.problems || []).length;
+    out.push({ id: `run:${r.id}`, utc: r.utc, kind: probs ? 'run-problems' : 'run', mine: false, title: `${RUN_WORD[r.type] || 'Run'} ${r.ref ? `of ${r.ref} ` : ''}finished${probs ? `: ${probs === 1 ? 'one problem' : `${probs} problems`}` : ''}`,
+      text: r.analysis?.summary ? String(r.analysis.summary).slice(0, 300) : null, item: r.id, ref: r.id });
+  }
+  return out.sort((a, b) => b.utc.localeCompare(a.utc)).slice(0, 50);
+}
+const RUN_WORD = { regression: 'Nightly regression', issue: 'Issue run', scenario: 'Scenario run', rerun: 'Run by hand', feature: 'Feature run', security: 'Security run' };
+function notificationsFor(who) {
+  const list = notifications(WORK, who, catalog().data), n = who.email ? readNotes()[who.email] ?? {} : {};
+  const read = new Set(n.read ?? []);
+  const rows = list.map((x) => ({ ...x, unread: !read.has(x.id) && (!n.seen || x.utc > n.seen) }));
+  return { notifications: rows, unread_mine: rows.filter((x) => x.unread && x.mine).length, unread: rows.filter((x) => x.unread).length };
+}
+
 // ------------------------------------------------------------------ http
 const HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`, `[::1]:${PORT}`]);
+const PEOPLE = join(DIR, 'PEOPLE.md'), JOBS = join(DIR, 'jobs.jsonl'), NOTES = join(DIR, 'notes.json');
 function callerOf(req) {
   const role = req.headers['x-platform-caller-role'];
   if (role !== 'owner' && role !== 'viewer') return null;
   const email = String(req.headers['x-platform-caller-email'] || '').trim().toLowerCase() || null;
-  return { role, email, sub: String(req.headers['x-platform-caller-sub'] || '') };
+  // `access`: admin, developer, tester or viewer — the roster's word (lib/people.mjs).
+  return { role, email, sub: String(req.headers['x-platform-caller-sub'] || ''), access: roleOf(PEOPLE, role, email) };
 }
 async function body(req) {
   const chunks = []; let n = 0;
@@ -308,7 +362,7 @@ async function route(req, res, url, who) {
     // The dashboard's share link (work/catalog/artifact.url, written at its publish): the page builds an
     // item's link from it ("Copy link"); none → the page uses its own address.
     const link = (read(join(WORK, 'catalog', 'artifact.url')) ?? '').trim();
-    return send(res, 200, { role: who.role === 'owner' ? 'operator' : 'viewer', email: who.email, name: cfg('display_name') || 'Quality Inspector', version: version(),
+    return send(res, 200, { role: who.access, owner: who.role === 'owner', email: who.email, name: cfg('display_name') || 'Quality Inspector', version: version(),
       link: /^https:\/\/[^\s#]{1,500}$/.test(link) ? link : null });
   }
   if (m === 'GET' && p[1] === 'catalog') {
@@ -340,11 +394,11 @@ async function route(req, res, url, who) {
     } finally { closeSync(fd); }
   }
   if (m === 'POST' && p[1] === 'act') {
-    if (who.role !== 'owner') throw new Said(403, 'Only the operator does this. Ask the operator.');
     const b = await body(req);
     const text = typeof b.command === 'string' ? b.command : '';
     const hit = ACTIONS.map(([re, fn]) => [re.exec(text), fn]).find(([x]) => x);
     if (!hit || !allowed(text)) throw new Said(400, 'This is not an action the dashboard does by itself.');
+    if (!may(who.access, text)) throw new Said(403, refusal(who.access));
     spend(`act:${who.email}`);
     const out = JSON.stringify(hit[1](hit[0]));
     log('info', 'dashboard_act', `${text} by=${who.email || '-'}`);
@@ -353,9 +407,9 @@ async function route(req, res, url, who) {
     return send(res, 200, { ok: true, done: (out || '').trim().slice(0, 400), hash: c.hash, data: c.data });
   }
   if (m === 'POST' && p[1] === 'settings') {
-    // The operator's own press is their word (docs/modules.md → Control): this server writes it, after
-    // `modules.sh valid` checked the key and the value. A viewer's press stays a request, through the chat.
-    if (who.role !== 'owner') throw new Said(403, 'Only the operator changes the settings. Ask the operator.');
+    // An admin's press is their word (docs/modules.md → Control): this server writes it, after
+    // `modules.sh valid` checked the key and the value. Anyone else's is refused.
+    if (who.access !== 'admin') throw new Said(403, 'Only an admin changes the settings. Ask an admin.');
     const b = await body(req);
     spend(`settings:${who.email}`);
     const command = typeof b.focus === 'string' ? `focus ${b.focus}`
@@ -385,7 +439,8 @@ async function route(req, res, url, who) {
   if (m === 'POST' && p[1] === 'asks') {
     const b = await body(req);
     const command = typeof b.command === 'string' && b.command ? b.command : null;
-    if (command && (command.length > 2200 || !allowed(command))) throw new Said(400, 'This is not a command of the dashboard. Use a button of the page.');
+    if (command && (command.length > 2200 || !allowed(command) || JOB_PING.test(command))) throw new Said(400, 'This is not a command of the dashboard. Use a button of the page.');
+    if (command && !may(who.access, command)) throw new Said(403, refusal(who.access));
     const text = typeof b.text === 'string' && b.text.trim() ? b.text.trim() : command ?? '';
     if (!text || text.length > 2000 || /[\u0000-\u0008\u000b-\u001f\u007f]/.test(text)) throw new Said(400, 'Write a question of at most 2000 letters.');
     spend(who.email || who.sub || who.role);
@@ -406,12 +461,52 @@ async function route(req, res, url, who) {
   if (m === 'POST' && p[1] === 'commands') {
     const b = await body(req);
     const text = typeof b.command === 'string' ? b.command : '';
-    if (!text || text.length > 2200 || !allowed(text)) throw new Said(400, 'This is not a command of the dashboard. Use a button of the page.');
+    if (!text || text.length > 2200 || !allowed(text) || JOB_PING.test(text)) throw new Said(400, 'This is not a command of the dashboard. Use a button of the page.');
+    if (!may(who.access, text)) throw new Said(403, refusal(who.access));
     spend(who.email || who.sub || who.role);
     const row = record(who, text);
     log('info', 'dashboard_command', `${row.id} from ${who.role}`);
     // The page sends `ping` as its message to the agent: the command, exactly as recorded.
     return send(res, 201, { id: row.id, ping: text });
+  }
+  if (m === 'POST' && p[1] === 'jobs' && !p[2]) {
+    const b = await body(req);
+    const command = typeof b.command === 'string' ? b.command : '';
+    // A job is work for the model: the page's own command, not one this server does itself (POST /api/act).
+    if (!command || command.length > 2200 || !allowed(command) || JOB_PING.test(command) || ACTIONS.some(([re]) => re.test(command)))
+      throw new Said(400, 'This is not work the dashboard gives Quality Inspector. Use a button of the page.');
+    if (!may(who.access, command)) throw new Said(403, refusal(who.access));
+    spend(who.email || who.sub || who.role);
+    const clean = (v, n) => (typeof v === 'string' && v.trim() ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, n) : null);
+    const id = queueJob(JOBS, { command, label: clean(b.label, 80), item: clean(b.item, 200), note: clean(b.note, 1000), role: who.access, platform: who.role, email: who.email }, utc());
+    log('info', 'dashboard_job', `${id} from ${who.access}`);
+    return send(res, 201, { id, ping: `do dashboard job ${id}` });
+  }
+  if (m === 'GET' && p[1] === 'jobs' && !p[2]) return send(res, 200, { jobs: jobsOf(JOBS).slice(-80).reverse().map((j) => jobView(j, who)) });
+  if (m === 'GET' && p[1] === 'people' && !p[2]) {
+    const list = people(PEOPLE);
+    return send(res, 200, { roles: ROLES, people: who.access === 'admin' ? list : [], counts: Object.fromEntries(ROLES.map((r) => [r, list.filter((x) => x.role === r).length])) });
+  }
+  if (m === 'POST' && p[1] === 'people' && !p[2]) {
+    if (who.access !== 'admin') throw new Said(403, 'Only an admin gives people their roles.');
+    const b = await body(req);
+    spend(`people:${who.email}`);
+    let done;
+    try { done = setRole(PEOPLE, b.email, b.role === null ? null : String(b.role ?? ''), utc()); } catch (e) { throw new Said(400, e.message); }
+    log('info', 'dashboard_people', `role ${done.old ?? '-'} → ${done.role ?? '-'} by=${who.email || '-'}`);
+    return send(res, 200, { ok: true, ...done, people: people(PEOPLE) });
+  }
+  if (m === 'GET' && p[1] === 'notifications' && !p[2]) return send(res, 200, notificationsFor(who));
+  if (m === 'POST' && p[1] === 'notifications' && (p[2] === 'read' || p[2] === 'seen') && !p[3]) {
+    if (!who.email) return send(res, 200, { ok: true });
+    const b = p[2] === 'read' ? await body(req) : {};
+    const notes = readNotes(), mine = notes[who.email] ?? { seen: null, read: [] };
+    if (p[2] === 'read') {
+      if (typeof b.id !== 'string' || !/^(?:job|ans|run):[A-Z]-\d{1,6}$/.test(b.id)) throw new Said(400, 'There is no such notification.');
+      if (!mine.read.includes(b.id)) mine.read = [...mine.read, b.id].slice(-500);
+    } else { mine.seen = utc(); mine.read = []; }
+    notes[who.email] = mine; writeFile(NOTES, JSON.stringify(notes));
+    return send(res, 200, { ok: true });
   }
   throw new Said(404, `There is no route ${m} ${url.pathname}.`);
 }

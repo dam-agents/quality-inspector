@@ -44,7 +44,8 @@
 #                                          work/FOCUS.md, work/design/DISMISSED.md, work/design/CATEGORIES.md,
 #                                          work/PROBLEMS.md (scripts/problems.mjs: a dashboard problem dismissed)
 #                                          (docs/modules.md), work/FOUND.md (skills/create-issue), work/RISKS.md
-#                                          and work/benchmark/cases.json (scripts/risks.mjs, scripts/escapes.mjs)
+#                                          and work/benchmark/cases.json (scripts/risks.mjs, scripts/escapes.mjs),
+#                                          work/dashboard/PEOPLE.md and jobs.jsonl (the dashboard server, dashboard/jobs.mjs)
 #   scheduled-git    Bash (scheduled)      git commit
 #   policy-tamper    Bash (scheduled)      any command naming RUN_MODE (the Slack marker), scripts/hooks/ or .claude/settings
 #   channel-write    Bash (channel turn)   a command naming github.sh, comment or unlabel in any spelling
@@ -86,8 +87,8 @@
 #                                          the newest prompt when the operator wrote it, in a scheduled run
 #                                          and not a channel turn (lib/channel.sh → transcript_operator_words);
 #                                          or, in a channel turn, of the line `<qi-viewer-handoff>` and then
-#                                          the dashboard command a shared viewer's newest prompt holds
-#                                          (transcript_viewer_command; docs/persistence.md → Handoff)
+#                                          the dashboard job's ping (`do dashboard job J-<n>`) a shared person's
+#                                          newest prompt holds (transcript_viewer_command; docs/persistence.md → Handoff)
 #
 # Every denial logs one `policy_denied` event (scripts/log.sh): `tool=<name> rule=<id>`
 # plus `at=<host/path or file>` — never a full command or a query string.
@@ -519,8 +520,8 @@ check_write() {
     && deny channel-write "$p" "a channel turn writes no file that names github.sh (docs/slack.md)"
   [ "$p" = "$WORK/env/RUN_MODE" ] && deny run-mode "$p" "only precheck.sh slack <n> writes the Slack marker"
   if under "$p" "$WORK"; then
-    case "$p" in ("$WORK/CONFIG.md"|"$WORK/OPERATOR.md"|"$WORK/FOCUS.md"|"$WORK/design/DISMISSED.md"|"$WORK/design/CATEGORIES.md"|"$WORK/PROBLEMS.md"|"$WORK/FOUND.md"|"$WORK/RISKS.md"|"$WORK/benchmark/cases.json")
-      scheduled && deny scheduled-def "$p" "a scheduled run or a channel turn never changes the configuration, the operator's preferences, the focus queue, the design findings' triage, the dismissed problems, the found issues, the risk rules or the benchmark cases (their scripts write them: risks.mjs, escapes.mjs)";; esac
+    case "$p" in ("$WORK/CONFIG.md"|"$WORK/OPERATOR.md"|"$WORK/FOCUS.md"|"$WORK/design/DISMISSED.md"|"$WORK/design/CATEGORIES.md"|"$WORK/PROBLEMS.md"|"$WORK/FOUND.md"|"$WORK/RISKS.md"|"$WORK/benchmark/cases.json"|"$WORK/dashboard/PEOPLE.md"|"$WORK/dashboard/jobs.jsonl")
+      scheduled && deny scheduled-def "$p" "a scheduled run or a channel turn never changes the configuration, the operator's preferences, the focus queue, the design findings' triage, the dismissed problems, the found issues, the risk rules, the benchmark cases, the dashboard's people or its jobs (their scripts write them: risks.mjs, escapes.mjs, the dashboard server, dashboard/jobs.mjs)";; esac
     return 0
   fi
   in_tmp_qi "$p" && return 0
@@ -532,8 +533,8 @@ check_write() {
 # -------------------------------------------------------- platform schedules ----
 # A schedule's prompt opens a session with no frame — a direct one. So a scheduled run or a
 # channel turn starts, changes and removes no schedule; the one exception is the handoff to a
-# fresh session of the operator's own words, as they are, or of the one dashboard command a
-# shared viewer sent (docs/persistence.md → Handoff).
+# fresh session of the operator's own words, as they are, or of the one dashboard job's ping a
+# shared person sent (docs/persistence.md → Handoff).
 HANDOFF_LEAD='<qi-handoff>'
 VIEWER_HANDOFF_LEAD='<qi-viewer-handoff>'
 check_schedule() {
@@ -552,7 +553,7 @@ check_schedule() {
       return 0
     fi;;
   esac
-  deny platform-schedule "${TOOL##*__}" "a scheduled run or a channel turn starts, changes or removes no schedule; it only hands the operator's newest words, as they are, or a shared viewer's dashboard command to a fresh session (docs/persistence.md → Handoff)"
+  deny platform-schedule "${TOOL##*__}" "a scheduled run or a channel turn starts, changes or removes no schedule; it only hands the operator's newest words, as they are, or a shared person's dashboard job (do dashboard job J-<n>) to a fresh session (docs/persistence.md → Handoff)"
 }
 
 # ------------------------------------------------------------------ dispatch ----
