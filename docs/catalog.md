@@ -390,8 +390,8 @@ published once, and asks the server for everything it shows.
 
 ## The look
 
-A new, simpler page is being built from Design Desk's Desk: [dashboard-page.md](dashboard-page.md)
-(not published yet). The dashboard keeps Design Desk's scale (the section "The look" of `docs/desk-page.md` in the Design Desk repository), so the two
+The interactive dashboard is the new, simpler page built from Design Desk's Desk:
+[dashboard-page.md](dashboard-page.md); the static one stays `scripts/catalog/viewer.html`. The dashboard keeps Design Desk's scale (the section "The look" of `docs/desk-page.md` in the Design Desk repository), so the two
 agents read as one family: Design Desk's colour tokens under this page's names, in light and dark;
 text only in five sizes (`--fs-title` 26, `--fs-head` 17, `--fs-ui` 14, `--fs-meta` 12.5,
 `--fs-micro` 11; weights up to 600; IBM Plex Sans, else the system font); corners 4, 6, 8, 10, 12
@@ -423,12 +423,13 @@ release ([issue-qa.md](issue-qa.md) step 10, also for an operator's or a Slack "
    names the file to fix.
 2. **Interactive** (`dashboard_interactive: enabled`, recommended: it needs the operator's Interactive artifacts feature): `data.json` is written, and the
    server shows it — done, unless `page_changed` or `work/catalog/artifact.interactive` does not say
-   `true`. Then publish `work/catalog/live.html` (the page with no data, `live`) as below and write
+   `true`. Then publish `work/catalog/live.html` (the page with no data, `live`: the new page
+   `scripts/dashboard/page.html`, [dashboard-page.md](dashboard-page.md)) as below and write
    `<page_hash>` to `work/catalog/page.hash`. First check `dashboard-service.sh check`; a server that
    does not answer → `install`, else `restart`, then check again; still none → log it as an `error`,
    tell the operator once, and publish `index.html` as for a static dashboard meanwhile.
    **Static** (`disabled`): `changed: false` → done; else publish `work/catalog/index.html` (the page
-   with its data) and write `<hash>` to `work/catalog/published.hash`.
+   with its data: the old page `scripts/catalog/viewer.html`) and write `<hash>` to `work/catalog/published.hash`.
 3. Publishing is [reporting.md](reporting.md) → Delivery step 1 — artifact only, through an upload URL
    (the static page exceeds the inline limit), sent with `Content-Type: text/html; charset=utf-8`; its
    images are in the page or on the server, so it skips `report-media.mjs`. The reference lives in
