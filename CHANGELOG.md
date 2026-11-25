@@ -19,6 +19,16 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    dashboard is shared with is a viewer, and reads only, until an admin gives them a role; an older page's
    bare command from a shared person is declined.
 
+## 3.69.0 — 2026-11-25
+
+**Upgrade:**
+1. Nothing to run: the product is one installation that stays up between runs
+   ([docs/nested-env.md](docs/nested-env.md) → **One running product**). The regression, modules and
+   discovery runs and an on-demand scenario start with `env.sh up <candidate>` and no reset — an
+   upgrade in place. A run that ends with a reset brings the candidate back up before it unlocks.
+2. Nothing to run: on the `helm-k3s` engine `env.sh reset` keeps the images, as `up` does, and removes
+   them only below `prune_below_gi` free — the install after a reset pulls nothing it already has.
+
 ## 3.68.0 — 2026-11-25
 
 **Upgrade:**

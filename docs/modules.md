@@ -118,7 +118,8 @@ candidate), `focus[]`, `inventory` (the candidate's UI map or `null`), `max_wall
 and with `ux-signals` due `ux_signals` (`period`, `scored`, `new`, `resolve`).
 
 1. `env.sh lock modules` (busy → end, log it). Note the claim time.
-2. `env.sh reset`, `env.sh up <candidate>`, `suite.sh run smoke-<candidate> --tag smoke`.
+2. `env.sh up <candidate>` (no reset — [nested-env.md](nested-env.md) → **One running product**),
+   `suite.sh run smoke-<candidate> --tag smoke`.
    Failure → environment failure ([nested-env.md](nested-env.md) → **Failures**): append
    `<ISO> ERROR: environment candidate=<c>` to `work/MODULES.log`, unlock, end. Only own-build
    work due (`pr-build` entries, `ux-signals`) → skip steps 2 and 3: each brings up its own builds
@@ -136,7 +137,8 @@ and with `ux-signals` due `ux_signals` (`period`, `scored`, `new`, `resolve`).
    → **1**), under the same budget.
 6. `ux-signals` due → its steps on the builds the users ran ([ux-signals.md](ux-signals.md)), under
    the same budget.
-7. `env.sh reset` — form input and load must not reach the next run.
+7. `env.sh reset` — form input and load must not reach the next run —, then `env.sh up <candidate>`
+   and `wait`: the next run finds the product running ([nested-env.md](nested-env.md) → **One running product**).
 8. `env.sh unlock modules`. Log `modules_run`. Chat summary: per module one line (counts by
    severity, the newest major findings by id); a stress `critical` or a new `major` design
    finding first.

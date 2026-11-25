@@ -52,7 +52,8 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, `b
 - `channel` — `regression_channel`, or `null`: where step 9's summary goes.
 
 1. `env.sh lock regression` (busy → end the run, log it).
-2. `env.sh reset`, `env.sh up <candidate>`, `suite.sh run smoke-<candidate> --tag smoke`.
+2. `env.sh up <candidate>` — no reset: it upgrades the running product in place
+   ([nested-env.md](nested-env.md) → **One running product**) —, `suite.sh run smoke-<candidate> --tag smoke`.
    Failure → environment failure: diagnose and repair per [nested-env.md](nested-env.md) →
    Failures, then register its cause ([autonomy.md](autonomy.md)). Still failing → **the night without results**:
    1. Write `work/regression/<candidate>/environment.json` — `{"mode": "regression",
