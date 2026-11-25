@@ -45,7 +45,8 @@
 #                                          work/PROBLEMS.md (scripts/problems.mjs: a dashboard problem dismissed)
 #                                          (docs/modules.md), work/FOUND.md (skills/create-issue), work/RISKS.md
 #                                          and work/benchmark/cases.json (scripts/risks.mjs, scripts/escapes.mjs),
-#                                          work/dashboard/PEOPLE.md and jobs.jsonl (the dashboard server, dashboard/jobs.mjs)
+#                                          work/dashboard/PEOPLE.md and jobs.jsonl (the dashboard server, dashboard/jobs.mjs),
+#                                          work/TEST-NAMES.md (the dashboard server: a test renamed)
 #   scheduled-git    Bash (scheduled)      git commit
 #   policy-tamper    Bash (scheduled)      any command naming RUN_MODE (the Slack marker), scripts/hooks/ or .claude/settings
 #   channel-write    Bash (channel turn)   a command naming github.sh, comment or unlabel in any spelling
@@ -520,8 +521,8 @@ check_write() {
     && deny channel-write "$p" "a channel turn writes no file that names github.sh (docs/slack.md)"
   [ "$p" = "$WORK/env/RUN_MODE" ] && deny run-mode "$p" "only precheck.sh slack <n> writes the Slack marker"
   if under "$p" "$WORK"; then
-    case "$p" in ("$WORK/CONFIG.md"|"$WORK/OPERATOR.md"|"$WORK/FOCUS.md"|"$WORK/design/DISMISSED.md"|"$WORK/design/CATEGORIES.md"|"$WORK/PROBLEMS.md"|"$WORK/FOUND.md"|"$WORK/RISKS.md"|"$WORK/benchmark/cases.json"|"$WORK/dashboard/PEOPLE.md"|"$WORK/dashboard/jobs.jsonl")
-      scheduled && deny scheduled-def "$p" "a scheduled run or a channel turn never changes the configuration, the operator's preferences, the focus queue, the design findings' triage, the dismissed problems, the found issues, the risk rules, the benchmark cases, the dashboard's people or its jobs (their scripts write them: risks.mjs, escapes.mjs, the dashboard server, dashboard/jobs.mjs)";; esac
+    case "$p" in ("$WORK/CONFIG.md"|"$WORK/OPERATOR.md"|"$WORK/FOCUS.md"|"$WORK/design/DISMISSED.md"|"$WORK/design/CATEGORIES.md"|"$WORK/PROBLEMS.md"|"$WORK/FOUND.md"|"$WORK/RISKS.md"|"$WORK/benchmark/cases.json"|"$WORK/dashboard/PEOPLE.md"|"$WORK/dashboard/jobs.jsonl"|"$WORK/TEST-NAMES.md")
+      scheduled && deny scheduled-def "$p" "a scheduled run or a channel turn never changes the configuration, the operator's preferences, the focus queue, the design findings' triage, the dismissed problems, the tests' names, the found issues, the risk rules, the benchmark cases, the dashboard's people or its jobs (their scripts write them: risks.mjs, escapes.mjs, the dashboard server, dashboard/jobs.mjs)";; esac
     return 0
   fi
   in_tmp_qi "$p" && return 0

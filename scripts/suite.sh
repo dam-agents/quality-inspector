@@ -100,16 +100,20 @@ pick_browser() {
 }
 
 summarize() { # <report.json> <label>
-  jq -c --arg label "$2" '
+  # Each result's checks (lib/walk.mjs): one walk may check several criteria, each with its own status.
+  local walks; walks="$(node "$SCRIPT_DIR/lib/walk.mjs" "$1" 2>/dev/null)" || walks='[]'
+  case "$walks" in (\[*) ;; (*) walks='[]';; esac
+  jq -c --arg label "$2" --argjson walks "$walks" '
     .run as $r
-    | [$r.results[]? | select(.selected != false) | {
+    | [($r.results // []) | to_entries[] | .key as $i | .value | select(.selected != false) | {
         title: (.titlePath | join(" › ")),
         file: (.file // .source.file // null),
         tags: (.tags // []),
         status,
         code: ([.attempts[]?.error.code // empty] | last // null),
         judged: (if .status == "passed" then [.attempts[-1].steps[]? | select((.api | startswith("expect.")) and .status == "failed") | .label] else [] end),
-        relearned: [.attempts[-1].steps[]? | select(.cache.mode == "agent-concluded" or .cache.mode == "missed") | .label]
+        relearned: [.attempts[-1].steps[]? | select(.cache.mode == "agent-concluded" or .cache.mode == "missed") | .label],
+        checks: ($walks[$i] // [])
       }] as $res
     | [$r.results[]?.attempts[]?.steps[]?.cache.mode // empty] as $modes
     | ($res | group_by(.title) | map({title: .[0].title, tags: .[0].tags, runs: length,

@@ -49,6 +49,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { controlRe, esc, matchable, pageRe } from './lib/match.mjs';
 import { AGENT_RGB, agentBoxes, drawMarks, splitMark } from './lib/shot-mark.mjs';
+import { checksOf } from './lib/walk.mjs';
 import { deskRef } from './lib/ux-field.mjs';
 import { mtime, read, readJson, tableRows } from './lib/util.mjs';
 
@@ -102,6 +103,9 @@ const quotesRequest = (t) => {
 const scenKey = (id) => (String(id).startsWith('P-') ? `profile-${String(id).slice(2)}` : `scenario-${String(id).replace(/^S-/i, '')}`);
 const heals = rows(join(work, 'HEALS.md')).map(([utc, test, ac, build, , , basis]) => ({ utc, test, ac, build, basis }));
 const flaky = rows(join(work, 'FLAKY.md')).map(([utc, test, ac, build, runs, passes]) => ({ utc, test, ac, build, runs: +runs || null, passes: +passes || 0 }));
+// The names people gave tests on the dashboard (work/TEST-NAMES.md `| key | name | renamed_utc |`, written by
+// the dashboard server for a "rename" press): a name there wins over the criterion's own.
+const testNames = new Map(rows(join(work, 'TEST-NAMES.md')).filter(([k, n]) => /^(?:issue-\d+|scenario-\d+|profile-[a-z0-9][a-z0-9-]*)\/(?:AC|IN)-\d+$/.test(k ?? '') && n).map(([k, n]) => [k, n]));
 const collections = rows(join(work, 'CATALOG.md')).map(([name, members]) =>
   ({ name, members: String(members ?? '').split(',').map((s) => s.trim()).filter(Boolean) })).filter((c) => c.name);
 // The agent's features (docs/features.md) and the open test maintenance proposals (docs/maintenance.md).
@@ -175,18 +179,20 @@ function parseTestFile(src) {
     const body = src.slice(s, starts[i + 1] ?? src.length);
     const title = unjs((body.match(new RegExp(String.raw`^\s*test\(\s*` + STR)) ?? [])[2] ?? '');
     const id = (title.match(/\b((?:AC|IN|EX)-\d+)\b/) ?? [])[1] ?? null;
+    // The criteria this walk checks (lib/walk.mjs): its `criterion('<id>', …)` calls in order, else the title's one.
+    const ids = [...new Set([...body.matchAll(/\bcriterion\(\s*['"]((?:AC|IN|EX)-\d+)['"]/g)].map((m) => m[1]))];
+    if (!ids.length && id) ids.push(id);
     const session = (body.match(/session:\s*['"]([\w-]+)['"]/) ?? [])[1] ?? 'owner';
     const tags = [...((body.match(/tags:\s*\[([^\]]*)\]/) ?? [])[1] ?? '').matchAll(/['"]([^'"]+)['"]/g)].map((m) => m[1]);
     const steps = [];
     for (const m of body.matchAll(STEP)) steps.push({ kind: STEP_KIND[m[1]], text: unjs(m[3]).slice(0, 240), at: m.index });
-    const block = id ? body.match(new RegExp(String.raw`//\s*${id} begin([\s\S]*?)//\s*${id} end`)) : null;
-    const inBlock = block?.[1] ?? '';
+    const inBlock = ids.map((x) => body.match(new RegExp(String.raw`//\s*${x} begin([\s\S]*?)//\s*${x} end`))?.[1] ?? '').join('\n');
     for (const m of inBlock.matchAll(/expect\(([\s\S]*?)\)\s*\.\s*(not\.)?(to\w+)\(([^;]*?)\)\s*;/g)) {
       steps.push({ kind: 'expect', text: `${m[1].replace(/\s+/g, ' ').trim()} ${m[2] ?? ''}${m[3]}(${m[4].replace(/\s+/g, ' ').trim()})`.slice(0, 240), at: body.indexOf(m[0]) });
     }
     steps.sort((a, b) => a.at - b.at);
     return {
-      title, id, session, tags,
+      title, id: ids[0] ?? id, ids, session, tags,
       steps: steps.map(({ kind, text }) => ({ kind, text })),
       checks: { expects: (inBlock.match(/\bexpect\(/g) ?? []).length, agent_asserts: (body.match(/\bagent\.assert\(/g) ?? []).length },
       pages: [...new Set(steps.filter((x) => x.kind === 'open' && x.text.startsWith('/')).map((x) => x.text.replace(/\?.*$/, '')))],
@@ -266,6 +272,8 @@ const withWhy = (o, w) => (w ? { ...o, why: w } : o); // only a result the agent
 // What is wrong, alone (docs/reporting.md → `wrong`): the page puts it beside the screen at the failure.
 const wrongOf = (e) => (CAUSE_OF.has(e?.verdict) || e?.verdict === 'partial' ? said(e?.wrong, 200) : null);
 const withWrong = (o, w) => (w ? { ...o, wrong: w } : o);
+// The agent's mark (docs/reporting.md → The mark), kept only to frame the report's shot it names; never on the page as such.
+const withMark = (o, m) => (agentBoxes(m).length && m.side !== 'baseline' ? { ...o, _mark: m } : o);
 const WORST = ['regression', 'failed', 'needs-review', 'flaky', 'inconclusive', 'partial', 'blocked', 'not-testable', 'passed', 'verified'];
 const rank = (v) => (WORST.includes(v) ? WORST.indexOf(v) : WORST.length);
 function readVerdicts(dir, okey, run, ref) {
@@ -280,7 +288,7 @@ function readVerdicts(dir, okey, run, ref) {
     const worst = (v.acs ?? []).map((e) => e?.verdict).filter(Boolean).sort((a, b) => rank(a) - rank(b))[0] ?? null;
     runs.push({ type: run, ref, build, baseline: v.baseline ?? null, utc, verdict: v.verdict ?? worst, report: artRef(dir), secs: secsOf(v, utc), cost_usd: costOf(v),
       analysis: analysisOf(v), trigger: triggerOf(v), _ev: { c: v.candidate_run ?? null, b: v.baseline_run ?? null, x: v.explorations_run ?? null },
-      entries: [...(v.acs ?? []), ...(v.intents ?? []), ...(v.explorations ?? []).filter((e) => !isObserved(e))].filter((e) => e?.id && e.verdict).map((e) => withWrong(withWhy({ key: `${okey}/${e.id}`, value: e.verdict, cause: causeOf(e) }, whyOf(e)), wrongOf(e))) });
+      entries: [...(v.acs ?? []), ...(v.intents ?? []), ...(v.explorations ?? []).filter((e) => !isObserved(e))].filter((e) => e?.id && e.verdict).map((e) => withMark(withWrong(withWhy({ key: `${okey}/${e.id}`, value: e.verdict, cause: causeOf(e) }, whyOf(e)), wrongOf(e)), e.mark)) });
     // An intent test (docs/intent.md) runs in the same candidate run as the criteria.
     for (const ac of [...(v.acs ?? []), ...(v.intents ?? [])]) {
       const key = `${okey}/${ac.id}`;
@@ -350,20 +358,22 @@ const nightOutcomes = new Map(); // build -> Map(item key -> value)
 const nightCauses = new Map(); // build -> Map(item key -> cause)
 const nightWhy = new Map(); // build -> Map(item key -> the agent's sentence)
 const nightWrong = new Map(); // build -> Map(item key -> what is wrong, alone)
+const nightMark = new Map(); // build -> Map(item key -> the agent's mark)
 const nightFile = new Map(); // build -> its verdicts.json
 for (const c of ls(join(work, 'regression'))) {
   const v = readJson(join(work, 'regression', c, 'verdicts.json'));
   if (!v) continue;
   nightFile.set(c, v);
-  const per = new Map(); const why = new Map(); const said = new Map(); const wrong = new Map();
+  const per = new Map(); const why = new Map(); const said = new Map(); const wrong = new Map(); const marks = new Map();
   for (const e of v.acs ?? v.entries ?? []) {
     const okey = e.scenario ? scenKey(e.scenario) : `issue-${e.issue}`;
     per.set(`${okey}/${e.id}`, e.verdict);
     if (causeOf(e)) why.set(`${okey}/${e.id}`, causeOf(e));
     if (whyOf(e)) said.set(`${okey}/${e.id}`, whyOf(e));
     if (wrongOf(e)) wrong.set(`${okey}/${e.id}`, wrongOf(e));
+    if (withMark({}, e.mark)._mark) marks.set(`${okey}/${e.id}`, e.mark);
   }
-  nightOutcomes.set(c, per); nightCauses.set(c, why); nightWhy.set(c, said); nightWrong.set(c, wrong);
+  nightOutcomes.set(c, per); nightCauses.set(c, why); nightWhy.set(c, said); nightWrong.set(c, wrong); nightMark.set(c, marks);
 }
 const TOP = ['regression', 'needs-review', 'healed', 'reworked', 'relearned'];
 const due = new Map(); // candidate -> the pre-flight's `due` time: the night's start
@@ -396,7 +406,7 @@ for (const line of (read(join(work, 'REGRESSION.log')) ?? '').split('\n')) {
     ui_diff: typeof ctx.ui_diff === 'string' ? ctx.ui_diff.slice(0, 4000) : null, signals,
     report: artRef(join(work, 'regression', m[2])), analysis: analysisOf(v), trigger: triggerOf(v),
     _ev: { c: v?.candidate_run ?? (existsSync(join(runsRoot, `regression-${m[2]}`, 'report.json')) ? `regression-${m[2]}` : null), b: null, x: null },
-    entries: [...(nightOutcomes.get(m[2]) ?? new Map())].map(([key, value]) => withWrong(withWhy({ key, value, cause: nightCauses.get(m[2])?.get(key) ?? null }, nightWhy.get(m[2])?.get(key)), nightWrong.get(m[2])?.get(key))) });
+    entries: [...(nightOutcomes.get(m[2]) ?? new Map())].map(([key, value]) => withMark(withWrong(withWhy({ key, value, cause: nightCauses.get(m[2])?.get(key) ?? null }, nightWhy.get(m[2])?.get(key)), nightWrong.get(m[2])?.get(key)), nightMark.get(m[2])?.get(key))) });
 }
 // A run whose file says nothing of its length: the events log (docs/logging.md, 14 days) — an issue
 // run's `issue_done minutes=` nearest its verdicts, a scenario run's `scenario_run` before them.
@@ -482,10 +492,10 @@ for (const okey of [...origins].sort((a, b) => a.localeCompare(b, 'en', { numeri
     ? { kind: 'issue', ref, number: +num, title: meta?.title ?? titles.get(okey) ?? crit?.title ?? null, summary: crit?.summary ?? null, labels: meta?.labels ?? null, state: meta?.state ?? null }
     : { kind: 'scenario', ref, title: crit?.title ?? titles.get(okey) ?? null, source: scen.get(ref)?.source ?? null };
   const ids = [...new Set([...(crit?.acs ?? []).map((a) => a.id), ...(ins?.acs ?? []).map((a) => a.id), ...(exps?.acs ?? []).map((a) => a.id),
-    ...parsed.tests.map((t) => t.id).filter(Boolean)])];
+    ...parsed.tests.flatMap((t) => t.ids)])];
   for (const id of ids) {
     const c = [...(crit?.acs ?? []), ...(ins?.acs ?? []), ...(exps?.acs ?? [])].find((a) => a.id === id) ?? {};
-    const t = parsed.tests.find((x) => x.id === id);
+    const t = parsed.tests.find((x) => x.ids.includes(id));
     const key = `${okey}/${id}`;
     if (observedRisk.has(key)) continue;
     const ex = id.startsWith('EX');
@@ -505,7 +515,7 @@ for (const okey of [...origins].sort((a, b) => a.localeCompare(b, 'en', { numeri
     items.push({
       key, file: t ? file : null, origin, id,
       kind: ex ? 'exploration' : id.startsWith('IN') ? 'intent' : 'criterion',
-      name: c.name ?? t?.title?.replace(/^.*?(?:AC|IN|EX)-\d+:\s*/, '') ?? null, goal: c.goal ?? null,
+      name: testNames.get(key) ?? c.name ?? t?.title?.replace(/^.*?(?:AC|IN|EX)-\d+(?:,\s*(?:AC|IN|EX)-\d+)*:\s*/, '') ?? null, renamed: testNames.has(key), goal: c.goal ?? null,
       quote: isIssue ? c.quote ?? null : null, given: c.given ?? null, when: c.when ?? null, then: c.then ?? null,
       surface: c.surface ?? null, testable: c.testable ?? true,
       tier: !t ? 'untracked' : ex ? 'exploratory' : (row?.tier ?? 'untracked'), // explorations are never promoted
@@ -513,6 +523,8 @@ for (const okey of [...origins].sort((a, b) => a.localeCompare(b, 'en', { numeri
       area: parsed.area ?? (t?.pages[0]?.split('/')[1] || null),
       summary: parsed.summary, session: t?.session ?? null, pages: t?.pages ?? [],
       steps: t?.steps ?? [], checks: t?.checks ?? null,
+      // Its test case (lib/walk.mjs): the walk it is checked on and every criterion that walk checks, in order.
+      case: t ? { id: t.ids[0], title: t.title, checks: t.ids } : null,
       verdict: hist.at(-1) ?? null, history: hist,
       heals: heals.filter((h) => h.test === file && h.ac === id).map(({ utc, build, basis }) => ({ utc, build, basis })),
       flaky: flaky.filter((f) => f.test === file && f.ac === id).map(({ utc, build, runs, passes }) => ({ utc, build, runs, passes })),
@@ -845,13 +857,23 @@ const repShots = []; // [{shot, src}] in the order the runs come: newest first
 // A side's video, for the server's copy only (docs/catalog.md → The server): the page plays it from
 // there. The static page has none — a video does not fit in it.
 const sideVideo = new Map();
-function sideOf(label, key) {
+// A shot's frame (docs/reporting.md → The mark; docs/test-authoring.md → The mark of a failed check):
+// the boxes as parts of the screenshot's width [x, y, w, h], so the page draws them over any size of it.
+// Only a PNG gives its width here; any other file keeps no frame.
+const pngWidth = (src) => { try { const b = readFileSync(src); return b.length > 24 && b.readUInt32BE(0) === 0x89504e47 ? b.readUInt32BE(16) : 0; } catch { return 0; } };
+const frameOf = (src, boxes, by, saw) => { const w = boxes.length ? pngWidth(src) : 0; if (!w) return null;
+  const f = (n) => Math.round((n / w) * 10000) / 10000;
+  const bx = boxes.filter((b) => b.x >= 0 && b.y >= 0 && b.x + b.w <= w).map((b) => [f(b.x), f(b.y), f(b.w), f(b.h)]);
+  return bx.length ? { by, boxes: bx, ...(saw ? { saw } : {}) } : null; };
+function sideOf(label, key, mark = null) {
   const run = e2eRun(label);
   if (!run) return label ? { st: 'missing' } : null;
   const [okey, id] = key.split('/');
   const tags = [id.startsWith('EX-') ? `${okey}-ex` : okey, id.toLowerCase()];
   const res = run.results.find((r) => tags.every((t) => (r.tags ?? []).includes(t)));
   if (!res) return { st: 'no-test' };
+  // A walk that checks several criteria (lib/walk.mjs): this one's own state, and every check of the walk.
+  const walk = checksOf(res), mine = walk.find((c) => c.id === id)?.status ?? res.status;
   const att = res.attempts?.at(-1) ?? {};
   const arts = new Map((att.artifacts ?? []).filter((a) => a?.kind === 'screenshot' && a.path).map((a) => [a.id, a]));
   const fileOf = (a) => run.roots.map((r) => join(r, a.path)).find(existsSync) ?? null;
@@ -859,7 +881,8 @@ function sideOf(label, key) {
   const all = att.steps ?? [];
   const steps = all.slice(0, REPORT_STEPS).map((s, n) => {
     const label = said(splitMark(String(s?.label ?? '')).label, 200) ?? '';
-    for (const a of (s?.artifacts ?? []).map((x) => arts.get(x)).filter(Boolean)) shots.push({ cap: s.api === 'app.screenshot' ? label : `After step ${n + 1}`, a, check: s.api === 'app.screenshot', at: n });
+    const boxes = s?.api === 'app.screenshot' ? splitMark(String(s?.label ?? '')).boxes : [];
+    for (const a of (s?.artifacts ?? []).map((x) => arts.get(x)).filter(Boolean)) shots.push({ cap: s.api === 'app.screenshot' ? label : `After step ${n + 1}`, a, check: s.api === 'app.screenshot', at: n, boxes });
     return [txt(s?.api, 40) ?? '', label, STATES.has(s?.status) ? s.status : null, Number.isFinite(s?.durationMs) ? Math.round(s.durationMs) : null];
   });
   // The screen at the failure first, then the screenshots the test took, then the ones after a step.
@@ -867,11 +890,16 @@ function sideOf(label, key) {
   // screen at the failure is at the first step that failed (else the last one).
   const failedAt = all.findIndex((s) => s?.status === 'failed' || s?.status === 'timed-out');
   const fail = [...arts.values()].filter((a) => a.producer?.kind !== 'step' && !all.some((s) => s?.artifacts?.includes(a.id))).map((a) => ({ cap: 'The screen at the failure', a, check: true, at: failedAt >= 0 ? failedAt : Math.max(0, all.length - 1), fail: true }));
+  // The agent's mark goes on the shot it names (`shot`), else the criterion's own still, else the screen at the failure.
+  const agent = agentBoxes(mark), still = shots.find((x) => x.check && x.cap.startsWith(`${id}:`) && !x.boxes?.length);
+  const named = !agent.length ? null : typeof mark.shot === 'string' && mark.shot ? shots.find((x) => x.check && x.cap.startsWith(mark.shot)) : still || fail[0];
   const picked = [...fail, ...shots.filter((x) => x.check && !fail.includes(x)), ...shots.filter((x) => !x.check)].slice(0, REPORT_SHOTS)
-    .sort((x, y) => x.at - y.at).map(({ cap, a, at, fail: f }) => { const src = fileOf(a); return src ? { cap, src, at, fail: !!f } : null; }).filter(Boolean);
-  const err = att.error ? said([att.error.code, att.error.message].filter((x) => typeof x === 'string' && x).join(': '), 600) : null;
-  const side = { st: STATES.has(res.status) ? res.status : 'failed', ms: Number.isFinite(att.durationMs) ? Math.round(att.durationMs) : null, err,
-    steps, more: Math.max(0, all.length - REPORT_STEPS), shots: picked.map(({ cap, src, at, fail: f }) => { const shot = { cap, img: null, at, ...(f ? { fail: true } : {}) }; repShots.push({ shot, src }); return shot; }) };
+    .sort((x, y) => x.at - y.at).map((x) => { const src = fileOf(x.a); if (!src) return null;
+      const frame = x.boxes?.length ? frameOf(src, x.boxes, 'test') : x === named ? frameOf(src, agent, 'agent', said(mark.saw, 300)) : null;
+      return { cap: x.cap, src, at: x.at, fail: !!x.fail, frame }; }).filter(Boolean);
+  const err = att.error && !['passed', 'not-reached'].includes(mine) ? said([att.error.code, att.error.message].filter((x) => typeof x === 'string' && x).join(': '), 600) : null;
+  const side = { st: mine === 'not-reached' || STATES.has(mine) ? mine : 'failed', ...(walk.length > 1 ? { walk: walk.map((c) => [c.id, c.at, c.status]) } : {}), ms: Number.isFinite(att.durationMs) ? Math.round(att.durationMs) : null, err,
+    steps, more: Math.max(0, all.length - REPORT_STEPS), shots: picked.map(({ cap, src, at, fail: f, frame }) => { const shot = { cap, img: null, at, ...(f ? { fail: true } : {}), ...(frame ? { frame } : {}) }; repShots.push({ shot, src }); return shot; }) };
   const video = (att.artifacts ?? []).find((a) => a?.kind === 'video' && a.path);
   const vsrc = video ? fileOf(video) : null;
   if (vsrc) sideVideo.set(side, vsrc);
@@ -885,13 +913,14 @@ for (const r of runs) {
   const results = {};
   for (const e of r.entries) {
     const ex = /\/EX-\d+$/.test(e.key);
-    const c = sideOf(ex ? ev.x : ev.c, e.key); const b = ex ? null : sideOf(ev.b, e.key);
+    const c = sideOf(ex ? ev.x : ev.c, e.key, e._mark); const b = ex ? null : sideOf(ev.b, e.key);
     if (c || b) results[e.key] = { c, b };
   }
   const size = Buffer.byteLength(JSON.stringify(results));
   if (!Object.keys(results).length || repUsed + size > REPORT_MAX) { repShots.splice(mark); if (Object.keys(results).length) repCut++; continue; }
   repUsed += size; r.rep = { results, side: ev.b ? 'both' : 'candidate' };
 }
+for (const r of runs) for (const e of r.entries ?? []) delete e._mark;
 if (repCut) notes.push(`${repCut} older report(s) not on the page: their text is over ${Math.round(REPORT_MAX / 1024)} KiB; the page links them`);
 const repName = (src) => `rep-${createHash('sha256').update(src).digest('hex').slice(0, 16)}`;
 for (const x of repShots) {

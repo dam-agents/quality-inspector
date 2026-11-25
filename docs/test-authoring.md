@@ -9,7 +9,7 @@ Its own docs ship offline in `work/suite/node_modules/e2e/docs/` and its skill v
 
 One file per issue, `tests/issue-<n>.e2e.ts` (a scenario: `tests/scenario-<k>.e2e.ts`, titles
 `S-<k> AC-<j>: …`, tag `scenario-<k>` where an issue's test has `issue-<n>`); one test per
-testable AC:
+testable AC, or one test for several ACs that one walk checks (**One walk, several checks** below):
 
 ```ts
 import { test } from '@e2e-dev/web';
@@ -82,6 +82,46 @@ test('#42 AC-1: a renamed project keeps its tasks', { session: 'owner', tags: ['
 **Explorations** live in the same file by the rules above, `EX` for `AC`, tagged and hashed
 apart ([explorations.md](explorations.md) → **Tests**); a role session other than `owner` comes
 from the setup test too (→ **Identities**).
+
+## One walk, several checks
+
+A test is a **test case**: one walk through the product. When several criteria are checked on the
+same walk — the same setup and the same steps, each check a little further on — one test checks
+them all, in the order the walk reaches them, instead of one test per AC that repeats the walk:
+
+```ts
+test('#42 AC-1, AC-3: a renamed project keeps its tasks and its link', { session: 'owner', tags: ['issue-42', 'ac-1', 'ac-3'] },
+  async ({ app, agent, screen }) => {
+    // … the walk …
+    await app.screenshot('AC-1: the renamed project and its tasks');
+    // AC-1 begin
+    await criterion('AC-1', '…', { agent, app }, async () => { /* … */ });
+    // AC-1 end
+    await agent.act('open the project from its old link');
+    await app.screenshot('AC-3: the project the old link opens');
+    // AC-3 begin
+    await criterion('AC-3', '…', { agent, app }, async () => { /* … */ });
+    // AC-3 end
+  });
+```
+
+- **Its title names every id it checks** (`#42 AC-1, AC-3: <what the walk does>`), its tags carry an
+  `ac-<k>` (`in-<k>`) for each, and each check keeps every AC-block rule above: its own
+  `criterion` block and its own still `<id>: …` right before it. That still is how a report knows
+  where the check is on the walk ([scripts/lib/walk.mjs](../scripts/lib/walk.mjs)); a check
+  without it counts as the last one.
+- **A walk stops at the first check that fails.** That check gets the test's result; each check
+  before it passed; each check after it is **not reached** — not judged by this run. Its verdict
+  is `blocked` ([reporting.md](reporting.md) → Verdicts: "could not reach the AC block"), never a
+  pass or a fail; a walk that stops before its first check reaches none. `scripts/suite.sh`'s
+  summary gives each result its `checks` (`[{id, status}]`, `status` `passed`, `failed`,
+  `timed-out` or `not-reached`); the reports, the reruns, the features and the dashboard read
+  them the same way.
+- **Join only what shares the walk.** Criteria with their own setup, session or data stay apart: a
+  check that a failure before it must not hide gets its own test. An exploration (`EX`) is never in
+  a walk with an AC: they are hashed and run apart.
+- A promoted test is never split or joined without the operator: its AC blocks move only by a heal
+  ([triage.md](triage.md)).
 
 ## The mark of a failed check
 

@@ -389,7 +389,7 @@ published once, and asks the server for everything it shows.
   /api/notifications/read` `{id}` and `/seen` read one or every one, for that caller only
   (`work/dashboard/notes.json`). When `work/CONFIG.md` is newer than `data.json`, `GET /api/catalog` shows each
   module setting's value from its CONFIG bullet (one that fits the setting) and a module's state from its
-  switch, under a new hash, until the next build; the same for a finding's dismissal (`work/design/DISMISSED.md`) and the collections (`work/CATALOG.md`); the dismissed problems (`work/PROBLEMS.md`) are always read from the file. The policy hook refuses a scheduled run's or a channel
+  switch, under a new hash, until the next build; the same for a finding's dismissal (`work/design/DISMISSED.md`) and the collections (`work/CATALOG.md`) and the tests' names (`work/TEST-NAMES.md`, [dashboard-page.md](dashboard-page.md) → Rename a test); the dismissed problems (`work/PROBLEMS.md`) are always read from the file. The policy hook refuses a scheduled run's or a channel
   turn's command that names the server (`dashboard-api`): the relay's headers are the server's first layer,
   and a process on the machine could set them.
 - **New results.** Each build writes `data.json`; the server serves it at once, so nothing is

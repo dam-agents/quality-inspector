@@ -120,21 +120,25 @@ function withConfig(modules) {
 // The operator's actions on the page show at once too: a dismissal or a reopened finding from
 // work/design/DISMISSED.md, the collections from work/CATALOG.md, when the file is newer than the data.
 // The dismissed problems (work/PROBLEMS.md) are always the file's: the catalog build does not read it.
-const DISMISSED = join(WORK, 'design', 'DISMISSED.md'), COLLECTIONS = join(WORK, 'CATALOG.md'), PROBLEMS = join(WORK, 'PROBLEMS.md');
+const DISMISSED = join(WORK, 'design', 'DISMISSED.md'), COLLECTIONS = join(WORK, 'CATALOG.md'), PROBLEMS = join(WORK, 'PROBLEMS.md'), NAMES = join(WORK, 'TEST-NAMES.md');
 const tableOf = (text) => (text ?? '').split('\n').filter((l) => l.startsWith('|')).slice(2).map((l) => l.split('|').slice(1, -1).map((x) => x.trim()));
 function catalog() {
-  const t = mtime(DATA), c = mtime(CONFIG), d = mtime(DISMISSED), k = mtime(COLLECTIONS), p = mtime(PROBLEMS), key = `${t}|${c}|${d}|${k}|${p}`;
+  const t = mtime(DATA), c = mtime(CONFIG), d = mtime(DISMISSED), k = mtime(COLLECTIONS), p = mtime(PROBLEMS), n = mtime(NAMES), key = `${t}|${c}|${d}|${k}|${p}|${n}`;
   if (key !== cache.at) {
     let data = null;
     try { data = JSON.parse(readFileSync(DATA, 'utf8')); } catch { data = null; }
     data = data && typeof data === 'object' && !Array.isArray(data) ? data : null;
-    const newer = [c, d, k, p].filter((x) => data && x > t);
+    const newer = [c, d, k, p, n].filter((x) => data && x > t);
     if (data && c > t) data.modules = withConfig(data.modules);
     if (data && d > t && Array.isArray(data.design)) {
       const off = new Map(tableOf(read(DISMISSED)).filter(([id]) => /^D-\d+$/.test(id ?? '')).map(([id, , reason]) => [id, reason || null]));
       data.design = data.design.map((f) => (off.has(f.id) ? { ...f, status: 'dismissed', dismiss_reason: off.get(f.id) } : f.status === 'dismissed' ? { ...f, status: 'open', dismiss_reason: null } : f));
     }
     if (data && k > t) data.collections = tableOf(read(COLLECTIONS)).filter(([n]) => n).map(([name, members]) => ({ name, members: String(members ?? '').split(',').map((x) => x.trim()).filter(Boolean) }));
+    if (data && n > t && Array.isArray(data.items)) {
+      const names = new Map(tableOf(read(NAMES)).filter(([key, name]) => key && name));
+      data.items = data.items.map((i) => (names.has(i.key) ? { ...i, name: names.get(i.key), renamed: true } : i));
+    }
     if (data) data.problems_dismissed = dismissedProblems(PROBLEMS);
     cache = { at: key, data, hash: data ? `${data.hash ?? t}${newer.length ? `-${Math.round(Math.max(...newer))}` : ''}` : null };
   }
@@ -187,6 +191,15 @@ const ACTIONS = [
     try { done = changeProblem(PROBLEMS, catalog().data?.runs, m[1], m[2], m[3] ?? null, NOW()); } catch (e) { throw new Said(400, e.message); }
     if (done.dismissed || done.reopened) logEvent(`module=problems key=dismiss old=${m[1] === 'dismiss' ? '-' : m[2]} new=${m[1] === 'dismiss' ? `${m[2]}:${m[3] || '-'}` : '-'}`);
     return done; }],
+  // A test's new name (docs/dashboard-page.md → Rename a test): work/TEST-NAMES.md, one row a test, the last name wins.
+  [/^rename (#\d{1,7} (?:AC|IN)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}) to: ([^\u0000-\u001f\u007f|]{1,80})$/, (m) => {
+    const [ref, id] = m[1].split(' '), key = `${ref.startsWith('#') ? `issue-${ref.slice(1)}` : ref.startsWith('S-') ? `scenario-${ref.slice(2)}` : `profile-${ref.slice(2)}`}/${id}`;
+    const name = m[2].trim(); if (!name) throw new Said(400, 'Write a name.');
+    if (!(catalog().data?.items ?? []).some((i) => i.key === key)) throw new Said(404, 'There is no such test.');
+    const lines = tableFile(NAMES, '| key | name | renamed_utc |').split('\n'), old = lines.find((l) => cell1(l) === key)?.split('|')[2]?.trim() ?? null;
+    writeFile(NAMES, `${lines.filter((l, j) => j < 2 || (l && cell1(l) !== key)).join('\n').replace(/\n*$/, '\n')}| ${key} | ${name} | ${NOW()} |\n`);
+    logEvent(`module=catalog key=rename old=${key} new=${name.replace(/\s+/g, '_')}`);
+    return { key, old, name }; }],
   [/^(add|remove) (#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) (?:to|from) the collection ([A-Za-z0-9][A-Za-z0-9 _.-]{0,39})$/, (m) => {
     try { return { collection: m[3], members: changeCollection(COLLECTIONS, m[1], m[3], [m[2]]) }; } catch (e) { throw new Said(400, e.message); } }],
 ];
