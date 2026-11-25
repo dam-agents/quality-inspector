@@ -7,7 +7,7 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
-## 3.70.0 — 2026-11-25
+## 3.71.0 — 2026-11-25
 
 **Upgrade:**
 1. `bash "$HOME/scripts/dashboard-service.sh" restart` — once: the server gives each caller a role (admin,
@@ -18,6 +18,21 @@ authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
    without asking again ([docs/on-demand.md](docs/on-demand.md)). **Behaviour change:** a person the
    dashboard is shared with is a viewer, and reads only, until an admin gives them a role; an older page's
    bare command from a shared person is declined.
+
+## 3.70.0 — 2026-11-25
+
+**Upgrade:**
+1. `bash "$HOME/scripts/dashboard-service.sh" restart` — once: the server gives each chat message the
+   page's own session (`ping_conversation`) and a scenario request its own page (`request: true`, its
+   progress from `work/SCENARIOS.md` and `work/scenarios/S-<k>/`). It must say `ok`.
+2. Nothing else: the new page (`scripts/dashboard/page.html`) is read again on every load. Its chat is
+   one session per page, as on Design Desk; a scenario sent from Ask for a test opens its own page
+   `A-<n>` on Tests → Scenarios. The agent links that row to its scenario with
+   `asks.mjs link A-<n> S-<k>` ([docs/scenarios.md](docs/scenarios.md) → The pipeline, step 2); a request
+   from before has no link and shows only Sent and its answer.
+3. `asks.mjs find` takes the command only from a file now (`--command-file <file>`, written with the file
+   tool); `--command` is refused. A command can hold a person's free text, which never goes on a shell
+   command line ([docs/on-demand.md](docs/on-demand.md) → "answer dashboard question").
 
 ## 3.69.0 — 2026-11-25
 

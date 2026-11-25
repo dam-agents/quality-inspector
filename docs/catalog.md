@@ -362,11 +362,17 @@ published once, and asks the server for everything it shows.
   `collections.mjs` and `problems.mjs`,
   a setting checked first by `modules.sh valid` — and logs (`module_set … via=dashboard`), with the new
   data back; a viewer gets 403, and so does a developer or tester for a setting or a focus area; `GET /api/asks` — the caller's own questions from the
-  page's chat, each with its answer and its command; `POST /api/asks` — `{text, context, command?}`, a
+  page's chat, each with its answer and its command, and a scenario request's `request.scenario` — its
+  `S-<k>` (linked by `asks.mjs link` in `links.jsonl`), status, verdict, build, the frozen criteria's
+  names, and whether the test file, the runs and the report exist; `POST /api/asks` — `{text, context, command?, request?}`, a
   question or a page command (checked as `/api/commands` checks it, and against the role; its ping is the command itself) (at most 2000 characters, the
   same limit of 20 in 10 minutes), recorded with who asked in `work/dashboard/asks.jsonl`; its ping
   `answer dashboard question A-<n>` the page sends to the agent ([on-demand.md](on-demand.md)),
-  whose answer `scripts/dashboard/asks.mjs answer` writes to `answers.jsonl`; `POST /api/settings` — `{module, key, value}` or `{focus}`, an admin's
+  whose answer `scripts/dashboard/asks.mjs answer` writes to `answers.jsonl`, with `ping_conversation`
+  — the page's own platform session: the item of `context`, else its `page` (the tab and its page), in
+  the platform's key shape (`[A-Za-z0-9._-]{1,64}`, a short hash where it had to change); `request: true`
+  with a `test this scenario` or `walk these steps live` command makes the row a request's page, its
+  context and its conversation `A-<n>` ([dashboard-page.md](dashboard-page.md) → A request's page); `POST /api/settings` — `{module, key, value}` or `{focus}`, an admin's
   own change on Settings (anyone else: 403): `modules.sh valid` checks the key
   and the value, read-only, and the server writes the bullet itself and logs it
   (`module_set … via=dashboard`), and answers with the new state; it counts against the same 20 in 10

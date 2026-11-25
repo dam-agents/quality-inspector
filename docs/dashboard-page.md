@@ -135,8 +135,8 @@ new place is a page or a filter of these five tabs before it is a tab of its own
     the bell tells the person when it ends. Quality Inspector never asks again: what cannot be taken back
     or writes outside asks first, on the page, in one dialog that says what happens — **Delete the
     test…**, **Open the issue** (on GitHub), **Discard the draft**, **Retire**, **Stop running it each
-    night**, **Keep all … ready**, a schedule off. A scenario in words or steps keeps its own way, through
-    the chat (**Ask for a test**).
+    night**, **Keep all … ready**, a schedule off. A scenario in words or steps opens its own page instead
+    (**A request's page**).
 - **Roles.** Each person has one, from the roster an admin keeps on Settings → **People**
   (`work/dashboard/PEOPLE.md`, `scripts/lib/people.mjs`); the dashboard's owner on the platform is always
   an admin, anyone not in the roster a viewer. The person's menu says their role.
@@ -189,7 +189,19 @@ new place is a page or a filter of these five tabs before it is a tab of its own
     test's steps or that screen; the draft before stays for Restore.
 
   What is missing is said in amber under the fields; nothing goes until it is right. Send sends it
-  (Commands): an issue's number as a job, a scenario through the chat. A viewer has no **Ask for a test**.
+  (Commands): an issue's number as a job, a scenario as its own page. A viewer has no **Ask for a test**.
+- **A request's page.** A scenario in your words, steps, or **Do the steps live** sent from Ask for
+  a test opens a page of its own at once — `A-<n>`, the chat row's number, on Tests → **Scenarios**
+  (`#tests/A-12`), above the tests while it runs and three days after. Its work goes to a session of
+  its own (`POST /api/asks` with `request: true`; its conversation is `A-<n>`), never to the chat of
+  the page the person had open. The page shows: the state in the box under the title (Sent,
+  Preparing, Waiting for the product, Testing, then the result, or Turned down), **How it goes** —
+  Sent, Recorded (`S-<k>`), What the test checks, Waiting for the product, Testing (the test written,
+  run), Result — each done, now (moving) or to come, read from what the pipeline writes
+  (`work/SCENARIOS.md`, the frozen criteria, the test file, the runs, the report; the agent links the
+  row to its scenario with `asks.mjs link`, [scenarios.md](scenarios.md) step 2); then the criteria,
+  its tests, the report's **Report R-n**, Quality Inspector's answer, and the words or steps sent.
+  It looks again every 5 s while it runs. Only the person who sent it sees it.
 - **Reports on the page.** Every run is its report, numbered `R-1`, `R-2` … in the order the
   catalog first saw it, and opens in Runs at its own address (`#runs/R-12`). A test's **Report R-n** and
   each result in its history open that report at the test's own result (`#runs/R-12@issue-42/AC-1`).
@@ -204,6 +216,11 @@ new place is a page or a filter of these five tabs before it is a tab of its own
   a link keeps its target, when older runs leave the page.
 - **The chat.** **Ask Quality Inspector** waits in the bottom-right corner, as Design Desk's private
   ask: a question about what is open (its label shows *About: …*), with three starters that fit it.
+  **Each page has its own chat and its own session**, as on Design Desk: an open item (a test, a
+  run, a problem, a request `A-<n>`), else the tab and its page (Tests · Nightly, Product · Map). The
+  chat shows only that page's questions, and the page sends their ping with the page's conversation
+  (`sendPrompt(ping, {conversation})`; the server's `ping_conversation`), so the platform keeps one
+  session per page and person, which remembers that page's earlier questions.
   Only the asker and Quality Inspector see it. The server records it and the page sends its ping
   (`answer dashboard question A-<n>`); the answer comes into the chat within seconds of being written
   ([on-demand.md](on-demand.md)). Quality Inspector explains; it changes nothing from a question. The

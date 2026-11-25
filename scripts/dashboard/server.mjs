@@ -9,9 +9,10 @@
 //   GET  /api/images/<id>     one picture of that data, as a data URI
 //   GET  /api/videos/<id>?part=k  one part of a report's video (VIDEO_PART bytes, base64), with its size
 //   GET  /api/asks            the caller's own questions from the page's chat, each with its answer
-//   POST /api/asks            {text, context, command?}: a question or a request to Quality Inspector,
+//   POST /api/asks            {text, context, command?, request?}: a question or a request to Quality Inspector,
 //                             recorded with who asked; its ping the page sends to the agent — the page's
-//                             command as it is, or `answer dashboard question A-<n>` for a question
+//                             command as it is, or `answer dashboard question A-<n>` for a question — and
+//                             `ping_conversation`, the page's own session (`request: true`: the request's own)
 //   POST /api/act             {command}: an action done without the model — a setting, a focus area (an
 //                             admin's), dismiss, reopen or categorize D-<k>, dismiss or reopen a problem F-<k>,
 //                             add to or remove from a collection — written by this server itself (not a viewer)
@@ -40,7 +41,8 @@ import { changeCollection } from '../lib/collections.mjs';
 import { changeProblem, dismissedProblems, orderedRuns } from '../lib/problems.mjs';
 import { jobs as jobsOf, queue as queueJob, STATES as JOB_STATES } from '../lib/jobs.mjs';
 import { may, people, roleOf, setRole, ROLES } from '../lib/people.mjs';
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, readSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -244,11 +246,41 @@ const ASKS = join(DIR, 'asks.jsonl'), ANSWERS = join(DIR, 'answers.jsonl');
 const jsonl = (f) => (read(f) ?? '').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
 const asksOf = () => jsonl(ASKS);
 const answersOf = () => new Map(jsonl(ANSWERS).filter((a) => /^A-\d+$/.test(a.id ?? '') && typeof a.text === 'string').map((a) => [a.id, { text: a.text.slice(0, 6000), utc: a.utc ?? null }]));
-function recordAsk(who, text, context, command = null) {
+function recordAsk(who, text, context, command = null, id = `A-${asksOf().length + 1}`, request = false) {
   mkdirSync(DIR, { recursive: true });
-  const row = { id: `A-${asksOf().length + 1}`, utc: utc(), role: who.role, email: who.email, text, context, ...(command ? { command } : {}) };
+  const row = { id, utc: utc(), role: who.role, email: who.email, text, context, ...(command ? { command } : {}), ...(request ? { request: true } : {}) };
   appendFileSync(ASKS, `${JSON.stringify(row)}\n`, { mode: 0o600 });
   return row;
+}
+// Each page has its own chat and its own platform session, as on Design Desk: the page sends its
+// ping with this conversation key (docs/dashboard-page.md → The chat). The key is the open item, else
+// the tab and its page; the platform allows [A-Za-z0-9._-]{1,64}, so another character becomes "-"
+// and a key that changed or ran long gets a short hash of the whole, so two items never share one.
+export function conversationOf(context) {
+  const c = context ?? {};
+  if (/^A-\d{1,6}$/.test(c.item ?? '')) return c.item;
+  const whole = c.item ? `item.${c.item}` : `page.${c.page || c.tab || 'home'}`;
+  const slug = whole.replace(/[^A-Za-z0-9._-]+/g, '-');
+  if (slug === whole && slug.length <= 64) return slug;
+  return `${slug.slice(0, 55)}.${createHash('sha256').update(whole).digest('hex').slice(0, 8)}`;
+}
+// A scenario request from Ask for a test has a page of its own (docs/dashboard-page.md → A request's
+// page): its chat row is the page, its ping goes to a session of its own, and the agent links the row
+// to the scenario it records (asks.mjs link A-<n> S-<k>). What the page shows is read from what the
+// pipeline writes: the SCENARIOS.md row, the frozen criteria, the test file, the runs, the report.
+export const REQUEST_CMD = /^(?:test this scenario|walk these steps live): /;
+const LINKS = join(DIR, 'links.jsonl');
+const linksOf = () => new Map(jsonl(LINKS).filter((l) => /^A-\d+$/.test(l.id ?? '') && /^S-\d+$/.test(l.scenario ?? '')).map((l) => [l.id, l.scenario]));
+export function scenarioProgress(work, sid) {
+  if (!/^S-\d+$/.test(sid ?? '')) return null;
+  const row = tableRows(read(join(work, 'SCENARIOS.md'))).find(([id]) => id === sid) ?? [];
+  const [, , , , , build, verdict, st, at] = row, dir = join(work, 'scenarios', sid);
+  let files = []; try { files = readdirSync(dir); } catch { /* not recorded yet */ }
+  const crit = files.filter((f) => /^criteria-[A-Za-z0-9]+\.md$/.test(f)).sort((a, b) => mtime(join(dir, b)) - mtime(join(dir, a)))[0];
+  const criteria = crit ? (read(join(dir, crit)) ?? '').split('\n').map((l) => /^## (AC-\d{1,3})\s*[—–-]\s*(.{1,160})$/.exec(l.trim())).filter(Boolean).slice(0, 30).map((m) => ({ id: m[1], name: m[2].trim() })) : [];
+  const val = (v) => (v && v !== '-' ? v : null);
+  return { id: sid, status: val(st), verdict: val(verdict), build: val(build), updated: val(at), criteria,
+    test: existsSync(join(work, 'suite', 'tests', `scenario-${sid.slice(2)}.e2e.ts`)), ran: files.includes('runs.json'), report: files.some((f) => f.startsWith('report-')) };
 }
 const commandsOf = () => (read(LOG) ?? '').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
 function record(who, text) {
@@ -398,9 +430,10 @@ async function route(req, res, url, who) {
     return send(res, 200, { commands: mine });
   }
   if (m === 'GET' && p[1] === 'asks') {
-    const answers = answersOf();
+    const answers = answersOf(), links = linksOf();
     const mine = asksOf().filter((r) => r.email && r.email === who.email).slice(-60)
-      .map(({ id, utc: at, text, context, command }) => ({ id, utc: at, text, context, command: command ?? null, answer: answers.get(id) ?? null }));
+      .map(({ id, utc: at, text, context, command, request }) => ({ id, utc: at, text, context, command: command ?? null, answer: answers.get(id) ?? null,
+        ...(request ? { request: { scenario: scenarioProgress(WORK, links.get(id)) } } : {}) }));
     return send(res, 200, { asks: mine });
   }
   if (m === 'POST' && p[1] === 'asks') {
@@ -412,13 +445,18 @@ async function route(req, res, url, who) {
     if (!text || text.length > 2000 || /[\u0000-\u0008\u000b-\u001f\u007f]/.test(text)) throw new Said(400, 'Write a question of at most 2000 letters.');
     spend(who.email || who.sub || who.role);
     const c = b.context && typeof b.context === 'object' ? b.context : {};
-    const context = { tab: /^[a-z]{1,20}$/.test(c.tab ?? '') ? c.tab : null, item: typeof c.item === 'string' && c.item.length <= 200 && !/[\u0000-\u001f]/.test(c.item) ? c.item : null,
-      label: typeof c.label === 'string' ? c.label.replace(/[\u0000-\u001f]/g, ' ').slice(0, 200) : null };
-    const row = recordAsk(who, text, context, command);
-    log('info', 'dashboard_ask', `${row.id} from ${who.role}${command ? ' with a command' : ''}`);
+    const id = `A-${asksOf().length + 1}`, request = b.request === true && command !== null && REQUEST_CMD.test(command);
+    // A scenario request is its own page: its context is the request itself.
+    const context = request ? { tab: 'tests', page: 'tests/scenarios', item: id, label: `Scenario request ${id}` }
+      : { tab: /^[a-z]{1,20}$/.test(c.tab ?? '') ? c.tab : null, page: /^[a-z]{1,20}(?:\/[a-z-]{1,20})?$/.test(c.page ?? '') ? c.page : null,
+        item: typeof c.item === 'string' && c.item.length <= 200 && !/[\u0000-\u001f]/.test(c.item) ? c.item : null,
+        label: typeof c.label === 'string' ? c.label.replace(/[\u0000-\u001f]/g, ' ').slice(0, 200) : null };
+    const row = recordAsk(who, text, context, command, id, request);
+    log('info', 'dashboard_ask', `${row.id} from ${who.role}${request ? ' a scenario request' : command ? ' with a command' : ''}`);
     // A command goes to the agent in its exact words, as the page's commands always did (a viewer's
-    // channel turn reads them so); the agent answers it in the chat (docs/on-demand.md).
-    return send(res, 201, { id: row.id, ping: command ?? `answer dashboard question ${row.id}` });
+    // channel turn reads them so); the agent answers it in the chat (docs/on-demand.md). The ping goes
+    // to the page's own session: one platform session per page, and one per scenario request.
+    return send(res, 201, { id: row.id, ping: command ?? `answer dashboard question ${row.id}`, ping_conversation: conversationOf(context) });
   }
   if (m === 'POST' && p[1] === 'commands') {
     const b = await body(req);
