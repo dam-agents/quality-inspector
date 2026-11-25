@@ -1643,14 +1643,29 @@
   .qi-walk figure { margin: 0; display: grid; gap: 4px; } .qi-walk figcaption { font-size: var(--fs-micro); color: var(--muted); overflow-wrap: anywhere; }
   .qi-thumb.fail { border: 2px solid var(--closed); box-shadow: 0 0 0 3px var(--closed-soft); }
   /* Expected beside what happened, under the screen with the error marked. */
-  .qi-vs { display: grid; gap: 12px; margin: 8px 0 12px; }
-  .qi-vs-g { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
-  .qi-vs-g > div { padding: 8px 12px; border-radius: var(--r-md); border-left: 3px solid var(--line); background: var(--soft); }
-  .qi-vs-g h4 { margin: 0 0 4px; font-size: var(--fs-meta); } .qi-vs-g p { margin: 0; }
-  .qi-vs-g .exp { border-left-color: var(--approved); background: var(--approved-soft); } .qi-vs-g .act { border-left-color: var(--closed); background: var(--closed-soft); }
   .qi-marked { margin: 0; display: grid; gap: 4px; max-width: 720px; } .qi-marked .qi-thumb { aspect-ratio: auto; max-height: 520px; } .qi-marked .qi-thumb img { object-fit: contain; height: auto; }
   .qi-marked figcaption { display: flex; gap: 8px; align-items: center; font-size: var(--fs-meta); color: var(--muted); }
   .qi-marked .mk { flex: none; width: 14px; height: 10px; border: 2px solid var(--closed); border-radius: 2px; } .qi-marked .mk[data-by="agent"] { border-color: var(--warn); }
+  .qi-fail { display: grid; gap: 12px; margin: 8px 0 12px; max-width: 760px; } .qi-fail.two { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); max-width: none; }
+  .qi-fail figure { margin: 0; display: grid; gap: 0; align-content: start; }
+  .qi-fail .qi-thumb { aspect-ratio: auto; max-height: 560px; border-radius: var(--r-md) var(--r-md) 0 0; } .qi-fail .qi-thumb img { object-fit: contain; height: auto; }
+  .qi-fail .qi-thumb.fail { border: 2px solid var(--closed); box-shadow: none; } .qi-fail .ok .qi-thumb { border: 2px solid var(--approved); }
+  .qi-fail figcaption { padding: 8px 12px; border-radius: 0 0 var(--r-md) var(--r-md); background: var(--closed-soft); display: grid; gap: 4px; }
+  .qi-fail .ok figcaption { background: var(--approved-soft); } .qi-fail figure > figcaption:only-child { border-radius: var(--r-md); }
+  .qi-fail h4 { margin: 0; font-size: var(--fs-meta); } .qi-fail .now h4 { color: var(--closed); } .qi-fail .ok h4 { color: var(--approved); } .qi-fail p { margin: 0; }
+  .qi-fail .mk { display: inline-block; vertical-align: -1px; margin-right: 6px; width: 14px; height: 10px; border: 2px solid var(--closed); border-radius: 2px; } .qi-fail .mk[data-by="agent"] { border-color: var(--warn); }
+  .qi-exp { padding: 8px 12px; border-radius: var(--r-md); border-left: 3px solid var(--approved); background: var(--soft); margin: 0 0 8px; } .qi-exp h4 { margin: 0 0 4px; font-size: var(--fs-meta); }
+  .qi-note { margin: 0 0 8px; }
+  details.qi-fold { margin: 8px 0 0; } details.qi-fold > summary { cursor: pointer; font-size: var(--fs-meta); font-weight: 600; padding: 4px 0; }
+  .qi-nospec { margin: 12px 0; padding: 12px 16px; border-radius: var(--r-md); border: 2px solid var(--warn); background: var(--waiting-soft); font-size: var(--fs-body, 15px); }
+  .qi-nospec b { display: block; margin-bottom: 4px; color: var(--waiting); font-size: 1.05em; }
+  .qi-upkeep { margin: 8px 0 12px; padding: 8px 12px; border-radius: var(--r-md); border-left: 3px solid var(--accent); background: var(--soft); } .qi-upkeep p { margin: 0; } .qi-upkeep p + p { margin-top: 4px; }
+  .qi-ways { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+  .qi-ways > div { padding: 8px 12px; border-radius: var(--r-md); background: var(--soft); border-left: 3px solid var(--line); } .qi-ways .now { border-left-color: var(--approved); background: var(--approved-soft); }
+  .qi-ways h4 { margin: 0 0 4px; font-size: var(--fs-meta); } .qi-ways ol { margin: 0; padding-left: 20px; } .qi-ways li.chg { font-weight: 600; color: var(--approved); }
+  .qi-diff { margin: 8px 0 0; padding: 8px; overflow-x: auto; font: var(--fs-micro)/1.5 var(--mono); background: var(--soft); border-radius: var(--r-sm); white-space: pre; }
+  .qi-diff [data-d="add"] { color: var(--approved); background: var(--approved-soft); } .qi-diff [data-d="del"] { color: var(--closed); background: var(--closed-soft); }
+  #nav .count.change { margin-left: 4px; background: var(--waiting-soft); color: var(--waiting); }
   .qi-walk-t + .qi-walk-t { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); } .qi-walk-t h4 { margin: 0 0 4px; }
   /* A bug issue: its stages as on Design Desk, the draft to read, the ways on. */
   .bug-box { display: grid; gap: 8px; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
@@ -1723,6 +1738,7 @@
   .qb-cap { display: flex; gap: 8px; align-items: flex-start; min-height: 44px; margin-bottom: 8px; }
   .qb-cap .qb-n { background: var(--ink); color: var(--bg); } .qb-cap b { display: block; overflow-wrap: anywhere; } .qb-cap > div { min-width: 0; }
   .qb-note { margin: 0 0 8px; font-size: var(--fs-meta); color: var(--live); }
+  .tp { max-width: 820px; } .tp .qb-ph { aspect-ratio: auto; min-height: 160px; }
   .qb-stage { position: relative; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--soft); }
   .qb-stage img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .qb-stage .hs { position: absolute; border-radius: var(--r-xs); box-sizing: border-box; padding: 0; font: inherit; font-size: var(--fs-micro); color: var(--muted); overflow: hidden; }
@@ -1946,6 +1962,10 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
   // Test upkeep (docs/maintenance.md): what changed, and what Quality Inspector proposes.
   const UPKEEP_KIND = { "needs-review": "The test no longer matches the product", rework: "The steps before the check no longer work", superseded: "A newer issue replaced it", drift: "The kept check was changed",
     quarantined: "Set aside: it was unstable", fighting: "Repaired three times in a month", obsolete: "What it needs is gone", moved: "A control it uses moved", renamed: "A control it uses was renamed", predicted: "A pull request may change it" };
+  // A test's open proposals: of the criterion, or of its whole issue or scenario.
+  const upkeepFor = (i) => upkeep().filter((m) => m.test === testNum(i) || (i.origin?.ref && m.test === i.origin.ref));
+  // A proposal's warning when no issue or pull request explains the change (docs/maintenance.md → The proposal's details).
+  const noSpec = (m) => m.spec === false;
   const UPKEEP_DO = { heal: "Repair the test", rewrite: "Rewrite the test", review: "A person looks at it", retire: "Retire the test", "re-promote": "Keep it each night again" };
 
   // ---------- bridge ----------
@@ -2010,7 +2030,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
   const testState = (i) => (running(i) ? "running" : verdictOf(i.verdict?.value)[1]);
   const running = (i) => i.origin?.kind === "issue" && (S.status?.issues || []).some((x) => `#${x.issue}` === i.origin.ref);
   const tests = () => D().items || [];
-  const testKinds = { all: "All", nightly: "Nightly", issues: "From issues", scenarios: "Scenarios", upkeep: "Upkeep", features: "Features" };
+  const testKinds = { all: "All", nightly: "Nightly", issues: "From issues", scenarios: "Scenarios", upkeep: "Needs a change", features: "Features" };
   const upkeep = () => (D().maintenance || []).filter((m) => /^M-\d+$/.test(m.id || ""));
   const ready = () => tests().filter((i) => i.tier === "promotable");
   const features = () => (D().features || []).filter((f) => /^[a-z0-9][a-z0-9-]{0,39}$/.test(f.id || ""));
@@ -2116,7 +2136,9 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
   // while a problem is open.
   function renderNav() {
     const open = probList("open").length, failing = testList("failing", "all").length;
-    const tab = ([k, n, warn]) => `<button data-tab="${k}" aria-current="${S.tab === k}"${k === "problems" ? ` class="main"` : ""}>${esc(TABS[k])}${n ? `<span class="count${warn ? " warn" : ""}"${warn ? ` title="${esc(warn)}"` : ""}>${n}</span>` : ""}</button>`;
+    const ups = upkeep().length;
+    const tab = ([k, n, warn]) => `<button data-tab="${k}" aria-current="${S.tab === k}"${k === "problems" ? ` class="main"` : ""}>${esc(TABS[k])}${n ? `<span class="count${warn ? " warn" : ""}"${warn ? ` title="${esc(warn)}"` : ""}>${n}</span>` : ""}`
+      + (k === "tests" && ups ? `<span class="count change" data-upkeep title="${esc(`${plural(ups, "test needs", "tests need")} a change: Quality Inspector waits for your decision`)}">✎ ${ups}</span>` : "") + `</button>`;
     const sep = `<span class="sep" aria-hidden="true"></span>`;
     const html = [[["problems", open, open && `${plural(open, "problem is", "problems are")} still in the product`]], [["tests", failing], ["runs"]], [["product", openDesign().length]]]
       .map((g) => g.map(tab).join("")).join(sep);
@@ -2193,7 +2215,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
       empty = S.probFilter === "open" ? "No problem is open. The newest runs found nothing wrong." : "Nothing here.";
     } else if (S.tab === "tests" && S.testPage === "upkeep") {
       head = pages("testPage", testPages()) + (ready().length ? `<div class="filterbar">${cmdBtn("promote all pending", `Keep all ${ready().length} ready`, "Every test that proved its change joins the nightly regression")}</div>` : "");
-      rows = [...upkeep().map((m) => { const t = byRef(m.test); return row(m.id, `${UPKEEP_KIND[m.kind] || human(m.kind)}`, m.id, dot("look", "Needs a decision"), [fact("test", m.test), fact("proposal", UPKEEP_DO[m.proposal] || m.proposal), whenFact("since", m.opened_utc)].join("")); }),
+      rows = [...upkeep().map((m) => { const t = byRef(m.test); return row(m.id, `${t?.name ? `${t.name} — ` : ""}${UPKEEP_KIND[m.kind] || human(m.kind)}`, m.id, dot("look", "Needs a decision"), [fact("test", m.test), fact("proposal", upkeepDo(m)), noSpec(m) ? fact("warning", "No issue or PR for this change") : "", whenFact("since", m.opened_utc)].join("")); }),
         ...ready().map((i) => row(i.key, i.name || i.id, testLabel(i), dot("pass", "Ready to keep"), [fact("kept", "Ready to keep"), whenFact("proved", i.verdict?.utc)].join("")))];
       empty = "Nothing to decide: every test runs as it should.";
     } else if (S.tab === "tests" && S.testPage === "features") {
@@ -2323,27 +2345,42 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     const inF = features().filter((f) => membersOf(f.members).includes(i)), inC = collections().filter((c) => membersOf(c.members).includes(i));
     return head(i.name || i.id, refLabel(ref), `${refLabel(ref) !== ref ? `<span class="num" title="Its name in the profile">${esc(whole)}</span> · ` : ""}${esc(text(i.origin?.title || ""))} · <span title="${esc(TIER_TIP[i.tier] || "")}">Kept: ${esc(TIER[i.tier] || i.tier)}</span>`)
       + statusBox(s, w, STATE_TIP[s], actions, now)
+      + upkeepBox(i)
       + bugSect(/^(#\d+ (AC|IN|EX)-\d+|S-\d+ AC-\d+|P-[a-z0-9-]+ AC-\d+)$/.test(ref) ? [ref] : [])
       + (cause && CAUSE_WORD[cause] ? `<p class="qi-why"><b>${esc(CAUSE_WORD[cause][0])}.</b> ${esc(CAUSE_WORD[cause][1])}</p>` : "")
       + (i.summary ? `<p class="lead">${esc(i.summary)}</p>` : "")
-      + (bad ? (() => { const got = newestRep(i); return got ? sect("What happened, step by step", expectedVsActual(i, got.e.why || i.verdict?.why, got.x, i.verdict?.utc === got.r.utc)
-        + `<p class="k">From <button class="anchor" data-goto="runs" data-item="${esc(`${got.r.id}@${i.key}`)}">report ${esc(got.r.id)}</button>, build ${buildA(got.r.build)}</p>${walkable(got.x) ? walkList(got.x) : sideHtml(got.x, "New build", got.r.build, i.name)}`) : ""; })() : "")
+      + (bad ? (() => { const got = newestRep(i); return got ? sect("What happened, step by step", failView(i, got, i.verdict?.utc === got.r.utc) + stepsFold(i, got, got.e.why || i.verdict?.why)) : ""; })() : "")
       + sect("What it checks", gwt.length ? `<dl class="qi-gwt">${gwt.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>${i.quote ? `<blockquote class="qi-quote">“${esc(i.quote)}”</blockquote>` : ""}` : "")
+      + tpSect(i)
       + sect("Results", i.history?.length ? histList(i.history, i) : "")
       + sect("Screens it opens", i.pages?.length ? `<ul class="qi-list">${i.pages.map((p) => `<li><button class="anchor" data-item="screen:${esc(p)}">${esc(p)}</button></li>`).join("")}</ul>` : "")
       + sect("Part of", inF.length || inC.length ? `<p>${[...inF.map((f) => `<button class="anchor" data-goto="tests" data-item="feature:${esc(f.id)}">${esc(f.name)}</button>`), ...inC.map((c) => `<button class="anchor" data-goto="tests" data-item="collection:${esc(c.name)}">${esc(c.name)}</button>`)].join(" ")}</p>` : "");
   }
   // An upkeep proposal (M-n): what changed for a kept test, what Quality Inspector proposes, the person's word.
+  const upkeepDo = (m) => (m.kind === "rework" && m.proposal === "rewrite" ? "Use the new way" : UPKEEP_DO[m.proposal] || m.proposal);
   function renderUpkeep(m) {
     const t = byRef(m.test), act = (k, label, tip, primary) => cmdBtn(`${k} ${m.id}`, label, tip, primary);
+    const newWay = m.kind === "rework" && m.proposal === "rewrite";
+    const because = (m.because || []).map((b) => `<li>${b.issue ? issueA(b.issue, `Issue #${b.issue}`) : issueA(b.pr, `PR #${b.pr}`)} ↗${b.quote ? ` <q>${esc(b.quote)}</q>` : ""}</li>`).join("");
+    const ways = (m.before?.length || m.after?.length) ? `<div class="qi-ways"><div class="was"><h4>The old way</h4><ol>${(m.before || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ol></div>`
+      + `<div class="now"><h4>The new way</h4><ol>${(m.after || []).map((x, k) => `<li class="${(m.before || [])[k] === x ? "" : "chg"}">${esc(x)}</li>`).join("")}</ol></div></div>` : "";
+    const diff = m.diff ? `<details class="qi-fold"><summary>The change to the test file</summary><pre class="qi-diff">${String(m.diff).split("\n").map((l) => `<span data-d="${l.startsWith("+") && !l.startsWith("+++") ? "add" : l.startsWith("-") && !l.startsWith("---") ? "del" : ""}">${esc(l)}</span>`).join("\n")}</pre></details>` : "";
     return head(UPKEEP_KIND[m.kind] || human(m.kind), m.id, t ? `<button class="anchor" data-goto="tests" data-item="${esc(t.key)}">${esc(t.name || "")} <span class="num">${esc(m.test)}</span></button>` : esc(m.test))
-      + statusBox("look", "Needs a decision", "Quality Inspector waits for a person's word before it changes a kept test.",
-        [act("accept", `Accept: ${(UPKEEP_DO[m.proposal] || m.proposal).toLowerCase()}`, "Quality Inspector does what it proposes", true), act("keep", "Keep it as it is", "Nothing changes; the proposal closes"),
+      + statusBox("look", "Needs a decision", newWay ? "The test did not pass. Quality Inspector found a new way to do its steps and waits for your word before it changes the test." : "Quality Inspector waits for a person's word before it changes a kept test.",
+        [act("accept", newWay ? "Use the new way" : `Accept: ${(UPKEEP_DO[m.proposal] || m.proposal).toLowerCase()}`, newWay ? "Quality Inspector changes the steps of the test to the new way, runs it, and records the change. The check does not change." : "Quality Inspector does what it proposes", true),
+          act("keep", "Keep it as it is", newWay ? "The test stays as it is and fails while the product does not do the old way" : "Nothing changes; the proposal closes"),
           more([act("rewrite", "Rewrite the test", "Quality Inspector writes the test anew"), act("retire", "Retire the test", "The test stops running")].filter(Boolean))].join(""), `since ${esc(ago(m.opened_utc))} · build ${buildA(m.build || "?")}`)
+      + (noSpec(m) ? `<div class="qi-nospec" role="note"><b>No issue or pull request asks for this change.</b> The product does this in a new way, but no specification says so. It can be a regression: make sure that the change is intended before you use the new way.</div>` : "")
+      + (because ? sect("Why it changed", `<ul class="qi-list">${because}</ul>`) : "")
       + sect("What changed", m.basis ? `<p>${esc(m.basis)}</p>` : "")
-      + sect("What Quality Inspector proposes", `<p>${esc(UPKEEP_DO[m.proposal] || m.proposal)}.</p>`)
+      + (ways ? sect("The steps before the check", ways + (m.found ? `<p class="k">Where Quality Inspector found the new way: ${esc(m.found)}</p>` : "")) : sect("What Quality Inspector proposes", `<p>${esc(upkeepDo(m))}.</p>`))
+      + diff
       + sect("The test", t ? `<p><button class="anchor" data-item="${esc(t.key)}">${esc(t.name || t.id)} <span class="num">${esc(testLabel(t))}</span></button></p>` : "");
   }
+  // A test's open proposals as a box on its page and in a report: what waits, with its warning.
+  const upkeepBox = (i) => { const ms = i ? upkeepFor(i) : []; if (!ms.length) return "";
+    return `<div class="qi-upkeep">${ms.map((m) => `<p><b>${m.kind === "rework" && m.proposal === "rewrite" ? "A new way to do this test waits for your decision." : `${esc(UPKEEP_KIND[m.kind] || human(m.kind))}: Quality Inspector waits for your decision.`}</b> `
+      + `<button class="anchor" data-goto="tests" data-item="${esc(m.id)}">Open ${esc(m.id)}</button>${noSpec(m) ? ` <span class="chip tag warn">No issue or PR for this change</span>` : ""}</p>`).join("")}</div>`; };
   // A feature or a collection: its tests, run together, and its criteria as Gherkin.
   const gherkin = (name, its) => [`Feature: ${name}`, "", ...its.flatMap((i) => [`  Scenario: ${testNum(i)} — ${i.name || ""}`, ...[["Given", i.given], ["When", i.when], ["Then", i.then]].filter(([, v]) => v).map(([k, v]) => `    ${k} ${v}`), ""])].join("\n");
   function renderGroup(kind, x) {
@@ -2385,20 +2422,72 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
         + (pics.length ? `<div class="wp">${pics.map((sh) => `<figure>${shotBtn(sh, sh.fail ? " fail" : "")}<figcaption>${esc(sh.cap)}</figcaption></figure>`).join("")}</div>` : "") + `</div></li>`; }).join("")}`
       + (x.more ? `<li class="k"><span class="wn">…</span><div>${x.more} more steps in the full report</div></li>` : "") + `</ol>`;
   }
-  // What the test expected beside what happened, with the screen the error is marked on: the test's own
-  // red frame, or Quality Inspector's orange one with what it saw (docs/reporting.md → The mark).
-  function expectedVsActual(i, why, x, newest) {
+  // The failure first (docs/dashboard-page.md → The walk): the screen at the failure, large — the marked
+  // still when the test or Quality Inspector framed the error — with what is wrong and nothing else beside
+  // it; how the screen looks where the test passes (the last release, else an earlier run), when a
+  // screenshot of that step exists; then the test's Given, When and Then; the steps folded under them.
+  const badSt = (st) => st === "failed" || st === "timed-out";
+  const failAt = (x) => (x?.steps || []).findIndex((s) => badSt(s[2]));
+  const failShot = (x) => { const sh = (x?.shots || []).filter((y) => y.img), n = failAt(x);
+    return sh.find((y) => y.fail) || (n >= 0 && sh.filter((y) => y.at <= n).at(-1)) || sh.at(-1) || null; };
+  // A step's label in words: a page address the test waited for, written as a pattern, reads as the address.
+  const stepWords = (api, label) => { const l = String(label || api || "");
+    const re = /^\/(.*)\/[a-z]*$/.exec(l); if (!re || !/\\|\[|\+|\*/.test(re[1])) return l;
+    return re[1].replace(/^\^|\$$/g, "").replace(/\[[^\]]*\][+*]?|\.[+*]|\\d[+*]?|\\w[+*]?/g, "…").replace(/\\(.)/g, "$1"); };
+  // What is wrong, alone: what the frame shows, else the agent's `wrong`, else the step that failed.
+  function wrongOf(i, e, x, newest) {
+    if (newest && i?.marked === "agent" && i.mark_saw) return i.mark_saw;
+    if (e?.wrong) return e.wrong;
+    const n = failAt(x);
+    if (n >= 0) { const [api, label, st, ms] = x.steps[n], l = String(label || api || ""), page = stepWords(api, label);
+      const t = ms != null ? ` in ${secs(ms)}` : "";
+      if (page !== l) return `The page ${page} did not open${t}.`;
+      return `Step ${n + 1} ${st === "timed-out" ? "did not end" : "did not pass"}${t}: ${l}`; }
+    const err = String(x?.err || "").split(/\n|(?<=\.)\s/)[0];
+    return err || "";
+  }
+  // The same step on a side where the test passed: the step with the same words, else the shot nearest before it.
+  function okShot(ok, label, n) {
+    const sh = (ok?.shots || []).filter((y) => y.img && !y.fail); if (!sh.length) return null;
+    const k = (ok.steps || []).findIndex((s) => (s[1] || s[0]) === label), at = k >= 0 ? k : n;
+    return sh.find((y) => y.at === at) || sh.filter((y) => y.at <= at).at(-1) || sh.at(-1);
+  }
+  function howItShouldLook(i, got) {
+    const n = failAt(got.x), st = got.x?.steps?.[n], label = st ? st[1] || st[0] : null;
+    const b = got.res?.b;
+    if (b?.st === "passed") { const sh = okShot(b, label, n); if (sh) return { sh, from: `On the last release${got.r.baseline ? `, build ${buildA(got.r.baseline)}` : ""}, where the test passes` }; }
+    const all = runs(), from = all.indexOf(got.r);
+    for (const r of all.slice(from + 1)) { const c = r.rep?.results?.[i.key]?.c; if (c?.st !== "passed") continue;
+      const sh = okShot(c, label, n); if (sh) return { sh, from: `In ${runA(r)}, build ${buildA(r.build)}, where the test passed` }; }
+    return null;
+  }
+  function failView(i, got, newest) {
     if (!i) return "";
+    const x = got?.x, e = got?.e, wrong = wrongOf(i, e, x, newest);
+    const marked = newest && i.marked && i.still, fs = failShot(x), ok = got ? howItShouldLook(i, got) : null;
+    const now = marked ? { img: i.still_sharp || i.still, cap: `${testLabel(i)} — ${i.mark_saw || "the failing check"}` } : fs ? { ...fs, cap: `${testLabel(i)} — the screen at the failure` } : null;
+    const frame = marked ? (i.marked === "test" ? "The red frame marks the check that failed." : "The orange frame marks what is wrong.") : "";
+    const pic = (sh, cls) => `<button type="button" class="qi-thumb${cls}" data-shot="${esc(sh.img)}" data-cap="${esc(sh.cap)}" title="Shows the screenshot at its full size"><img data-img="${esc(sh.img)}" alt="${esc(sh.cap)}" /></button>`;
     const exp = [i.given && ["Given", i.given], i.when && ["When", i.when], i.then && ["Then", i.then]].filter(Boolean);
-    const saw = why || x?.err || "";
-    const pic = newest && i.marked && i.still ? `<figure class="qi-marked"><button type="button" class="qi-thumb" data-shot="${esc(i.still_sharp || i.still)}" data-cap="${esc(`${testLabel(i)} — ${i.mark_saw || "the failing check"}`)}" title="Shows the screen at its full size"><img data-img="${esc(i.still_sharp || i.still)}" alt="The screen with the error marked" /></button>`
-      + `<figcaption><span class="mk" data-by="${esc(i.marked)}"></span>${i.marked === "test" ? "The test marked the check that failed, in red." : `Quality Inspector marked what is wrong, in orange${i.mark_saw ? `: ${esc(i.mark_saw)}` : "."}`}</figcaption></figure>` : "";
-    if (!exp.length && !saw && !pic) return "";
-    return `<div class="qi-vs">${pic}<div class="qi-vs-g"><div class="exp"><h4>Expected</h4>${exp.length ? `<dl class="qi-gwt">${exp.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : `<p class="k">The test's criterion is not on the page.</p>`}</div>`
-      + `<div class="act"><h4>What happened</h4>${saw ? `<p>${esc(saw)}</p>` : `<p class="k">The run says no more than its result.</p>`}</div></div></div>`;
+    const pics = now || wrong ? `<div class="qi-fail${ok && now ? " two" : ""}">`
+      + `<figure class="now">${now ? pic(now, " fail") : ""}<figcaption><h4>What is wrong</h4>${wrong ? `<p>${esc(wrong)}</p>` : `<p class="k">The run says no more than its result.</p>`}${frame ? `<p class="k"><span class="mk" data-by="${esc(i.marked)}"></span>${frame}</p>` : ""}</figcaption></figure>`
+      + (ok && now ? `<figure class="ok">${pic({ img: ok.sh.img, cap: `${testLabel(i)} — how it should look` }, "")}<figcaption><h4>How it should look</h4><p class="k">${ok.from}.</p></figcaption></figure>` : "")
+      + `</div>` : "";
+    const gwt = exp.length ? `<div class="qi-exp"><h4>Expected</h4><dl class="qi-gwt">${exp.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl></div>` : "";
+    return pics + gwt;
+  }
+  // The steps, folded: their count, the step that failed, and the report they come from.
+  function stepsFold(i, got, why) {
+    const note = why ? `<p class="qi-note"><b>The agent's note:</b> ${esc(why)}</p>` : "";
+    if (!got) return note ? `<details class="qi-fold"><summary>The agent's note</summary>${note}</details>` : "";
+    const x = got.x, n = failAt(x), all = (x?.steps || []).length + (x?.more || 0);
+    const body = walkable(x) ? walkList(x) : sideHtml(x, "New build", got.r.build, i.name);
+    if (!body) return note ? `<details class="qi-fold"><summary>The agent's note</summary>${note}</details>` : "";
+    return `<details class="qi-fold"><summary>${all ? `All ${all} steps` : "The steps"}${n >= 0 ? ` · step ${n + 1} failed` : ""}<span class="k"> · report ${esc(got.r.id)}, build ${esc(got.r.build || "?")}</span></summary>`
+      + `${note}<p class="k">From <button class="anchor" data-goto="runs" data-item="${esc(`${got.r.id}@${i.key}`)}">report ${esc(got.r.id)}</button>, build ${buildA(got.r.build)}</p>${body}</details>`;
   }
   // A test's newest result with its report on the page: the run, its entry and the new build's side.
-  const newestRep = (i, among = runs()) => { for (const r of among) { const x = r.rep?.results?.[i.key]?.c, e = (r.entries || []).find((y) => y.key === i.key); if (x && e) return { r, x, e }; } return null; };
+  const newestRep = (i, among = runs()) => { for (const r of among) { const res = r.rep?.results?.[i.key], x = res?.c, e = (r.entries || []).find((y) => y.key === i.key); if (x && e) return { r, x, e, res }; } return null; };
   // What changed since the run before of the same night, issue or scenario: tests newly failing, fixed,
   // still failing and new; the product map's difference; new errors in the browser console.
   const before = (r) => { const series = runs().filter((x) => x.type === r.type && (r.type === "regression" ? x.verdict !== "environment" : x.ref === r.ref)); return series[series.indexOf(r) + 1] || null; };
@@ -2427,8 +2516,9 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     const results = (r.entries || []).map((e) => {
       const i = tests().find((x) => x.key === e.key), x = rep[e.key], [ew, es] = verdictOf(e.value);
       return `<details class="qi-res" data-key="${esc(e.key)}"${es === "fail" || es === "look" || es === "blocked" ? " open" : ""}><summary><span class="t">${esc(i?.name || e.key)}</span><span class="num">${esc(i ? testLabel(i) : "")}</span>${dot(es, ew)}${stw(es, ew)}</summary>`
-        + `<div class="qi-res-b">${["fail", "look", "blocked"].includes(es) ? expectedVsActual(i, e.why, x?.c, i && i.verdict?.utc === r.utc) : e.why ? `<p>${esc(e.why)}</p>` : ""}${i ? `<p class="k"><button class="anchor" data-goto="tests" data-item="${esc(i.key)}">Open the test</button></p>` : ""}`
-        + (x ? `<div class="qi-sides">${sideHtml(x.c, "New build", r.build, i?.name)}${sideHtml(x.b, "Last release", r.baseline, i?.name)}</div>` : `<p class="k">The steps and screenshots of this test are not on the page. ${video ? "The full report has them." : ""}</p>`)
+        + `<div class="qi-res-b">${upkeepBox(i)}${["fail", "look", "blocked"].includes(es) ? failView(i, x?.c ? { r, x: x.c, e, res: x } : null, i && i.verdict?.utc === r.utc) + (e.why ? `<details class="qi-fold"><summary>The agent's note</summary><p class="qi-note">${esc(e.why)}</p></details>` : "") : e.why ? `<p>${esc(e.why)}</p>` : ""}${i ? `<p class="k"><button class="anchor" data-goto="tests" data-item="${esc(i.key)}">Open the test</button></p>` : ""}`
+        + (x ? (["fail", "look", "blocked"].includes(es) ? `<details class="qi-fold"><summary>The steps on the new build and on the last release</summary><div class="qi-sides">${sideHtml(x.c, "New build", r.build, i?.name)}${sideHtml(x.b, "Last release", r.baseline, i?.name)}</div></details>`
+          : `<div class="qi-sides">${sideHtml(x.c, "New build", r.build, i?.name)}${sideHtml(x.b, "Last release", r.baseline, i?.name)}</div>`) : `<p class="k">The steps and screenshots of this test are not on the page. ${video ? "The full report has them." : ""}</p>`)
         + `</div></details>`;
     }).join("");
     return head(runTitle(r), r.id, `${esc(when(r.utc))} · build ${buildA(r.build || "?")}${r.baseline ? ` against the last release ${esc(r.baseline)}` : ""}`)
@@ -2466,8 +2556,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     const parts = about.slice(0, 3).map((ref) => { const i = byRef(ref); if (!i) return "";
       const got = newestRep(i, runsOf), why = got?.e.why || i.verdict?.why || p.what;
       return `<div class="qi-walk-t">${about.length > 1 ? `<h4><button class="anchor" data-goto="tests" data-item="${esc(i.key)}">${esc(i.name || i.id)} <span class="num">${esc(refLabel(ref))}</span></button></h4>` : ""}`
-        + expectedVsActual(i, why, got?.x, !got || i.verdict?.utc === got.r.utc)
-        + (got ? `<p class="k">Step by step in <button class="anchor" data-goto="runs" data-item="${esc(`${got.r.id}@${i.key}`)}">report ${esc(got.r.id)}</button>, build ${buildA(got.r.build)}</p>${walkable(got.x) ? walkList(got.x) : sideHtml(got.x, "New build", got.r.build, i.name)}` : "")
+        + failView(i, got, !got || i.verdict?.utc === got.r.utc) + stepsFold(i, got, why)
         + `</div>`; }).join("");
     return sect("What happened, step by step", parts);
   }
@@ -3001,13 +3090,14 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     return { name, steps };
   }
   // From a test: its Given, the pages it opens, its actions and checks, its Then.
-  function bFromItem(i) {
+  function itemSteps(i) {
     const steps = [];
     if (i.given) steps.push({ k: "given", t: bClean(i.given) });
-    for (const s of i.steps || []) { const k = { open: "open", act: "do", assert: "check" }[s.kind]; if (k) steps.push({ k, t: bClean(s.text) }); }
+    for (const s of i.steps || []) { const k = { open: "open", act: "do", assert: "check", expect: "check" }[s.kind]; if (k) steps.push({ k, t: bClean(s.text) }); }
     if (i.then) steps.push({ k: "check", t: bClean(i.then) });
-    bReplace(`Like ${testLabel(i)}: ${i.name || ""}`, steps.length ? steps : bDefault());
+    return steps.slice(0, B_MAX);
   }
+  function bFromItem(i) { const steps = itemSteps(i); bReplace(`Like ${testLabel(i)}: ${i.name || ""}`, steps.length ? steps : bDefault()); }
   const bVerb = (x) => { const n = String(x.name).replace(/"/g, "").slice(0, 80); return x.kind === "inputs" ? `Type a value in the field "${n}"` : `Click the ${(KIND[x.kind] || "control").toLowerCase()} "${n}"`; };
   const pageOf = (pat) => screens().find((p) => p.pattern === pat);
   const patOf = (path) => { if (!path) return null; if (pageOf(path)) return path;
@@ -3025,11 +3115,12 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     return best ? best[0] : null;
   }
   // Where each step happens: an Open goes to its page; a Do's control that leads to a page moves the next step there.
-  function bFrames() {
+  // A Check marks the control it names too, so a test's walk shows what it checks.
+  function framesOf(steps, checks = false) {
     let cur = null, path = null;
-    return B.steps.map((st, k) => {
+    return steps.map((st, k) => {
       if (st.k === "open") { path = st.t.trim().replace(/[?#].*$/, "") || null; cur = path ? patOf(path) : null; }
-      const p = cur ? pageOf(cur) : null, hs = st.k === "do" ? bControl(p, st.t) : null;
+      const p = cur ? pageOf(cur) : null, hs = st.k === "do" || (checks && st.k === "check") ? bControl(p, st.t) : null;
       const f = { st, k, pg: p, path, hs };
       const to = hs != null ? p.hotspots[hs].to : null;
       if (to && pageOf(to)) { cur = to; path = to; }
@@ -3037,6 +3128,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
       return f;
     });
   }
+  const bFrames = () => framesOf(B.steps);
   const bFilled = () => B.steps.filter((s) => s.t.trim());
   const bWords = () => [B.name.trim() ? `Name: ${B.name.trim()}` : null, ...bFilled().map((s, k) => `${k + 1}. ${bLine({ k: s.k, t: s.t.trim().replace(/\s+/g, " ") })}`)].filter(Boolean).join("\n");
   function bProblem() {
@@ -3068,24 +3160,59 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     bChanged(); bDraw();
   }
   // One step on its screen: the page's picture, its control marked, a Check written over it.
-  function bStage(f) {
+  const bStage = (f) => stageOf(f, B.rec);
+  function stageOf(f, rec = false) {
     if (!f) return `<div class="qb-ph">Add a step at the left.</div>`;
-    const p = B.rec ? f.next : f.pg;
+    const p = rec ? f.next : f.pg;
     if (!p) return `<div class="qb-ph">${f.st.k === "given" ? `<b>The state at the start</b><span>${esc(f.st.t || "Write what must be true at the start.")}</span>`
       : f.path ? `<b>${esc(f.path)}</b><span>This page is not on the product map. Quality Inspector finds it in the product.</span>`
       : `<b>No page yet</b><span>Add an Open step before this one. The preview then shows the page.</span>`}</div>`;
     const vp = (p.viewport || []).map(Number), ratio = vp[0] > 0 && vp[1] > 0 ? vp[0] / vp[1] : 1.6;
     const uri = p.shot ? imgNow.get(p.shot) : null;
     const hs = (p.hotspots || []).map((x, k) => [x, k]).sort(([a], [b]) => b.box[2] * b.box[3] - a.box[2] * a.box[3]).map(([x, k]) => {
-      const on = !B.rec && k === f.hs; if (!B.rec && !on && p.shot) return "";
+      const on = !rec && k === f.hs; if (!rec && !on && p.shot) return "";
       const [bx, by, bw, bh] = x.box.map((n) => Math.max(0, Math.min(1, n)) * 100), style = `left:${bx}%;top:${by}%;width:${bw}%;height:${bh}%`;
       const what = `${KIND[x.kind] || "Control"} "${x.name}"`, label = p.shot ? "" : `<span>${esc(x.name)}</span>`;
-      return B.rec ? `<button type="button" class="hs rec${on ? " step" : ""}" style="${style}" data-qb-pick="${k}" title="${esc(`${what}. Adds the step: ${bVerb(x)}`)}">${label}</button>`
-        : `<div class="hs ${on ? "step" : "mute"}" style="${style}"${on ? ` title="${esc(`${what}: this step uses it`)}"` : ""}>${label}</div>`;
+      return rec ? `<button type="button" class="hs rec${on ? " step" : ""}" style="${style}" data-qb-pick="${k}" title="${esc(`${what}. Adds the step: ${bVerb(x)}`)}">${label}</button>`
+        : `<div class="hs ${on ? "step" : "mute"}" style="${style}"${on ? ` title="${esc(`${what}: this step ${f.st.k === "check" ? "checks" : "uses"} it`)}"` : ""}>${label}</div>`;
     }).join("");
-    const check = !B.rec && f.st.k === "check" && f.st.t.trim() ? `<div class="qb-check" role="note">Check: ${esc(f.st.t)}</div>` : "";
+    const check = !rec && f.st.k === "check" && f.st.t.trim() ? `<div class="qb-check" role="note">Check: ${esc(f.st.t)}</div>` : "";
     return `<div class="qb-stage${p.shot ? "" : " wf"}" style="aspect-ratio:${ratio}">${p.shot ? `<img ${uri ? `src="${esc(uri)}"` : `data-img="${esc(p.shot)}"`} alt="The screen ${esc(p.title || p.pattern)}" />` : ""}${hs}${check}</div>`;
   }
+  // A test's walk on the product map (docs/dashboard-page.md → The walk on the map): its steps as the test
+  // file has them, each on its screen with the control it uses or checks marked. Nothing runs: it needs
+  // only the product map, so it shows before the test's first run too.
+  const TP = { key: null, cur: 0, timer: null };
+  const tpStop = () => { if (TP.timer) clearInterval(TP.timer); TP.timer = null; };
+  function tpHtml(i) {
+    const fr = framesOf(itemSteps(i), true); if (!fr.length) return "";
+    if (TP.key !== i.key) { tpStop(); TP.key = i.key; TP.cur = 0; }
+    TP.cur = Math.max(0, Math.min(fr.length - 1, TP.cur));
+    const f = fr[TP.cur], p = f.pg, hs = f.hs != null && p ? p.hotspots[f.hs] : null;
+    const where = p ? `${esc(p.title || p.pattern)} <span class="num">${esc(p.pattern)}</span>${hs ? ` · ${esc(KIND[hs.kind] || "Control")} “${esc(hs.name)}”` : ""}` : f.path ? `${esc(f.path)} (not on the product map)` : "";
+    return `<div class="qb-cap" aria-live="polite"><span class="qb-n">${TP.cur + 1}</span><div><b>${esc(STEP[f.st.k][0])}: ${esc(f.st.t || "…")}</b><span class="k">${where}</span></div></div>`
+      + stageOf(f)
+      + `<div class="qb-play"><button type="button" class="btn small" data-tp="back" title="Shows the step before"${TP.cur <= 0 ? " disabled" : ""}>◀ Back</button>`
+      + `<button type="button" class="btn small${TP.timer ? " on" : ""}" data-tp="play" title="${TP.timer ? "Stops the walk" : "Shows the steps one after the other, on the screens"}">${TP.timer ? "⏸ Stop" : "▶ Play the steps"}</button>`
+      + `<button type="button" class="btn small" data-tp="next" title="Shows the next step"${TP.cur >= fr.length - 1 ? " disabled" : ""}>Next ▶</button><span class="grow"></span>`
+      + `<span class="k">The screens of the product map. The test does not run here.</span></div>`
+      + `<div class="qb-film" role="group" aria-label="The steps">${fr.map((x) => `<button type="button" data-tp-go="${x.k}" aria-current="${x.k === TP.cur}" title="Shows step ${x.k + 1}"><b>${x.k + 1} ${esc(STEP[x.st.k][0])}</b><span>${esc(x.st.t || "…")}</span><span class="k">${esc(x.pg ? x.pg.title || x.pg.pattern : x.path || "–")}</span></button>`).join("")}</div>`;
+  }
+  const tpSect = (i) => { const h = tpHtml(i); return h ? sect("The test, step by step", `<div class="tp" id="tp" data-key="${esc(i.key)}">${h}</div>`) : ""; };
+  function tpDraw() {
+    const el = $("#tp"), i = el && tests().find((x) => x.key === el.dataset.key); if (!i) { tpStop(); return; }
+    el.innerHTML = tpHtml(i); loadImages(el);
+    const cur = el.querySelector('.qb-film [aria-current="true"]'); if (cur) cur.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest?.("[data-tp], [data-tp-go]"); if (!t || !t.closest("#tp")) return;
+    const n = $("#tp .qb-film")?.children.length || 0;
+    if (t.dataset.tpGo != null) { tpStop(); TP.cur = +t.dataset.tpGo; }
+    else if (t.dataset.tp === "back") { tpStop(); TP.cur -= 1; } else if (t.dataset.tp === "next") { tpStop(); TP.cur += 1; }
+    else if (TP.timer) tpStop();
+    else { if (TP.cur >= n - 1) TP.cur = 0; TP.timer = setInterval(() => { if (!$("#tp") || TP.cur >= ($("#tp .qb-film")?.children.length || 0) - 1) { tpStop(); if ($("#tp")) tpDraw(); return; } TP.cur += 1; tpDraw(); }, 1800); }
+    tpDraw();
+  });
   // The right side changes as a person types; the left is drawn anew only when the steps change shape.
   function bPreview() {
     const el = $("#qb-preview"); if (!el) return;
@@ -3347,7 +3474,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
   document.addEventListener("click", (e) => {
     const t = e.target.closest?.("[data-tab], [data-item], [data-filter], [data-back], [data-reload], [data-ask-page]");
     if (!t) return;
-    if (t.matches("a[data-tab], [data-tab]")) { e.preventDefault(); moreClose(); S.tab = t.dataset.tab; S.item = null; draw(); return; }
+    if (t.matches("a[data-tab], [data-tab]")) { e.preventDefault(); moreClose(); S.tab = t.dataset.tab; S.item = null; if (e.target.closest("[data-upkeep]")) S.testPage = "upkeep"; draw(); return; }
     if (t.matches("[data-back]")) { S.item = null; draw(); return; }
     if (t.matches("[data-reload]")) { location.reload(); return; }
     if (t.matches("[data-ask-page]")) { askTest({ page: t.dataset.askPage, control: t.dataset.askControl }); return; }

@@ -81,8 +81,9 @@ refused with a "start a new chat". A direct session's first request names it
   before its frozen block: the "run" procedure below with `--no-cache` finds the step; the explaining
   change comes from `radar.mjs issues` over the window since the build it last passed
   ([change-awareness.md](change-awareness.md)) or from the operator's words (basis `operator: <words>`);
-  then [triage.md](triage.md) → **Reworking the steps before a block** on the build that is up. Rules
-  hold → save, `HEALS.md` row, answer with the strict run; a rule fails → a `rework` proposal, shown here.
+  then [triage.md](triage.md) → **Reworking the steps before a block** on the build that is up. A new
+  way found → its `rework` proposal, shown here with its steps and reason (or its no-specification
+  warning); the operator's "accept M-<k>" saves it. None found → the `review` proposal, shown here.
 - **"run feature <words>"** — a feature's recurring tests now, by hand: [features.md](features.md)
   → Asking for a feature. **"add #N[ AC-k|IN-k] to the feature <id>"**, **"remove … from the feature
   <id>"**, **"alias feature <id> <text>"**, **"rename feature <id> <text>"**, **"merge feature <a>

@@ -94,15 +94,15 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, `b
    `criterion()` judges a check whose control moved instead of failing it. Explorations
    (`issue-<n>-ex`) are never replayed ([explorations.md](explorations.md)).
 6. **Triage** every result that is not plain `unchanged` per [triage.md](triage.md) (heal,
-   retire and rework only where its rules allow); re-run every healed or reworked file strictly.
+   retire only where its rules allow, a rework only as a proposal); re-run every healed file strictly.
    A `blocked` criterion whose cause outside the product will stop it again is a `tests` blocker
-   ([autonomy.md](autonomy.md)). Each `needs-review`, `superseded`, quarantine, failed rework and
+   ([autonomy.md](autonomy.md)). Each `needs-review`, `superseded`, quarantine, rework and
    third heal in a month is a proposal ([maintenance.md](maintenance.md) → What opens a proposal).
 7. **Report**: write `work/regression/<candidate>/verdicts.json` with `"mode": "regression"`
    — one entry per criterion that was not `unchanged`, each with `issue`, `id`, `name`,
    `quote` (from the criteria file), `then`, `verdict` (the category), `cause` for a `regression`, `needs-review`, `flaky` or
-   `blocked` ([triage.md](triage.md) → **Cause**), `explanation`, `because_issue` when an issue explains
-   it, `heal` `{from, to}` for a repair (a `reworked` one: the replaced and the new step), `regressed_between` `{from, to, builds_between}`
+   `blocked` ([triage.md](triage.md) → **Cause**), `explanation`, `wrong` for one that is not a pass ([reporting.md](reporting.md) → **What is wrong**), `because_issue` when an issue explains
+   it, `heal` `{from, to}` for a repair, `regressed_between` `{from, to, builds_between}`
    for a confirmed regression, and `before_shot` (the previous map's screenshot of the
    page). Add `trigger` ([reporting.md](reporting.md) → **Who started the run**) and `context` `{previous, window, issues[{number,title}], ui_diff, iface_diff, signals}`
    (`ui_diff`, `iface_diff`: the diffs' `--md` text; `signals`: `{console_errors_new,
@@ -118,7 +118,7 @@ not run — say so, never treat it as clean), `profile_scenarios`, `channel`, `b
    [reporting.md](reporting.md) → Delivery (artifact only, its reference in
    `work/regression/<candidate>/artifact.id`; regression runs never comment).
    The run's top verdict is `regression` if any criterion is, else `needs-review` if any
-   criterion or signal is, else `healed`, `reworked`, `relearned` or `unchanged`. Then
+   criterion or signal is, else `healed`, `relearned` or `unchanged` (`reworked` only on a night before 3.68.0). Then
    `maintenance.mjs sweep` ([maintenance.md](maintenance.md) → Closing by itself).
 8. Append `<ISO> ran candidate=<c> unchanged=<n> relearned=<n> healed=<n> reworked=<n> needs_review=<n> superseded=<n> flaky=<n> regression=<n> blocked=<n> drift=<n>`
    to `work/REGRESSION.log` — the pre-flight keys "already tested" and

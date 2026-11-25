@@ -126,6 +126,8 @@ const WHY = {
   inconclusive: 'The progress bar showed on the old build too, so this run cannot tell if the issue changed it.', partial: 'Restoring works, but the project comes back without its members.',
   'not-testable': 'The plan comes from the billing provider, which the test product does not have.',
 };
+// What is wrong, alone (docs/reporting.md → `wrong`), for some failures; the others show the step that failed.
+const WRONG = { 'issue-108/AC-2': 'The 60 MB file uploads, and no message shows.', 'issue-101/AC-2': 'The project shows as “Untitled”: the name is empty.' };
 const whyOf = (v, ref) => (typeof WHY[v] === 'object' ? WHY[v][ref] : WHY[v]) || null;
 
 const items = [];
@@ -240,7 +242,7 @@ for (const r of runs) {
   for (const i of items) for (const h of i.history) {
     if (h.run !== r.type || (r.type === 'regression' ? h.utc !== r.utc : i.origin.ref !== r.ref) || h.value === 'not-testable') continue;
     if (r.type !== 'regression') h.utc = r.utc; // one issue or scenario run: its tests share its time
-    entries.push({ key: i.key, value: h.value, cause: null, ...(h.why ? { why: h.why } : {}) });
+    entries.push({ key: i.key, value: h.value, cause: null, ...(h.why ? { why: h.why } : {}), ...(WRONG[i.key] && ['failed', 'regression'].includes(h.value) ? { wrong: WRONG[i.key] } : {}) });
     // Red-green: a verified test failed on the last release; an inconclusive one passed there too.
     results[i.key] = { c: side(i, h.value), b: r.type === 'regression' ? null : side(i, h.value === 'inconclusive' ? 'passed' : 'failed') };
   }
@@ -340,6 +342,15 @@ data.maintenance = [
   { id: 'M-4', test: '#112 AC-1', kind: 'needs-review', build: NEWEST, basis: 'The list says “Pending” where the test expects “Invited”.', proposal: 'heal', opened_utc: iso(5 * H) },
   { id: 'M-5', test: '#115 AC-2', kind: 'quarantined', build: buildAt(2), basis: 'Flaky on two builds within 14 days.', proposal: 're-promote', opened_utc: iso(2 * DAY) },
   { id: 'M-6', test: '#117 AC-2', kind: 'predicted', build: NEWEST, basis: 'PR #140: Search shows suggestions while you type', proposal: 'review', opened_utc: iso(9 * H) },
+  // A rework: the new way found, explained by a pull request, and one with no specification (docs/maintenance.md → The proposal's details).
+  { id: 'M-7', test: '#104 AC-2', kind: 'rework', build: NEWEST, basis: 'PR #138: Tasks move with a Status menu', proposal: 'rewrite', opened_utc: iso(4 * H),
+    spec: true, because: [{ pr: 138, quote: 'A task moves with the Status menu; dragging a card is gone.' }],
+    before: ['Open /projects/12/board', 'Drag the card “Write notes” to Done'], after: ['Open /projects/12/board', 'Open the card “Write notes”', 'Choose Done in the Status menu'],
+    found: 'The Status menu on the task card; the pull request text names it.',
+    diff: '--- a/tests/issue-104.e2e.ts\n+++ b/tests/issue-104.e2e.ts\n@@ -8,3 +8,4 @@\n   await app.open("/projects/12/board");\n-  await agent.act("Drag the card Write notes to Done");\n+  await page.getByRole("button", { name: "Write notes" }).click();\n+  await page.getByRole("combobox", { name: "Status" }).selectOption("Done");\n   // AC-2\n' },
+  { id: 'M-8', test: '#101 AC-1', kind: 'rework', build: NEWEST, basis: 'no specification: the New project button moved into a + menu', proposal: 'rewrite', opened_utc: iso(3 * H),
+    spec: false, because: [], before: ['Open /projects', 'Click New project'], after: ['Open /projects', 'Click +', 'Choose New project'],
+    found: 'The + menu at the top of the project list.' },
 ];
 // What changed since the night before: the UI map's difference and new console errors.
 for (const r of runs.filter((x) => x.type === 'regression' && x.verdict !== 'environment')) {

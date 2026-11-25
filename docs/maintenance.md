@@ -34,12 +34,31 @@ after screenshots (`work/inventory/<previous>/shots/`, the run's), and a `heal` 
 proposal's change as a diff of the test file in `work/maintenance/M-<k>.diff` — prepared, never
 applied before the operator's word.
 
+**The proposal's details — `M-<k>.json`.** A `rework` proposal `rewrite` also writes, with the file
+tool, what the dashboard shows the person who decides (ASD-STE100):
+
+```json
+{"spec": true, "because": [{"issue": 4552, "quote": "The export button becomes a share link."}],
+ "before": ["Open /projects", "Click Export"], "after": ["Open /projects", "Click Share", "Click Copy link"],
+ "found": "The share menu on the project page; the profile's guide names it."}
+```
+
+- `spec` — `true` when an issue or a merged pull request states the new flow; `false` when none does
+  (the page warns: no specification for this change, it may be a regression).
+- `because` — up to 3: `{"issue": <n>}` or `{"pr": <n>}`, each with its `quote`; empty when `spec` is false.
+- `before`, `after` — the steps before the frozen block in words, the old way and the new one, up to 20
+  each, one short sentence a step; the frozen blocks are not in them.
+- `found` — one sentence: where the agent found the new way.
+
+The catalog passes them to the page, each text cut and checked like a basis; a file that is not this
+shape is left out, and the page shows the basis and the diff only.
+
 ## What opens a proposal
 
 | kind | opened by | proposal |
 | --- | --- | --- |
 | `needs-review` | the triage's `needs-review` ([triage.md](triage.md)): a healing rule failed | `heal` with the repair ready in the diff; `review` when none is (it fails on the previous build too) |
-| `rework` | a step before a frozen block no longer works, and a rule of [triage.md](triage.md) → **Reworking the steps before a block** failed; or the operator's "repair" | `rewrite` with the rewritten file ready in the diff; `review` when none is (its basis names what is missing) |
+| `rework` | a step before a frozen block no longer works ([triage.md](triage.md) → **Reworking the steps before a block**), or the operator's "repair" | `rewrite` with the new way ready in the diff and `M-<k>.json`; `review` when none was found (its basis names what is missing) |
 | `superseded` | the triage retired the test for a completed issue | `retire` — already done; accept confirms it, keep restores it |
 | `drift` | the worklist's `assert_drift` ([regression.md](regression.md) step 4) | `re-promote`, or `rewrite` when the changed block no longer matches the criterion |
 | `quarantined` | the triage moved it to `quarantined` | `re-promote` once its cause is fixed, else `retire` |
@@ -102,7 +121,7 @@ regression in the next report.
 At the end of each regression run (step 7) and after each promote or demote:
 `node "$HOME/scripts/maintenance.mjs" sweep --unchanged <test> … --absorbed <test> …`, one
 `--unchanged` per test the night replayed plain `unchanged` (`#N` when all its criteria did, else
-`#N AC-k`), one `--absorbed` per test the triage found `relearned`, `healed` or `reworked`, and `--built
+`#N AC-k`), one `--absorbed` per test the triage found `relearned` or `healed`, and `--built
 <to.utc>` (the candidate's build time, `changes.sh`'s `.to.utc`): a `predicted` row closes only when
 its pull request merged at or before it ([radar.md](radar.md)). It resolves the rows
 whose cause is gone — a drift no longer measured, a quarantine or a retirement the operator undid, a
@@ -112,5 +131,8 @@ unchanged, a predicted or `rework` test the triage absorbed — and changes no t
 ## Where it shows
 
 The nightly summary names the open proposals, newest first ([regression.md](regression.md)
-step 9); the dashboard lists them with their basis and buttons ([catalog.md](catalog.md)); the
+step 9); the dashboard lists them under Tests → **Needs a change**, with a count on the Tests tab,
+and links each from its test's page: the basis, a rework's old and new steps side by side, the issue or
+pull request that explains it or the warning that none does, the diff folded, and the buttons
+([catalog.md](catalog.md)); the
 audit warns about any left open over 14 days ([audit.md](audit.md)).

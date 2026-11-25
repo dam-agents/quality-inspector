@@ -78,7 +78,7 @@ Your judgment, the renderer's only input besides the runs:
  "verdict": "partial", "started_utc": "2026-10-12T18:41:07Z", "generated_utc": "2026-10-12T19:20:00Z", "display_name": "<display_name>",
  "acs": [{"id": "AC-1", "name": "…", "quote": "…", "given": "…", "when": "…", "then": "…", "surface": "ui",
           "testable": true, "verdict": "verified", "baseline_blocked_reason": null,
-          "cause": null, "error_at_check": null, "mark": null, "note": "optional, one sentence"}],
+          "cause": null, "error_at_check": null, "mark": null, "wrong": null, "note": "optional, one sentence"}],
  "open_questions": [{"id": "Q-1", "ac": "AC-2", "question": "…",
                      "variants": [{"source": "the issue", "quote": "…"}, {"source": "a comment of 2026-10-20", "quote": "…"}]}],
  "notes": ["assertion edits after the first run, blocked reasons, anything a reader needs"]}
@@ -149,6 +149,13 @@ caption; it never changes a verdict and is not drawn where the test's red frame 
 that cannot be drawn (a box off the screenshot) is left out with its caption, and the next choice
 applies. A problem that does not show on a screenshot (an absent control, a wrong answer of the
 API) gets no mark; leave `mark` out.
+
+**What is wrong — `wrong`.** An entry that is not a pass gets one short sentence of what is
+wrong, and only that: what the user sees or does not get, no steps before it, no criteria it
+stopped ("The Connect Slack channels dialog lists no channel."). The dashboard puts it beside
+the screen at the failure (dashboard-page.md → **The walk**); the full story stays in `note` or
+`explanation`. With a `mark`, its `saw` is shown instead. Leave it out and the page names the step
+that failed.
 
 **The agent's analysis — `analysis`.** Every verdicts file — an issue run's, a scenario run's, a
 night's (`work/regression/<c>/verdicts.json`) — carries your reading of the run for a person, the

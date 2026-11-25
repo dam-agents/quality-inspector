@@ -15,7 +15,7 @@
 //   node maintenance.mjs check                 -> {"ok", "problems": []}
 //
 // <test>: `#N`, `#N AC-k`, `#N IN-k`, `S-k[ AC-j]`, `P-<slug>[ AC-j]` (one argument or two). <kind>: needs-review |
-// rework (a step before a frozen block no longer works, and the agent could not rewrite it alone) | superseded | drift | quarantined | fighting, one predicted before the replay — obsolete | moved | renamed —, or
+// rework (a step before a frozen block no longer works: the new way proposed, or what is missing) | superseded | drift | quarantined | fighting, one predicted before the replay — obsolete | moved | renamed —, or
 // `predicted`: a pull request's text names the test (the Change radar, docs/radar.md; proposal `review`, basis
 // `PR #<n>: <title>`). <proposal>: heal | rewrite | retire | re-promote | review.
 // <state>: accepted | rewritten | retired | kept | resolved. The basis — read from <path>, the call's own
@@ -36,7 +36,7 @@
 // `sweep` resolves the open rows whose cause is gone: a drift whose file no longer drifts
 // (check-asserts.sh --json), a quarantine or a superseded test whose tier changed, a test with no
 // work/SUITE.md row, each --unchanged test (the night replayed it plain unchanged), and a predicted
-// row and a rework row of each --absorbed test (relearned, healed or reworked: the triage absorbed the change) — a `predicted` row only when
+// row and a rework row of each --absorbed test (relearned or healed, or reworked on a night before 3.68.0: the triage absorbed the change) — a `predicted` row only when
 // a pull request that holds it (work/PRSCAN.md) was merged at or before --built, the candidate's build time:
 // before that the build did not carry the change. An unreadable
 // work/SUITE.md stops it with no change (exit 1): an unhydrated work/ would else resolve every row.
