@@ -13,7 +13,7 @@ printf 'x' > "$W/catalog/thumbs/a.jpg"; printf 'secret' > "$W/env/credentials.en
 ln -s "$W/env/credentials.env" "$W/catalog/thumbs/link.jpg"
 mkdir -p "$W/suite/.e2e/runs/r1"; head -c 2000000 /dev/zero > "$W/suite/.e2e/runs/r1/v.webm"; printf 'x' > "$W/env/v.webm"
 ln -s "$W/env/v.webm" "$W/suite/.e2e/runs/r1/link.webm"
-jq -n '{schema:"qi-catalog/v1", hash:"h1", items:[],
+jq -n '{schema:"qi-catalog/v1", hash:"h1", items:[{key:"issue-42/AC-1", id:"AC-1", name:"The old name"}],
   runs:[{type:"issue", ref:"#42", utc:"2026-11-16T09:00:00Z", analysis:{problems:[{title:"The upload | never ends", where:"/upload"}]}},
         {type:"issue", ref:"#43", utc:"2026-11-15T09:00:00Z", analysis:{problems:[{title:"First seen", where:null}]}}], images:{r0:"catalog/thumbs/a.jpg", r1:"env/credentials.env", r2:"catalog/thumbs/link.jpg", r3:"../etc/passwd.jpg"},
   videos:{v0:"suite/.e2e/runs/r1/v.webm", v1:"env/v.webm", v2:"suite/.e2e/runs/r1/link.webm", v3:"catalog/thumbs/a.jpg"}}' > "$W/catalog/data.json"
@@ -140,6 +140,14 @@ assert_eq "a viewer's action: refused" 403 "$(code "${VW[@]}" -X POST -d "$A" "$
 assert "a test into a collection" '.ok == true and (.data.collections | map(select(.name == "Smoke")) | .[0].members) == ["#42 AC-1"]' "$(call "${OP[@]}" -X POST -d "$A" "$U/api/act")"
 grep -q '^| Smoke | #42 AC-1 |$' "$W/CATALOG.md"; assert_eq "the row is in CATALOG.md" 0 "$?"
 assert "out of it again: the emptied collection goes" '.ok == true and ((.data.collections // []) | map(select(.name == "Smoke")) | length) == 0' "$(call "${OP[@]}" -X POST -d '{"command":"remove #42 AC-1 from the collection Smoke"}' "$U/api/act")"
+# A test renamed (docs/dashboard-page.md → Rename a test): a row of TEST-NAMES.md, the name on the data at once.
+R='{"command":"rename #42 AC-1 to: A clearer name"}'
+assert_eq "a viewer's rename: refused" 403 "$(code "${VW[@]}" -X POST -d "$R" "$U/api/act")"
+assert "a test renamed: its name on the data" '.ok == true and (.data.items | map(select(.key == "issue-42/AC-1"))[0] | .name == "A clearer name" and .renamed == true)' "$(call "${OP[@]}" -X POST -d "$R" "$U/api/act")"
+call "${OP[@]}" -X POST -d '{"command":"rename #42 AC-1 to: The last name"}' "$U/api/act" >/dev/null
+assert_eq "one row a test, the last name wins" "1 1" "$(grep -c '^| issue-42/AC-1 |' "$W/TEST-NAMES.md") $(grep -c '| The last name |' "$W/TEST-NAMES.md")"
+assert_eq "a test not on the page: refused" 404 "$(code "${OP[@]}" -X POST -d '{"command":"rename #43 AC-1 to: x"}' "$U/api/act")"
+assert_eq "a name with a | sign: no command" 400 "$(code "${OP[@]}" -X POST -d '{"command":"rename #42 AC-1 to: a | b"}' "$U/api/act")"
 assert_eq "work for the agent is no direct action" 400 "$(code "${OP[@]}" -X POST -d '{"command":"run #42 AC-1"}' "$U/api/act")"
 WORK_DIR="$W" QI_DASHBOARD_WRITE=operator node "$SCRIPTS/collections.mjs" add Smoke '#42' >/dev/null 2>&1
 assert_eq "outside the direct session collections.mjs writes nothing, whatever the variables" 2 "$?"

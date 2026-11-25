@@ -34,6 +34,7 @@ import { withMutex, writeAtomic } from './lib/mutex.mjs';
 import { takeTrigger } from './lib/trigger.mjs';
 import { takeWords } from './lib/words.mjs';
 import { now, read, tableRows as rows } from './lib/util.mjs';
+import { checksOf } from './lib/walk.mjs';
 
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 const runsRoot = process.env.QI_RUNS_ROOT ?? join(work, 'suite', '.e2e', 'runs');
@@ -222,14 +223,15 @@ switch (cmd) {
     const results = {};
     for (const r of report.run?.results ?? []) {
       const tags = r.tags ?? [];
-      const id = tags.map((t) => /^(ac|in)-(\d+)$/.exec(t)).find(Boolean);
-      if (!id) continue; // explorations are not recurring tests
-      const ac = `${id[1].toUpperCase()}-${id[2]}`;
-      const m = wanted.find((w) => tags.includes(w.stem) && (!w.ac || w.ac === ac));
-      if (!m) continue;
       const att = r.attempts?.at(-1) ?? {};
-      results[`${m.stem}/${ac}`] = { status: r.status === 'passed' ? 'passed' : r.status === 'failed' ? 'failed' : 'blocked',
-        error: att.error?.message ? String(att.error.message).replace(/\s+/g, ' ').slice(0, 400) : null };
+      // Each check of the walk on its own (lib/walk.mjs); explorations are not recurring tests.
+      for (const c of checksOf(r).filter((x) => /^(AC|IN)-/.test(x.id))) {
+        const m = wanted.find((w) => tags.includes(w.stem) && (!w.ac || w.ac === c.id));
+        if (!m) continue;
+        const status = c.status === 'passed' ? 'passed' : c.status === 'failed' ? 'failed' : 'blocked';
+        results[`${m.stem}/${c.id}`] = { status, error: status === 'passed' ? null : c.status === 'not-reached' ? 'not reached: an earlier check of the same walk stopped it'
+          : att.error?.message ? String(att.error.message).replace(/\s+/g, ' ').slice(0, 400) : null };
+      }
     }
     const dir = join(work, 'reruns', `feature-${f.id}`);
     mkdirSync(dir, { recursive: true });

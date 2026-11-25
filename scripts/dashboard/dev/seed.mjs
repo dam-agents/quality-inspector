@@ -161,6 +161,16 @@ for (const [n, title, area, page, ac] of SCENARIOS) addItem({ kind: 'scenario', 
 addItem({ kind: 'scenario', ref: 'P-sign-in', number: null, title: 'The owner signs in', summary: null, labels: [], state: null, area: 'sign-in' },
   ['The home page shows after sign-in', 'the sign-in page', 'the owner signs in', 'the home page shows “Good morning”', null], 1, '/sign-in', 'regression');
 
+// One walk, several checks: #104 drags a task (AC-1), then reloads and checks it stayed (AC-2). One
+// test does both, so the two run together each time. One night the drag timed out: AC-2 was not reached.
+const CASE104 = ['issue-104/AC-1', 'issue-104/AC-2'].map((k) => items.find((i) => i.key === k));
+{
+  const [a, b] = CASE104, AC1 = ['verified', 'unchanged', 'blocked', 'unchanged', 'flaky', 'unchanged'];
+  b.history[2] = { ...b.history[2], value: 'blocked', why: 'Not reached: AC-1 stopped the walk.' };
+  a.history = b.history.map((h, j) => ({ ...h, value: AC1[j], ...(AC1[j] === 'blocked' ? { why: 'The card did not move within 30 s.' } : { why: undefined }) }));
+  for (const i of CASE104) { i.verdict = i.history.at(-1); i.case = { id: 'AC-1', title: '#104 AC-1, AC-2: a dragged task moves and stays after a reload', checks: ['AC-1', 'AC-2'] }; }
+}
+
 // ------------------------------------------------------------------ the runs
 const runs = [];
 const PROBLEMS = {
@@ -227,7 +237,13 @@ const STATUS = (v) => (['failed', 'regression', 'partial'].includes(v) ? 'failed
 function side(i, v) {
   const st = STATUS(v), page = i.pages[0], why = i.history.find((h) => h.value === v)?.why;
   const last = st === 'failed' ? 'failed' : st === 'timed-out' ? 'timed-out' : 'passed';
-  const steps = [['app.open', `Open ${page.replace(':id', '12')}`, 'passed', 700 + Math.floor(rnd() * 600)],
+  const steps = [['app.open', page.replace(':id', '12'), 'passed', 700 + Math.floor(rnd() * 600)],
+    // The steps a written test does, as the e2e report names them: a locator, and its state after a check.
+    ['', 'getByRole("heading", name: /^Providers$/i).first() → visible', 'passed', 1000],
+    ['', 'getByRole("button", name: "Create agent").first()', 'passed', 267],
+    ['', 'getByRole("menuitem", name: /^From a starter kit/).first()', 'passed', 271],
+    ['', 'getByRole("textbox", name: "Name").first()', 'passed', 78],
+    ['', 'getByText(/^OK\\.?$/).first()', 'passed', 61000],
     ...(i.given ? [['agent.act', `Make sure: ${i.given}`, 'passed', 3000 + Math.floor(rnd() * 3000)]] : []),
     ['agent.act', i.when, st === 'timed-out' ? 'timed-out' : 'passed', 2500 + Math.floor(rnd() * 4000)],
     ...(st === 'timed-out' ? [] : [['app.screenshot', `${i.id}: ${i.name}`, 'passed', 300], ['agent.assert', i.then, last, 1500 + Math.floor(rnd() * 2000)]])];
@@ -235,7 +251,7 @@ function side(i, v) {
     err: st === 'failed' ? `The check did not hold: ${i.then}. ${why || ''}`.trim() : st === 'timed-out' ? 'The page did not answer within 60 s.' : null,
     // Each shot at its step (`at`): after the page opened, the test's own screenshot, the screen at the failure.
     shots: [{ cap: 'After step 1', img: shotOf(page), at: 0 }, ...(st === 'timed-out' ? [] : [{ cap: `${i.id}: ${i.name}`, img: shotOf(page), at: steps.length - 2 }]),
-      ...(st === 'passed' ? [] : [{ cap: 'The screen at the failure', img: shotOf(page), at: steps.length - 1, fail: true }])] };
+      ...(st === 'passed' ? [] : [{ cap: 'The screen at the failure', img: shotOf(page), at: steps.length - 1, fail: true, ...(rnd() < 0.6 ? { frame: { by: rnd() < 0.5 ? 'test' : 'agent', boxes: [[0.08, 0.12, 0.42, 0.07]], saw: 'The Save button stays grey.' } } : {}) }])] };
 }
 for (const r of runs) {
   const results = {}, entries = [];
@@ -249,6 +265,16 @@ for (const r of runs) {
   r.entries = entries;
   if (r.type !== 'regression') r.baseline = 'r1829';
   if (Object.keys(results).length) r.rep = { results, side: r.type === 'regression' ? 'candidate' : 'both' };
+}
+
+// The walk of each #104 run (catalog.mjs → a side's `walk`): [check, step of its still, status].
+for (const r of runs) for (const sd of ['c', 'b']) {
+  const [a, b] = CASE104.map((i) => r.rep?.results?.[i.key]?.[sd]); if (!a || !b) continue;
+  if (sd === 'c' && r.entries.find((e) => e.key === CASE104[0].key)?.value === 'blocked') {
+    Object.assign(a, { st: 'timed-out', err: 'The card did not move within 30 s.' }); Object.assign(b, { st: 'not-reached', err: null });
+  }
+  const fin = (x) => (x === 'flaky' ? 'passed' : x);
+  a.walk = b.walk = [['AC-1', 5, fin(a.st)], ['AC-2', b.steps.length - 2, ['failed', 'timed-out'].includes(a.st) ? 'not-reached' : fin(b.st)]];
 }
 
 // Each run's number, as catalog.mjs gives it: R-1 the oldest.

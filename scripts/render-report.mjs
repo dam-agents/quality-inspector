@@ -34,6 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { VIEWER_CSS, VIEWER_HTML } from './lib/media-viewer.mjs';
 import { AGENT_RGB, agentBoxes, drawMarks, splitMark } from './lib/shot-mark.mjs';
 import { escHtml as esc } from './lib/util.mjs';
+import { checkOf } from './lib/walk.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -144,8 +145,9 @@ function evidence(run, ac, suffix = '') {
   const screenLog = arts.find((a) => a.kind === 'log' && a.path && a.path.includes('failure'));
   const tracePage = video || trace ? findTracePage(run, (video ?? trace).path) : null;
   return {
-    state: res.status, title: res.titlePath?.join(' › '), durationMs: att.durationMs,
-    error: att.error ? { code: att.error.code, message: att.error.message } : null,
+    // One walk may check several criteria (lib/walk.mjs): this criterion's own state, and the error only on the check that stopped the walk.
+    state: checkOf(res, ac.id), title: res.titlePath?.join(' › '), durationMs: att.durationMs,
+    error: att.error && !['passed', 'not-reached'].includes(checkOf(res, ac.id)) ? { code: att.error.code, message: att.error.message } : null,
     steps,
     video: video ? copyMedia(run, video.path, key(ac)) : null,
     videoSteps: video ? stepMarks(att.steps ?? [], video.startedAt ?? att.startedAt) : null,
@@ -230,7 +232,7 @@ const errorAtCheck = (x) => (x.error_at_check
 const badge = (x) => { const [t, c] = VERDICT[x] ?? [x, 'muted']; return `<span class="badge ${c}">${esc(t)}</span>`; };
 const stateBadge = (s) => {
   const map = { passed: 'ok', pass: 'ok', flaky: 'warn', failed: 'bad', fail: 'bad', 'timed-out': 'bad', interrupted: 'muted', skipped: 'muted' };
-  const text = { 'not-run': 'not run', missing: 'run missing', 'no-test': 'no test' }[s] ?? s;
+  const text = { 'not-run': 'not run', missing: 'run missing', 'no-test': 'no test', 'not-reached': 'not reached' }[s] ?? s;
   return `<span class="state ${map[s] ?? 'muted'}">${esc(text)}</span>`;
 };
 

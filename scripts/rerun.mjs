@@ -17,6 +17,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { takeTrigger } from './lib/trigger.mjs';
+import { checksOf } from './lib/walk.mjs';
 
 const work = process.env.WORK_DIR ?? join(process.env.HOME ?? '/home/agent', 'work');
 const runsRoot = process.env.QI_RUNS_ROOT ?? join(work, 'suite', '.e2e', 'runs');
@@ -47,13 +48,15 @@ for (const r of report.run?.results ?? []) {
   const tags = r.tags ?? [];
   const ex = tags.includes(`${stem}-ex`);
   if (!tags.includes(stem) && !ex) continue;
-  const id = tags.map((t) => /^(ac|in|ex)-(\d+)$/.exec(t)).find(Boolean);
-  if (!id) continue;
-  const key = `${id[1].toUpperCase()}-${id[2]}`;
-  if (only && key !== only) continue;
+  // One test case may check several criteria on one walk (lib/walk.mjs): each gets its own status;
+  // a check the walk did not reach is blocked, and only the check that stopped it carries the error.
   const att = r.attempts?.at(-1) ?? {};
-  const status = r.status === 'passed' ? 'passed' : r.status === 'failed' ? 'failed' : 'blocked';
-  results[key] = { status, error: att.error?.message ? String(att.error.message).replace(/\s+/g, ' ').slice(0, 400) : null };
+  for (const c of checksOf(r)) {
+    if (only && c.id !== only) continue;
+    const status = c.status === 'passed' ? 'passed' : c.status === 'failed' ? 'failed' : 'blocked';
+    const own = status !== 'passed' && c.status !== 'not-reached';
+    results[c.id] = { status, error: own && att.error?.message ? String(att.error.message).replace(/\s+/g, ' ').slice(0, 400) : c.status === 'not-reached' ? 'not reached: an earlier check of the same walk stopped it' : null };
+  }
 }
 const utc = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 const dir = join(work, 'reruns', stem);

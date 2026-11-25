@@ -7,6 +7,16 @@ why lives in the PR and commit history, not here. Consumed by the version check
 ([docs/persistence.md](docs/persistence.md) → **Definition version & upgrade**);
 authoring rules: [docs/self-modification.md](docs/self-modification.md) §12.
 
+## 3.72.0 — 2026-11-25
+
+**Upgrade:**
+1. `bash "$HOME/scripts/dashboard-service.sh" restart` — once: the server renames a test at once
+   (`rename <ref> to: <name>`, a row of `work/TEST-NAMES.md`) and shows the new name. It must say `ok`.
+2. Nothing else: the page is read again on every load, and the next catalog build gives each test its
+   `case` and each run its `walk` (`scripts/lib/walk.mjs`). **Behaviour change:** a test can check several
+   criteria on one walk ([docs/test-authoring.md](docs/test-authoring.md) → One walk, several checks);
+   each criterion gets its own result, and a check that the walk did not reach is `blocked`.
+
 ## 3.71.0 — 2026-11-25
 
 **Upgrade:**

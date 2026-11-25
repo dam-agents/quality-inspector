@@ -1642,6 +1642,53 @@
   .qi-walk .wp { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
   .qi-walk figure { margin: 0; display: grid; gap: 4px; } .qi-walk figcaption { font-size: var(--fs-micro); color: var(--muted); overflow-wrap: anywhere; }
   .qi-thumb.fail { border: 2px solid var(--closed); box-shadow: 0 0 0 3px var(--closed-soft); }
+  /* A frame over a shot: its boxes are parts of the shot's width (margin and padding in % follow the width). */
+  .qi-frames { position: absolute; inset: 0; pointer-events: none; }
+  .qi-frames i { position: absolute; top: 0; height: 0; box-sizing: border-box; border: 3px solid var(--closed); border-radius: 3px; box-shadow: 0 0 0 9999px rgba(0,0,0,.18); }
+  .qi-frames[data-by="agent"] i { border-color: var(--warn); }
+  /* Who did a step: the tester (it acts) or the product (it answers). */
+  .who { flex: none; display: inline-block; padding: 1px 6px; border-radius: 999px; font: 600 var(--fs-micro)/1.4 var(--sans, inherit); text-transform: none; cursor: help; }
+  .who[data-who="tester"] { background: var(--soft); color: var(--muted); border: 1px solid var(--line); }
+  .who[data-who="product"] { background: var(--decided-soft); color: var(--decided); border: 1px solid transparent; }
+  .say { cursor: help; } .qi-who-key { margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .qi-walk > li[data-who="product"] .wn { border-style: dashed; }
+  .qi-steplist .wl { display: flex; gap: 6px; align-items: baseline; }
+  /* A test's runs: when, build, result, what was wrong — one line each. */
+  .qi-runs { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; max-width: 980px; }
+  .qi-runs li { display: grid; grid-template-columns: 9.5em 8em 8.5em minmax(0, 1fr) auto; gap: 4px 12px; align-items: baseline; padding: 8px 12px; font-size: var(--fs-meta); }
+  .qi-runs li + li { border-top: 1px solid var(--line); } .qi-runs li[data-st="fail"] { background: var(--closed-soft); } .qi-runs li[data-st="look"], .qi-runs li[data-st="blocked"] { background: var(--waiting-soft); }
+  .qi-runs .rs { display: inline-flex; gap: 6px; align-items: center; font-weight: 600; } .qi-runs .re { color: var(--text, inherit); overflow-wrap: anywhere; } .qi-runs .rl { text-align: right; white-space: nowrap; }
+  .qi-runs.has-ck li { grid-template-columns: 9.5em 8em 8.5em auto minmax(0, 1fr) auto; } .qi-runs li.rh { padding-top: 4px; padding-bottom: 4px; background: var(--soft); }
+  .qi-runs .rc { display: inline-flex; gap: 6px; align-items: center; } .qi-runs .rc > * { width: 3.2em; display: inline-flex; justify-content: center; } .qi-runs li.rh .num { font-size: 11px; }
+  /* A test case: the diamond of a check, by its state; not reached is an empty dashed one; this page's check has a ring. */
+  .qi-dm { display: inline-block; width: 11px; height: 11px; transform: rotate(45deg); border-radius: 2px; background: var(--muted); border: 1.5px solid transparent; box-sizing: border-box; flex: none; }
+  .qi-dm[data-s="pass"] { background: var(--approved); } .qi-dm[data-s="fail"] { background: var(--closed); } .qi-dm[data-s="look"] { background: var(--waiting); } .qi-dm[data-s="blocked"] { background: var(--decided); }
+  .qi-dm[data-nr] { background: transparent; border: 1.5px dashed var(--muted); } .qi-dm[data-me] { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3.5px var(--ink); }
+  .qi-walk { max-width: 980px; margin: 4px 0 14px; } .qi-walk .track { position: relative; height: 46px; margin: 0 14px; }
+  .qi-walk .ln { position: absolute; top: 13px; left: 0; height: 2px; background: var(--ink); opacity: .55; } .qi-walk .ln.nr { right: 0; width: auto; background: none; border-top: 2px dashed var(--muted); height: 0; opacity: 1; }
+  .qi-walk .track > b { position: absolute; top: 10px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--panel); border: 2px solid var(--ink); box-sizing: border-box; opacity: .7; }
+  .qi-walk .track > b[data-nr] { border-style: dashed; border-color: var(--muted); }
+  .qi-walk .ck { all: unset; position: absolute; top: 3px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 7px; cursor: default; }
+  .qi-walk button.ck { cursor: pointer; } .qi-walk .ck .qi-dm { width: 16px; height: 16px; } .qi-walk button.ck:hover .lb, .qi-walk button.ck:focus-visible .lb { text-decoration: underline; }
+  .qi-walk .lb { font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap; } .qi-walk .lb.me { color: var(--ink); }
+  .qi-walkkey { display: inline-flex; flex-wrap: wrap; gap: 4px 14px; margin-left: 8px; } .qi-walkkey > span { display: inline-flex; gap: 6px; align-items: center; }
+  .qi-walkkey b.d { display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--ink); box-sizing: border-box; opacity: .7; }
+  .qi-checks { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--r-md); max-width: 980px; }
+  .qi-checks li { display: grid; grid-template-columns: 4.5em minmax(0, 1fr) auto auto; gap: 4px 12px; align-items: center; padding: 8px 12px; }
+  .qi-checks li + li { border-top: 1px solid var(--line); } .qi-checks li[data-me] { background: var(--soft); }
+  .qi-spark { display: inline-flex; gap: 5px; align-items: center; min-width: 9em; justify-content: flex-end; }
+  @media (max-width: 720px) { .qi-runs.has-ck li { grid-template-columns: 1fr auto; } .qi-checks li { grid-template-columns: 4.5em minmax(0, 1fr); } .qi-spark { justify-content: flex-start; } .qi-runs li.rh { display: none; } }
+  @media (max-width: 720px) { .qi-runs li { grid-template-columns: 1fr auto; } .qi-runs .re { grid-column: 1 / -1; } .qi-runs .rb, .qi-runs .rl { text-align: left; } }
+  /* The problem in short: four cards, each with its ink. */
+  .qi-diag-s { max-width: none; } .qi-diag { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; max-width: 980px; }
+  .qi-diag-c { padding: 12px 14px; border-radius: var(--r-md); background: var(--c-soft); border-left: 4px solid var(--c); }
+  .qi-diag-c h4 { margin: 0 0 6px; display: flex; gap: 6px; align-items: center; font-size: var(--fs-meta); color: var(--c); }
+  .qi-diag-c svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .qi-diag-c p { margin: 0; } .qi-diag-c[data-k="what"] { grid-column: 1 / -1; } .qi-diag-c[data-k="what"] p { font-size: 1.05em; }
+  .qi-path { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .qi-path li { padding: 2px 8px; border-radius: var(--r-sm); background: var(--panel); border: 1px solid var(--line); font-size: var(--fs-meta); }
+  .qi-path li + li::before { content: "→"; margin: 0 6px 0 -2px; color: var(--muted); }
+  .qi-path li + li { margin-left: 0; }
   /* Expected beside what happened, under the screen with the error marked. */
   .qi-marked { margin: 0; display: grid; gap: 4px; max-width: 720px; } .qi-marked .qi-thumb { aspect-ratio: auto; max-height: 520px; } .qi-marked .qi-thumb img { object-fit: contain; height: auto; }
   .qi-marked figcaption { display: flex; gap: 8px; align-items: center; font-size: var(--fs-meta); color: var(--muted); }
@@ -1785,6 +1832,7 @@
   .qi-shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
   .qi-shots figure { margin: 0; display: grid; gap: 4px; } .qi-shots figcaption { font-size: var(--fs-micro); color: var(--muted); overflow-wrap: anywhere; }
   .qi-thumb { all: unset; box-sizing: border-box; display: block; aspect-ratio: 16 / 10; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; cursor: zoom-in; background: var(--soft); }
+  .qi-thumb { position: relative; }
   .qi-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
   .qi-thumb.none { cursor: default; display: flex; align-items: center; justify-content: center; font-size: var(--fs-micro); color: var(--muted); }
   .qi-steplist > summary { cursor: pointer; font-size: var(--fs-meta); color: var(--muted); }
@@ -1796,6 +1844,15 @@
   .qi-shotdlg figcaption { font-size: var(--fs-meta); color: var(--muted); }
   .qi-shotdlg video { width: 100%; aspect-ratio: 16 / 10; border-radius: var(--r-md); background: #000; }
   .qi-shotdlg .k { margin: 0; }
+  .qi-shotgrid { display: grid; gap: 16px; } dialog.qi-shotdlg.has-why { width: min(1440px, calc(100% - 32px)); }
+  .qi-shotdlg.has-why .qi-shotgrid { grid-template-columns: minmax(0, 1fr) 300px; align-items: start; }
+  @media (max-width: 860px) { .qi-shotdlg.has-why .qi-shotgrid { grid-template-columns: 1fr; } }
+  .qi-shotbox { position: relative; display: block; line-height: 0; } .qi-shotbox img { display: block; }
+  .qi-shotbox .qi-frames i { border-width: 3px; }
+  .qi-shotwhy { padding: 12px 14px; border-radius: var(--r-md); background: var(--closed-soft); border-left: 4px solid var(--closed); display: grid; gap: 4px; font-size: var(--fs-meta); position: sticky; top: 0; }
+  .qi-shotwhy h4 { margin: 8px 0 0; font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .04em; color: var(--closed); } .qi-shotwhy h4:first-child { margin-top: 0; }
+  .qi-shotwhy p { margin: 0; } .qi-shotwhy .qi-path li { background: var(--panel); }
+  .qi-shotkey { display: flex; gap: 6px; align-items: baseline; } .qi-shotkey .mk { flex: none; display: inline-block; width: 14px; height: 10px; border: 2px solid var(--closed); border-radius: 2px; } .qi-shotkey .mk[data-by="agent"] { border-color: var(--warn); }
   /* Product: the map's controls, coverage bars, the legend; Settings rows. */
   .qi-map { position: relative; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--soft); margin-top: 16px; }
   .qi-map img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
@@ -1915,7 +1972,7 @@
   .qi-roles { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 8px 0 12px; font-size: var(--fs-meta); }
   .qi-roles b { font-weight: 600; } .qi-roles span { color: var(--muted); }
   /* A viewer reads: no button that changes anything (docs/dashboard-page.md → Roles). */
-  body.ro [data-cmd], body.ro #ask-test, body.ro [data-ask-page], body.ro [data-coll-add], body.ro [data-build-item], body.ro [data-build-page], body.na [data-set-go], body.na [data-focus-go] { display: none !important; }
+  body.ro [data-cmd], body.ro #ask-test, body.ro [data-ask-page], body.ro [data-coll-add], body.ro [data-rename], body.ro [data-build-item], body.ro [data-build-page], body.na [data-set-go], body.na [data-focus-go] { display: none !important; }
   body.na [data-setting], body.na [data-set] { pointer-events: none; }
 </style>
 </head>
@@ -1927,8 +1984,8 @@
     <button class="btn primary" id="ask-test" type="button" title="[Opens a dialog] Describe what to try on a page; Quality Inspector writes the test and runs it on the newest build">+ Ask for a test</button>
     <div class="grow"></div>
     <div class="search"><input class="goto" id="goto" type="search" placeholder="Search, or #42, S-7, F-3" role="combobox" aria-expanded="false" aria-controls="hits" aria-label="Search tests, runs, problems and screens: words, an issue's number like #42, a scenario's like S-7, a problem's like F-3" autocomplete="off" spellcheck="false" /><div id="hits" role="listbox" hidden></div></div>
-    <details class="more bell" id="bell"><summary id="bell-btn" aria-label="Notifications" title="Notifications: what happened lately"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg><span class="badge" id="bell-count" hidden></span></summary><div class="menu notes" id="notes" role="dialog" aria-label="Notifications"></div></details>
     <details class="more me-menu"><summary class="me" id="me" aria-label="Your menu"></summary><div class="menu"><div class="me-who" id="me-who"></div><button class="btn" id="settings" type="button" data-tab="settings" title="What Quality Inspector does beside the issues, and when">⚙ Settings</button><button class="btn" id="help" type="button" data-tab="guide" title="How Quality Inspector works, tab by tab">? How it works</button><button class="btn" id="theme" type="button"></button></div></details>
+    <details class="more bell" id="bell"><summary id="bell-btn" aria-label="Notifications" title="Notifications: what happened lately"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg><span class="badge" id="bell-count" hidden></span></summary><div class="menu notes" id="notes" role="dialog" aria-label="Notifications"></div></details>
   </header>
   <div class="banners" id="banners"></div>
   <main id="main">
@@ -1967,7 +2024,7 @@
 </dialog>
 
 <dialog id="shot-dialog" class="qi-shotdlg">
-  <form method="dialog"><figure><img id="shot-img" alt="" /><figcaption id="shot-cap"></figcaption></figure><div class="actions"><button type="button" class="btn" data-close="cancel">Close</button></div></form>
+  <form method="dialog"><div class="qi-shotgrid"><figure><span class="qi-shotbox"><img id="shot-img" alt="" /><span id="shot-frames"></span></span><figcaption id="shot-cap"></figcaption></figure><aside id="shot-why" class="qi-shotwhy" hidden></aside></div><div class="actions"><button type="button" class="btn" data-close="cancel">Close</button></div></form>
 </dialog>
 
 <dialog id="video-dialog" class="qi-shotdlg">
@@ -1980,6 +2037,15 @@
     <p class="sub" id="confirm-text"></p>
     <label id="confirm-note-l" hidden><span>What should change?</span><textarea id="confirm-note" maxlength="1000"></textarea></label>
     <div class="actions"><button type="button" class="btn primary" data-close="yes" id="confirm-yes"></button><button type="button" class="btn" data-close="cancel">Cancel</button></div>
+  </form>
+</dialog>
+
+<dialog id="rename-dialog">
+  <form method="dialog" id="rename-form">
+    <h2>Rename the test</h2>
+    <p class="sub">A short name that says what the test checks. Quality Inspector keeps it as you write it; the test does not change.</p>
+    <label><span>Name</span><input name="name" maxlength="80" autocomplete="off" required /></label>
+    <div class="actions"><button type="button" class="btn primary" data-close="send">Rename</button><button type="button" class="btn" data-close="cancel">Cancel</button></div>
   </form>
 </dialog>
 
@@ -1999,7 +2065,7 @@
   "use strict";
   // The page's commands: the closed set the dashboard server accepts (scripts/dashboard/server.mjs
   // reads them from the published page). The same patterns as scripts/catalog/viewer.html.
-const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|run (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)(?:, (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)){0,19}|repair (?:#\d+(?: (?:AC|IN)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: AC-\d+)?)|test scenario [a-z0-9][a-z0-9-]{0,40}|create issue for (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|PROP-\d{1,4}|STRESS-[A-Z]{1,20}-\d{1,3})(?:, (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|PROP-\d{1,4}|STRESS-[A-Z]{1,20}-\d{1,3})){0,19}(?: for the architect)?|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+(?: as (?:false-positive|wont-fix|duplicate|by-design))?|(?:reopen|recheck|discuss) D-\d+|send D-\d+ to design|recheck VAL-\d{1,6}|categorize D-\d+ (?:[a-z0-9][a-z0-9-]{0,29}|-)|(?:add (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) to|remove (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) from) the collection [A-Za-z0-9][A-Za-z0-9 _.-]{0,39}|run feature [a-z0-9][a-z0-9-]{0,39}|(?:accept|rewrite|retire|keep) M-\d{1,6}|send issue draft [a-z0-9][a-z0-9-]{0,59}(?: for the architect)?|(?:revise|discard) issue draft [a-z0-9][a-z0-9-]{0,59}|dismiss F-\d{1,6}(?: as (?:false-positive|wont-fix|duplicate|by-design))?|reopen F-\d{1,6}|delete (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?)|look into what needs attention|show blockers|retry B-\d{1,6}|do dashboard job J-\d{1,6})$/;
+const CMD_RE = /^(?:(?:promote|demote|test) (?:#\d+|S-\d+|P-[a-z0-9][a-z0-9-]*)|promote all pending|run (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)(?:, (?:#\d+(?: (?:AC|IN|EX)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: (?:AC|EX)-\d+)?)){0,19}|repair (?:#\d+(?: (?:AC|IN)-\d+)?|(?:S-\d+|P-[a-z0-9][a-z0-9-]*)(?: AC-\d+)?)|test scenario [a-z0-9][a-z0-9-]{0,40}|create issue for (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|PROP-\d{1,4}|STRESS-[A-Z]{1,20}-\d{1,3})(?:, (?:#\d{1,7} (?:AC|IN|EX)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}|D-\d{1,6}|VAL-\d{1,6}|PROP-\d{1,4}|STRESS-[A-Z]{1,20}-\d{1,3})){0,19}(?: for the architect)?|module [a-z][a-z-]{1,30} (?:set [a-z_]+=[A-Za-z0-9,._-]{1,40}|on|off|run now)|focus [A-Za-z0-9][A-Za-z0-9 _.\/-]{0,39}|dismiss D-\d+(?: as (?:false-positive|wont-fix|duplicate|by-design))?|(?:reopen|recheck|discuss) D-\d+|send D-\d+ to design|recheck VAL-\d{1,6}|categorize D-\d+ (?:[a-z0-9][a-z0-9-]{0,29}|-)|(?:add (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) to|remove (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?) from) the collection [A-Za-z0-9][A-Za-z0-9 _.-]{0,39}|run feature [a-z0-9][a-z0-9-]{0,39}|(?:accept|rewrite|retire|keep) M-\d{1,6}|send issue draft [a-z0-9][a-z0-9-]{0,59}(?: for the architect)?|(?:revise|discard) issue draft [a-z0-9][a-z0-9-]{0,59}|dismiss F-\d{1,6}(?: as (?:false-positive|wont-fix|duplicate|by-design))?|reopen F-\d{1,6}|delete (?:#\d+(?: (?:AC|IN)-\d+)?|S-\d+(?: AC-\d+)?)|rename (?:#\d{1,7} (?:AC|IN)-\d{1,3}|S-\d{1,6} AC-\d{1,3}|P-[a-z0-9][a-z0-9-]{0,40} AC-\d{1,3}) to: [^\u0000-\u001f\u007f|]{1,80}|look into what needs attention|show blockers|retry B-\d{1,6}|do dashboard job J-\d{1,6})$/;
 const SCEN_RE = /^test this scenario: On the page \/[A-Za-z0-9_./:-]{0,120}(?:, the [a-z ]{2,20} "[^"\n]{1,80}")?: [^\u0000-\u0009\u000b-\u001f\u007f]{10,2000}$/;
 const WALK_RE = /^walk these steps live: On the page \/[A-Za-z0-9_./:-]{0,120}: [^\u0000-\u0009\u000b-\u001f\u007f]{10,2000}$/;
 const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
@@ -2391,7 +2457,68 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
   // Every item's title has its link beside its number, as on Design Desk: a click copies a link that opens it.
   const LINK_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>`;
   const titleLink = (n) => `<button class="linkbtn" data-copy-link aria-label="Copy a link to ${esc(n || "this item")}" title="A link that opens ${esc(n || "this item")}: paste it in Slack, an issue or a message">${LINK_ICON}</button>`;
-  const head = (title, n, sub) => `${back()}<h2>${esc(title)}${num(n)}${titleLink(n)}</h2>${sub ? `<div class="sub"><span>${sub}</span></div>` : ""}`;
+  const head = (title, n, sub, rename = "") => `${back()}<h2${rename ? ` class="renamable"` : ""}>${esc(title)}${num(n)}${titleLink(n)}${rename}</h2>${sub ? `<div class="sub"><span>${sub}</span></div>` : ""}`;
+  const PEN_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
+  const renameBtn = (ref) => /^(#\d+ (AC|IN)-\d+|S-\d+ AC-\d+|P-[a-z0-9-]+ AC-\d+)$/.test(ref) && mayCmd(`rename ${ref} to: x`)
+    ? `<button class="linkbtn rename" data-rename="${esc(ref)}" aria-label="Rename this test" title="[Opens a dialog] Give this test a clearer name; Quality Inspector keeps it">${PEN_ICON}</button>` : "";
+  // A test's runs, newest first (docs/dashboard-page.md → A test's page): when, on which build, its result
+  // and, for a run that did not pass, what was wrong in one line. The failure itself is on the run's page.
+  const RUNS_SHOWN = 10;
+  function testRuns(i) {
+    const h = (i.history || []).slice().reverse(), shown = h.slice(0, RUNS_SHOWN);
+    if (!shown.length) return "";
+    const sibs = caseTests(i);
+    const rows = shown.map((x) => { const [w, st] = verdictOf(x.value), r = runOf(i, x), e = r?.entries?.find((y) => y.key === i.key);
+      const cks = sibs.map((t) => [t, checkIn(i, x, t)]), stop = cks.find(([, m]) => ["fail", "blocked"].includes(m[0]) && !m[2])?.[0];
+      const me = cks.find(([t]) => t.key === i.key)?.[1], nr = Boolean(me?.[2]) && me[1] !== "No result";
+      const bad = ["fail", "look", "blocked"].includes(st), why = nr ? `Not reached: ${stop ? `${stop.id} stopped the walk` : "the walk stopped"} before this check.`
+        : bad ? e?.wrong || (r?.rep?.results?.[i.key]?.c ? wrongOf(i, e, r.rep.results[i.key].c, false) : "") || x.why || "" : "";
+      const t = new Date(x.utc), ok = !isNaN(t);
+      return `<li data-st="${st}"><span class="rw">${ok ? `<b title="${esc(when(x.utc))}">${esc(dayWord(x.utc))}</b> <span class="k">${esc(t.toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" }))}</span>` : `<span class="k">?</span>`}</span>`
+        + `<span class="rb">build ${buildA(x.build || "?")}</span><span class="rs"><span class="chip tag ${TAG_INK[st] || ""}">${esc(w)}</span></span>`
+        + (sibs.length ? `<span class="rc">${cks.map(([t, m]) => ckMark(m, t, t.key === i.key)).join("")}</span>` : "")
+        + `<span class="re">${why ? esc(why.length > 140 ? `${why.slice(0, 138)}…` : why) : ""}</span>`
+        + `<span class="rl">${r ? `<button class="anchor" data-goto="runs" data-item="${esc(`${r.id}@${i.key}`)}" title="Opens this run: the steps and the screens">${esc(RUN_KIND[x.run] || "Run")} ${esc(r.id)}</button>` : `<span class="k">${esc(RUN_KIND[x.run] || x.run || "")}</span>`}</span></li>`; }).join("");
+    const top = sibs.length ? `<li class="rh" aria-hidden="true"><span></span><span></span><span></span><span class="rc">${sibs.map((t) => `<span class="num">${esc(t.id)}</span>`).join("")}</span><span></span><span></span></li>` : "";
+    return sect(h.length > RUNS_SHOWN ? `The last ${RUNS_SHOWN} runs · of ${h.length}` : `Runs · ${h.length}`, `<ol class="qi-runs${sibs.length ? " has-ck" : ""}">${top}${rows}</ol>`);
+  }
+  // A test case (docs/dashboard-page.md → A test case and its checks): one walk through the product that
+  // checks several criteria in order. Each check is its own test on the page; the case shows them together:
+  // the walk with its checks, each check's last runs, and per run which checks passed, failed or were not reached.
+  const caseOf = (i) => (i?.case?.checks?.length > 1 ? i.case : null);
+  const fileOf = (i) => String(i?.key || "").split("/")[0];
+  const caseTests = (i) => { const c = caseOf(i); return c ? c.checks.map((id) => tests().find((t) => fileOf(t) === fileOf(i) && t.id === id) || { id, key: null, history: [] }) : []; };
+  // One check's state in one run of the case → [state, word]: its status on the walk, else that check's own result of the run.
+  function checkIn(i, x, t) {
+    const r = runOf(i, x), res = r?.rep?.results, w = res?.[i.key]?.c?.walk || (t.key && res?.[t.key]?.c?.walk);
+    const c = w?.find((y) => y[0] === t.id);
+    if (c) { const [word, s] = ST_WORD[c[2]] || [human(c[2] || "-"), "none"]; return [s, word, c[2] === "not-reached"]; }
+    const h = (t.history || []).find((y) => y.run === x.run && y.utc === x.utc);
+    if (h) { const [word, s] = verdictOf(h.value); return [s, word, false]; }
+    return ["none", "No result", true];
+  }
+  const ckMark = ([s, word, nr], t, me, x) => `<span class="qi-dm" data-s="${esc(s)}"${nr ? " data-nr" : ""}${me ? " data-me" : ""} title="${esc(`${t.id}${t.name ? ` · ${t.name}` : ""}: ${word}${x ? ` · ${dayWord(x.utc)}, build ${x.build || "?"}` : ""}`)}"></span>`;
+  function caseSect(i) {
+    const c = caseOf(i); if (!c) return "";
+    const sibs = caseTests(i), hist = (i.history || []).slice().reverse();
+    // The walk of the newest run that has one: its steps as dots, its checks as diamonds where their stills were taken.
+    const x = hist.find((y) => runOf(i, y)?.rep?.results?.[i.key]?.c?.walk), r = x && runOf(i, x), side = r?.rep?.results?.[i.key]?.c;
+    const n = side ? Math.max(1, (side.steps || []).length + (side.more || 0)) : sibs.length + 1;
+    const pos = (k, at) => (side && Number.isInteger(at) ? ((at + 0.5) / n) * 100 : ((k + 1) / (sibs.length + 1)) * 100);
+    const marks = sibs.map((t, k) => { const at = side?.walk?.find((y) => y[0] === t.id)?.[1]; return { t, p: pos(k, at), m: x ? checkIn(i, x, t) : ["none", "Not run yet", false] }; });
+    const stop = marks.find((m) => ["fail", "blocked"].includes(m.m[0]) && !m.m[2]);
+    const dots = side && n <= 80 ? Array.from({ length: n }, (_, k) => k).filter((k) => !(side.walk || []).some((y) => y[1] === k)).map((k) => `<b style="left:${(((k + 0.5) / n) * 100).toFixed(2)}%"${stop && (k + 0.5) / n * 100 > stop.p ? " data-nr" : ""}></b>`).join("") : "";
+    const strip = `<div class="qi-walk"><div class="track"><i class="ln" style="width:${stop ? stop.p.toFixed(2) : 100}%"></i>${stop ? `<i class="ln nr" style="left:${stop.p.toFixed(2)}%"></i>` : ""}${dots}`
+      + marks.map(({ t, p, m }) => { const tag = t.key && t.key !== i.key ? "button" : "span";
+        return `<${tag} class="ck"${tag === "button" ? ` data-item="${esc(t.key)}"` : ""} style="left:${p.toFixed(2)}%">${ckMark(m, t, t.key === i.key)}<span class="lb${t.key === i.key ? " me" : ""}">${esc(t.id)}</span></${tag}>`; }).join("")
+      + `</div><p class="k">${x ? `The walk of the newest run${r ? ` ${esc(r.id)}` : ""}, build ${buildA(x.build || "?")} · ${esc(dayWord(x.utc))}.` : "The walk has not run yet."} <span class="qi-walkkey"><span><b class="d"></b> a step</span><span><span class="qi-dm" data-s="pass"></span> a check</span><span><span class="qi-dm" data-s="none" data-nr></span> not reached</span></span></p></div>`;
+    // Each check: its name, its newest state and its last runs, oldest at the left.
+    const list = `<ol class="qi-checks">${sibs.map((t) => { const mine = t.key === i.key, [w, s] = verdictOf(t.verdict?.value);
+      const spark = (t.history || []).slice(-RUNS_SHOWN).map((y) => ckMark(checkIn(i, y, t), t, false, y)).join("");
+      const name = mine ? `<b>${esc(t.name || t.id)}</b> <span class="k">· this page</span>` : t.key ? `<button class="anchor" data-item="${esc(t.key)}">${esc(t.name || t.id)}</button>` : `<span class="k">Not in the catalog</span>`;
+      return `<li${mine ? " data-me" : ""}><span class="num">${esc(t.id)}</span><span class="cn">${name}</span><span class="chip tag ${TAG_INK[s] || ""}">${esc(w)}</span><span class="qi-spark" aria-label="The last runs of ${esc(t.id)}">${spark}</span></li>`; }).join("")}</ol>`;
+    return sect(`One walk, ${sibs.length} checks`, `<p class="k">${esc(text(c.title || ""))}${c.title ? " — " : ""}the test does its steps once and checks each criterion on the way. When a check fails, the walk stops: the checks after it are not reached.</p>${strip}${list}`);
+  }
 
   function renderTest(i) {
     const s = testState(i), [w] = running(i) ? ["Running"] : verdictOf(i.verdict?.value);
@@ -2414,16 +2541,15 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     const now = i.verdict ? `${esc(RUN_KIND[i.verdict.run] || "Run")} on build ${buildA(i.verdict.build || "?")} · ${esc(ago(i.verdict.utc))}` : "";
     const gwt = [i.given && ["Given", i.given], i.when && ["When", i.when], i.then && ["Then", i.then]].filter(Boolean);
     const inF = features().filter((f) => membersOf(f.members).includes(i)), inC = collections().filter((c) => membersOf(c.members).includes(i));
-    return head(i.name || i.id, refLabel(ref), `${refLabel(ref) !== ref ? `<span class="num" title="Its name in the profile">${esc(whole)}</span> · ` : ""}${esc(text(i.origin?.title || ""))} · <span title="${esc(TIER_TIP[i.tier] || "")}">Kept: ${esc(TIER[i.tier] || i.tier)}</span>`)
+    return head(i.name || i.id, refLabel(ref), `${refLabel(ref) !== ref ? `<span class="num" title="Its name in the profile">${esc(whole)}</span> · ` : ""}${esc(text(i.origin?.title || ""))} · <span title="${esc(TIER_TIP[i.tier] || "")}">Kept: ${esc(TIER[i.tier] || i.tier)}</span>`, renameBtn(ref))
       + statusBox(s, w, STATE_TIP[s], actions, now)
       + upkeepBox(i)
       + bugSect(/^(#\d+ (AC|IN|EX)-\d+|S-\d+ AC-\d+|P-[a-z0-9-]+ AC-\d+)$/.test(ref) ? [ref] : [])
-      + (cause && CAUSE_WORD[cause] ? `<p class="qi-why"><b>${esc(CAUSE_WORD[cause][0])}.</b> ${esc(CAUSE_WORD[cause][1])}</p>` : "")
       + (i.summary ? `<p class="lead">${esc(i.summary)}</p>` : "")
-      + (bad ? (() => { const got = newestRep(i); return got ? sect("What happened, step by step", failView(i, got, i.verdict?.utc === got.r.utc) + stepsFold(i, got, got.e.why || i.verdict?.why)) : ""; })() : "")
       + sect("What it checks", gwt.length ? `<dl class="qi-gwt">${gwt.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>${i.quote ? `<blockquote class="qi-quote">“${esc(i.quote)}”</blockquote>` : ""}` : "")
       + tpSect(i)
-      + sect("Results", i.history?.length ? histList(i.history, i) : "")
+      + caseSect(i)
+      + testRuns(i)
       + sect("Screens it opens", i.pages?.length ? `<ul class="qi-list">${i.pages.map((p) => `<li><button class="anchor" data-item="screen:${esc(p)}">${esc(p)}</button></li>`).join("")}</ul>` : "")
       + sect("Part of", inF.length || inC.length ? `<p>${[...inF.map((f) => `<button class="anchor" data-goto="tests" data-item="feature:${esc(f.id)}">${esc(f.name)}</button>`), ...inC.map((c) => `<button class="anchor" data-goto="tests" data-item="collection:${esc(c.name)}">${esc(c.name)}</button>`)].join(" ")}</p>` : "");
   }
@@ -2526,7 +2652,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
   // A run's report (R-n), on the page: what ran and how it went, then each test's result on the new build
   // and on the last release — the status, the error, the screenshots and the steps. The video stays in
   // the report artifact, linked. The list at the left walks the reports; the report has no Previous or Next of its own.
-  const ST_WORD = { passed: ["Passed", "pass"], failed: ["Failed", "fail"], flaky: ["Flaky", "look"], "timed-out": ["Timed out", "blocked"], interrupted: ["Stopped", "blocked"], skipped: ["Skipped", "none"], missing: ["No run", "none"], "no-test": ["No test", "none"] };
+  const ST_WORD = { passed: ["Passed", "pass"], failed: ["Failed", "fail"], flaky: ["Flaky", "look"], "timed-out": ["Timed out", "blocked"], interrupted: ["Stopped", "blocked"], skipped: ["Skipped", "none"], "not-reached": ["Not reached", "none"], missing: ["No run", "none"], "no-test": ["No test", "none"] };
   const secs = (ms) => (ms == null ? "" : ms < 1000 ? `${ms} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 60000)} min`);
   function sideHtml(x, title, build, name) {
     if (!x) return "";
@@ -2535,20 +2661,75 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
       + (x.err ? `<p class="qi-err">${esc(x.err)}</p>` : "")
       + (x.video ? `<div><button type="button" class="btn small" data-video="${esc(x.video)}" data-cap="${esc(`${name || ""} · ${title}${build ? `, build ${build}` : ""}`)}" title="[Opens a dialog] Plays the video of this test on the page">▶ Play the video</button></div>` : "")
       + (walkable(x) ? walkList(x) : x.shots?.length ? `<div class="qi-shots">${x.shots.map((sh) => `<figure>${shotBtn(sh)}<figcaption>${esc(sh.cap)}</figcaption></figure>`).join("")}</div>` : "")
-      + (walkable(x) ? "" : x.steps?.length ? `<details class="qi-steplist"${failed ? " open" : ""}><summary>Steps · ${x.steps.length + (x.more || 0)}</summary><ol>${x.steps.map(([api, label, st, ms]) => `<li class="${st === "failed" || st === "timed-out" ? "bad" : ""}"><span>${esc(label || api)}</span><span class="k">${esc(ST_WORD[st]?.[0] || "")}${ms != null ? ` · ${esc(secs(ms))}` : ""}</span></li>`).join("")}${x.more ? `<li class="k">… ${x.more} more steps in the full report</li>` : ""}</ol></details>` : "")
+      + (walkable(x) ? "" : x.steps?.length ? `<details class="qi-steplist"${failed ? " open" : ""}><summary>Steps · ${x.steps.length + (x.more || 0)}</summary><ol>${x.steps.map(([api, label, st, ms]) => `<li class="${st === "failed" || st === "timed-out" ? "bad" : ""}"><span class="wl">${stepLine(api, label)}</span><span class="k">${esc(ST_WORD[st]?.[0] || "")}${ms != null ? ` · ${esc(secs(ms))}` : ""}</span></li>`).join("")}${x.more ? `<li class="k">… ${x.more} more steps in the full report</li>` : ""}</ol></details>` : "")
       + `</div>`;
   }
   // What happened, step by step (docs/dashboard-page.md → The walk): each step the test did, in order,
   // the screenshot taken at it beside it, the step that failed in red with the screen at the failure in a
   // red frame. A report built before the steps knew their shots (no `at`) shows its pictures and steps apart.
-  const shotBtn = (sh, cls = "") => sh.img ? `<button type="button" class="qi-thumb${cls}" data-shot="${esc(sh.img)}" data-cap="${esc(sh.cap)}" title="Shows the screenshot at its full size"><img data-img="${esc(sh.img)}" alt="${esc(sh.cap)}" /></button>` : `<div class="qi-thumb none">Not on this page</div>`;
+  // A shot's frames (catalog.mjs → frameOf): boxes as parts of the shot's width, drawn over it at any size.
+  const framesHtml = (f) => f?.boxes?.length ? `<span class="qi-frames" data-by="${esc(f.by)}" aria-hidden="true">${f.boxes.map(([x, y, w, h]) => `<i style="left:${x * 100}%;width:${w * 100}%;margin-top:${y * 100}%;padding-top:${h * 100}%"></i>`).join("")}</span>` : "";
+  // A shot button carries what the full-size view says beside it: what is wrong, where to look, the step.
+  const shotData = (sh, ctx) => [["frame", sh.frame ? JSON.stringify(sh.frame) : ""], ["wrong", ctx?.wrong], ["where", ctx?.where], ["step", ctx?.step], ["nobox", ctx?.nobox]]
+    .filter(([, v]) => v).map(([k, v]) => ` data-${k}="${esc(v)}"`).join("");
+  const shotBtn = (sh, cls = "", ctx = null) => sh.img ? `<button type="button" class="qi-thumb${cls}" data-shot="${esc(sh.img)}" data-cap="${esc(sh.cap)}"${shotData(sh, ctx)} title="Shows the screenshot at its full size${ctx?.wrong ? ", with what is wrong" : ""}"><img data-img="${esc(sh.img)}" alt="${esc(sh.cap)}" />${framesHtml(sh.frame)}</button>` : `<div class="qi-thumb none">Not on this page</div>`;
+  // A step in plain words (docs/dashboard-page.md → The walk): who did it — the tester, or the product
+  // that answered — and what, read from its locator. The technical form stays in the tooltip.
+  const productName = () => { const p = D().product; return (typeof p === "string" ? p : p?.name || p?.display_name) || "The product"; };
+  const ROLE_WORD = { button: "button", link: "link", menuitem: "menu item", menuitemradio: "option", menuitemcheckbox: "option", option: "option", tab: "tab", checkbox: "check box",
+    radio: "option", switch: "switch", textbox: "field", searchbox: "search field", combobox: "field", spinbutton: "number field", heading: "heading", dialog: "dialog", alert: "message",
+    status: "message", img: "picture", listitem: "item", row: "row", cell: "cell", region: "area", navigation: "menu", slider: "slider", list: "list", grid: "table", table: "table" };
+  const FIELDS = new Set(["textbox", "searchbox", "combobox", "spinbutton"]);
+  // A name written as a pattern reads as its words: /^Tool approval:/ -> "Tool approval: …", /^OK\.?$/ -> "OK".
+  const nameWords = (raw) => { const t = String(raw || "").trim(), re = /^\/(.*)\/[a-z]*$/s.exec(t);
+    if (!re) return t.replace(/^["'`]|["'`]$/g, "");
+    let c = re[1]; const a = c.startsWith("^"), z = c.endsWith("$") && !c.endsWith("\\$");
+    c = c.replace(/^\^/, "").replace(/\$$/, "").replace(/\((?:\?:)?([^|()]*)\|[^()]*\)/g, "$1").replace(/\\.\?|\.\?/g, "")
+      .replace(/\[[^\]]*\][+*?]?|\.[+*]|\\[dws][+*?]?/g, "…").replace(/\\(.)/g, "$1").replace(/[()]/g, "").trim();
+    return `${a ? "" : "… "}${c}${z ? "" : " …"}`.trim(); };
+  // getByRole("button", name: /^Allow once$/).first() -> { by: "Role", role: "button", name: "Allow once" }
+  const parseLoc = (l) => { const m = /getBy(Role|Text|Label|Placeholder|TestId|AltText|Title)\(/.exec(l); if (!m) return null;
+    let k = m.index + m[0].length, d = 1, q = null; const from = k;
+    for (; k < l.length && d; k++) { const ch = l[k]; if (q) { if (ch === "\\") k++; else if (ch === q) q = null; } else if (ch === '"' || ch === "'") q = ch; else if (ch === "(") d++; else if (ch === ")") d--; }
+    const args = l.slice(from, k - 1).trim();
+    if (m[1] === "Role") { const r = /^["']([a-z]+)["']\s*(?:,\s*(?:\{\s*)?name:\s*(.+?)\s*\}?)?$/s.exec(args); return r ? { by: "Role", role: r[1], name: r[2] ? nameWords(r[2]) : "" } : null; }
+    return { by: m[1], name: nameWords(args.replace(/,\s*\{.*\}$/s, "")) }; };
+  const ACTS = { click: ["Clicks", "click"], dblclick: ["Double-clicks", "double-click"], fill: ["Types into", "type into"], type: ["Types into", "type into"], presssequentially: ["Types into", "type into"],
+    press: ["Presses a key in", "press a key in"], check: ["Ticks", "tick"], uncheck: ["Clears", "clear"], selectoption: ["Chooses an option in", "choose an option in"], hover: ["Points at", "point at"],
+    focus: ["Goes to", "go to"], setinputfiles: ["Adds a file to", "add a file to"], clear: ["Clears", "clear"], tap: ["Taps", "tap"] };
+  function stepSay(api, label) {
+    const a = String(api || ""), l = String(label || a), verb = (a.split(".").pop() || "").toLowerCase(), P = productName();
+    const tech = a && l !== a ? `${a} · ${l}` : l;
+    if (a === "agent.act") return { who: "tester", text: l, tech };
+    if (a === "agent.assert") return { who: "product", text: l, tech, fail: `This did not hold: ${l}` };
+    if (a === "app.screenshot") return { who: "tester", text: `Takes a picture of the screen${l.replace(/^[A-Z]{2}-\d+:\s*/, "") ? `: ${l.replace(/^[A-Z]{2}-\d+:\s*/, "")}` : ""}`, tech };
+    if (/^(\/|https?:)/.test(l) && !/getBy/.test(l)) { const page = stepWords(a, l).replace(/^https?:\/\/[^/]+/, "") || "/";
+      return { who: "tester", text: page === "/" ? "Opens the home page" : `Opens the page ${page}`, tech, fail: `The page ${page} did not open` }; }
+    const loc = parseLoc(l);
+    if (!loc) return { who: /expect|assert|waitfor|^to[a-z]/i.test(verb) ? "product" : "tester", text: l, tech };
+    const thing = loc.role ? `the ${ROLE_WORD[loc.role] || loc.role}${loc.name ? ` “${loc.name}”` : ""}` : loc.by === "Text" ? `the text “${loc.name}”`
+      : loc.by === "Label" || loc.by === "Placeholder" ? `the field “${loc.name}”` : `“${loc.name}”`;
+    const state = ((/→\s*(.+)$/.exec(l) || [])[1] || "").trim().toLowerCase();
+    if (state || /^(expect|to[a-z]+|waitfor|isvisible)$/.test(verb)) {
+      const hide = /hidden|not|detached/.test(state || verb), txt = /text|value/.test(state), on = /enabled/.test(state), off = /disabled/.test(state);
+      const text = hide ? `${P} hides ${thing}` : txt ? `${P} shows ${thing} with the expected text` : on ? `${P} lets you use ${thing}` : off ? `${P} does not let you use ${thing}` : `${P} shows ${thing}`;
+      return { who: "product", text, tech, fail: hide ? `${P} did not hide ${thing}` : `${P} did not show ${thing}` }; }
+    const act = ACTS[verb] || (loc.by === "Text" && !loc.role ? null : FIELDS.has(loc.role) || loc.by === "Label" || loc.by === "Placeholder" ? ACTS.fill : ACTS.click);
+    if (!act) return { who: "product", text: `${P} shows ${thing}`, tech, fail: `${P} did not show ${thing}` };
+    return { who: "tester", text: `${act[0]} ${thing}`, tech, fail: `The tester could not ${act[1]} ${thing}: ${P} did not show it` };
+  }
+  const WHO = { tester: ["Tester", "Quality Inspector did this step"], product: ["", "The product answered: this step checks what it shows"] };
+  const whoChip = (who) => { const [w, tip] = WHO[who] || WHO.tester; return `<span class="who" data-who="${who}" title="${esc(tip)}">${esc(w || productName())}</span>`; };
+  const stepLine = (api, label) => { const s = stepSay(api, label); return `${whoChip(s.who)}<span class="say" title="${esc(s.tech)}">${esc(s.text)}</span>`; };
   const walkable = (x) => (x?.steps || []).length && (x.shots || []).length && x.shots.every((sh) => Number.isInteger(sh.at));
-  function walkList(x) {
+  function walkList(x, ctx = null) {
     const byAt = new Map(); for (const sh of x.shots || []) (byAt.get(sh.at) || byAt.set(sh.at, []).get(sh.at)).push(sh);
     const bad = (st) => st === "failed" || st === "timed-out";
-    return `<ol class="qi-walk">${(x.steps || []).map(([api, label, st, ms], n) => { const pics = byAt.get(n) || [];
-      return `<li class="${bad(st) ? "bad" : ""}${pics.length ? " pic" : ""}"><span class="wn">${n + 1}</span><div class="wb"><div class="wl"><span>${esc(label || api)}</span>${bad(st) ? stw("fail", ST_WORD[st][0]) : ""}${ms != null ? `<span class="k">${esc(secs(ms))}</span>` : ""}</div>`
-        + (pics.length ? `<div class="wp">${pics.map((sh) => `<figure>${shotBtn(sh, sh.fail ? " fail" : "")}<figcaption>${esc(sh.cap)}</figcaption></figure>`).join("")}</div>` : "") + `</div></li>`; }).join("")}`
+    const legend = `<p class="qi-who-key k">${whoChip("tester")} what the test did · ${whoChip("product")} what ${esc(productName() === "The product" ? "the product" : productName())} showed · hold the pointer on a step for its technical form</p>`;
+    return legend + `<ol class="qi-walk">${(x.steps || []).map(([api, label, st, ms], n) => { const pics = byAt.get(n) || [], say = stepSay(api, label);
+      const shotCtx = (sh) => sh.fail || sh.frame ? { wrong: ctx?.wrong || (sh.frame?.saw ?? ""), where: ctx?.where, step: `Step ${n + 1} · ${say.text}`, nobox: sh.fail && !sh.frame && /getBy/.test(String(label)) ? "1" : "" } : null;
+      return `<li class="${bad(st) ? "bad" : ""}${pics.length ? " pic" : ""}" data-who="${say.who}"><span class="wn">${n + 1}</span><div class="wb"><div class="wl">${stepLine(api, label)}${bad(st) ? stw("fail", ST_WORD[st][0]) : ""}${ms != null ? `<span class="k">${esc(secs(ms))}</span>` : ""}</div>`
+        + (pics.length ? `<div class="wp">${pics.map((sh) => `<figure>${shotBtn(sh, sh.fail ? " fail" : "", shotCtx(sh))}<figcaption>${esc(sh.cap)}</figcaption></figure>`).join("")}</div>` : "") + `</div></li>`; }).join("")}`
       + (x.more ? `<li class="k"><span class="wn">…</span><div>${x.more} more steps in the full report</div></li>` : "") + `</ol>`;
   }
   // The failure first (docs/dashboard-page.md → The walk): the screen at the failure, large — the marked
@@ -2568,10 +2749,10 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     if (newest && i?.marked === "agent" && i.mark_saw) return i.mark_saw;
     if (e?.wrong) return e.wrong;
     const n = failAt(x);
-    if (n >= 0) { const [api, label, st, ms] = x.steps[n], l = String(label || api || ""), page = stepWords(api, label);
-      const t = ms != null ? ` in ${secs(ms)}` : "";
-      if (page !== l) return `The page ${page} did not open${t}.`;
-      return `Step ${n + 1} ${st === "timed-out" ? "did not end" : "did not pass"}${t}: ${l}`; }
+    if (n >= 0) { const [api, label, st, ms] = x.steps[n], say = stepSay(api, label);
+      const t = ms != null ? ` (step ${n + 1}, ${secs(ms)})` : ` (step ${n + 1})`;
+      if (say.fail) return `${say.fail}${t}.`;
+      return `Step ${n + 1} ${st === "timed-out" ? "did not end" : "did not pass"}${ms != null ? ` in ${secs(ms)}` : ""}: ${say.text}`; }
     const err = String(x?.err || "").split(/\n|(?<=\.)\s/)[0];
     return err || "";
   }
@@ -2590,13 +2771,15 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
       const sh = okShot(c, label, n); if (sh) return { sh, from: `In ${runA(r)}, build ${buildA(r.build)}, where the test passed` }; }
     return null;
   }
-  function failView(i, got, newest) {
+  function failView(i, got, newest, where = "") {
     if (!i) return "";
     const x = got?.x, e = got?.e, wrong = wrongOf(i, e, x, newest);
     const marked = newest && i.marked && i.still, fs = failShot(x), ok = got ? howItShouldLook(i, got) : null;
     const now = marked ? { img: i.still_sharp || i.still, cap: `${testLabel(i)} — ${i.mark_saw || "the failing check"}` } : fs ? { ...fs, cap: `${testLabel(i)} — the screen at the failure` } : null;
     const frame = marked ? (i.marked === "test" ? "The red frame marks the check that failed." : "The orange frame marks what is wrong.") : "";
-    const pic = (sh, cls) => `<button type="button" class="qi-thumb${cls}" data-shot="${esc(sh.img)}" data-cap="${esc(sh.cap)}" title="Shows the screenshot at its full size"><img data-img="${esc(sh.img)}" alt="${esc(sh.cap)}" /></button>`;
+    const n = failAt(x), fst = n >= 0 ? x.steps[n] : null;
+    const ctx = { wrong, where, step: fst ? `Step ${n + 1} · ${stepSay(fst[0], fst[1]).text}` : "", nobox: !marked && !now?.frame && /getBy/.test(String(fst?.[1] || "")) ? "1" : "" };
+    const pic = (sh, cls) => shotBtn(sh, cls, cls ? ctx : null);
     const exp = [i.given && ["Given", i.given], i.when && ["When", i.when], i.then && ["Then", i.then]].filter(Boolean);
     const pics = now || wrong ? `<div class="qi-fail${ok && now ? " two" : ""}">`
       + `<figure class="now">${now ? pic(now, " fail") : ""}<figcaption><h4>What is wrong</h4>${wrong ? `<p>${esc(wrong)}</p>` : `<p class="k">The run says no more than its result.</p>`}${frame ? `<p class="k"><span class="mk" data-by="${esc(i.marked)}"></span>${frame}</p>` : ""}</figcaption></figure>`
@@ -2606,11 +2789,11 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     return pics + gwt;
   }
   // The steps, folded: their count, the step that failed, and the report they come from.
-  function stepsFold(i, got, why) {
+  function stepsFold(i, got, why, ctx = null) {
     const note = why ? `<p class="qi-note"><b>The agent's note:</b> ${esc(why)}</p>` : "";
     if (!got) return note ? `<details class="qi-fold"><summary>The agent's note</summary>${note}</details>` : "";
     const x = got.x, n = failAt(x), all = (x?.steps || []).length + (x?.more || 0);
-    const body = walkable(x) ? walkList(x) : sideHtml(x, "New build", got.r.build, i.name);
+    const body = walkable(x) ? walkList(x, ctx) : sideHtml(x, "New build", got.r.build, i.name);
     if (!body) return note ? `<details class="qi-fold"><summary>The agent's note</summary>${note}</details>` : "";
     return `<details class="qi-fold"><summary>${all ? `All ${all} steps` : "The steps"}${n >= 0 ? ` · step ${n + 1} failed` : ""}<span class="k"> · report ${esc(got.r.id)}, build ${esc(got.r.build || "?")}</span></summary>`
       + `${note}<p class="k">From <button class="anchor" data-goto="runs" data-item="${esc(`${got.r.id}@${i.key}`)}">report ${esc(got.r.id)}</button>, build ${buildA(got.r.build)}</p>${body}</details>`;
@@ -2671,12 +2854,25 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     return head(p.title, p.id, [`Seen first ${esc(day(p.first))}, last ${esc(day(p.last))}`, ...iss.map((n) => `Issue ${issueA(n)}`)].join(" · "))
       + (p.dismissed ? statusBox("none", "Dismissed", `A person dismissed it: ${(DISMISS_WHY.find(([r]) => r === p.dismissed.reason) || [, "no reason given"])[1].toLowerCase()}.`, actions, `dismissed ${esc(ago(p.dismissed.utc))}`)
         : statusBox(p.open ? (p.env ? "blocked" : "fail") : "pass", p.open ? "Still there" : "Not seen now", p.open ? "The newest run still found it." : "The newest run did not find it again.", actions, plural(p.runs.length, "run", "runs") + " found it"))
+      + diagHtml(p)
       + bugSect(about)
       + probWalk(p, about)
-      + sect("What happens", p.what ? `<p>${esc(p.what)}</p>` : "") + sect("Where", p.where ? `<p>${esc(p.where)}</p>` : "")
-      + sect("Why", p.why ? `<p>${esc(p.why)}</p>` : "") + sect("What fixes it", p.fix ? `<p>${esc(p.fix)}</p>` : "")
       + sect(about.length === 1 ? "The test that found it" : "Tests that found it", testsOf ? `<ul class="qi-list">${testsOf}</ul>` : "")
       + sect("Runs that found it", `<ul class="qi-list">${p.runs.slice().reverse().map((r) => `<li><button class="anchor" data-goto="runs" data-item="${esc(runKey(r))}">${esc(runTitle(r))}</button> · ${esc(day(r.utc))}</li>`).join("")}</ul>`);
+  }
+  // The problem in four parts, each its own card: what happens (red), where (the place to look),
+  // why (amber), what fixes it (green, with who). The order reads as a story: the fault, then its fix.
+  const DIAG = [["what", "What happens", "closed", "M12 8v5m0 3.5v.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"],
+    ["where", "Where to look", "accent", "M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Zm0-9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"],
+    ["why", "Why it happens", "waiting", "M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3m.1 4h.01M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z"],
+    ["fix", "What fixes it", "approved", "M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4 2.6-2.6Z"]];
+  // "The chat's session dialog, Tool approval …, then the message box" reads as a path of places.
+  const wherePath = (t) => { const parts = String(t).split(/,\s*(?:then\s+)?|\s+then\s+|\s*→\s*|\s*>\s*/).map((x) => x.trim()).filter(Boolean);
+    return parts.length > 1 && parts.length <= 6 ? `<ol class="qi-path">${parts.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>` : `<p>${esc(t)}</p>`; };
+  function diagHtml(p) {
+    const cards = DIAG.filter(([k]) => p[k]).map(([k, title, ink, d]) => `<div class="qi-diag-c" data-k="${k}" style="--c: var(--${ink}); --c-soft: var(--${ink}-soft)">`
+      + `<h4><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>${esc(title)}</h4>${k === "where" ? wherePath(p[k]) : `<p>${esc(p[k])}</p>`}</div>`).join("");
+    return cards ? `<section class="qi-sect qi-diag-s"><h3>The problem in short</h3><div class="qi-diag">${cards}</div></section>` : "";
   }
   // A problem's evidence first: per test that found it (at most three), what it expected beside what
   // happened, the screen with the error marked, then every step it did with its screenshots.
@@ -2685,7 +2881,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     const parts = about.slice(0, 3).map((ref) => { const i = byRef(ref); if (!i) return "";
       const got = newestRep(i, runsOf), why = got?.e.why || i.verdict?.why || p.what;
       return `<div class="qi-walk-t">${about.length > 1 ? `<h4><button class="anchor" data-goto="tests" data-item="${esc(i.key)}">${esc(i.name || i.id)} <span class="num">${esc(refLabel(ref))}</span></button></h4>` : ""}`
-        + failView(i, got, !got || i.verdict?.utc === got.r.utc) + stepsFold(i, got, why)
+        + failView(i, got, !got || i.verdict?.utc === got.r.utc, p.where) + stepsFold(i, got, why, { wrong: wrongOf(i, got?.e, got?.x, !got || i.verdict?.utc === got.r.utc), where: p.where })
         + `</div>`; }).join("");
     return sect("What happened, step by step", parts);
   }
@@ -3175,7 +3371,7 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
   // Where a command goes (docs/dashboard-page.md → Commands): what a script does without the model
   // happens at once (POST /api/act); work for Quality Inspector is a job (doCmd below).
   const DIRECT = [/^dismiss D-\d{1,6}( as [a-z-]+)?$/, /^reopen D-\d{1,6}$/, /^dismiss F-\d{1,6}( as [a-z-]+)?$/, /^reopen F-\d{1,6}$/, /^categorize D-\d{1,6} \S+$/,
-    /^(add|remove) (#\d+( (AC|IN)-\d+)?|S-\d+( AC-\d+)?) (to|from) the collection .+$/, /^module [a-z-]+ set [a-z_]+=\S+$/, /^focus .+$/];
+    /^(add|remove) (#\d+( (AC|IN)-\d+)?|S-\d+( AC-\d+)?) (to|from) the collection .+$/, /^rename \S+ [A-Z]{2}-\d+ to: .+$/, /^module [a-z-]+ set [a-z_]+=\S+$/, /^focus .+$/];
   const isDirect = (cmd) => DIRECT.some((re) => re.test(cmd));
   async function act(cmd, what) {
     const r = await api("POST", "/api/act", { command: cmd });
@@ -3592,6 +3788,18 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
       await send(cmd); });
     dlg.returnValue = ""; dlg.showModal(); f.coll.focus();
   }));
+  // Rename a test, as Design Desk renames a request (docs/dashboard-page.md → Rename a test): the server writes it at once.
+  document.addEventListener("click", guard(async (e) => {
+    const b = e.target.closest?.("[data-rename]"); if (!b) return;
+    const dlg = $("#rename-dialog"), f = $("#rename-form"), ref = b.dataset.rename, i = byRef(ref);
+    f.reset(); f.name.value = i?.name || "";
+    dlg.onclose = guard(async () => { if (dlg.returnValue !== "send") return;
+      const name = f.name.value.replace(/\s+/g, " ").trim(); if (!name || name === i?.name) return;
+      const cmd = `rename ${ref} to: ${name}`;
+      if (!CMD_RE.test(cmd)) { toast("A name has at most 80 letters, and no | sign."); return; }
+      await send(cmd); });
+    dlg.returnValue = ""; dlg.showModal(); f.name.select();
+  }));
   document.addEventListener("click", guard(async (e) => {
     const b = e.target.closest?.("[data-gherkin]"); if (!b) return;
     const [kind, ...rest] = b.dataset.gherkin.split(":"), key = rest.join(":");
@@ -3628,7 +3836,17 @@ const DISCUSS_RE = /^discuss D-\d{1,6}: [^\u0000-\u001f\u007f]{1,1000}$/;
     const b = e.target.closest?.("[data-shot]"); if (!b) return;
     const id = b.dataset.shot; let uri = imgNow.get(id);
     if (!uri) { uri = (await api("GET", `/api/images/${encodeURIComponent(id)}`)).uri; if (uri) imgNow.set(id, uri); }
-    $("#shot-img").src = uri || ""; $("#shot-img").alt = b.dataset.cap || ""; $("#shot-cap").textContent = b.dataset.cap || ""; $("#shot-dialog").showModal();
+    $("#shot-img").src = uri || ""; $("#shot-img").alt = b.dataset.cap || ""; $("#shot-cap").textContent = b.dataset.cap || "";
+    let frame = null; try { frame = b.dataset.frame ? JSON.parse(b.dataset.frame) : null; } catch { frame = null; }
+    $("#shot-frames").outerHTML = framesHtml(frame).replace("<span class=\"qi-frames\"", "<span id=\"shot-frames\" class=\"qi-frames\"") || `<span id="shot-frames"></span>`;
+    const d = b.dataset, why = $("#shot-why"), burned = !frame && b.classList.contains("fail") && /frame marks/.test(b.closest("figure")?.textContent || "");
+    const mark = frame ? `<p class="qi-shotkey"><span class="mk" data-by="${esc(frame.by)}"></span>${frame.by === "test" ? "The red frame marks the check that failed." : "The orange frame marks what is wrong."}${frame.saw && frame.saw !== d.wrong ? ` ${esc(frame.saw)}` : ""}</p>`
+      : burned ? `<p class="qi-shotkey">The frame on the picture marks what is wrong.</p>`
+      : d.nobox ? `<p class="qi-shotkey k">No frame: what the test looked for is not on this screen. Look for where it should be.</p>` : "";
+    why.innerHTML = d.wrong || d.where || frame ? `<h4>What is wrong</h4><p>${esc(d.wrong || frame?.saw || "The run says no more than its result.")}</p>${mark}`
+      + (d.where ? `<h4>Where to look</h4>${wherePath(d.where)}` : "") + (d.step ? `<h4>The step</h4><p class="k">${esc(d.step)}</p>` : "") : "";
+    why.hidden = !why.innerHTML; $("#shot-dialog").classList.toggle("has-why", !why.hidden);
+    $("#shot-dialog").showModal();
   }));
   // Into the builder from a test ("Change these steps") or a screen ("Build a test from here").
   document.addEventListener("click", (e) => {
