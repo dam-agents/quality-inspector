@@ -409,7 +409,7 @@ cmd_up() {
 }
 
 # Images no container uses: every earlier build's after an `up`, this one's too after a
-# `reset`. containerd keeps them all otherwise, until the kubelet evicts pods for disk.
+# `reset` — both only below prune_below_gi free. containerd keeps them all otherwise.
 prune_images() {
   low k3s crictl rmi --prune >/dev/null 2>&1 && say "removed the images no container uses" \
     || say "image prune failed — continuing"
@@ -424,7 +424,11 @@ cmd_reset() {
   helm -n "$NS" uninstall "$RELEASE" --wait --timeout 10m >/dev/null 2>&1 || true
   kc -n "$NS" delete pvc --all --wait=true --timeout=300s >/dev/null 2>&1 || true
   rm -f "$ENVD/STATE.json"
-  prune_images
+  # The images stay, as after an `up`: the next install pulls nothing it already has. Below
+  # prune_below_gi free they go — a reset stays the repair for a disk full of old builds.
+  local free; free="$(free_gi)"
+  [ -n "$free" ] && [ "$free" -lt "$PRUNE_BELOW_GI" ] && prune_images
+  return 0
 }
 
 cmd_status() {

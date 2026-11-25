@@ -73,7 +73,7 @@ or in words, under [modules.md](modules.md) → **Rechecks and discussions**; it
    input leaves `qa-val-*` objects. A run with no `val-<k>` result (no `report.json`, a non-JSON
    summary, an exit before the tests) is `blocked` — say why, with the summary's error; never
    report the case as fixed.
-4. Reset, unlock; log `finding_rechecked` (`before` the case's `result` in that `results.json`,
+4. Reset, `env.sh up <candidate>` and `wait` again, unlock; log `finding_rechecked` (`before` the case's `result` in that `results.json`,
    `after` this one's).
 5. Answer: `ok` (all three pass — possibly fixed; the next validation run decides), `finding`
    (all fail, with the message), `flaky` or `blocked`, and the build.

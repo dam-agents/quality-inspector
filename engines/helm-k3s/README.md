@@ -11,8 +11,9 @@ lowest best-effort I/O class), and so does everything they start — the product
 starves the agent's own runtime. `up` of the build already recorded in
 `$QI_ENV_DIR/STATE.json`, with the same rendered values, returns as soon as the UI answers
 (within 5 minutes — a restarted VM's cluster comes back from disk); anything else installs.
-`reset` uninstalls the release, deletes its volumes and removes every image no container
-uses, so it is also the repair for a full disk. **Limit:** the prune also removes an image only
+`reset` uninstalls the release and deletes its volumes; it removes every image no container
+uses only below `prune_below_gi` free, as `up` does — the next install pulls nothing it
+already has, and a reset stays the repair for a full disk. **Limit:** the prune also removes an image only
 a short-lived pod uses (the local-path provisioner's helper, for one); the next such pod
 pulls it again, so its registry must be reachable unless k3s keeps it pinned.
 
@@ -36,7 +37,7 @@ pulls it again, so its registry must be reachable unless k3s keeps it pinned.
 | `max_pages` | quay pages to read at most (default 30) |
 | `resolve_max_tags` | newest tags per channel `bin/versions --resolve` looks at (default 50) |
 | `pull_requests` | `{tag: <regex with {pr}>, order, max_pages}` — what a pull request's build looks like, `{pr}` standing for its number (`^0\\.0\\.0-pr\\.{pr}\\.[0-9]+$`); `bin/versions --prs` reads at most `max_pages` (default 5) quay pages for them. Absent → `--prs` exits 2 |
-| `prune_below_gi` | after an `up`, the images no container uses (earlier builds') are removed while the k3s data volume has less free than this, in Gi (default 20); `reset` always removes them |
+| `prune_below_gi` | after an `up` and a `reset`, the images no container uses (earlier builds') are removed while the k3s data volume has less free than this, in Gi (default 20) |
 | `kvm` | `true` — the product's pods open `/dev/kvm` from a user namespace (a VM runner) — see below |
 | `host_dirs` | absolute node directories the chart hands such pods as `hostPath` volumes — see below |
 | `environment_bridge` | `{image, port}` — the host-name bridge of an install in a platform Environment — see below |
